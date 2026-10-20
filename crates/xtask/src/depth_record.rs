@@ -4,9 +4,14 @@
 //! identities, the digest an acceptance entry is made over, and how the coverage of two records
 //! is compared, and whether it states what a maintenance request froze. Whether the parts agree
 //! with each other or with the registry is depth admission, and is not decided here. Nothing
-//! writes a record yet; `manifest-validate` reads one.
+//! writes a record yet; `manifest-validate` and the support matrix generator read one.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -20,6 +25,77 @@ use crate::agent_registry::support_depth::{
 pub const DEPTH_RECORD_SCHEMA_VERSION: u64 = 1;
 /// The record's file in `reports/<version>/` of its manifest root (Annex B.1).
 pub const DEPTH_RECORD_FILE_NAME: &str = "depth-record.json";
+
+/// Every `reports/<version>/depth-record.json` under a manifest root, by version. Anything at the
+/// name counts, a dangling symlink or a directory included, so a reader fails on it rather than
+/// taking it for no record.
+pub fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(entries) = fs::read_dir(root.join("reports")) else {
+        return Vec::new();
+    };
+    let mut files: Vec<_> = entries
+        .flatten()
+        .map(|entry| entry.path().join(DEPTH_RECORD_FILE_NAME))
+        .filter(|path| fs::symlink_metadata(path).is_ok())
+        .filter_map(|path| {
+            let version = path.parent()?.file_name()?.to_string_lossy().into_owned();
+            Some((version, path))
+        })
+        .collect();
+    files.sort();
+    files
+}
+
+/// The content identity of each file the records bind, as the revision holds it: the SHA-256 of a
+/// regular file git tracks at that path in `workspace`. A path the revision does not hold has none
+/// however it reads: an ignored build output, git's own files, a tracked symlink, or a file reached
+/// through one.
+pub fn bound_evidence<'a>(
+    workspace: &Path,
+    records: impl IntoIterator<Item = &'a DepthRecord>,
+) -> Result<BTreeMap<String, String>, String> {
+    let paths: BTreeSet<&str> = records
+        .into_iter()
+        .flat_map(|record| &record.execution)
+        .flat_map(|execution| &execution.results)
+        .flat_map(|result| &result.evidence)
+        .map(|file| file.path.as_str())
+        .collect();
+    if paths.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(["--literal-pathspecs", "ls-files", "--stage", "-z", "--"])
+        .args(&paths)
+        .output()
+        .map_err(|err| format!("run git ls-files in {}: {err}", workspace.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "list the files git tracks in {}: {}",
+            workspace.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let mut identities = BTreeMap::new();
+    // Each entry is `<mode> <object> <stage>\t<path>`.
+    for entry in output.stdout.split(|byte| *byte == 0) {
+        let entry = String::from_utf8_lossy(entry);
+        let Some((meta, path)) = entry.split_once('\t') else {
+            continue;
+        };
+        let regular = meta.starts_with("100644 ") || meta.starts_with("100755 ");
+        let full = workspace.join(path);
+        if regular && paths.contains(path) && fs::symlink_metadata(&full).is_ok_and(|m| m.is_file())
+        {
+            if let Ok(bytes) = fs::read(&full) {
+                identities.insert(path.to_string(), hex::encode(Sha256::digest(bytes)));
+            }
+        }
+    }
+    Ok(identities)
+}
 
 /// What a maintenance request states of the generation it froze: its Event, and the P and O
 /// identities of its `[support_depth]` table, both `None` when it has none.

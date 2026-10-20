@@ -54,8 +54,9 @@ impl SupportMatrixConsistencyIssue {
             agent: identity.agent.clone(),
             version: identity.version.clone(),
             target: identity.target.clone(),
-            message: "publication contains a row not implied by committed manifest metadata"
-                .to_string(),
+            message:
+                "publication contains a row implied neither by committed manifest metadata nor by a depth record"
+                    .to_string(),
         }
     }
 
@@ -137,6 +138,25 @@ impl SupportMatrixConsistencyIssue {
                 row.uaa_support.as_str(),
                 expected.as_str()
             ),
+        }
+    }
+
+    /// Checks 5, 6, 7, 8 and 12 of the support-depth validation test list: the published depth
+    /// facts are the ones the record and the evidence it binds decide.
+    fn depth_mismatch(row: &SupportRow, expected: &SupportRow) -> Self {
+        let message = match (&row.depth, &expected.depth) {
+            (None, _) => {
+                "row publishes no depth facts and its depth record makes it depth-enrolled"
+            }
+            (Some(_), None) => "row publishes depth facts and is not depth-enrolled",
+            (Some(_), Some(_)) => "row depth facts are not the ones its depth record decides",
+        };
+        Self {
+            code: "SUPPORT_MATRIX_DEPTH_MISMATCH",
+            agent: row.agent.clone(),
+            version: row.version.clone(),
+            target: row.target.clone(),
+            message: message.to_string(),
         }
     }
 
@@ -363,6 +383,12 @@ fn validate_row_consistency(
         issues.push(SupportMatrixConsistencyIssue::uaa_support_mismatch(
             row,
             expected_row.uaa_support,
+        ));
+    }
+    if row.depth != expected_row.depth {
+        issues.push(SupportMatrixConsistencyIssue::depth_mismatch(
+            row,
+            expected_row,
         ));
     }
 

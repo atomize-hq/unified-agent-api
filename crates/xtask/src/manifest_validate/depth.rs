@@ -2,18 +2,14 @@
 //! checks 1, 3, 10 and 13 of `docs/agents/lifecycle/support-depth-validation-test-list.md`.
 //! Checks 5, 6, 7, 8 and 12 are the support publication's, decided by `support-matrix --check`.
 
-use std::{
-    collections::BTreeMap,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde::Deserialize;
 use xtask::{
     agent_lifecycle::{self, EvidenceId},
     agent_maintenance::closeout,
     agent_registry::AgentRegistry,
-    depth_record::{DepthRecord, Event, RequestBinding, DEPTH_RECORD_FILE_NAME},
+    depth_record::{self, DepthRecord, Event, RequestBinding, DEPTH_RECORD_FILE_NAME},
     proving_run_closeout,
 };
 
@@ -47,7 +43,7 @@ struct RequestTable {
 pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Violation>) {
     // Canonical, as the workspace root is, so the root's path can be named relative to it.
     let root_dir = fs::canonicalize(&ctx.root).unwrap_or_else(|_| ctx.root.clone());
-    let files = record_files(&root_dir);
+    let files = depth_record::record_files(&root_dir);
     let workspace = workspace_root_for(&ctx.root);
     let base = workspace.clone().unwrap_or_else(|| root_dir.clone());
     let mut fail = |code: &'static str, path: &Path, message: String| {
@@ -221,25 +217,6 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
             }
         }
     }
-}
-
-/// Every `reports/<version>/depth-record.json` under the root, by version.
-fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
-    let Ok(entries) = fs::read_dir(root.join("reports")) else {
-        return Vec::new();
-    };
-    let mut files: Vec<_> = entries
-        .flatten()
-        .map(|entry| entry.path().join(DEPTH_RECORD_FILE_NAME))
-        // Any entry at the name is a record, so one that cannot be read fails rather than hides.
-        .filter(|path| fs::symlink_metadata(path).is_ok())
-        .filter_map(|path| {
-            let version = path.parent()?.file_name()?.to_string_lossy().into_owned();
-            Some((version, path))
-        })
-        .collect();
-    files.sort();
-    files
 }
 
 fn violation(code: &'static str, path: String, message: String) -> Violation {

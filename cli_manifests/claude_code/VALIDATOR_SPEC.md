@@ -259,6 +259,8 @@ Policy:
 - `xtask codex-validate` treats the committed support-matrix JSON as a required publication
   artifact when the workspace root can be resolved from `--root`.
 - The artifact must exist before publication consistency checks run.
+- Its `schema_version` is the revision its rows are written in: 2 when a row carries depth facts
+  and 1 otherwise (see [Depth records](#depth-records)).
 
 Violations:
 - `SUPPORT_MATRIX_ARTIFACT_MISSING`
@@ -318,7 +320,11 @@ manifest root:
   checked here, so a first-freeze placeholder passes;
 - when the root holds a record, the agent's lifecycle record,
   `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`, the files it
-  names, and `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json`.
+  names, and `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json`;
+- through the support publication check, the depth records of every root the support matrix
+  publishes, the names of the record files of every other registry root, which the check
+  refuses, and each file a record binds that git tracks as a regular file, read for its content
+  identity and nothing else.
 
 Outside a workspace no registry entry names the record's agent, so the validator cannot read a
 record there.
@@ -357,12 +363,31 @@ Checks 1 and 3 are decided against the maintenance request only. An onboarding g
 its approval's Event beside the record, and the onboarding charter names no second statement of its
 P and O yet, so until it does neither check reaches the create lane.
 
-Checks 5, 6, 7, 8 and 12 concern the support publication and are not this validator's. Checks 2, 4,
-9 and 11 compare a merge result with the integration branch tip, which this validator does not
-read.
+Checks 5, 6, 7, 8 and 12 are decided through the support publication. Inside a workspace the
+validator requires each row of `cli_manifests/support_matrix/current.json` to be the row the
+support matrix derives from the committed tree, depth facts included: for a depth-enrolled row, the
+facts that its record and the files it binds decide under "Support depth" of
+`docs/specs/unified-agent-api/support-matrix.md`. Violations:
+
+- `SUPPORT_MATRIX_DEPTH_MISMATCH` (checks 5, 6, 7, 8 and 12): a row publishes depth facts other
+  than those, publishes none while its record makes it depth-enrolled, or publishes some while it
+  is not depth-enrolled.
+- `SUPPORT_MATRIX_SCHEMA_INVALID`: the artifact's `schema_version` is not the revision its rows are
+  written in, 2 when a row carries depth facts and 1 otherwise.
+- `SUPPORT_MATRIX_ROOT_READ_ERROR`: the support matrix cannot derive a root's rows: it cannot read
+  a record, a root holds one without adopting Annex B, a registry root it does not publish holds
+  one, a record's obligations part states, for an operation, an obligation set other than the
+  one its policy part resolves, or a record binds evidence and git cannot list the files it
+  tracks in the workspace. Publication fails rather than publishing that version's rows as rows
+  without depth facts.
+
+Checks 2, 4, 9 and 11 compare a merge result with the integration branch tip, which this
+validator does not read.
 
 ### Present behavior
 
-The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs`. No root holds a
+The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs`, except checks
+5, 6, 7, 8 and 12: the support matrix derives depth facts in `crates/xtask/src/support_matrix/`,
+and its consistency check compares each published row with the derived one. No root holds a
 depth record and no request carries a `[support_depth]` table, so none of them fails on the
 committed tree. The relay's validating loader still rejects the table as an unknown key.

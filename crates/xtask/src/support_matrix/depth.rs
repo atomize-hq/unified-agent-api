@@ -5,7 +5,7 @@
 //! of the evidence the record binds. It decides what the record decides: the published results
 //! of record invariant 3, qualification under invariants 3 and 4, and depth qualification under
 //! shared mapping rule 5. Whether a route may write a change to those facts is depth admission,
-//! and is not decided here. The generator does not call it yet.
+//! and is not decided here.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -110,16 +110,20 @@ pub fn apply_depth(uaa_support: UaaSupportState, facts: Option<&DepthFacts>) -> 
     }
 }
 
-/// Whether the record's selection selects a mode on the target.
-fn covers(record: &DepthRecord, target: &str) -> bool {
+/// The targets on which the record's selection selects a mode: those it covers, each of which
+/// implies a row (rule 4).
+pub fn covered_targets(record: &DepthRecord) -> BTreeSet<&str> {
     let enrollment = &record.policy.selection.enrollment;
-    enrollment.modes.iter().any(|mode| {
-        mode.targets
-            .as_ref()
-            .unwrap_or(&enrollment.targets)
-            .iter()
-            .any(|t| t == target)
-    })
+    enrollment
+        .modes
+        .iter()
+        .flat_map(|mode| mode.targets.as_ref().unwrap_or(&enrollment.targets))
+        .map(String::as_str)
+        .collect()
+}
+
+fn covers(record: &DepthRecord, target: &str) -> bool {
+    covered_targets(record).contains(target)
 }
 
 fn not_yet_frozen() -> DepthFacts {

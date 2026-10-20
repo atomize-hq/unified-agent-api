@@ -10,8 +10,10 @@ review rounds produced, so they become tests of the validator instead of contrac
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
 digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them.
-`manifest-validate` calls that reader. Checks 1, 3, 10 and 13 are normative in the validator specs
-of the three roots that adopt Annex B, with their code and tests. The other checks stay
+`manifest-validate` and the support matrix generator call that reader. Checks 1, 3, 5, 6, 7, 8,
+10, 12 and 13 are normative in the validator specs of the three roots that adopt Annex B, with
+their code and tests, checks 5, 6, 7, 8 and 12 through the support publication. The other checks
+stay
 non-normative until they are implemented. Each one then becomes normative in the
 manifest root's validator spec together with its code and its tests, as the existing validator
 checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
@@ -180,9 +182,9 @@ Must be refused:
 ## Support publication cases
 
 The [support matrix spec](../../specs/unified-agent-api/support-matrix.md#support-depth) states
-which rows are depth-enrolled, what such a row publishes and how its `uaa_support` is derived. The
-fields that carry those facts are left to the next revision of the JSON artifact. Until then the
-cases below are the acceptance test of that section.
+which rows are depth-enrolled, what such a row publishes and how its `uaa_support` is derived.
+Revision 2 of the JSON artifact carries those facts, and the generator writes them. The cases
+below are the acceptance test of that section.
 
 Must be published as listed:
 
@@ -350,8 +352,9 @@ Must fail:
   and the record's Event does not change. Decide whether it refuses.
 - The digests are taken over the serialization Annex B.7 fixes, with one test vector. The
   reader refuses a record whose part does not have the identity it states, which is check 13.
-  `manifest-validate` decides check 3. Checks 8, 9 and 11 compare a record with an entry or a
-  second tree and still have no caller.
+  `manifest-validate` decides check 3. Check 8 is decided through the support publication, which
+  qualifies nothing unless an entry identifies what the record states. Checks 9 and 11 compare a
+  record with a second tree and still have no caller.
 - A declaration keeps at least one operation that is not a mode exclusion, so a version whose
   only covered mode turns out to be interactive-only cannot have it excluded and stays at
   insufficient depth. Dropping that rule later is a compatible change and adding it later is
@@ -391,13 +394,6 @@ Must fail:
 - A re-freeze after a relay run derives O from snapshots and reports the run may have rewritten.
   A re-freeze refuses when P has changed and has no such refusal for O, and the tree does not
   show which actor changed the acquired inputs.
-- A depth record can exist without its version's `versions/<version>.json`: it is written at the
-  first freeze, before acquisition writes the metadata, the docs-only lane writes none, and the
-  metadata can be removed while `reports/<version>/` is kept. Support matrix rule 4 now has the
-  record imply its rows in those cases, with `manifest_support` `unsupported`, and rule 3 applies
-  to every record. A target that is no longer expected takes its `pointer_promotion` from its
-  pointer files. The generator implements neither yet: it reads pointer files only for expected
-  targets and derives rows from metadata.
 - A depth-enrolled row states every obligation's result, and one promise can have more than a dozen
   obligations. Decide how the Markdown projection renders them so that it still agrees with the
   JSON artifact.

@@ -272,7 +272,7 @@ facts. A **depth enrollment declaration** (below, a declaration) is one entry of
 | `enrollments` | One declaration for each depth enrollment the maintainer has approved for this agent. It MUST be omitted when there is none. |
 | `lifecycle_path` | MUST be `maintenance` or `onboarding`. |
 | `version` | MUST be one exact semantic version, `MAJOR.MINOR.PATCH` with no prerelease and no build metadata: the string that `detected_release.target_version` and the manifest root's `versions/<version>.json` use for that version. A range, a wildcard, a prefix such as `v` and a moving name such as `latest` are invalid. |
-| `targets` | MUST list at least one target, without repeats. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`, or a target that the version's depth record, as the integration branch holds it, already covers. Rule 12 covers any other target. |
+| `targets` | MUST list at least one target, without repeats. Each is a plain name of ASCII letters, digits, `.`, `-` and `_`, other than `.` and `..`, since a target names the manifest root's pointer files. Each names a target in `union.expected_targets` of the manifest root's `RULES.json`, or a target that the version's depth record, as the integration branch holds it, already covers. Rule 12 covers any other target. |
 
 The table MUST be omitted when it would hold neither key.
 
@@ -289,7 +289,7 @@ of a list is empty or holds whitespace, and a value that holds only whitespace i
 | `command_path` | The form the maintenance request contract's `command_path` uses: the entry's `agent_id`, then the command tokens, separated by single spaces, such as `codex exec`. No token after the first is a flag. |
 | `mode` | A name for the mode of that command, such as `headless` or `interactive`. A declaration MUST NOT carry two selectors with the same `command_path` and `mode`. |
 | `predicates` | Optional. The flags and values that select the mode. Each entry states a `flag`, which starts with `-`, names a flag and holds no whitespace and no `=`, and MAY state a `value`, which is not empty. A selector MUST NOT name a flag twice. A mode that the command's defaults select states none. |
-| `targets` | Optional. The targets the mode is selected on: at least one, without repeats, each listed in the declaration's `targets`. When it is omitted the mode is selected on every target of the declaration. |
+| `targets` | Optional. The targets the mode is selected on: at least one, without repeats, each a plain name as the declaration's `targets` are, and each listed there. When it is omitted the mode is selected on every target of the declaration. |
 
 `operations` lists the operations of the declaration. An entry is also the classification entry
 for the modes it serves: it assigns their obligation templates.

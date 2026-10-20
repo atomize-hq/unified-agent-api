@@ -167,6 +167,14 @@ fn depth_record_rejects_what_the_annex_refuses() {
     let sealed_cases: &[(&str, Edit)] = &[
         ("no other revision", |r| r["schema_version"] = json!(2)),
         ("no other revision", |r| r["schema_version"] = json!("1")),
+        // A target names a manifest root's pointer files, so a record never states a path.
+        ("plain name", |r| {
+            r["policy"]["selection"]["enrollment"]["targets"] =
+                json!(["../linux-x64", "darwin-arm64"]);
+        }),
+        ("plain name", |r| {
+            r["policy"]["selection"]["enrollment"]["modes"][1]["targets"] = json!(["linux/x64"]);
+        }),
         ("missing field `obligations`", |r| {
             r.as_object_mut().unwrap().remove("obligations");
         }),

@@ -15,24 +15,43 @@ pub struct PublicationBundle {
     pub runtime_support_data: String,
 }
 
+/// A reader rejects any member the artifact's revision does not define (Support depth rule 9).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SupportMatrixArtifact {
     pub schema_version: u8,
     pub rows: Vec<SupportRow>,
+}
+
+impl SupportMatrixArtifact {
+    /// Support depth rule 9: a reader requires the revision its rows are written in, so it never
+    /// reads an artifact of one revision as the other.
+    pub fn revision_error(&self) -> Option<String> {
+        let expected = revision(&self.rows);
+        (self.schema_version != expected).then(|| {
+            format!(
+                "schema_version must be {expected} for these rows (got {})",
+                self.schema_version
+            )
+        })
+    }
+}
+
+/// Revision 2 carries depth facts; revision 1 cannot, so a row with them makes the artifact 2.
+fn revision(rows: &[SupportRow]) -> u8 {
+    if rows.iter().any(|row| row.depth.is_some()) {
+        2
+    } else {
+        1
+    }
 }
 
 pub fn render_publication_bundle(
     rows: &[SupportRow],
     runtime_support_data: String,
 ) -> Result<PublicationBundle, String> {
-    // Revision 2 carries depth facts; revision 1 cannot, so a row with them makes the artifact 2.
-    let schema_version = if rows.iter().any(|row| row.depth.is_some()) {
-        2
-    } else {
-        1
-    };
     let json = serde_json::to_string_pretty(&SupportMatrixArtifact {
-        schema_version,
+        schema_version: revision(rows),
         rows: rows.to_vec(),
     })
     .map_err(|err| format!("serialize support-matrix json: {err}"))?;
@@ -58,7 +77,8 @@ pub fn render_publication_artifacts(
     })
 }
 
-fn render_markdown_projection(rows: &[SupportRow]) -> String {
+/// The generated Markdown block's body: each agent's table, followed by its rows' depth facts.
+pub fn render_markdown_projection(rows: &[SupportRow]) -> String {
     let mut out = String::new();
     let mut current_agent: Option<&str> = None;
     // An agent's depth facts follow its table.

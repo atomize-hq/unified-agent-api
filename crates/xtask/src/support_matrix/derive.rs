@@ -1,7 +1,6 @@
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
-    fmt::Write as _,
     fs,
     path::{Path, PathBuf},
 };
@@ -12,18 +11,38 @@ use serde::Deserialize;
 use agent_api::RuntimeSupportRecord;
 
 use crate::agent_registry::AgentRegistry;
+use crate::depth_record::{self, DepthRecord};
 use crate::root_intake_layout::RootIntakeLayout;
 
-use super::{
-    BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
+use super::runtime_support::{
+    derive_runtime_support_projection_for_loaded_roots,
+    derive_validated_runtime_support_for_loaded_roots,
+    render_agent_api_runtime_support_data_from_projection, EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
 };
-
-const EMBEDDED_RUNTIME_SUPPORT_FAMILIES: &[&str] = &["codex"];
+use super::{
+    depth, BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow,
+    UaaSupportState,
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct AgentRoot {
     pub(super) agent: String,
     pub(super) root: PathBuf,
+    /// The root's path in the workspace, which names where it holds its depth records.
+    manifest_root: String,
+    /// Evidence a depth record binds is named relative to the workspace.
+    workspace: PathBuf,
+}
+
+impl AgentRoot {
+    fn new(workspace_root: &Path, agent: &str, manifest_root: &str) -> Self {
+        Self {
+            agent: agent.to_string(),
+            root: workspace_root.join(manifest_root),
+            manifest_root: manifest_root.to_string(),
+            workspace: workspace_root.to_path_buf(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +52,9 @@ pub(super) struct LoadedAgentRoot {
     pub(super) pointers: PointerSet,
     pub(super) layout: RootIntakeLayout,
     pub(super) versions: Vec<VersionMetadata>,
+    records: BTreeMap<String, DepthRecord>,
+    /// The content identity of each file the records bind, where the revision holds it.
+    evidence: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -145,10 +167,7 @@ pub fn render_agent_api_runtime_support_data_for_agent_root(
     agent: &str,
     manifest_root: &str,
 ) -> Result<String, String> {
-    let roots = [AgentRoot {
-        agent: agent.to_string(),
-        root: workspace_root.join(manifest_root),
-    }];
+    let roots = [AgentRoot::new(workspace_root, agent, manifest_root)];
     render_agent_api_runtime_support_data_for_roots(&roots)
 }
 
@@ -157,10 +176,7 @@ pub fn derive_rows_for_agent_root(
     agent: &str,
     manifest_root: &str,
 ) -> Result<Vec<SupportRow>, String> {
-    let roots = [AgentRoot {
-        agent: agent.to_string(),
-        root: workspace_root.join(manifest_root),
-    }];
+    let roots = [AgentRoot::new(workspace_root, agent, manifest_root)];
     derive_rows_for_roots(&roots)
 }
 
@@ -169,10 +185,7 @@ pub fn derive_validated_runtime_support_for_agent_root(
     agent: &str,
     manifest_root: &str,
 ) -> Result<Vec<RuntimeSupportRecord>, String> {
-    let roots = [AgentRoot {
-        agent: agent.to_string(),
-        root: workspace_root.join(manifest_root),
-    }];
+    let roots = [AgentRoot::new(workspace_root, agent, manifest_root)];
     derive_validated_runtime_support_for_roots(&roots)
 }
 
@@ -183,10 +196,7 @@ pub fn render_agent_api_runtime_support_data_for_test_roots(
 ) -> Result<String, String> {
     let roots = roots
         .iter()
-        .map(|(agent, rel_root)| AgentRoot {
-            agent: (*agent).to_string(),
-            root: workspace_root.join(rel_root),
-        })
+        .map(|(agent, rel_root)| AgentRoot::new(workspace_root, agent, rel_root))
         .collect::<Vec<_>>();
     render_agent_api_runtime_support_data_for_roots(&roots)
 }
@@ -198,10 +208,7 @@ pub fn derive_rows_for_test_roots(
 ) -> Result<Vec<SupportRow>, String> {
     let roots = roots
         .iter()
-        .map(|(agent, rel_root)| AgentRoot {
-            agent: (*agent).to_string(),
-            root: workspace_root.join(rel_root),
-        })
+        .map(|(agent, rel_root)| AgentRoot::new(workspace_root, agent, rel_root))
         .collect::<Vec<_>>();
     derive_rows_for_roots(&roots)
 }
@@ -213,10 +220,7 @@ pub fn derive_validated_runtime_support_for_test_roots(
 ) -> Result<Vec<RuntimeSupportRecord>, String> {
     let roots = roots
         .iter()
-        .map(|(agent, rel_root)| AgentRoot {
-            agent: (*agent).to_string(),
-            root: workspace_root.join(rel_root),
-        })
+        .map(|(agent, rel_root)| AgentRoot::new(workspace_root, agent, rel_root))
         .collect::<Vec<_>>();
     derive_validated_runtime_support_for_roots(&roots)
 }
@@ -259,12 +263,24 @@ pub(super) fn enrolled_agent_roots(workspace_root: &Path) -> Result<Vec<AgentRoo
     let registry =
         AgentRegistry::load(workspace_root).map_err(|err| format!("load agent registry: {err}"))?;
 
+    // A root the support matrix does not publish would publish its depth facts nowhere.
+    for entry in registry
+        .agents
+        .iter()
+        .filter(|entry| !entry.publication.support_matrix_enabled)
+    {
+        let root = workspace_root.join(&entry.manifest_root);
+        if !depth_record::record_files(&root).is_empty() {
+            return Err(format!(
+                "{}: holds a depth record, and the support matrix does not publish agent `{}`",
+                root.display(),
+                entry.agent_id
+            ));
+        }
+    }
     Ok(registry
         .support_matrix_entries()
-        .map(|entry| AgentRoot {
-            agent: entry.agent_id.clone(),
-            root: workspace_root.join(&entry.manifest_root),
-        })
+        .map(|entry| AgentRoot::new(workspace_root, &entry.agent_id, &entry.manifest_root))
         .collect())
 }
 
@@ -280,78 +296,73 @@ pub(super) fn derive_rows_for_loaded_roots(
     Ok(rows)
 }
 
-fn derive_validated_runtime_support_for_loaded_roots(
-    roots: &[LoadedAgentRoot],
-) -> Result<Vec<RuntimeSupportRecord>, String> {
-    let mut records = derive_runtime_support_projection_for_loaded_roots(roots)?
-        .into_iter()
-        .filter_map(|record| {
-            record.latest_validated.map(|version| RuntimeSupportRecord {
-                runtime_family: record.runtime_family,
-                target_triple: record.target_triple,
-                version,
-            })
-        })
-        .collect::<Vec<_>>();
-
-    records.sort_by(|left, right| {
-        left.runtime_family
-            .cmp(&right.runtime_family)
-            .then(left.target_triple.cmp(&right.target_triple))
-            .then(left.version.cmp(&right.version))
-    });
-    Ok(records)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct RuntimeSupportProjectionRecord {
-    runtime_family: String,
-    target_triple: String,
-    latest_validated: Option<String>,
-}
-
 fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>, String> {
+    let metadata = root
+        .versions
+        .iter()
+        .map(|metadata| (metadata.semantic_version.as_str(), metadata))
+        .collect::<BTreeMap<_, _>>();
+    let versions = metadata
+        .keys()
+        .copied()
+        .chain(root.records.keys().map(String::as_str))
+        .collect::<BTreeSet<_>>();
+    let evidence = |path: &str| root.evidence.get(path).cloned();
     let mut rows = Vec::new();
 
-    for metadata in &root.versions {
-        let supported_targets = metadata
-            .coverage
-            .supported_targets
-            .iter()
-            .cloned()
-            .collect::<BTreeSet<_>>();
+    for version in versions {
+        let metadata = metadata.get(version);
+        let record = root.records.get(version);
+        // Support depth rule 4: a target the record covers implies a row, whether or not the
+        // version has metadata and whether or not `expected_targets` lists the target.
+        let mut targets = record.map(depth::covered_targets).unwrap_or_default();
+        if metadata.is_some() {
+            targets.extend(root.posture.expected_targets.iter().map(String::as_str));
+        }
 
-        for target in &root.posture.expected_targets {
-            let manifest_support = if supported_targets.contains(target) {
-                ManifestSupportState::Supported
-            } else {
-                ManifestSupportState::Unsupported
+        for target in targets {
+            let manifest_support = match metadata {
+                Some(metadata)
+                    if metadata
+                        .coverage
+                        .supported_targets
+                        .iter()
+                        .any(|t| t == target) =>
+                {
+                    ManifestSupportState::Supported
+                }
+                _ => ManifestSupportState::Unsupported,
             };
 
-            let report = load_support_report(&root.layout, &metadata.semantic_version, target)?;
+            let report = load_support_report(&root.layout, version, target)?;
             let backend_support = classify_backend_support(report.as_ref());
-            let pointer_promotion =
-                classify_pointer_promotion(&root.pointers, target, &metadata.semantic_version);
-            let evidence_notes = build_evidence_notes(
-                report.as_ref(),
-                &root.posture,
-                target,
-                &metadata.semantic_version,
+            let pointer_promotion = classify_pointer_promotion(&root.pointers, target, version);
+            let evidence_notes =
+                build_evidence_notes(report.as_ref(), &root.posture, target, version);
+            // ponytail: `declared` is false until the registry admits a depth declaration, which
+            // route wiring brings; rule 4's declared rows come with it.
+            let depth =
+                depth::derive_depth_facts(record, false, target, &evidence).map_err(|err| {
+                    format!(
+                        "agent `{}` version `{version}` target `{target}`: {err}",
+                        root.agent
+                    )
+                })?;
+            let uaa_support = depth::apply_depth(
+                classify_uaa_support(manifest_support, backend_support, &evidence_notes),
+                depth.as_ref(),
             );
-            let uaa_support =
-                classify_uaa_support(manifest_support, backend_support, &evidence_notes);
 
             rows.push(SupportRow {
                 agent: root.agent.clone(),
-                version: metadata.semantic_version.clone(),
-                target: target.clone(),
+                version: version.to_string(),
+                target: target.to_string(),
                 manifest_support,
                 backend_support,
                 uaa_support,
                 pointer_promotion,
                 evidence_notes,
-                // ponytail: no depth facts until the evaluator gates writing them.
-                depth: None,
+                depth,
             });
         }
     }
@@ -359,118 +370,16 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
     Ok(rows)
 }
 
-fn derive_runtime_support_projection_for_loaded_roots(
-    roots: &[LoadedAgentRoot],
-) -> Result<Vec<RuntimeSupportProjectionRecord>, String> {
-    let mut records = Vec::new();
-    for root in roots {
-        records.extend(derive_runtime_support_projection_for_loaded_root(root)?);
-    }
-
-    records.sort_by(|left, right| {
-        left.runtime_family
-            .cmp(&right.runtime_family)
-            .then(left.target_triple.cmp(&right.target_triple))
-            .then_with(|| left.latest_validated.cmp(&right.latest_validated))
-    });
-    Ok(records)
-}
-
-fn derive_runtime_support_projection_for_loaded_root(
-    root: &LoadedAgentRoot,
-) -> Result<Vec<RuntimeSupportProjectionRecord>, String> {
-    let known_versions = root
-        .versions
-        .iter()
-        .map(|metadata| metadata.semantic_version.as_str())
-        .collect::<BTreeSet<_>>();
-    let mut records = Vec::new();
-
-    for target in &root.posture.expected_targets {
-        let latest_validated = match root
-            .pointers
-            .latest_validated
-            .get(target)
-            .and_then(|value| value.as_deref())
-        {
-            Some(version) => {
-                if !known_versions.contains(version) {
-                    return Err(format!(
-                        "agent `{}` target `{}` latest_validated pointer references unknown version `{version}`",
-                        root.agent, target
-                    ));
-                }
-                Some(version.to_string())
-            }
-            None => None,
-        };
-
-        records.push(RuntimeSupportProjectionRecord {
-            runtime_family: root.agent.clone(),
-            target_triple: target.clone(),
-            latest_validated,
-        });
-    }
-
-    Ok(records)
-}
-
-fn render_agent_api_runtime_support_data_from_projection(
-    projection: &[RuntimeSupportProjectionRecord],
-    runtime_families: &[&str],
-) -> String {
-    let mut rendered = String::from(
-        "// This file is derived from committed repo truth.\n\
-         // Validate it with `cargo test -p xtask --all-targets`.\n\n",
-    );
-
-    for runtime_family in runtime_families {
-        let symbol = runtime_family_symbol(runtime_family);
-        let _ = writeln!(
-            rendered,
-            "const {symbol}: &[EmbeddedRuntimeSupportRecord] = &["
-        );
-
-        for record in projection
-            .iter()
-            .filter(|record| record.runtime_family == *runtime_family)
-        {
-            let latest_validated = match &record.latest_validated {
-                Some(version) => format!("Some(\"{version}\")"),
-                None => "None".to_string(),
-            };
-            let _ = writeln!(
-                rendered,
-                "    EmbeddedRuntimeSupportRecord {{\n        target_triple: \"{}\",\n        latest_validated: {},\n    }},",
-                record.target_triple, latest_validated
-            );
-        }
-
-        rendered.push_str("];\n");
-    }
-
-    rendered
-}
-
-fn runtime_family_symbol(runtime_family: &str) -> String {
-    format!(
-        "{}_RUNTIME_SUPPORT",
-        runtime_family
-            .chars()
-            .map(|ch| {
-                if ch.is_ascii_alphanumeric() {
-                    ch.to_ascii_uppercase()
-                } else {
-                    '_'
-                }
-            })
-            .collect::<String>()
-    )
-}
-
 pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, String> {
     let posture = read_current_root_posture(&root.root)?;
-    let pointers = read_pointers(&root.root, &posture.expected_targets)?;
+    let records = read_depth_records(root)?;
+    let evidence = depth_record::bound_evidence(&root.workspace, records.values())?;
+    let covered = records
+        .values()
+        .flat_map(depth::covered_targets)
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    let pointers = read_pointers(&root.root, &posture.expected_targets, &covered)?;
     let layout = RootIntakeLayout::new(root.root.clone());
     let versions = read_version_metadata(&layout)?;
 
@@ -480,7 +389,49 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
         pointers,
         layout,
         versions,
+        records,
+        evidence,
     })
+}
+
+/// The root's depth records by version. A record that does not read fails publication rather than
+/// leaving its version's rows without depth facts (Support depth rule 3), and so does one in a root
+/// whose `RULES.json` does not adopt Annex B by naming where the root holds its records (record
+/// invariant 1), as `manifest-validate` requires.
+fn read_depth_records(root: &AgentRoot) -> Result<BTreeMap<String, DepthRecord>, String> {
+    let files = depth_record::record_files(&root.root);
+    if files.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let expected = format!(
+        "{}/reports/<version>/{}",
+        root.manifest_root,
+        depth_record::DEPTH_RECORD_FILE_NAME
+    );
+    let rules = fs::read_to_string(root.root.join("RULES.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
+    let adopted = rules.is_some_and(|rules| {
+        rules.pointer("/storage/committed/reports/depth_record")
+            == Some(&serde_json::Value::String(expected.clone()))
+    });
+    if !adopted {
+        return Err(format!(
+            "{}: holds a depth record, and its RULES.json does not name storage.committed.reports.depth_record `{expected}`, so the root does not adopt Annex B",
+            root.root.display()
+        ));
+    }
+    let agent = &root.agent;
+    files
+        .into_iter()
+        .map(|(version, path)| {
+            let record = fs::read_to_string(&path)
+                .map_err(|err| err.to_string())
+                .and_then(|raw| DepthRecord::parse(&raw, agent, &version))
+                .map_err(|err| format!("{}: {err}", path.display()))?;
+            Ok((version, record))
+        })
+        .collect()
 }
 
 fn read_version_metadata(layout: &RootIntakeLayout) -> Result<Vec<VersionMetadata>, String> {
@@ -542,7 +493,13 @@ fn read_current_root_posture(root: &Path) -> Result<CurrentRootPosture, String> 
     })
 }
 
-fn read_pointers(root: &Path, expected_targets: &[String]) -> Result<PointerSet, String> {
+/// The pointers of every expected target, whose files must exist, and of each other target a
+/// depth record covers, which has no pointer when it has no file (Support depth rule 4).
+fn read_pointers(
+    root: &Path,
+    expected_targets: &[String],
+    covered: &BTreeSet<String>,
+) -> Result<PointerSet, String> {
     let layout = RootIntakeLayout::new(root.to_path_buf());
     let mut latest_supported = BTreeMap::new();
     let mut latest_validated = BTreeMap::new();
@@ -556,6 +513,22 @@ fn read_pointers(root: &Path, expected_targets: &[String]) -> Result<PointerSet,
             target.clone(),
             read_pointer_file(&layout.latest_validated_pointer_path(target))?,
         );
+    }
+    for target in covered.iter().filter(|t| !expected_targets.contains(t)) {
+        for (pointers, path) in [
+            (
+                &mut latest_supported,
+                layout.latest_supported_pointer_path(target),
+            ),
+            (
+                &mut latest_validated,
+                layout.latest_validated_pointer_path(target),
+            ),
+        ] {
+            if path.exists() {
+                pointers.insert(target.clone(), read_pointer_file(&path)?);
+            }
+        }
     }
 
     Ok(PointerSet {

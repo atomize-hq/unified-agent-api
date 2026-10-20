@@ -133,6 +133,11 @@ fn support_depth_accepts_what_the_registry_alone_does_not_decide() {
             "targets = [\"linux-x64\"]",
             "targets = [\"linux-x64\", \"darwin-arm64\"]",
         ),
+        // A target is a plain name: ASCII letters, digits, `.`, `-` and `_`.
+        (
+            "targets = [\"linux-x64\", \"darwin-arm64\"]",
+            "targets = [\"linux-x64\", \"darwin-arm64\", \"x86_64-unknown-linux-musl\", \"v1.2\"]",
+        ),
         // Whether forwarding suffices for a conditional template is not decided here.
         (
             "templates = [\"CORE\", \"SESSION\"]\nshared_mapping = \"mapped\"\nforwarding = false\nnot_applicable_permitted = [\"X1\", \"OUT3\"]",
@@ -173,6 +178,11 @@ fn support_depth_rejects_invalid_tables() {
         (TARGETS, "targets = []", "at least one entry"),
         (TARGETS, "targets = [\"linux-x64\", \"linux-x64\"]", "without repeats"),
         (TARGETS, "targets = [\"linux-x64\", \" \"]", "hold whitespace"),
+        (TARGETS, "targets = [\"linux-x64\", \"../codex/x\"]", "plain name"),
+        (TARGETS, "targets = [\"linux-x64\", \"..\"]", "plain name"),
+        (TARGETS, "targets = [\"linux-x64\", \".\"]", "plain name"),
+        (TARGETS, "targets = [\"linux-x64\", \"linux-\u{3c7}64\"]", "plain name"),
+        (MODE_TARGETS, "targets = [\"linux/x64\"]", "plain name"),
         (TARGETS, "targets = [\"linux-x64\", \"\"]", "may be empty"),
         (PREDICATES, "targets = [\"linux-x64\"]", "no mode is selected on"),
         (TARGETS, "targets = [\"linux-x64\", \"darwin-arm64\"]\nunknown = 1", "unknown field"),
