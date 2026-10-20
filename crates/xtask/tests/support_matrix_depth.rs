@@ -132,7 +132,12 @@ fn sealed(record: Value, accept: bool) -> DepthRecord {
 }
 
 /// `sealed`, as the JSON a manifest root holds.
-fn sealed_json(mut record: Value, accept: bool) -> Value {
+fn sealed_json(record: Value, accept: bool) -> Value {
+    sealed_json_for(record, accept, "1.2.3")
+}
+
+/// `sealed_json` for the record of another version of the aider root.
+fn sealed_json_for(mut record: Value, accept: bool, version: &str) -> Value {
     sorted(&mut record, "");
     record["policy"]["identity"] = json!(part_identity(&record["policy"]).unwrap());
     let policy = record["policy"]["identity"].clone();
@@ -147,7 +152,7 @@ fn sealed_json(mut record: Value, accept: bool) -> Value {
         record["execution"]["obligations_identity"] = record["obligations"]["identity"].clone();
         record["execution"]["identity"] = json!(part_identity(&record["execution"]).unwrap());
     }
-    let parsed = DepthRecord::parse(&record.to_string(), "aider", "1.2.3").expect("parse record");
+    let parsed = DepthRecord::parse(&record.to_string(), "aider", version).expect("parse record");
     if accept {
         record["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [LINUX],
                                                 "record_sha256": parsed.stated_sha256().unwrap() }]);

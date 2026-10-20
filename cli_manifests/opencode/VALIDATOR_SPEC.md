@@ -68,9 +68,10 @@ manifest root:
 - when the root holds a record, the agent's lifecycle record,
   `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/lifecycle-state.json`, the files it
   names, and `docs/agents/lifecycle/<agent_id>-maintenance/governance/maintenance-closeout.json`;
-- through the support publication check, the depth records of every root in the registry, and
-  each file a record binds that git tracks as a regular file, read for its content identity and
-  nothing else.
+- through the support publication check, the depth records of every root the support matrix
+  publishes, the names of the record files of every other registry root, which the check
+  refuses, and each file a record binds that git tracks as a regular file, read for its content
+  identity and nothing else.
 
 Outside a workspace no registry entry names the record's agent, so the validator cannot read a
 record there.
@@ -122,9 +123,10 @@ facts that its record and the files it binds decide under "Support depth" of
   written in, 2 when a row carries depth facts and 1 otherwise.
 - `SUPPORT_MATRIX_ROOT_READ_ERROR`: the support matrix cannot derive a root's rows: it cannot read
   a record, a root holds one without adopting Annex B, a registry root it does not publish holds
-  one, or a record's obligations part states, for an operation, an obligation set other than the
-  one its policy part resolves. Publication fails rather than publishing that version's rows as
-  rows without depth facts.
+  one, a record's obligations part states, for an operation, an obligation set other than the
+  one its policy part resolves, or a record binds evidence and git cannot list the files it
+  tracks in the workspace. Publication fails rather than publishing that version's rows as rows
+  without depth facts.
 
 Checks 2, 4, 9 and 11 compare a merge result with the integration branch tip, which this
 validator does not read.

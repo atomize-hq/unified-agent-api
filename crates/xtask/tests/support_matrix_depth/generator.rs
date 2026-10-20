@@ -237,6 +237,13 @@ fn publication_fails_on_a_record_it_cannot_read_or_that_its_root_does_not_adopt(
         json!({ "storage": { "committed": { "reports": { "depth_record": "x" } } } }),
         json!({ "storage": { "committed": { "reports": {
             "depth_record": "cli_manifests/codex/reports/<version>/depth-record.json" } } } }),
+        // The root's own path names where it holds its records only in exactly this form.
+        json!({ "storage": { "committed": { "reports": {
+            "depth_record": "cli_manifests/aider/reports/<version>/other.json" } } } }),
+        json!({ "storage": { "committed": { "reports": {
+            "depth_record": "cli_manifests/aider/reports/1.2.3/depth-record.json" } } } }),
+        json!({ "storage": { "committed": { "reports": {
+            "depth_record": "cli_manifests/aider/depth-record.json" } } } }),
     ] {
         write(
             &temp.path().join(ROOT).join("RULES.json"),
@@ -337,4 +344,107 @@ fn a_covered_target_that_is_not_expected_has_both_of_its_pointer_files_read() {
         row(&rows, DARWIN).pointer_promotion,
         PointerPromotionState::LatestSupportedAndValidated
     );
+}
+
+/// The record with its bound evidence spread over `files`, each result's files taken in turn.
+fn bound_in_turn(record: Value, files: &[(&str, String)]) -> Value {
+    let mut record = record;
+    let mut next = 0;
+    for result in record["execution"]["results"].as_array_mut().unwrap() {
+        for file in result["evidence"].as_array_mut().unwrap() {
+            let (path, sha256) = &files[next % files.len()];
+            *file = json!({ "path": path, "sha256": sha256 });
+            next += 1;
+        }
+    }
+    record
+}
+
+#[test]
+fn evidence_is_a_regular_file_in_the_index_and_in_the_working_tree() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    // Whether the capability is qualified when the record binds `path` as `prepare` leaves it.
+    let qualified_with = |path: &str, prepare: &dyn Fn(&Path)| {
+        let temp = workspace(record(), true);
+        prepare(temp.path());
+        let held = fs::read_to_string(temp.path().join(path)).unwrap();
+        write_record(
+            temp.path(),
+            &sealed_json(bound_to(record(), path, &digest(&held)), true),
+        );
+        qualified(row(&rows(temp.path()).unwrap(), LINUX))
+    };
+
+    // An executable file is a regular file.
+    let script = "crates/aider/tests/run.sh";
+    assert!(qualified_with(script, &|workspace| {
+        write(&workspace.join(script), "echo run\n");
+        fs::set_permissions(workspace.join(script), fs::Permissions::from_mode(0o755)).unwrap();
+        git(workspace, &["add", script]);
+    }));
+
+    // A regular file in the index that the working tree holds as a link.
+    assert!(!qualified_with(EVIDENCE, &|workspace| {
+        let moved = workspace.join("moved.rs");
+        fs::rename(workspace.join(EVIDENCE), &moved).unwrap();
+        symlink(&moved, workspace.join(EVIDENCE)).unwrap();
+    }));
+
+    // A link in the index that the working tree holds as a regular file.
+    let link = "crates/aider/tests/link.rs";
+    assert!(!qualified_with(link, &|workspace| {
+        symlink(workspace.join(EVIDENCE), workspace.join(link)).unwrap();
+        git(workspace, &["add", link]);
+        fs::remove_file(workspace.join(link)).unwrap();
+        write(&workspace.join(link), "fn run() {}\n");
+    }));
+}
+
+#[test]
+fn publication_fails_where_git_cannot_say_what_the_revision_holds() {
+    let temp = workspace(record(), true);
+    fs::remove_dir_all(temp.path().join(".git")).unwrap();
+    let err = rows(temp.path()).unwrap_err();
+    assert!(err.contains("list the files git tracks in"), "{err}");
+}
+
+#[test]
+fn evidence_in_several_files_and_several_records_is_all_looked_up() {
+    let temp = workspace(record(), true);
+    let second = "crates/aider/tests/second.rs";
+    let third = "crates/aider/tests/third.rs";
+    for path in [second, third] {
+        write(&temp.path().join(path), &format!("// {path}\n"));
+        git(temp.path(), &["add", path]);
+    }
+
+    // One record binds two files: its results are verified only if each is held.
+    let both = bound_in_turn(
+        record(),
+        &[
+            (EVIDENCE, digest("fn run() {}\n")),
+            (second, digest(&format!("// {second}\n"))),
+        ],
+    );
+    write_record(temp.path(), &sealed_json(both, true));
+    assert!(qualified(row(&rows(temp.path()).unwrap(), LINUX)));
+
+    // The record of another version of the root binds its own file.
+    let mut later = bound_to(record(), third, &digest(&format!("// {third}\n")));
+    later["policy"]["selection"]["enrollment"]["version"] = json!("1.2.4");
+    write(
+        &temp
+            .path()
+            .join(ROOT)
+            .join("reports/1.2.4/depth-record.json"),
+        &sealed_json_for(later, true, "1.2.4").to_string(),
+    );
+    let rows = self::rows(temp.path()).unwrap();
+    assert!(qualified(row(&rows, LINUX)));
+    let later = rows
+        .iter()
+        .find(|row| row.version == "1.2.4" && row.target == LINUX)
+        .expect("the later record implies a row");
+    assert!(qualified(later));
 }

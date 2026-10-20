@@ -412,7 +412,8 @@ record, so the committed artifact is revision 1. Today:
   tracks a regular file at its path, and only such a file is read, for its SHA-256 only. An
   untracked or ignored file, git's own files and a symlink are not in the revision whatever they
   hold, so a result bound to one is `unverified`, and evidence a change adds counts once it is
-  staged.
+  staged. Where a record binds evidence and git cannot list the files it tracks in the workspace,
+  because it is not a git checkout or git cannot run, publication fails.
 - It reads no registry declaration: the registry loader refuses a `support_depth` table until
   route wiring admits one. So no row is depth-enrolled by declaration, and rule 4 implies no row
   from a declaration.
