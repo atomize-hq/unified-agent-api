@@ -2,6 +2,9 @@ use xtask::depth_record::part_identity;
 
 use super::*;
 
+#[path = "depth_records/merge.rs"]
+mod merge;
+
 const COMMIT: &str = "1111111111111111111111111111111111111111";
 const RECORDED_AT: &str = "2026-10-10T00:00:00Z";
 const OPENED_FROM: &str = ".github/workflows/agent-maintenance-open-pr.yml";

@@ -1,0 +1,37 @@
+name: Depth tip validation
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+# Detection after a push. Required PR checks and tip-conditional integration are prerequisites
+# for path enablement, not supplied by this job; see uaa-0073 in docs/backlog.json.
+# Committing acquisition requires AUTOMATION_TOKEN so its pushes can trigger this workflow.
+jobs:
+  validate:
+    name: Validate staging depth transition
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate staging update
+        shell: bash
+        env:
+          TIP_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TIP_SHA" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ || "$TIP_SHA" =~ ^0+$ ]]; then
+            echo "::error::The staging update has no usable prior tip; refusing to skip comparison." >&2
+            exit 1
+          fi
+          git fetch --no-tags --depth=1 origin "$TIP_SHA"
+          for agent in codex claude_code opencode; do
+            cargo run -p xtask -- manifest-validate --root "cli_manifests/$agent" --tip "$TIP_SHA"
+          done
+          cargo run -p xtask -- support-matrix --check

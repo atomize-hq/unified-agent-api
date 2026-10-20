@@ -55,6 +55,10 @@ pub struct Args {
     /// Emit a machine-readable JSON report to stdout in addition to human text.
     #[arg(long)]
     pub json: bool,
+
+    /// Integration-tip commit to compare with the current workspace for depth merge checks.
+    #[arg(long)]
+    pub tip: Option<String>,
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
@@ -75,6 +79,8 @@ pub enum FatalError {
     Rules(String),
     #[error("--root is required (no manifest root default is available for this subcommand)")]
     MissingRoot,
+    #[error("--tip cannot be combined with --mode fix")]
+    TipWithFix,
 }
 
 #[derive(Debug)]
@@ -141,6 +147,9 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> i32 {
 }
 
 fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, FatalError> {
+    if args.tip.is_some() && matches!(args.mode, Mode::Fix) {
+        return Err(FatalError::TipWithFix);
+    }
     let root = args
         .root
         .or_else(|| default_root.map(PathBuf::from))
@@ -331,6 +340,9 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
 
     // 8) Depth records.
     depth::validate_depth_records(&ctx, &mut violations);
+    if let Some(tip) = args.tip.as_deref() {
+        depth::merge::validate(&ctx, tip, &mut violations);
+    }
 
     violations.sort_by(|a, b| {
         a.sort_key()

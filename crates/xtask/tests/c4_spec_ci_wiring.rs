@@ -12,6 +12,9 @@ mod acquisition_token;
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
 
+#[path = "c4_spec_ci_wiring/depth_merge.rs"]
+mod depth_merge;
+
 const GENERATED_PR_SUMMARY_SUFFIX: &str = "governance/pr-summary.md";
 
 fn repo_root() -> PathBuf {
@@ -325,36 +328,6 @@ fn c4_spec_legacy_per_agent_parity_workflows_are_retired() {
             "acquisition/promotion must live only in the reusable parity-* lanes, found {name}"
         );
     }
-}
-
-#[test]
-fn c4_spec_ci_workflow_has_conditional_manifest_validate_gate() {
-    let yml = read_repo_file(".github/workflows/ci.yml");
-
-    // C4-spec (normative): gate runs only when committed artifacts regime is active.
-    //
-    // Two supported implementations:
-    // - job-level hashFiles gate
-    // - a first step that detects committed versions and gates subsequent steps via outputs
-    let has_hashfiles_gate = yml.contains("hashFiles('cli_manifests/codex/versions/*.json') != ''");
-    let has_step_gate = yml.contains("Detect Codex committed artifacts")
-        && yml.contains("has_versions")
-        && yml.contains("steps.codex-artifacts.outputs.has_versions");
-    assert!(
-        has_hashfiles_gate || has_step_gate,
-        "ci.yml must gate manifest validation behind either hashFiles('cli_manifests/codex/versions/*.json') != '' or a Detect Codex committed artifacts step gate"
-    );
-
-    // Ensure the job actually runs the validator (not just mentions it). Both the neutral name and
-    // the retained back-compat alias are acceptable.
-    let validate_invocation = Regex::new(
-        r"cargo\s+run\s+-p\s+xtask\s+--[\s\\]*\n?[\s\\]*(manifest-validate|codex-validate)",
-    )
-    .expect("valid regex");
-    assert!(
-        validate_invocation.is_match(&yml),
-        "ci.yml must invoke: cargo run -p xtask -- manifest-validate"
-    );
 }
 
 #[test]

@@ -1,6 +1,9 @@
 //! Depth records: the checks the root's `VALIDATOR_SPEC.md` states in "Depth records", which are
 //! checks 1, 3, 10 and 13 of `docs/agents/lifecycle/support-depth-validation-test-list.md`.
 //! Checks 5, 6, 7, 8 and 12 are the support publication's, decided by `support-matrix --check`.
+//! With `--tip`, the merge child adds checks 2 and 4; parsing both records also decides check 11.
+
+pub(super) mod merge;
 
 use std::{collections::BTreeMap, fs, path::Path};
 

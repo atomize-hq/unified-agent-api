@@ -6,6 +6,9 @@ This document defines the deterministic validator contract for `cli_manifests/op
 
 `cargo run -p xtask -- codex-validate --root cli_manifests/opencode`
 
+Optional `--tip <REV>` compares the workspace with the named integration-tip commit. It requires
+Git and cannot be combined with `--mode fix` (exit 3 before any write).
+
 ## Inputs
 
 - `RULES.json`
@@ -87,7 +90,7 @@ Violations:
 - `DEPTH_RECORD_PATH_INVALID`: `RULES.json` names a depth record path other than
   `<root>/reports/<version>/depth-record.json`, where `<root>` is this root's path in the
   workspace. Outside a workspace the root has no such path, so this is not checked there.
-- `DEPTH_RECORD_INVALID` (check 13): anything is at a record's path that is not a readable record,
+- `DEPTH_RECORD_INVALID` (checks 11 and 13): anything is at a record's path that is not a readable record,
   or a record does not parse, states another revision, or states a P, O or E identity that is not
   the digest of its part.
 - `DEPTH_RECORD_NOT_THE_REQUESTS` (check 3): the standing request is for a version whose record
@@ -128,12 +131,65 @@ facts that its record and the files it binds decide under "Support depth" of
   tracks in the workspace. Publication fails rather than publishing that version's rows as rows
   without depth facts.
 
-Checks 2, 4, 9 and 11 compare a merge result with the integration branch tip, which this
-validator does not read.
+### Comparison with the integration tip (normative)
+
+With `--tip <REV>`, the candidate is the current workspace tree. In PR validation it is the
+checked-out test merge; `<REV>` is `HEAD^1`, its integration-tip parent, with both commits fetched.
+On a push to `staging`, the candidate is the event's SHA and the tip is the event's `before` SHA,
+explicitly fetched even for a multi-commit push. The caller must supply the actual tip being
+replaced; the validator resolves it once to a commit and never substitutes another baseline.
+Without `--tip`, validation continues to decide the one-tree checks only.
+
+Additional inputs: this root's `reports/<version>/depth-record.json` entries in the tip's Git
+tree (including an entry of the wrong file kind), and the tip's registry entry naming the root.
+The tip registry is read even when this root has no tip record, to detect relocated anchors.
+Tip records are read from Git objects through Annex B's reader, never from a checkout of that
+revision. Candidate records remain anchored to the candidate registry; removing that anchor,
+adoption, or all candidate records does not exempt the tip's records from comparison.
+
+For a changed or newly created onboarding record only, the validator also reads the canonical
+`approved-agent.toml` at the path derived from the candidate registry entry's onboarding pack,
+through the existing approval loader. It must name this agent and manifest root and state this
+record's exact version in `[support_depth].version`. The onboarding Event and second statement
+of P/O remain deferred until the charter defines that statement; this check adds neither.
+
+Violations:
+
+- `DEPTH_TIP_UNREADABLE`: no Git workspace is available, the tip cannot resolve to a commit,
+  its records or registry cannot be read/parsed, or a tip record is not a regular file.
+  A failed enumeration is never an empty record set.
+- `DEPTH_RECORD_REMOVED` (check 2): a tip record is absent in the candidate, including after
+  retention or removal of every record.
+- `DEPTH_ACCEPTANCE_ENTRIES_CHANGED` (check 2): the tip's acceptance entries are not an unchanged
+  prefix of the candidate's entries, by parsed equality. Removal, alteration, reordering, and
+  insertion before old entries fail; appending and JSON formatting changes are allowed.
+- `DEPTH_SELECTION_SHRUNK` (check 2): `candidate.lacking_from(tip)` lists a previously covered
+  mode, target of a mode, or claimed capability that is lacking under Annex B.4.
+- `DEPTH_RECORD_WITHOUT_FREEZE` (check 4): the candidate creates a record or changes its Event or
+  parts, measured by `stated_sha256()` (acceptance entries excluded), and holds no matching freeze
+  on the record's lifecycle path. On maintenance, the standing request must name the record's
+  exact version and carry a `[support_depth]` P identity; check 3 additionally requires that
+  request's Event/P/O to match. On onboarding, the approval must match as described above. A
+  different version or another path's working file is no freeze for this record. Entry-only
+  appends need no surviving working request/approval.
+- `DEPTH_APPROVAL_UNREADABLE`: an approval needed for this comparison is present but fails its
+  loader. An absent approval supplies no freeze.
+
+`DEPTH_RECORD_UNANCHORED` also fails when a tip record loses its registry anchor in the candidate
+or the candidate assigns its root to another agent. Both revisions' relevant records must pass
+check 13: each produced part's identity is its canonical digest. This also decides check 11,
+since changed part content cannot keep the same valid identity under that content-identity model.
+No redundant second part comparator is used.
+
+Check 9 (acceptance-effect detection) remains for enforcement slice 2b. A successful comparison
+is repository validation, not route admission or a tip-conditional ref update. Before path
+enablement, the maintainer must require the merge checks and an up-to-date PR via the planned
+strict staging ruleset; MA2's direct-push mode must then comply or refuse (see docs/backlog.json).
 
 ### Present behavior
 
-The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs`, except checks
+The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs` and its
+`merge` child module, except checks
 5, 6, 7, 8 and 12: the support matrix derives depth facts in `crates/xtask/src/support_matrix/`,
 and its consistency check compares each published row with the derived one. No root holds a
 depth record and no request carries a `[support_depth]` table, so none of them fails on the
