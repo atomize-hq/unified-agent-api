@@ -7,6 +7,8 @@ use xtask::agent_maintenance::stand_down::{BASE_BRANCH, EXIT_STOOD_DOWN};
 
 #[path = "c4_spec_ci_wiring/acquisition_refreeze.rs"]
 mod acquisition_refreeze;
+#[path = "c4_spec_ci_wiring/acquisition_token.rs"]
+mod acquisition_token;
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
 

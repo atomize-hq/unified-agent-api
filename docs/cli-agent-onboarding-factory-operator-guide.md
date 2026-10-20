@@ -626,6 +626,13 @@ block of `cli_manifests/<agent>/RULES.json` and is resolved by
 `cargo run -p xtask -- manifest-acquisition-plan --agent <agent_id> --version <semver>`, which you
 can run locally to preview exactly what CI will do.
 
+Committing acquisition (`commit: true`) requires the repository's `AUTOMATION_TOKEN` secret,
+including when dispatched directly against `staging`. The workflow fails before acquisition if
+that secret is missing, because pushes made with `GITHUB_TOKEN` do not trigger push validation.
+Read-only acquisition (`commit: false`) uses `GITHUB_TOKEN` and needs no automation token. The
+planning job receives only a boolean indicating whether the secret exists; the token itself is
+used only by the union job when committing.
+
 An agent takes the acquisition lane when — and only when — it is enrolled in
 `maintenance.release_watch` **and** its `RULES.json` carries an `acquisition` block. Docs-only
 agents satisfy neither and keep their existing maintenance behavior unchanged; the packet opener
