@@ -43,8 +43,11 @@ const PINNED_EXTERNAL_SANDBOX_WARNING: &str =
 const PINNED_EXTERNAL_SANDBOX_FLAG_UNSUPPORTED: &str =
     "codex backend error: installed codex does not support --dangerously-bypass-approvals-and-sandbox (details redacted)";
 
+#[cfg(test)]
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
+#[cfg(test)]
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
+#[cfg(test)]
 const CAP_ARTIFACTS_FINAL_TEXT_V1: &str = "agent_api.artifacts.final_text.v1";
 const CAP_SESSION_HANDLE_V1: &str = "agent_api.session.handle.v1";
 
@@ -76,6 +79,7 @@ fn is_not_found_signal(text: &str) -> bool {
         || text.contains("unknown thread")
 }
 
+#[cfg(test)]
 fn codex_mcp_supported_on_target() -> bool {
     // The pinned Codex MCP artifact is the Linux x86_64 musl binary, but it is intended to run
     // on standard Linux hosts regardless of whether the wrapper itself is built against musl or
@@ -98,8 +102,7 @@ use harness::{
 };
 use policy::{
     validate_and_extract_exec_policy, CodexApprovalPolicy, CodexExecPolicy, CodexSandboxMode,
-    EXT_ADD_DIRS_V1, EXT_CODEX_APPROVAL_POLICY, EXT_CODEX_SANDBOX_MODE, EXT_EXTERNAL_SANDBOX_V1,
-    EXT_NON_INTERACTIVE, SUPPORTED_EXTENSION_KEYS_DEFAULT,
+    EXT_ADD_DIRS_V1, SUPPORTED_EXTENSION_KEYS_DEFAULT,
     SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN,
 };
 
@@ -113,3 +116,8 @@ use mapping::map_thread_event;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+use policy::{
+    EXT_CODEX_APPROVAL_POLICY, EXT_CODEX_SANDBOX_MODE, EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE,
+};

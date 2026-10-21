@@ -45,6 +45,7 @@ pub use xtask::support_matrix;
 pub use xtask::wrapper_scaffold;
 
 use clap::{Parser, Subcommand};
+use xtask::runtime_advertising;
 
 #[derive(Debug, Parser)]
 #[command(name = "xtask")]
@@ -57,6 +58,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::enum_variant_names)]
 enum Command {
+    /// Generate or check the restricted runtime capability model.
+    RuntimeAdvertisingModel(runtime_advertising::Args),
     /// Guard against backend crate types leaking into the public agent_api surface.
     AgentApiBackendTypeLeakGuard(agent_api_backend_type_leak_guard::Args),
     /// Generate a Codex CLI snapshot manifest under `cli_manifests/codex/`.
@@ -355,6 +358,13 @@ fn main() {
             }
         },
         Command::RepairRuntimeEvidence(args) => match repair_runtime_evidence::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                err.exit_code()
+            }
+        },
+        Command::RuntimeAdvertisingModel(args) => match runtime_advertising::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");

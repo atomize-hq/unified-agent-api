@@ -143,11 +143,13 @@ Rules:
 
 ### Present behavior
 
-None of this section is implemented, and it changes neither the generator nor the generated file.
-Today `capability-matrix` derives the matrix from lifecycle-backed publication truth and reads no
-depth record (`crates/xtask/src/capability_matrix.rs`,
-`crates/xtask/src/capability_publication.rs`), and the generated header says that the inventory
-"documents backend capability advertising, not support or promotion status".
+`capability-matrix` continues to derive the matrix from lifecycle-backed publication truth and
+reads no depth record (`crates/xtask/src/capability_matrix.rs`,
+`crates/xtask/src/capability_publication.rs`). Its generated inventory documents advertising,
+not support or promotion status. The [runtime advertising model](runtime-advertising-model.md)
+constrains the five built-ins to a checked registry projection, including opt-in, host and
+feature contexts beyond the publication matrix. That preparation preserves runtime behavior;
+check 9 entry admission and depth-qualified capability publication remain unimplemented.
 
 ## Change control and verification (normative)
 

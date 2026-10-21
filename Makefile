@@ -230,6 +230,7 @@ support-matrix-check:
 
 .PHONY: capability-matrix-guard
 capability-matrix-guard:
+	cargo run -p xtask -- runtime-advertising-model --check
 	cargo run -p xtask -- capability-matrix --check
 	cargo run -p xtask -- capability-matrix-audit
 

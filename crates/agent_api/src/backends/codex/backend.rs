@@ -1,10 +1,8 @@
-use std::{collections::BTreeSet, future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use super::{
     harness::{new_harness_adapter, CodexTerminationHandle},
-    mcp_management, CodexBackend, CAP_ARTIFACTS_FINAL_TEXT_V1, CAP_SESSION_HANDLE_V1,
-    CAP_TOOLS_RESULTS_V1, CAP_TOOLS_STRUCTURED_V1, EXT_ADD_DIRS_V1, EXT_CODEX_APPROVAL_POLICY,
-    EXT_CODEX_SANDBOX_MODE, EXT_EXTERNAL_SANDBOX_V1, EXT_NON_INTERACTIVE,
+    mcp_management, CodexBackend,
 };
 use crate::{
     backend_harness::BackendDefaults,
@@ -16,10 +14,7 @@ use crate::{
     },
     AgentWrapperBackend, AgentWrapperCapabilities, AgentWrapperError, AgentWrapperKind,
     AgentWrapperRunControl, AgentWrapperRunHandle, AgentWrapperRunRequest,
-    EXT_AGENT_API_CONFIG_MODEL_V1,
 };
-
-use super::super::session_selectors::{EXT_SESSION_FORK_V1, EXT_SESSION_RESUME_V1};
 
 fn unsupported_capability<T>(
     agent_kind: String,
@@ -39,35 +34,16 @@ impl AgentWrapperBackend for CodexBackend {
     }
 
     fn capabilities(&self) -> AgentWrapperCapabilities {
-        let mut ids = BTreeSet::new();
-        ids.insert("agent_api.run".to_string());
-        ids.insert("agent_api.events".to_string());
-        ids.insert("agent_api.events.live".to_string());
-        ids.insert(crate::CAPABILITY_CONTROL_CANCEL_V1.to_string());
-        ids.insert(CAP_TOOLS_STRUCTURED_V1.to_string());
-        ids.insert(CAP_TOOLS_RESULTS_V1.to_string());
-        ids.insert(CAP_ARTIFACTS_FINAL_TEXT_V1.to_string());
-        ids.insert(CAP_SESSION_HANDLE_V1.to_string());
-        ids.insert(EXT_AGENT_API_CONFIG_MODEL_V1.to_string());
-        ids.insert("backend.codex.exec_stream".to_string());
-        ids.insert(EXT_ADD_DIRS_V1.to_string());
-        ids.insert(EXT_NON_INTERACTIVE.to_string());
-        ids.insert(EXT_CODEX_APPROVAL_POLICY.to_string());
-        ids.insert(EXT_CODEX_SANDBOX_MODE.to_string());
-        ids.insert(EXT_SESSION_RESUME_V1.to_string());
-        ids.insert(EXT_SESSION_FORK_V1.to_string());
-        if super::codex_mcp_supported_on_target() {
-            ids.insert(CAPABILITY_MCP_LIST_V1.to_string());
-            ids.insert(CAPABILITY_MCP_GET_V1.to_string());
-            if self.config.allow_mcp_write {
-                ids.insert(CAPABILITY_MCP_ADD_V1.to_string());
-                ids.insert(CAPABILITY_MCP_REMOVE_V1.to_string());
-            }
+        AgentWrapperCapabilities {
+            ids: crate::runtime_advertising::evaluator::evaluate(
+                &crate::runtime_advertising::data::CODEX,
+                crate::runtime_advertising::host(),
+                crate::runtime_advertising::evaluator::ConfigValues {
+                    allow_mcp_write: self.config.allow_mcp_write,
+                    allow_external_sandbox_exec: self.config.allow_external_sandbox_exec,
+                },
+            ),
         }
-        if self.config.allow_external_sandbox_exec {
-            ids.insert(EXT_EXTERNAL_SANDBOX_V1.to_string());
-        }
-        AgentWrapperCapabilities { ids }
     }
 
     fn mcp_list(
