@@ -7,6 +7,7 @@ mod conformance;
 #[path = "../../../agent_api/src/runtime_advertising/evaluator.rs"]
 mod evaluator;
 mod features;
+mod graph;
 pub mod projection;
 pub mod revision;
 pub mod source;

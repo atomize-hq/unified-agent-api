@@ -38,3 +38,6 @@ mod guards;
 
 #[path = "runtime_advertising/wiring.rs"]
 mod wiring;
+
+#[path = "runtime_advertising/graph_guards.rs"]
+mod graph_guards;

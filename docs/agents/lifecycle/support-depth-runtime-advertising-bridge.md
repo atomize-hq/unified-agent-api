@@ -72,3 +72,18 @@ config/storage to the model; constrained-source conformance and independent full
 the remaining cells. Publication matrix freshness/audit remain separate checks and its committed
 bytes are unchanged. The baseline itself has no revision-1 table, so immutable model reads of it
 correctly fail as unsupported; future check 9 comparisons begin from a post-bridge baseline.
+
+## Conformance regression evidence
+
+The two independent implementation review lanes demonstrated compiling bypasses through
+qualified/macro-generated backend constructors and an inherent config `default()` in an existing
+descendant module. They also demonstrated Cargo's extra implicit feature from an optional
+`serde` dependency. These are rejected by the reachable-module declaration/expansion guard and
+optional-dependency validation. Regression fixtures cover parent, descendant, nested and newly
+selected module declarations, aliases, opaque expansion and immutable old-tree corruption;
+an unrelated method-body edit remains accepted. The existing normalization guard permits the
+literal in the exact generated data file while retaining its raw-selection-access prohibition.
+
+A separately compiled OpenCode-to-Aider kind mutation was rejected by source conformance. Its
+independent runtime gateway probe resolved session resume/fork under Aider and found no OpenCode
+registration, demonstrating why checked identity is necessary beyond table/set equality.

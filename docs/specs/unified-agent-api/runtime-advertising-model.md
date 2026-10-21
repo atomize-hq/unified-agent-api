@@ -66,9 +66,24 @@ In revision 1, conformance requires:
 - canonical kind/capabilities/type imports and any referenced `AGENT_KIND` literal resolve to
   the expected items, binding Rust type, gateway key, registry id and model identity together;
 - the complete guarded config/storage declarations, derives and constructor retain supported
-  direct-field input/default semantics, without alternate inherent constructors in the parent;
+  direct-field input/default semantics;
 - relevant Cargo selection has no build script, target dependency selection, alternate library
   path, repository Cargo configuration or workspace dependency patch/replacement.
+
+The checker MUST walk each view's reachable runtime crate module graph, including inline and
+nested declarations and the fixed embedded runtime-support include. Checking only the parent
+and delegate files is insufficient: Rust implementations can attach methods from another module.
+Guarded config implementations and noncanonical backend implementations/producers, qualified or
+aliased forms, and guarded type aliases MUST fail. Only the prescribed backend constructor,
+backend trait and existing harness trait implementation sites are supported. Exact `cfg(test)`
+items are excluded from this production graph; other host/feature branches are inspected.
+
+Unsupported item macros, procedural attributes/derives, module paths, namespace rebinding and
+expansion MUST fail on that graph. Revision 1 supports ordinary built-in attributes/derives and
+the existing fully qualified serde/thiserror derives. Expression macros are restricted to the
+recognized built-ins and existing Tokio/serde_json forms; opaque macro arguments MUST NOT hide
+declarations or unsupported nested expansion. New accepted expansion forms require an explicit
+conformance extension. Relevant files in this graph are read independently from each revision.
 
 The checker extracts guarded items from larger backend files so unrelated backend method
 changes do not require advertising-template changes. Unsupported source MUST be reported as a
@@ -83,6 +98,8 @@ Third-party implementations of the public backend trait are outside this built-i
 
 The `agent_api` manifest MUST contain exactly `default` and the five backend feature keys.
 Extra aliases, including empty aliases, missing keys and unknown references are unsupported.
+Unsupported optional dependencies MUST also fail, since Cargo creates implicit public features
+for optional dependencies even when no explicit feature key is authored.
 Supported lists contain references among those five features and explicit activation of their
 actual optional dependencies. Each backend feature MUST directly activate its matching wrapper,
 `tokio` and `futures-util`. Cyclic feature references MUST fail.

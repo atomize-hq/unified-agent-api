@@ -28,6 +28,17 @@ impl Features {
         if root.get("patch").is_some() || root.get("replace").is_some() {
             return Err("unsupported workspace dependency replacement".into());
         }
+        let optional = doc["dependencies"]
+            .as_object()
+            .ok_or("missing runtime dependencies")?;
+        for (name, dependency) in optional {
+            if dependency["optional"] == true
+                && !AGENTS.contains(&name.as_str())
+                && !["tokio", "futures-util"].contains(&name.as_str())
+            {
+                return Err(format!("unsupported implicit runtime feature: {name}"));
+            }
+        }
         let fields = doc["features"]
             .as_object()
             .ok_or("missing runtime feature table")?;

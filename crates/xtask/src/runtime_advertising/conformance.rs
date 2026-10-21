@@ -38,14 +38,16 @@ pub(super) fn check(source: &Source) -> Result<(), String> {
         )?;
         backend(source, agent)?;
     }
-    Ok(())
+    super::graph::check(source)
 }
 
 pub(super) fn parse(source: &Source, path: &str) -> Result<syn::File, String> {
     let file = syn::parse_file(&source.read(path)?).map_err(|e| format!("{path}: {e}"))?;
     for attr in &file.attrs {
-        let raw = attr.to_token_stream().to_string();
-        if !attr.path().is_ident("doc") && raw != "# ! [forbid (unsafe_code)]" {
+        if !["doc", "allow", "warn", "deny", "forbid"]
+            .iter()
+            .any(|name| attr.path().is_ident(name))
+        {
             return Err(format!("{path}: unsupported crate attribute"));
         }
     }

@@ -2,26 +2,30 @@ use super::*;
 
 pub fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
-    let mut paths = vec![
-        "Cargo.toml".to_string(),
-        "crates/agent_api/Cargo.toml".into(),
-        "crates/xtask/data/agent_registry.toml".into(),
-        "crates/agent_api/src/lib.rs".into(),
-        "crates/agent_api/src/backends/mod.rs".into(),
-    ];
-    for name in ["mod.rs", "evaluator.rs", "data.rs"] {
-        paths.push(format!("crates/agent_api/src/runtime_advertising/{name}"));
+    for path in [
+        "Cargo.toml",
+        "crates/agent_api/Cargo.toml",
+        "crates/xtask/data/agent_registry.toml",
+    ] {
+        let dest = temp.path().join(path);
+        std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+        std::fs::copy(workspace().join(path), dest).unwrap();
     }
-    for agent in AGENTS {
-        for name in ["mod.rs", "backend.rs"] {
-            paths.push(format!("crates/agent_api/src/backends/{agent}/{name}"));
+    fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                copy_tree(&entry.path(), &to.join(entry.file_name()));
+            } else {
+                std::fs::copy(entry.path(), to.join(entry.file_name())).unwrap();
+            }
         }
     }
-    for path in paths {
-        let dest = temp.path().join(&path);
-        std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
-        std::fs::copy(workspace().join(&path), dest).unwrap();
-    }
+    copy_tree(
+        &workspace().join("crates/agent_api/src"),
+        &temp.path().join("crates/agent_api/src"),
+    );
     Revision::workspace(temp.path()).expect("valid starting fixture");
     temp
 }
