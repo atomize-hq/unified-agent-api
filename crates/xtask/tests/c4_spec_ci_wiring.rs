@@ -16,6 +16,8 @@ mod maintenance_audit_gate;
 
 #[path = "c4_spec_ci_wiring/depth_merge.rs"]
 mod depth_merge;
+#[path = "c4_spec_ci_wiring/integration_gate.rs"]
+mod integration_gate;
 
 const GENERATED_PR_SUMMARY_SUFFIX: &str = "governance/pr-summary.md";
 

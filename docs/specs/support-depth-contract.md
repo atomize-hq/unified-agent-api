@@ -891,6 +891,31 @@ incoherent canonical outputs MUST fail before checkout, including before deliver
 are provided to the union checkout. Preparation branches reach staging through a PR; acquisition
 does not create one or establish integration admission.
 
+CI candidate validation is updated against `staging` at `c27ac7a6` on 2026-10-21. This remains
+a bounded inventory update; it does not install GitHub protection or establish route authority.
+For a staging PR, CI MUST validate the checked two-parent merge against the event's base and
+head commits. For a staging merge group, CI MUST validate the checked group SHA and the supplied
+`base_sha`, fetch that base explicitly and establish its ancestry. All three manifest validators
+MUST use that exact base with `--tip`; missing or contradictory inputs MUST fail rather than
+select one-tree validation. Queue validation covers the whole supplied group and MUST NOT infer
+its membership or parent layout. Non-staging events retain one-tree manifest validation.
+
+The terminal `Staging integration gate` MUST evaluate all 17 existing CI job results, without
+rerunning them. Failure, cancellation, missing/unknown results and unexpected skips MUST fail.
+It permits a readiness skip only when VERSION is unchanged from the integration base to the
+candidate; a minimum-supported smoke skip only when valid candidate min/latest pointers match;
+and a Claude smoke skip only when the valid candidate latest pointer is `none`. Candidate inputs
+MUST be read independently and match the version/pointer job outputs. Both staging PR and group
+version/CHANGELOG comparisons use the same base-to-candidate range, including when the base and
+head independently contain an identical version bump. The existing main/release comparisons
+remain unchanged. Other events use the distinct `CI summary (non-staging)` context.
+
+The gate records the checked candidate/base/tree, event, run identity, dependency results and
+justified skips. A CheckRun's associated SHA is not evidence of the executed checkout's identity.
+These checks provide structural evidence for a candidate. Required checks, queue serialization,
+effective host enforcement, exact final-tip/result correspondence and production enablement
+still require the separately reviewed installation and host-proof work.
+
 No route establishes full depth admission today. MA2 has behavioral destination-refusal tests;
 full route-admission conformance remains unproved. Every
 "Required" cell below is enforcement and test work under [Path enablement](#path-enablement)
@@ -1422,7 +1447,8 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   record binds for its content identity, and the check compares each published row's depth facts
   with the derived ones. With `--tip`, it also reads the integration-tip records and their registry
   from Git objects, and a changed onboarding record's versioned approval, to decide checks 2, 4
-  and 11. PR validation compares the test merge with its first parent; light push-to-staging
+  and 11. PR validation verifies the test merge's parents against event base/head; merge-group
+  validation compares the checked whole group with its supplied base. Light push-to-staging
   validation compares event SHA with event.before. With `--tip`, check 9 also compares every
   acceptance-effect category through `xtask/depth_acceptance/`, using each revision's own immutable
   inputs and the checked runtime advertising model. It requires a candidate record-wide current

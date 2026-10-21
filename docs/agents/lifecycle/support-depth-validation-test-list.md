@@ -239,8 +239,9 @@ Must fail:
   changed onboarding record. Check 2 preserves the old entry sequence as an unchanged prefix.
   Check 4 compares statements with entries excluded and covers first creation too; its matching
   maintenance request must carry the depth P table, and an approval cannot substitute for another
-  lifecycle path. The caller supplies the test merge's first parent for a PR and event.before for
-  a push. Check 11 follows from checking each part's digest in both records (check 13).
+  lifecycle path. The caller supplies the test merge's verified first parent for a staging PR,
+  the supplied base_sha for a staging merge group, and event.before for a push. Check 11 follows
+  from checking each part's digest in both records (check 13).
 - `manifest-validate` reads the standing request's `[support_depth]` table without the validating
   loader, which rejects the table as an unknown key until a depth enrollment can be declared.
   When the loader accepts it, rule 4 of the request contract's request fields is the comparison
