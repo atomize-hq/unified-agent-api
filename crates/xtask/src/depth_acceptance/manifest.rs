@@ -26,6 +26,11 @@ pub(super) fn pointer(view: &View, path: &str) -> Result<Option<String>, String>
 }
 pub(super) fn targets(view: &View, root: &str) -> Result<Vec<String>, String> {
     let current = view.json(&format!("{root}/current.json"))?;
+    if current["snapshot_schema_version"] != 2 || current["mode"] != "union" {
+        return Err(format!(
+            "{root}/current.json: unsupported snapshot schema or mode"
+        ));
+    }
     strings(
         current
             .get("expected_targets")
@@ -39,6 +44,9 @@ pub(super) fn pointer_path(
     target: Option<&str>,
 ) -> Result<String, String> {
     let rules = view.json(&format!("{root}/RULES.json"))?;
+    if rules["rules_schema_version"] != 1 {
+        return Err(format!("{root}/RULES.json: unsupported rules schema"));
+    }
     let pointers = rules
         .pointer("/storage/pointers")
         .ok_or("missing pointer declarations")?;

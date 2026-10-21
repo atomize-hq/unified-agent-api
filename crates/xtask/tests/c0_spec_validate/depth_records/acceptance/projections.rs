@@ -63,3 +63,26 @@ fn backsteps_into_recorded_versions_count_but_move_off_and_outside_selection_are
     republish(&root);
     assert!(requirements(temp.path(), &tip).is_empty());
 }
+
+#[test]
+fn unsupported_baseline_current_or_rules_discriminators_cannot_be_repaired_into_valid_inputs() {
+    for (name, field, invalid) in [
+        ("current.json", "snapshot_schema_version", json!(999)),
+        ("current.json", "mode", json!("per_target")),
+        ("RULES.json", "rules_schema_version", json!(999)),
+    ] {
+        let (temp, root, _) = baseline(Some(&record()));
+        let path = root.join(name);
+        let original: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        let mut changed = original.clone();
+        changed[field] = invalid;
+        write_json(&path, &changed);
+        let tip = commit_all(temp.path());
+        write_json(&path, &original);
+        let result = xtask::depth_acceptance::compare(temp.path(), &tip, "codex");
+        assert!(
+            result.is_err(),
+            "unsupported immutable {name}.{field} was accepted: {result:?}"
+        );
+    }
+}
