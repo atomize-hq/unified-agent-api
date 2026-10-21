@@ -1,29 +1,62 @@
 use super::*;
 
-#[test]
-fn terminal_gate_covers_all_existing_jobs_without_duplicate_test_runs() {
-    use std::collections::BTreeSet;
-    use std::process::Command;
+use std::collections::BTreeSet;
 
-    let yml = read_repo_file(".github/workflows/ci.yml");
+fn inventory(yml: &str) -> (BTreeSet<String>, Vec<String>) {
     let jobs = yml.split_once("jobs:\n").unwrap().1;
-    let actual: BTreeSet<_> = Regex::new(r"(?m)^  ([a-z][a-z0-9-]*):$")
+    let actual: BTreeSet<_> = Regex::new(r"(?m)^  ([A-Za-z_][A-Za-z0-9_-]*):$")
         .unwrap()
         .captures_iter(jobs)
         .map(|c| c[1].to_string())
         .filter(|id| id != "staging-integration-gate")
         .collect();
-    assert_eq!(actual.len(), 17);
     let block = jobs
         .split_once("\n  staging-integration-gate:\n")
         .unwrap()
         .1;
     let needs = section_between(block, "    needs:\n", "    steps:\n", "ci.yml");
-    let declared: Vec<_> = Regex::new(r"(?m)^      - ([a-z][a-z0-9-]*)$")
+    let declared: Vec<_> = Regex::new(r"(?m)^      - ([A-Za-z_][A-Za-z0-9_-]*)$")
         .unwrap()
         .captures_iter(needs)
         .map(|c| c[1].to_string())
         .collect();
+    (actual, declared)
+}
+
+#[test]
+fn inventory_recognizes_every_valid_job_identifier() {
+    let yml = read_repo_file(".github/workflows/ci.yml");
+    for id in ["job_2", "Job2", "_job2"] {
+        let added = yml.replacen(
+            "jobs:\n",
+            &format!(
+                "jobs:\n  {id}:\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 1\n"
+            ),
+            1,
+        );
+        let (actual, declared) = inventory(&added);
+        assert!(actual.contains(id), "unrecognized valid job ID {id}");
+        assert_eq!(actual.len(), 18);
+        assert_ne!(declared.into_iter().collect::<BTreeSet<_>>(), actual);
+
+        let declared_too = added.replacen(
+            "      - pr-purpose\n",
+            &format!("      - {id}\n      - pr-purpose\n"),
+            1,
+        );
+        let (actual, declared) = inventory(&declared_too);
+        assert_eq!(declared.into_iter().collect::<BTreeSet<_>>(), actual);
+    }
+}
+
+#[test]
+fn terminal_gate_covers_all_existing_jobs_without_duplicate_test_runs() {
+    use std::process::Command;
+
+    let yml = read_repo_file(".github/workflows/ci.yml");
+    let (actual, declared) = inventory(&yml);
+    let block = yml.split_once("\n  staging-integration-gate:\n").unwrap().1;
+    assert_eq!(actual.len(), 17);
     assert_eq!(declared.len(), actual.len());
     assert_eq!(declared.into_iter().collect::<BTreeSet<_>>(), actual);
     let output = Command::new("python3")
