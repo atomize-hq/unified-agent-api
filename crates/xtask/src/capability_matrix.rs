@@ -51,9 +51,11 @@ pub fn validate_agent_publication_continuity(
 }
 
 pub fn generate_markdown() -> Result<String, String> {
-    let inventory = capability_publication_mod::collect_capability_publication_inventory(
-        &resolve_workspace_root()?,
-    )?;
+    generate_markdown_for_workspace(&resolve_workspace_root()?)
+}
+
+pub fn generate_markdown_for_workspace(root: &Path) -> Result<String, String> {
+    let inventory = capability_publication_mod::collect_capability_publication_inventory(root)?;
     Ok(render_matrix(
         &inventory.backends,
         &inventory.canonical_target_header,

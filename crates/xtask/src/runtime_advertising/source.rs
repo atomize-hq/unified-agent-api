@@ -114,6 +114,65 @@ impl Source {
             .map_err(|e| format!("{path}: {e}"))
     }
 
+    /// Enumerate this revision without following directory symlinks or treating read errors as absence.
+    pub fn paths(&self, prefix: &str) -> Result<Vec<String>, String> {
+        self.optional(&format!("{prefix}/.source-directory-probe"))?;
+        if let Some(commit) = &self.commit {
+            let rows = self.git(&[
+                "ls-tree",
+                "-r",
+                "-t",
+                "-z",
+                "--full-tree",
+                commit,
+                "--",
+                prefix,
+            ])?;
+            return rows
+                .split('\0')
+                .filter(|r| !r.is_empty())
+                .map(|row| {
+                    row.split_once('\t')
+                        .map(|(_, path)| path.to_owned())
+                        .ok_or_else(|| "invalid source tree entry".into())
+                })
+                .collect();
+        }
+        fn walk(root: &Path, path: &Path, result: &mut Vec<String>) -> Result<(), String> {
+            let entries = match fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(e) => return Err(format!("{}: {e}", path.display())),
+            };
+            for entry in entries {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let kind = entry.file_type().map_err(|e| e.to_string())?;
+                if kind.is_symlink() {
+                    return Err(format!(
+                        "{}: source symlink is unsupported",
+                        entry.path().display()
+                    ));
+                }
+                let path = entry.path();
+                result.push(
+                    path.strip_prefix(root)
+                        .map_err(|e| e.to_string())?
+                        .to_str()
+                        .ok_or("non-UTF8 source path")?
+                        .replace('\\', "/"),
+                );
+                if kind.is_dir() {
+                    walk(root, &path, result)?;
+                }
+            }
+            Ok(())
+        }
+        let mut result = Vec::new();
+        walk(&self.root, &self.root.join(prefix), &mut result)?;
+        result.sort();
+        Ok(result)
+    }
+
     fn git(&self, args: &[&str]) -> Result<String, String> {
         let out = Command::new("git")
             .arg("-C")

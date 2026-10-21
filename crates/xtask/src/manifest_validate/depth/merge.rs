@@ -130,6 +130,50 @@ pub(in crate::manifest_validate) fn validate(
     let Some(anchor) = entry.or(earlier_entry) else {
         return;
     };
+    if !versions.is_empty() {
+        match xtask::depth_acceptance::compare(&workspace, tip.commit(), &anchor.agent_id) {
+            Ok(report) => {
+                for error in report.input_issues {
+                    emit(
+                        violations,
+                        "DEPTH_ACCEPTANCE_INPUT_INVALID",
+                        root.clone(),
+                        error,
+                    );
+                }
+                for requirement in report.missing_entries {
+                    let contexts = requirement
+                        .effects
+                        .iter()
+                        .map(|e| {
+                            format!(
+                                "{}:{} target={}",
+                                e.path,
+                                e.kind,
+                                e.target.as_deref().unwrap_or("covered scope")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    emit(
+                        violations,
+                        "DEPTH_ACCEPTANCE_ENTRY_MISSING",
+                        format!("{root}/reports/{}/depth-record.json", requirement.version),
+                        format!(
+                            "{}/{} requires current record_sha256 {} for {contexts} (check 9)",
+                            anchor.agent_id, requirement.version, requirement.digest
+                        ),
+                    );
+                }
+            }
+            Err(error) => emit(
+                violations,
+                "DEPTH_ACCEPTANCE_INPUT_INVALID",
+                root.clone(),
+                error,
+            ),
+        }
+    }
     for version in versions {
         let path = root_dir
             .join("reports")

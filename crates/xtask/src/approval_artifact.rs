@@ -192,19 +192,38 @@ fn load_approval_artifact_with_options(
         ))
     })?;
 
-    parse_approval_document(
+    let artifact = parse_approval_document(
         document,
-        &workspace_root,
         &relative_path,
         &canonical_path,
         &path_pack_prefix,
         &bytes,
-    )
+    )?;
+    validate_repo_relative_existing_file(
+        &workspace_root,
+        &relative_path,
+        "comparison_ref",
+        COMPARISON_REF_PATH,
+    )?;
+    Ok(artifact)
+}
+
+/// Structural attribution from this revision's exact bytes, without looking up today's files.
+/// This is not closeout authority or approval/registry continuity validation.
+pub fn parse_approval_form(
+    text: &str,
+    relative_path: &str,
+) -> Result<ApprovalArtifact, ApprovalArtifactError> {
+    let path = Path::new(relative_path);
+    let prefix = validate_approval_path(path, false)?;
+    let document = text
+        .parse::<DocumentMut>()
+        .map_err(|e| ApprovalArtifactError::Validation(e.to_string()))?;
+    parse_approval_document(document, path, path, &prefix, text.as_bytes())
 }
 
 fn parse_approval_document(
     document: DocumentMut,
-    workspace_root: &Path,
     relative_path: &Path,
     canonical_path: &Path,
     path_pack_prefix: &str,
@@ -243,12 +262,6 @@ fn parse_approval_document(
             relative_path.display()
         )));
     }
-    validate_repo_relative_existing_file(
-        workspace_root,
-        relative_path,
-        "comparison_ref",
-        &comparison_ref,
-    )?;
 
     let selection_mode = required_string(root, "selection_mode", relative_path)?;
     if !matches!(

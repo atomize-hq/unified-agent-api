@@ -33,10 +33,10 @@ pub(super) fn derive_validated_runtime_support_for_loaded_roots(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct RuntimeSupportProjectionRecord {
-    runtime_family: String,
-    target_triple: String,
-    latest_validated: Option<String>,
+pub struct RuntimeSupportProjectionRecord {
+    pub runtime_family: String,
+    pub target_triple: String,
+    pub latest_validated: Option<String>,
 }
 
 pub(super) fn derive_runtime_support_projection_for_loaded_roots(
@@ -95,7 +95,7 @@ fn derive_runtime_support_projection_for_loaded_root(
     Ok(records)
 }
 
-pub(super) fn render_agent_api_runtime_support_data_from_projection(
+pub fn render_agent_api_runtime_support_data_from_projection(
     projection: &[RuntimeSupportProjectionRecord],
     runtime_families: &[&str],
 ) -> String {

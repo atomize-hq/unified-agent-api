@@ -35,6 +35,10 @@ impl<'a> Tip<'a> {
         })
     }
 
+    pub(super) fn commit(&self) -> &str {
+        &self.commit
+    }
+
     pub(super) fn registry(&self) -> Result<AgentRegistry, String> {
         let raw = run(
             self.workspace,

@@ -89,6 +89,17 @@ fn republish(codex_dir: &Path) {
     else {
         return;
     };
+    if !workspace.join("crates/agent_api/Cargo.toml").exists() {
+        copy_dir_recursive(
+            &workspace_root().join("crates/agent_api/src"),
+            &workspace.join("crates/agent_api/src"),
+        );
+        fs::copy(
+            workspace_root().join("crates/agent_api/Cargo.toml"),
+            workspace.join("crates/agent_api/Cargo.toml"),
+        )
+        .unwrap();
+    }
     if let Ok(rows) = xtask::support_matrix::derive_rows(&workspace) {
         let bundle = xtask::support_matrix::render_publication_bundle(&rows, String::new())
             .expect("render publication");
@@ -96,6 +107,20 @@ fn republish(codex_dir: &Path) {
             &workspace.join("cli_manifests/support_matrix/current.json"),
             &bundle.json,
         );
+        write_text(&workspace.join("docs/specs/unified-agent-api/support-matrix.md"), &format!("<!-- support-matrix-published:start -->\n{}<!-- support-matrix-published:end -->\n",bundle.markdown));
+        if let Ok(source) = xtask::support_matrix::render_agent_api_runtime_support_data(&workspace)
+        {
+            write_text(
+                &workspace.join(xtask::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH),
+                &source,
+            );
+        }
+        if let Ok(source) = xtask::capability_matrix::generate_markdown_for_workspace(&workspace) {
+            write_text(
+                &workspace.join(xtask::capability_matrix::DEFAULT_OUT_PATH),
+                &source,
+            );
+        }
     }
 }
 
