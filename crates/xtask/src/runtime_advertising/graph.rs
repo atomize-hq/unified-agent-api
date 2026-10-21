@@ -323,6 +323,9 @@ impl<'ast> Visit<'ast> for Graph<'_> {
                     TokenTree::Ident(id)
                         if [
                             "impl",
+                            "fn",
+                            "const",
+                            "static",
                             "mod",
                             "use",
                             "extern",
@@ -339,6 +342,7 @@ impl<'ast> Visit<'ast> for Graph<'_> {
                         return true
                     }
                     TokenTree::Group(g) if declaration(g.stream()) => return true,
+                    TokenTree::Punct(p) if p.as_char() == '#' => return true,
                     TokenTree::Punct(p)
                         if p.as_char() == '!'
                             && matches!(tokens.get(i + 1), Some(TokenTree::Group(_))) =>

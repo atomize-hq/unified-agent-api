@@ -82,7 +82,8 @@ Unsupported item macros, procedural attributes/derives, module paths, namespace 
 expansion MUST fail on that graph. Revision 1 supports ordinary built-in attributes/derives and
 the existing fully qualified serde/thiserror derives. Expression macros are restricted to the
 recognized built-ins and existing Tokio/serde_json forms; opaque macro arguments MUST NOT hide
-declarations or unsupported nested expansion. New accepted expansion forms require an explicit
+declarations, attributes or unsupported nested expansion. In particular, function/const/static
+items and procedural attributes inside an expression macro remain unsupported. New accepted expansion forms require an explicit
 conformance extension. Relevant files in this graph are read independently from each revision.
 
 The checker extracts guarded items from larger backend files so unrelated backend method
@@ -99,7 +100,8 @@ Third-party implementations of the public backend trait are outside this built-i
 The `agent_api` manifest MUST contain exactly `default` and the five backend feature keys.
 Extra aliases, including empty aliases, missing keys and unknown references are unsupported.
 Unsupported optional dependencies MUST also fail, since Cargo creates implicit public features
-for optional dependencies even when no explicit feature key is authored.
+for optional dependencies even when no explicit feature key is authored. This applies to normal,
+build and development dependency tables, not only runtime dependencies.
 Supported lists contain references among those five features and explicit activation of their
 actual optional dependencies. Each backend feature MUST directly activate its matching wrapper,
 `tokio` and `futures-util`. Cyclic feature references MUST fail.
