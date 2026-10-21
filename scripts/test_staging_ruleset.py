@@ -19,7 +19,7 @@ class RulesetTests(unittest.TestCase):
     def setUp(self):
         self.desired = json.loads(DESIRED.read_text())
         self.detail = copy.deepcopy(self.desired) | {
-            "id": 42, "source_type": "Repository", "source": REPO,
+            "id": 42, "source_type": "Repository", "source": REPO, "current_user_can_bypass": "never",
         }
         self.listed = [{key: self.detail[key] for key in
                         ("id", "name", "target", "source_type", "source", "enforcement")}]
@@ -261,3 +261,17 @@ class RulesetTests(unittest.TestCase):
             "check_response_timeout_minutes": 60, "grouping_strategy": "ALLGREEN",
             "max_entries_to_build": 1, "max_entries_to_merge": 1, "merge_method": "MERGE",
             "min_entries_to_merge": 1, "min_entries_to_merge_wait_minutes": 0})
+
+    def test_current_viewer_bypass_metadata_only_accepts_explicit_never(self):
+        self.detail["current_user_can_bypass"] = "never"
+        code, report = self.run_main()
+        self.assertEqual((code, report["status"]), (0, "match"))
+        for value in ["always", "pull_requests_only", "unknown", None, False, [], {}]:
+            self.detail["current_user_can_bypass"] = value
+            code, report = self.run_main()
+            with self.subTest(value=value):
+                self.assertEqual((code, report["status"]), (2, "unavailable"))
+        self.detail["current_user_can_bypass"] = "never"
+        self.detail.pop("bypass_actors")
+        code, report = self.run_main()
+        self.assertEqual((code, report["status"]), (2, "unavailable"))

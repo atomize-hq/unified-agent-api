@@ -19,7 +19,8 @@ LEGACY_QUERY = """query($owner: String!, $name: String!) {
   }
 }"""
 FIELDS = {"name", "target", "enforcement", "bypass_actors", "conditions", "rules"}
-METADATA = {"id", "node_id", "source_type", "source", "_links", "created_at", "updated_at"}
+METADATA = {"id", "node_id", "source_type", "source", "_links", "created_at", "updated_at",
+            "current_user_can_bypass"}
 
 
 def require(condition, message):
@@ -68,6 +69,9 @@ def payload(value):
     require(isinstance(value, dict) and FIELDS <= value.keys(),
             "incomplete ruleset readback (including bypass_actors); verification unavailable")
     require(not value.keys() - FIELDS - METADATA, "unsupported ruleset fields in readback")
+    if "current_user_can_bypass" in value:
+        require(value["current_user_can_bypass"] == "never",
+                "viewer bypass capability is positive or unsupported; verification unavailable")
     return {key: value[key] for key in FIELDS}
 
 

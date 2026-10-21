@@ -55,7 +55,9 @@ Active push rulesets require separate review and return unavailable.
 
 Rules/contexts and other current policy arrays are compared without order sensitivity, retaining
 duplicates and parameter types. Documented server metadata is ignored; missing policy fields or
-unknown ruleset fields block verification. Full bypass visibility is required. For legacy-rule
+unknown ruleset fields block verification. The known viewer-derived `current_user_can_bypass`
+field is normalized only when it is `never`; positive or unknown values block a match. It never
+substitutes for the explicit `bypass_actors` list. Full bypass visibility is required. For legacy-rule
 visibility the helper requires an authenticated administrator user (`viewerPermission=ADMIN`);
 limited users and GitHub App credentials with null viewer permission return unavailable. Use
 existing authorized credentials; this command grants no permissions. Failed or empty readback,
@@ -102,6 +104,7 @@ production depth stays disabled until the contract's prerequisites are met.
 - [REST rulesets, parameters and bypass visibility](https://docs.github.com/en/rest/repos/rules#get-a-repository-ruleset)
 - [Effective branch rules, including inherited active rules](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch)
 - [GraphQL Ref branch protection](https://docs.github.com/en/graphql/reference/git#ref)
+- [Viewer-derived bypass state](https://github.blog/changelog/2023-06-27-repository-rules-public-beta-updates/)
 - [Repository viewer permission](https://docs.github.com/en/graphql/reference/repos#repository)
 
 The REST reads pin API version `2026-03-10`. New schema/defaults that prevent an exact comparison
