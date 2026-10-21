@@ -111,3 +111,32 @@ fn status_and_passed_targets_compare_values_not_timestamps() {
         .iter()
         .any(|e| e.kind == "validation.passed_targets"));
 }
+
+#[test]
+fn source_paths_have_one_canonical_identity_in_both_revisions() {
+    let (temp, _root, tip) = baseline(Some(&record()));
+    for source in [
+        xtask::runtime_advertising::source::Source::workspace(temp.path()).unwrap(),
+        xtask::runtime_advertising::source::Source::tip(temp.path(), &tip).unwrap(),
+    ] {
+        for path in [
+            "crates/agent_api/src/./runtime_support_data.rs",
+            "crates//agent_api/src/runtime_support_data.rs",
+            "crates/agent_api/src/../src/runtime_support_data.rs",
+        ] {
+            assert!(source.optional(path).is_err(), "accepted alias {path}");
+        }
+    }
+}
+
+#[path = "acceptance/lifecycle.rs"]
+mod lifecycle;
+
+#[path = "acceptance/publication.rs"]
+mod publication;
+
+#[path = "acceptance/attribution.rs"]
+mod attribution;
+
+#[path = "acceptance/projections.rs"]
+mod projections;

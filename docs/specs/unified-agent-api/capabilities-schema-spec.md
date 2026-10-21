@@ -148,8 +148,11 @@ reads no depth record (`crates/xtask/src/capability_matrix.rs`,
 `crates/xtask/src/capability_publication.rs`). Its generated inventory documents advertising,
 not support or promotion status. The [runtime advertising model](runtime-advertising-model.md)
 constrains the five built-ins to a checked registry projection, including opt-in, host and
-feature contexts beyond the publication matrix. That preparation preserves runtime behavior;
-check 9 entry admission and depth-qualified capability publication remain unimplemented.
+feature contexts beyond the publication matrix. The bridge preserves runtime behavior.
+`manifest-validate --tip` now compares new advertising in all supported model contexts and actual
+positive matrix cells for relevant recorded scope, requiring a current record-wide entry under
+check 9. Continuous support publication checks decide depth qualification. Neither supplies
+route admission or production enablement.
 
 ## Change control and verification (normative)
 

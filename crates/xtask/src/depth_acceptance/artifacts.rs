@@ -170,12 +170,11 @@ fn owner(view: &View, artifact: &Artifact) -> Result<Option<String>, String> {
 }
 fn binding_owner(view: &View, artifact: &Artifact, raw: &str) -> Result<Option<String>, String> {
     if artifact.kind != Kind::Maintenance {
-        let approval = crate::approval_artifact::parse_approval_form(raw, &artifact.binding)
+        let approval = crate::approval_artifact::parse_approval_attribution(raw, &artifact.binding)
             .map_err(|e| e.to_string())?;
-        if approval.descriptor.agent_id != view.entry.agent_id
-            || approval.descriptor.manifest_root != view.entry.manifest_root
-            || approval.descriptor.onboarding_pack_prefix
-                != view.entry.scaffold.onboarding_pack_prefix
+        if approval.agent_id != view.entry.agent_id
+            || approval.manifest_root != view.entry.manifest_root
+            || approval.onboarding_pack_prefix != view.entry.scaffold.onboarding_pack_prefix
         {
             return Err("approval belongs to another agent/root".into());
         }

@@ -135,7 +135,11 @@ fn host(target: &str) -> Result<(&str, &str), String> {
         "x86_64-unknown-linux-musl" | "x86_64-unknown-linux-gnu" | "linux-x64" => {
             Ok(("linux", "x86_64"))
         }
-        "aarch64-unknown-linux-musl" | "aarch64-unknown-linux-gnu" => Ok(("linux", "aarch64")),
+        "aarch64-unknown-linux-musl" | "aarch64-unknown-linux-gnu" | "linux-arm64" => {
+            Ok(("linux", "aarch64"))
+        }
+        "x86_64-apple-darwin" | "darwin-x64" => Ok(("macos", "x86_64")),
+        "aarch64-pc-windows-msvc" | "win32-arm64" => Ok(("windows", "aarch64")),
         "aarch64-apple-darwin" | "darwin-arm64" => Ok(("macos", "aarch64")),
         "x86_64-pc-windows-msvc" | "win32-x64" => Ok(("windows", "x86_64")),
         _ => Err(format!("unresolved advertising target label {target}")),
@@ -164,7 +168,8 @@ pub(super) fn advertising(
                 continue;
             }
             for target in crate::support_matrix::depth::covered_targets(record) {
-                if host(target)? == (added.os.as_str(), added.arch.as_str()) {
+                let (os, arch) = host(target)?;
+                if now.host_cell(&old, os, arch) == (added.os.as_str(), added.arch.as_str()) {
                     effect(
                         effects,
                         version,

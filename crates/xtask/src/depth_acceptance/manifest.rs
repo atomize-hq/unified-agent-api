@@ -90,15 +90,30 @@ pub(super) fn detect(
     }
     for version in after.records.keys() {
         let path = format!("{root}/versions/{version}.json");
-        let now = after.json(&path)?;
-        let old = before.optional_json(&path)?.unwrap_or(Value::Null);
-        if now["schema_version"] != 1 || now["semantic_version"] != *version {
-            return Err(format!("{path}: unsupported version metadata"));
-        }
-        if !old.is_null() && (old["schema_version"] != 1 || old["semantic_version"] != *version) {
-            return Err(format!("{path}: unsupported baseline metadata"));
-        }
-        let status = text(&now, "status")?;
+        let read = |view: &View| -> Result<Value, String> {
+            let Some(value) = view.optional_json(&path)? else {
+                return Ok(Value::Null);
+            };
+            if value["schema_version"] != 1 || value["semantic_version"] != *version {
+                return Err(format!("{path}: unsupported version metadata"));
+            }
+            if !["snapshotted", "reported", "validated", "supported"]
+                .contains(&text(&value, "status")?)
+            {
+                return Err(format!("{path}: unsupported version status"));
+            }
+            if value.get("validation").is_some_and(|v| !v.is_object()) {
+                return Err(format!("{path}: invalid validation object"));
+            }
+            Ok(value)
+        };
+        let now = read(after)?;
+        let old = read(before)?;
+        let status = if now.is_null() {
+            ""
+        } else {
+            text(&now, "status")?
+        };
         if ["validated", "supported"].contains(&status) && old["status"] != now["status"] {
             effect(effects, version, None, &path, "status");
         }

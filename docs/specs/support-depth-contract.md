@@ -597,12 +597,25 @@ A depth-gated effect is an **acceptance effect** for a tuple when it does any of
 - sets the tuple's version status to `validated` or `supported`, or records a passed per-target
   outcome
 - retires a stand-down marker
-- creates or changes a maintenance closeout record, or records a proving-run closeout as `closed`
+- creates or semantically changes a maintenance closeout record, records a proving-run closeout
+  as `closed`, or semantically changes it while it remains `closed`. Actual timestamp values count;
+  serialization and set ordering alone do not
 - advances the lifecycle record's stage to `published` or `closed_baseline`, adds one of its
-  closeout evidence ids or clears a drift side state
+  closeout evidence ids or clears a drift side state. A still-present accepting stage, evidence id
+  or absence-of-drift assertion also counts when it reports a different actual packet or closeout
+  present in the candidate, including replacement bytes at the same path. Reference identity uses
+  the path and raw content digest. Disappearance alone supplies no acceptance destination and
+  imposes no general maintenance-closeout-presence requirement
 - lists an acceptance entry in a depth record, or publishes a promise as qualified or a capability
   as depth-qualified
 - adds capability advertising
+
+When `drifted` is removed, including by removal of the lifecycle record, and the agent has a depth
+record in either revision, the candidate maintenance closeout MUST resolve its generation in that
+same revision. A destination covered by a retained record requires its current entry. A positively
+resolved ordinary destination is ordinary; missing, malformed, conflicting or unresolved attribution
+MUST fail. An unchanged absence of drift is not a new clearance. A binding held only in the tip
+cannot authorize candidate artifact bytes.
 
 Every other depth-gated effect is a **reporting effect**.
 
@@ -1392,8 +1405,12 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   with the derived ones. With `--tip`, it also reads the integration-tip records and their registry
   from Git objects, and a changed onboarding record's versioned approval, to decide checks 2, 4
   and 11. PR validation compares the test merge with its first parent; light push-to-staging
-  validation compares event SHA with event.before. Check 9, route admission and tip-conditional
-  integration remain prerequisites before enablement (uaa-0073 in docs/backlog.json).
+  validation compares event SHA with event.before. With `--tip`, check 9 also compares every
+  acceptance-effect category through `xtask/depth_acceptance/`, using each revision's own immutable
+  inputs and the checked runtime advertising model. It requires a candidate record-wide current
+  entry for every covered acceptance destination, except entry listing itself. This is structural
+  validation, not actor authorization or route admission. Route admission, strict staging
+  integration and the remaining proof/enablement work remain prerequisites (uaa-0073).
 - In the three roots that have them, `RULES.json` names the record's path as
   `storage.committed.reports.depth_record`, which is how a root states that it adopts this annex.
   `SCHEMA.json` defines no shape for a depth record: the typed reader rejects any member B.6 does

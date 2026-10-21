@@ -51,6 +51,9 @@ impl Source {
 
     pub fn optional(&self, path: &str) -> Result<Option<String>, String> {
         if path.is_empty()
+            || path
+                .split('/')
+                .any(|part| part.is_empty() || part == "." || part == ".." || part.contains('\\'))
             || Path::new(path)
                 .components()
                 .any(|p| !matches!(p, Component::Normal(_)))

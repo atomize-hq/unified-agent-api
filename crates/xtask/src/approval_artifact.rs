@@ -208,18 +208,26 @@ fn load_approval_artifact_with_options(
     Ok(artifact)
 }
 
-/// Structural attribution from this revision's exact bytes, without looking up today's files.
-/// This is not closeout authority or approval/registry continuity validation.
-pub fn parse_approval_form(
+/// Identity and optional depth scope from the approval's own revision. Historical approval
+/// forms need not contain today's maintenance authority descriptor.
+#[derive(Debug, Clone)]
+pub struct ApprovalAttribution {
+    pub agent_id: String,
+    pub manifest_root: String,
+    pub onboarding_pack_prefix: String,
+    pub support_depth_version: Option<String>,
+}
+
+pub fn parse_approval_attribution(
     text: &str,
     relative_path: &str,
-) -> Result<ApprovalArtifact, ApprovalArtifactError> {
+) -> Result<ApprovalAttribution, ApprovalArtifactError> {
     let path = Path::new(relative_path);
     let prefix = validate_approval_path(path, false)?;
     let document = text
         .parse::<DocumentMut>()
         .map_err(|e| ApprovalArtifactError::Validation(e.to_string()))?;
-    parse_approval_document(document, path, path, &prefix, text.as_bytes())
+    approval_scope(&document, path, &prefix).map(|(scope, _)| scope)
 }
 
 fn parse_approval_document(
@@ -229,6 +237,74 @@ fn parse_approval_document(
     path_pack_prefix: &str,
     bytes: &[u8],
 ) -> Result<ApprovalArtifact, ApprovalArtifactError> {
+    let (scope, descriptor) = approval_scope(&document, relative_path, path_pack_prefix)?;
+    let maintenance = required_table(descriptor, "maintenance", relative_path)?;
+    let maintenance = parse_maintenance(maintenance, relative_path)?;
+
+    Ok(ApprovalArtifact {
+        support_depth_version: scope.support_depth_version,
+        relative_path: relative_path.display().to_string(),
+        canonical_path: canonical_path.to_path_buf(),
+        sha256: hex::encode(Sha256::digest(bytes)),
+        descriptor: ApprovalDescriptor {
+            agent_id: scope.agent_id,
+            display_name: required_string(descriptor, "display_name", relative_path)?,
+            crate_path: required_string(descriptor, "crate_path", relative_path)?,
+            backend_module: required_string(descriptor, "backend_module", relative_path)?,
+            manifest_root: required_string(descriptor, "manifest_root", relative_path)?,
+            package_name: required_string(descriptor, "package_name", relative_path)?,
+            canonical_targets: string_array(descriptor, "canonical_targets", relative_path, true)?,
+            wrapper_coverage_binding_kind: required_string(
+                descriptor,
+                "wrapper_coverage_binding_kind",
+                relative_path,
+            )?,
+            wrapper_coverage_source_path: required_string(
+                descriptor,
+                "wrapper_coverage_source_path",
+                relative_path,
+            )?,
+            always_on_capabilities: string_array(
+                descriptor,
+                "always_on_capabilities",
+                relative_path,
+                false,
+            )?,
+            target_gated_capabilities: target_gate_entries(descriptor, relative_path)?,
+            config_gated_capabilities: config_gate_entries(descriptor, relative_path)?,
+            backend_extensions: string_array(
+                descriptor,
+                "backend_extensions",
+                relative_path,
+                false,
+            )?,
+            support_matrix_enabled: required_bool(
+                descriptor,
+                "support_matrix_enabled",
+                relative_path,
+            )?,
+            capability_matrix_enabled: required_bool(
+                descriptor,
+                "capability_matrix_enabled",
+                relative_path,
+            )?,
+            capability_matrix_target: optional_string(
+                descriptor,
+                "capability_matrix_target",
+                relative_path,
+            )?,
+            docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,
+            onboarding_pack_prefix: scope.onboarding_pack_prefix,
+        },
+        maintenance,
+    })
+}
+
+fn approval_scope<'a>(
+    document: &'a DocumentMut,
+    relative_path: &Path,
+    path_pack_prefix: &str,
+) -> Result<(ApprovalAttribution, &'a dyn toml_edit::TableLike), ApprovalArtifactError> {
     let root = document.as_item().as_table_like().ok_or_else(|| {
         ApprovalArtifactError::Validation(format!(
             "approval artifact `{}` root must be a table",
@@ -321,66 +397,15 @@ fn parse_approval_document(
         )));
     }
 
-    let maintenance = required_table(descriptor, "maintenance", relative_path)?;
-    let maintenance = parse_maintenance(maintenance, relative_path)?;
-
-    Ok(ApprovalArtifact {
-        support_depth_version,
-        relative_path: relative_path.display().to_string(),
-        canonical_path: canonical_path.to_path_buf(),
-        sha256: hex::encode(Sha256::digest(bytes)),
-        descriptor: ApprovalDescriptor {
+    Ok((
+        ApprovalAttribution {
             agent_id,
-            display_name: required_string(descriptor, "display_name", relative_path)?,
-            crate_path: required_string(descriptor, "crate_path", relative_path)?,
-            backend_module: required_string(descriptor, "backend_module", relative_path)?,
             manifest_root: required_string(descriptor, "manifest_root", relative_path)?,
-            package_name: required_string(descriptor, "package_name", relative_path)?,
-            canonical_targets: string_array(descriptor, "canonical_targets", relative_path, true)?,
-            wrapper_coverage_binding_kind: required_string(
-                descriptor,
-                "wrapper_coverage_binding_kind",
-                relative_path,
-            )?,
-            wrapper_coverage_source_path: required_string(
-                descriptor,
-                "wrapper_coverage_source_path",
-                relative_path,
-            )?,
-            always_on_capabilities: string_array(
-                descriptor,
-                "always_on_capabilities",
-                relative_path,
-                false,
-            )?,
-            target_gated_capabilities: target_gate_entries(descriptor, relative_path)?,
-            config_gated_capabilities: config_gate_entries(descriptor, relative_path)?,
-            backend_extensions: string_array(
-                descriptor,
-                "backend_extensions",
-                relative_path,
-                false,
-            )?,
-            support_matrix_enabled: required_bool(
-                descriptor,
-                "support_matrix_enabled",
-                relative_path,
-            )?,
-            capability_matrix_enabled: required_bool(
-                descriptor,
-                "capability_matrix_enabled",
-                relative_path,
-            )?,
-            capability_matrix_target: optional_string(
-                descriptor,
-                "capability_matrix_target",
-                relative_path,
-            )?,
-            docs_release_track: required_string(descriptor, "docs_release_track", relative_path)?,
             onboarding_pack_prefix,
+            support_depth_version,
         },
-        maintenance,
-    })
+        descriptor,
+    ))
 }
 
 const ROOT_KEYS: [&str; 10] = [
