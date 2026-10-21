@@ -6,6 +6,9 @@ on:
       - staging
       - main
     types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
+    branches: [staging]
   push:
     branches:
       - main
@@ -81,6 +84,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_changed: ${{ steps.version-changelog-diff.outputs.version_changed }}
+      candidate: ${{ steps.version-changelog-diff.outputs.candidate }}
+      tip: ${{ steps.version-changelog-diff.outputs.tip }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -115,49 +120,12 @@ jobs:
           set -euo pipefail
           python3 scripts/validate_publish_versions.py
 
-      - name: Guard CHANGELOG.md updates when VERSION changes
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+      - name: Validate candidate and VERSION/CHANGELOG transition
         id: version-changelog-diff
         shell: bash
         run: |
           set -euo pipefail
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha="${{ github.event.pull_request.base.sha }}"
-            head_sha="${{ github.event.pull_request.head.sha }}"
-            compare_sha="$(git merge-base "$base_sha" "$head_sha")"
-          else
-            base_sha="${{ github.event.before }}"
-            head_sha="${{ github.sha }}"
-            compare_sha="$base_sha"
-          fi
-
-          if [ -z "$compare_sha" ] || [ "$compare_sha" = "0000000000000000000000000000000000000000" ]; then
-            echo "No comparable base commit is available; skipping VERSION/CHANGELOG diff guard."
-            echo "version_changed=0" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          version_changed=0
-          changelog_changed=0
-
-          if ! git diff --quiet "$compare_sha" "$head_sha" -- VERSION; then
-            version_changed=1
-          fi
-
-          if ! git diff --quiet "$compare_sha" "$head_sha" -- CHANGELOG.md; then
-            changelog_changed=1
-          fi
-
-          if (( version_changed == 1 && changelog_changed == 0 )); then
-            echo "Root VERSION changed between $compare_sha and $head_sha, but CHANGELOG.md did not." >&2
-            echo "Update CHANGELOG.md whenever the root VERSION file changes." >&2
-            exit 1
-          fi
-
-          echo "version_changed=$version_changed" >> "$GITHUB_OUTPUT"
-          echo "VERSION changed: $version_changed"
-          echo "CHANGELOG.md changed: $changelog_changed"
+          python3 scripts/check_staging_integration.py version
 
   publish-readiness:
     name: Publish readiness
@@ -168,11 +136,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Unit test publish planner
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Validate publish readiness
         shell: bash
         run: |
@@ -272,16 +235,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: xtask manifest-validate (codex root)
         shell: bash
-        env:
-          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
+          DEPTH_TIP="$(python3 scripts/check_staging_integration.py tip)"
           ARGS=(--root cli_manifests/codex)
           if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
           cargo run -p xtask -- manifest-validate "${ARGS[@]}"
@@ -292,16 +254,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: xtask manifest-validate (claude_code root)
         shell: bash
-        env:
-          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
+          DEPTH_TIP="$(python3 scripts/check_staging_integration.py tip)"
           ARGS=(--root cli_manifests/claude_code)
           if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
           cargo run -p xtask -- manifest-validate "${ARGS[@]}"
@@ -312,16 +273,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: xtask manifest-validate (opencode root)
         shell: bash
-        env:
-          DEPTH_TIP: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && 'HEAD^1' || '' }}
         run: |
           set -euo pipefail
+          DEPTH_TIP="$(python3 scripts/check_staging_integration.py tip)"
           ARGS=(--root cli_manifests/opencode)
           if [ -n "$DEPTH_TIP" ]; then ARGS+=(--tip "$DEPTH_TIP"); fi
           cargo run -p xtask -- manifest-validate "${ARGS[@]}"
@@ -556,3 +516,41 @@ jobs:
         run: |
           set -euo pipefail
           cargo test -p unified-agent-api-claude-code --examples
+
+  staging-integration-gate:
+    name: >-
+      ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') ||
+           (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/staging')) &&
+          'Staging integration gate' || 'CI summary (non-staging)' }}
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    needs:
+      - pr-purpose
+      - repo-version-guards
+      - publish-readiness
+      - preflight
+      - rust-tests
+      - agent-api-all-features
+      - loc-check
+      - agent-api-backend-type-leak-guard
+      - capability-matrix
+      - codex-validate-artifacts
+      - claude-validate-artifacts
+      - opencode-validate-artifacts
+      - versions
+      - claude-versions
+      - linux-latest-validated
+      - linux-min-supported
+      - linux-claude-latest-validated
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Evaluate existing CI results
+        shell: bash
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check_staging_integration.py gate

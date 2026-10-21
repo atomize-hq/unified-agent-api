@@ -4,7 +4,7 @@ use super::*;
 use std::{os::unix::fs::PermissionsExt, process::Command};
 
 #[test]
-fn pr_depth_validation_uses_the_test_merge_parent_for_every_root_without_skips() {
+fn integration_depth_validation_checks_candidate_context_for_every_root_without_skips() {
     let yml = read_repo_file(".github/workflows/ci.yml");
     for (job, next, root) in [
         (
@@ -26,17 +26,20 @@ fn pr_depth_validation_uses_the_test_merge_parent_for_every_root_without_skips()
             "ci.yml",
         );
         assert!(
-            block.contains("fetch-depth: 2"),
-            "{job}: fetch the integration parent"
+            block.contains("fetch-depth: 0"),
+            "{job}: fetch the complete candidate history for PRs and queue groups"
         );
         assert!(
             !block.contains("has_versions") && !block.contains("hashFiles"),
             "{job}: records can outlive metadata"
         );
-        assert!(
-            block.contains("github.event_name == 'pull_request' && github.base_ref == 'staging'")
+        assert!(block.contains("DEPTH_TIP=\"$(python3 scripts/check_staging_integration.py tip)\""));
+        assert_text_order(
+            block,
+            "check_staging_integration.py tip",
+            "cargo run -p xtask -- manifest-validate",
+            "ci.yml",
         );
-        assert!(block.contains("'HEAD^1'"));
         assert!(block.contains("ARGS+=(--tip \"$DEPTH_TIP\")"));
         assert!(block.contains(&format!("ARGS=(--root cli_manifests/{root})")));
         assert!(block.contains("cargo run -p xtask -- manifest-validate \"${ARGS[@]}\""));

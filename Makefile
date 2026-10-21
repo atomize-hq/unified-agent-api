@@ -212,6 +212,7 @@ flightcheck:
 	@echo "##flightcheck -- must run from repo root"
 	@echo "##flightcheck -- must pass for *integ tasks to be considered green"
 	$(MAKE) fmt-check
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 	$(MAKE) clippy
 	cargo clean
 	$(MAKE) check
