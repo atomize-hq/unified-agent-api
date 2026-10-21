@@ -12,6 +12,8 @@ use std::time::Duration;
 use futures_core::Stream;
 
 mod agent_kind;
+#[allow(dead_code)]
+mod runtime_advertising;
 mod runtime_support;
 
 use crate::mcp::{

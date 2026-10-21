@@ -18,6 +18,7 @@ pub mod recommend_next_agent_research;
 pub mod release_doc;
 pub mod repair_runtime_evidence;
 mod root_intake_layout;
+pub mod runtime_advertising;
 pub mod runtime_evidence_bundle;
 pub mod runtime_evidence_run;
 pub mod runtime_follow_on;

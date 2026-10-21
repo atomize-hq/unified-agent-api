@@ -184,10 +184,13 @@ fn bh_r0_agent_api_config_model_v1_is_rejected_before_value_shape_validation_via
 }
 
 #[test]
-fn bh_r0_agent_api_config_model_v1_is_confined_to_normalize_rs_in_production_code() {
+fn bh_r0_model_literal_homes_and_raw_selection_access_are_confined() {
     let src_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let allowed_normalize = src_root.join("backend_harness/normalize.rs");
     let allowed_constant_home = src_root.join("lib.rs");
+    // Advertising data is generated from the registry and checked by xtask source conformance.
+    // This permits its capability literal, never raw model-selection access below.
+    let allowed_advertising_data = src_root.join("runtime_advertising/data.rs");
 
     let mut files = Vec::new();
     collect_rs_files(&src_root, &mut files);
@@ -207,6 +210,7 @@ fn bh_r0_agent_api_config_model_v1_is_confined_to_normalize_rs_in_production_cod
         let contents = fs::read_to_string(&path).expect("read source file");
         if path != allowed_normalize
             && path != allowed_constant_home
+            && path != allowed_advertising_data
             && contents.contains(EXT_AGENT_API_CONFIG_MODEL_V1)
         {
             literal_offenders.push(
@@ -237,7 +241,7 @@ fn bh_r0_agent_api_config_model_v1_is_confined_to_normalize_rs_in_production_cod
 
     assert!(
         literal_offenders.is_empty(),
-        "agent_api.config.model.v1 literal leaked outside normalize.rs/lib.rs and tests: {literal_offenders:?}"
+        "agent_api.config.model.v1 literal leaked outside normalize.rs/lib.rs/generated advertising data and tests: {literal_offenders:?}"
     );
     assert!(
         raw_access_offenders.is_empty(),

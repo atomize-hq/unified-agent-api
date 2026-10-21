@@ -3,9 +3,6 @@
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
 const AGENT_KIND: &str = "gemini_cli";
-const CAP_RUN_V1: &str = "agent_api.run";
-const CAP_EVENTS_V1: &str = "agent_api.events";
-const CAP_EVENTS_LIVE_V1: &str = "agent_api.events.live";
 const CHANNEL_ASSISTANT: &str = "assistant";
 const CHANNEL_TOOL: &str = "tool";
 

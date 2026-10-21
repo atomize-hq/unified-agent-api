@@ -37,7 +37,9 @@ const SUPPORTED_EXTENSION_KEYS_EXTERNAL_SANDBOX_OPT_IN: &[&str] = &[
 ];
 
 const CAP_TOOLS_STRUCTURED_V1: &str = "agent_api.tools.structured.v1";
+#[cfg(test)]
 const CAP_TOOLS_RESULTS_V1: &str = "agent_api.tools.results.v1";
+#[cfg(test)]
 const CAP_ARTIFACTS_FINAL_TEXT_V1: &str = "agent_api.artifacts.final_text.v1";
 const CAP_SESSION_HANDLE_V1: &str = "agent_api.session.handle.v1";
 
@@ -46,6 +48,7 @@ const SESSION_HANDLE_OVERSIZE_WARNING: &str = "session handle omitted: id exceed
 const PINNED_EXTERNAL_SANDBOX_WARNING: &str =
     "DANGEROUS: external sandbox exec policy enabled (agent_api.exec.external_sandbox.v1=true)";
 
+#[cfg(test)]
 fn claude_mcp_list_supported_on_target() -> bool {
     cfg!(any(
         all(target_os = "linux", target_arch = "x86_64"),
@@ -54,6 +57,7 @@ fn claude_mcp_list_supported_on_target() -> bool {
     ))
 }
 
+#[cfg(test)]
 fn claude_mcp_get_supported_on_target() -> bool {
     cfg!(all(target_os = "windows", target_arch = "x86_64"))
 }
