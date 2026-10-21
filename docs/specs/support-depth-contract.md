@@ -916,6 +916,14 @@ These checks provide structural evidence for a candidate. Required checks, queue
 effective host enforcement, exact final-tip/result correspondence and production enablement
 still require the separately reviewed installation and host-proof work.
 
+The desired staging host policy is versioned in
+[`staging-integration-ruleset.json`](../agents/lifecycle/staging-integration-ruleset.json), with a
+[maintainer runbook](../agents/lifecycle/staging-integration-enforcement.md) and a read-only
+configuration comparison. A match MUST require complete policy readback, including bypass scope,
+inherited effective rules and legacy protection. Missing installation, policy differences and
+unavailable/unsupported readback MUST NOT be reported as a match. These artifacts do not install
+host settings or establish the required isolated-host proof, route authority or depth enablement.
+
 No route establishes full depth admission today. MA2 has behavioral destination-refusal tests;
 full route-admission conformance remains unproved. Every
 "Required" cell below is enforcement and test work under [Path enablement](#path-enablement)
