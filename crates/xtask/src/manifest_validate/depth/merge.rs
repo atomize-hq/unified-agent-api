@@ -1,5 +1,5 @@
-//! Two-tree record invariants. Route admission and acceptance-effect detection (check 9) are
-//! later slices; see docs/backlog.json. Both parsed revisions enforce check 11 through check 13.
+//! Two-tree record invariants and check 9 acceptance detection. Route admission remains later
+//! work; see docs/backlog.json. Both parsed revisions enforce check 11 through check 13.
 
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -7,7 +7,7 @@ use xtask::{
     agent_lifecycle,
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact,
-    depth_record::{self, DepthRecord, Event, DEPTH_RECORD_FILE_NAME},
+    depth_record::{DepthRecord, Event, DEPTH_RECORD_FILE_NAME},
 };
 
 use super::{
@@ -79,7 +79,26 @@ pub(in crate::manifest_validate) fn validate(
             return;
         }
     };
-    let candidates = depth_record::record_files(&root_dir);
+    // Enumerate with the same fail-closed reader even before the first record is discovered.
+    // The one-tree convenience scanner intentionally ignores unreadable directories.
+    let candidates = match xtask::runtime_advertising::source::Source::workspace(&workspace)
+        .and_then(|source| source.paths(&format!("{root}/reports")))
+    {
+        Ok(paths) => paths
+            .into_iter()
+            .filter_map(|path| {
+                let prefix = format!("{root}/reports/");
+                let relative = path.strip_prefix(&prefix)?;
+                let (version, name) = relative.split_once('/')?;
+                (name == DEPTH_RECORD_FILE_NAME)
+                    .then(|| (version.to_owned(), workspace.join(&path)))
+            })
+            .collect::<Vec<_>>(),
+        Err(error) => {
+            emit(violations, "DEPTH_RECORD_INVALID", root.clone(), error);
+            return;
+        }
+    };
     if !files.is_empty() && earlier_entry.is_none() {
         emit(
             violations,
@@ -130,6 +149,50 @@ pub(in crate::manifest_validate) fn validate(
     let Some(anchor) = entry.or(earlier_entry) else {
         return;
     };
+    if !versions.is_empty() {
+        match xtask::depth_acceptance::compare(&workspace, tip.commit(), &anchor.agent_id) {
+            Ok(report) => {
+                for error in report.input_issues {
+                    emit(
+                        violations,
+                        "DEPTH_ACCEPTANCE_INPUT_INVALID",
+                        root.clone(),
+                        error,
+                    );
+                }
+                for requirement in report.missing_entries {
+                    let contexts = requirement
+                        .effects
+                        .iter()
+                        .map(|e| {
+                            format!(
+                                "{}:{} target={}",
+                                e.path,
+                                e.kind,
+                                e.target.as_deref().unwrap_or("covered scope")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    emit(
+                        violations,
+                        "DEPTH_ACCEPTANCE_ENTRY_MISSING",
+                        format!("{root}/reports/{}/depth-record.json", requirement.version),
+                        format!(
+                            "{}/{} requires current record_sha256 {} for {contexts} (check 9)",
+                            anchor.agent_id, requirement.version, requirement.digest
+                        ),
+                    );
+                }
+            }
+            Err(error) => emit(
+                violations,
+                "DEPTH_ACCEPTANCE_INPUT_INVALID",
+                root.clone(),
+                error,
+            ),
+        }
+    }
     for version in versions {
         let path = root_dir
             .join("reports")

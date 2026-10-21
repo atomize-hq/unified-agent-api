@@ -6,7 +6,8 @@ This contract governs the restricted advertising implementation for the five reg
 built-ins: `aider`, `claude_code`, `codex`, `gemini_cli` and `opencode`. It uses RFC 2119 keywords.
 The [capability schema](capabilities-schema-spec.md) owns capability semantics; the
 [support-depth contract](../support-depth-contract.md) owns depth admission. This preparation
-implements neither check 9 entry admission nor production depth enrollment.
+does not itself implement route admission or production depth enrollment. Its additions feed
+the integrated check 9 comparison.
 
 ## Authored inputs and runtime semantics
 
@@ -119,8 +120,10 @@ user-default configuration context. The default context is interpreted independe
 view; revision 1 supports only the checked false/false default.
 
 `Revision::additions` returns candidate-minus-tip ids with their caller contexts. It MUST
-validate both complete views before narrowing the result. This is preparatory tooling only:
-version/target ownership, destination attribution and acceptance entries remain check 9 work.
+validate both complete views before narrowing the result. The integrated check 9 reader supplies
+version/target ownership, destination attribution and current acceptance-entry requirements.
+A concrete recorded host MUST map into this union partition: an OS or architecture unmentioned
+by either view belongs to its OTHER class, not to an absent literal cell.
 It MUST NOT infer those facts from `latest_validated`.
 
 ## Generation and immutable reads
@@ -145,7 +148,7 @@ MUST fail rather than imply no advertising.
 
 The read-only check MUST run in the existing capability-matrix preflight/CI gate alongside the
 unchanged publication freshness and semantic audit checks. The light staging push route still
-requires a future integrated check 9 reader when relevant depth records exist.
+uses the integrated check 9 reader when relevant depth records exist.
 
 ## Bridge evidence
 

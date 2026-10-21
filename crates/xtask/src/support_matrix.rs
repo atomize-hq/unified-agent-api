@@ -199,3 +199,7 @@ pub fn generate_publication_artifacts(workspace_root: &Path) -> Result<Publicati
         render_agent_api_runtime_support_data(workspace_root)?,
     )
 }
+
+pub use runtime_support::{
+    render_agent_api_runtime_support_data_from_projection, RuntimeSupportProjectionRecord,
+};

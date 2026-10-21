@@ -407,8 +407,46 @@ through the existing approval loader. It must name this agent and manifest root 
 record's exact version in `[support_depth].version`. The onboarding Event and second statement
 of P/O remain deferred until the charter defines that statement; this check adds neither.
 
+Check 9 additionally reads both revisions' own RULES pointer declarations, current expected
+sets, optional version metadata, pointer values, stand-down markers, closeouts, lifecycle and their
+exact bound requests/approvals; support JSON and its generated Markdown block; capability matrix
+cells; embedded runtime support source and its derivation; and the complete checked runtime
+advertising model, source/default/feature inputs. Git inputs are never executed or checked out.
+A retained record may precede version metadata. Missing optional metadata supplies no status or
+passed-target values; a malformed existing input or unsupported file kind fails.
+
+Compare semantic destination values: changed pointers into a recorded version (including
+backsteps), changed accepting status, newly passed targets, new/changed embedded Some(version),
+marker retirement, maintenance closeout changes, and creation/changes while proving closed.
+Lifecycle stage/evidence additions, actual destination retargets and drift clearance follow the
+contract's D1–D3 rules. Qualification additions are keyed by agent/version/target/operation or id.
+Positive capability publication cells touch every recorded version claiming the id. Runtime
+advertising uses both complete D5 views and their union host partition, all feature requests,
+explicit/default configuration contexts, then maps concrete recorded hosts to those cells.
+Expected-set edits count only through changed accepting outputs. Unchanged/reporting values,
+moves off a version, and new acceptance-entry listings need no new check 9 entry.
+
+Resolve packet/closeout ownership in the same revision through an exact byte-bound request or
+approval, or an exact durable FileRef with the matching backs variant. Historical entry statement
+digests can locate a generation but cannot back its current statement. Live and durable owners
+must agree. A structurally valid exact legacy approval with no root support_depth table resolves
+ordinary scope; absent, malformed or displaced bindings cannot establish ordinary scope. Narrow
+attribution does not run today's full approval authority schema or add create-lane Event checks.
+Never borrow a tip binding for candidate bytes. Candidate scope filters acceptance destinations;
+a root pointer or agent-wide advertising cell conservatively touches all applicable covered scope.
+
+For each affected recorded version, recompute stated_sha256 once and require any candidate entry
+whose record_sha256 equals it. This is record-wide: do not filter entries by backs variant,
+promotion.targets, requesting agent or triggering effect. Aggregate effect/target context in the
+missing-entry diagnostic. Existing current qualification/freshness checks still apply.
+
 Violations:
 
+- `DEPTH_ACCEPTANCE_INPUT_INVALID` (check 9): a relevant comparison input is unavailable,
+  malformed, unsupported, contradictory, stale, or cannot resolve generation scope. Publication
+  freshness failures do not suppress independently detected missing-entry diagnostics.
+- `DEPTH_ACCEPTANCE_ENTRY_MISSING` (check 9): at least one covered acceptance destination has
+  no entry identifying that candidate version's current record statement.
 - `DEPTH_TIP_UNREADABLE`: no Git workspace is available, the tip cannot resolve to a commit,
   its records or registry cannot be read/parsed, or a tip record is not a regular file.
   A failed enumeration is never an empty record set.
@@ -435,15 +473,15 @@ check 13: each produced part's identity is its canonical digest. This also decid
 since changed part content cannot keep the same valid identity under that content-identity model.
 No redundant second part comparator is used.
 
-Check 9 (acceptance-effect detection) remains for enforcement slice 2b. A successful comparison
-is repository validation, not route admission or a tip-conditional ref update. Before path
+A successful comparison, including check 9, is repository validation, not route admission or a
+tip-conditional ref update. Before path
 enablement, the maintainer must require the merge checks and an up-to-date PR via the planned
 strict staging ruleset; MA2's direct-push mode must then comply or refuse (see docs/backlog.json).
 
 ### Present behavior
 
 The checks above are implemented in `crates/xtask/src/manifest_validate/depth.rs` and its
-`merge` child module, except checks
+`merge` child module and `crates/xtask/src/depth_acceptance/`, except checks
 5, 6, 7, 8 and 12: the support matrix derives depth facts in `crates/xtask/src/support_matrix/`,
 and its consistency check compares each published row with the derived one. No root holds a
 depth record and no request carries a `[support_depth]` table, so none of them fails on the

@@ -10,15 +10,11 @@ review rounds produced, so they become tests of the validator instead of contrac
 Annex B of the contract defines the depth record: its file, what it states, its three identities
 and its acceptance entries. Its sections B.6 and B.7 are revision 1 of the record's encoding and of the serialization the
 digests are taken over, and `crates/xtask/src/depth_record.rs` reads a record by them.
-`manifest-validate` and the support matrix generator call that reader. Checks 1, 2, 3, 4, 5, 6, 7, 8,
-10, 11, 12 and 13 are normative in the validator specs of the three roots that adopt Annex B, with
-their code and tests, checks 5, 6, 7, 8 and 12 through the support publication and checks 2, 4
-and 11 through `manifest-validate --tip <rev>`. Check 9 stays non-normative until enforcement
-slice 2b (uaa-0073 in docs/backlog.json). Each one then becomes normative in the
-manifest root's validator spec together with its code and its tests, as the existing validator
-checks did: in one change, or a day apart. Until then the checks and scenarios are the acceptance
-test of the record's definition: every check has to be decidable from a record as Annex B defines
-it, together with the inputs named below, and every scenario has to come out as listed. The
+`manifest-validate` and the support matrix generator call that reader. Checks 1 through 13
+are normative in the three adopted validator specs with code and tests. Checks 5, 6, 7, 8 and 12
+run through support publication; checks 2, 4, 9 and 11 run with `manifest-validate --tip <rev>`.
+This note remains non-normative scenario inventory; the validator specs and contract govern.
+The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
 states how a maintenance request carries P and O. The
 [onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names no second
@@ -44,7 +40,7 @@ integration branch tip it would replace.
 | 6 | Any revision | A tuple the record selects is published as not depth-enrolled | 3 |
 | 7 | Any revision | A result is published as `verified`, or a promise or capability as qualified or depth-qualified on it, and the record states it as `verified` and binds no evidence for it, or binds evidence that is absent or has another content identity | 3 |
 | 8 | Any revision | A promise is published as qualified, or a capability as depth-qualified, and no acceptance entry identifies what the record states | 4 |
-| 9 | Merge | The merge result makes an acceptance effect for a tuple and no acceptance entry identifies what the tuple's depth record states in the merge result | 4 |
+| 9 | Merge | The merge result makes an acceptance effect other than listing an entry for a tuple and no acceptance entry identifies what the tuple's depth record states in the merge result | 4 |
 | 10 | Any revision | The lifecycle record of an agent that has a depth record holds a `published` or `closed_baseline` stage, or a closeout evidence id, that reports a packet or closeout the revision does not hold | 4 |
 | 11 | Merge | Anything a part of a depth record states changes while that part's identity does not | 2 |
 | 13 | Any revision | A P, O or E identity a record states is not the digest of its part | 2 |
@@ -323,7 +319,8 @@ Must fail:
   can acquire it. Its tuples stay insufficient depth, and acceptance values that hold for the
   whole version are blocked until a later version displaces it.
 - Retargeting the lifecycle record's `publication_packet_path` re-attributes a `published` stage.
-  Decide whether the reference itself is checked.
+  The reference path and actual raw digest are checked; candidate disappearance alone creates no
+  D2 destination. See the contract and check 9 validator section.
 - The absence of a drift side state is attributed to the previous maintenance closeout while a
   newer generation is open.
 - Coverage reports, wrapper code and `wrapper_coverage.json` are dependencies whose change no
@@ -357,8 +354,9 @@ Must fail:
   reader refuses a record whose part does not have the identity it states, which is check 13.
   `manifest-validate` decides check 3. Check 8 is decided through the support publication, which
   qualifies nothing unless an entry identifies what the record states. With --tip, checks 2 and 4
-  compare records across two trees and check 11 follows from check 13 in each. Check 9 still needs
-  acceptance-effect detection in slice 2b (uaa-0073 in docs/backlog.json).
+  compare records across two trees and check 11 follows from check 13 in each. Check 9 compares
+  semantic effects and same-revision destinations, including runtime profile additions beyond
+  the canonical publication matrix. Route admission and enablement remain uaa-0073 work.
 - A declaration keeps at least one operation that is not a mode exclusion, so a version whose
   only covered mode turns out to be interactive-only cannot have it excluded and stays at
   insufficient depth. Dropping that rule later is a compatible change and adding it later is
@@ -476,3 +474,14 @@ Must fail:
   the agent's approval does not state: the charter keeps its version depth-enrolled with nothing
   frozen, and no dry run signals it. Its rows are those of the case "Declared, no record yet".
   Decide whether validation reports it.
+
+## Implemented check 9 regression coverage
+
+The Git-backed c0 comparison tests cover pointers, status/passed targets, marker retirement,
+embedded expected-target exposure, maintenance/proving closeouts, lifecycle publication and raw
+retargets, drift clearance and removal, durable ownership/displacement/conflicts, ordinary legacy
+approvals, qualification and capability-cell additions, and runtime opt-in/default-feature additions.
+They distinguish reporting changes from acceptance, require current entries and preserve the
+entry-listing exception. D5 tests separately exercise the complete model domain and unsupported
+source/default/feature inputs. No native execution on unavailable hosts or route admission is
+inferred from structural comparisons.

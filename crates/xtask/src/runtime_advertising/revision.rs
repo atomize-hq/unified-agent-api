@@ -71,6 +71,29 @@ impl Revision {
         Ok(model.capabilities(context.os, context.arch, write, sandbox))
     }
 
+    /// Classify a concrete host in the exact partition used by `additions`, including OTHER.
+    pub fn host_cell<'a>(&self, tip: &Self, os: &'a str, arch: &'a str) -> (&'a str, &'a str) {
+        let hosts: Vec<_> = self
+            .models
+            .iter()
+            .chain(&tip.models)
+            .flat_map(|model| &model.gates)
+            .flat_map(|gate| gate.hosts.iter().flatten())
+            .collect();
+        (
+            if hosts.iter().any(|(o, _)| *o == os) {
+                os
+            } else {
+                "other"
+            },
+            if hosts.iter().any(|(_, a)| *a == arch) {
+                arch
+            } else {
+                "other"
+            },
+        )
+    }
+
     pub fn additions(&self, tip: &Self) -> Result<Vec<Addition>, String> {
         let mut os_values = BTreeSet::from(["other"]);
         let mut arch_values = BTreeSet::from(["other"]);

@@ -69,6 +69,10 @@ fn compare(root: &Path, tip: &str) -> (i32, String) {
 
 fn compare_args(root: &Path, tip: &str, command: &str, extra: &[&str]) -> (i32, String) {
     republish(root);
+    compare_as_published(root, tip, command, extra)
+}
+
+fn compare_as_published(root: &Path, tip: &str, command: &str, extra: &[&str]) -> (i32, String) {
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .arg(command)
         .arg("--root")
@@ -181,3 +185,40 @@ fn merge_rejects_invalid_tips_and_fix_mode_without_writing() {
     assert_eq!(status, 3, "{report}");
     assert!(!pointer.exists(), "merge checking must not repair files");
 }
+
+#[test]
+fn merge_acceptance_pointer_requires_the_candidate_statement_entry() {
+    let (temp, root, _) = baseline(Some(&record()));
+    let pointer = root.join(format!("pointers/latest_supported/{REQUIRED_TARGET}.txt"));
+    write_text(&pointer, "none\n");
+    republish(&root);
+    git(temp.path(), &["add", "."]);
+    git(temp.path(), &["commit", "-qm", "unpromoted"]);
+    let tip = git(temp.path(), &["rev-parse", "HEAD"]);
+    write_text(&pointer, &format!("{VERSION}\n"));
+    fails(&root, &tip, "DEPTH_ACCEPTANCE_ENTRY_MISSING");
+    let mut rec = record();
+    let parsed =
+        xtask::depth_record::DepthRecord::parse(&rec.to_string(), "codex", VERSION).unwrap();
+    rec["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": parsed.stated_sha256().unwrap() }]);
+    write_record(&root, &rec);
+    let (status, report) = compare(&root, &tip);
+    assert_eq!(status, 0, "{report}");
+}
+
+#[test]
+fn merge_acceptance_runtime_source_cannot_diverge_from_its_revision_inputs() {
+    let (temp, root, tip) = baseline(Some(&record()));
+    write_text(
+        &temp
+            .path()
+            .join("crates/agent_api/src/runtime_support_data.rs"),
+        "const OTHER: () = ();\n",
+    );
+    let (status, report) = compare_as_published(&root, &tip, "manifest-validate", &[]);
+    assert_eq!(status, 2, "{report}");
+    assert!(report.contains("runtime_support_data.rs"), "{report}");
+}
+
+#[path = "acceptance.rs"]
+mod acceptance;
