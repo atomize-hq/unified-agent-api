@@ -88,7 +88,47 @@ jobs:
       manifest_root: ${{ steps.plan.outputs.manifest_root }}
       required_target: ${{ steps.plan.outputs.required_target }}
       source_date_epoch: ${{ steps.metadata.outputs.source_date_epoch }}
+      branch_name: ${{ steps.destination.outputs.branch_name }}
+      delivery_ref: ${{ steps.destination.outputs.delivery_ref }}
     steps:
+      - name: Admit the acquisition destination
+        id: destination
+        shell: bash
+        env:
+          COMMIT_ARTIFACTS: ${{ inputs.commit }}
+          ACQUISITION_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import subprocess
+          import sys
+
+          commit = os.environ["COMMIT_ARTIFACTS"]
+          if commit == "false":
+              sys.exit(0)  # Read-only acquisition keeps its existing checkout-ref behavior.
+
+          reference = os.environ["ACQUISITION_REF"]
+
+          def refuse(reason):
+              sys.exit(f"Acquisition destination {reference!r}: {reason}. Use a packet/custom branch and a PR, or commit=false.")
+
+          if commit != "true":
+              refuse("commit must be a typed boolean")
+          branch = reference.removeprefix("refs/heads/")
+          if (not branch or branch.startswith(("-", "refs/")) or branch in ("HEAD", "@")
+                  or any(c.isspace() or ord(c) < 32 or 127 <= ord(c) < 160 for c in branch)):
+              refuse("expected a literal short branch or refs/heads/<branch>")
+          delivery_ref = f"refs/heads/{branch}"
+          # Syntax only: do not normalize slashes or expand previous-checkout/revision syntax.
+          if subprocess.run(["git", "check-ref-format", delivery_ref], check=False).returncode:
+              refuse("invalid branch name")
+          if delivery_ref in ("refs/heads/staging", "refs/heads/main"):
+              refuse("direct integration/release delivery is forbidden")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as outputs:
+              outputs.write(f"branch_name={branch}\ndelivery_ref={delivery_ref}\n")
+          PY
+
       - name: Require an automation token for committing acquisition
         shell: bash
         env:
@@ -102,13 +142,42 @@ jobs:
             exit 1
           fi
 
+      - name: Check canonical acquisition outputs
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ steps.destination.outputs.branch_name }}
+          DELIVERY_REF: ${{ steps.destination.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          case "$BRANCH_NAME" in
+            ""|-*|HEAD|@|refs/*|staging|main)
+              echo "Missing or forbidden canonical acquisition branch" >&2
+              exit 1
+              ;;
+          esac
+          test "$DELIVERY_REF" = "refs/heads/$BRANCH_NAME"
+          git check-ref-format "$DELIVERY_REF"
+
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.commit && steps.destination.outputs.delivery_ref || (!inputs.commit && inputs.ref) }}
           # This job downloads and hashes upstream assets. It never talks to this repository's
           # remote, so it has no use for a persisted credential. The one credentialed call it
           # makes is the step-scoped GITHUB_TOKEN against the upstream release API below.
           persist-credentials: false
+      - name: Verify acquisition checkout
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ steps.destination.outputs.branch_name }}
+          DELIVERY_REF: ${{ steps.destination.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          # Fully qualified checkout must resolve an existing remote head, never a tag/SHA.
+          test "$(git symbolic-ref -q HEAD)" = "$DELIVERY_REF"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse --verify "refs/remotes/origin/$BRANCH_NAME")"
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -292,13 +361,42 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: git config --global core.longpaths true
+      - name: Check canonical acquisition outputs
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ needs.plan.outputs.branch_name }}
+          DELIVERY_REF: ${{ needs.plan.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          case "$BRANCH_NAME" in
+            ""|-*|HEAD|@|refs/*|staging|main)
+              echo "Missing or forbidden canonical acquisition branch" >&2
+              exit 1
+              ;;
+          esac
+          test "$DELIVERY_REF" = "refs/heads/$BRANCH_NAME"
+          git check-ref-format "$DELIVERY_REF"
+
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.commit && needs.plan.outputs.delivery_ref || (!inputs.commit && inputs.ref) }}
           # This job runs the pinned upstream binary for the help crawl. A persisted credential
           # would sit in .git/config, readable by that binary, until post-job cleanup. The job
           # never talks to this repository's remote, so it needs none.
           persist-credentials: false
+      - name: Verify acquisition checkout
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ needs.plan.outputs.branch_name }}
+          DELIVERY_REF: ${{ needs.plan.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          # Fully qualified checkout must resolve an existing remote head, never a tag/SHA.
+          test "$(git symbolic-ref -q HEAD)" = "$DELIVERY_REF"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse --verify "refs/remotes/origin/$BRANCH_NAME")"
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -484,13 +582,42 @@ jobs:
       uplifts_required: ${{ steps.maintenance_audit.outputs.uplifts_required }}
       audit_exit_code: ${{ steps.maintenance_audit.outputs.audit_exit_code }}
     steps:
+      - name: Check canonical acquisition outputs
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ needs.plan.outputs.branch_name }}
+          DELIVERY_REF: ${{ needs.plan.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          case "$BRANCH_NAME" in
+            ""|-*|HEAD|@|refs/*|staging|main)
+              echo "Missing or forbidden canonical acquisition branch" >&2
+              exit 1
+              ;;
+          esac
+          test "$DELIVERY_REF" = "refs/heads/$BRANCH_NAME"
+          git check-ref-format "$DELIVERY_REF"
+
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.commit && needs.plan.outputs.delivery_ref || (!inputs.commit && inputs.ref) }}
           # The plan refuses committing runs without this PAT: GITHUB_TOKEN pushes do not start
           # validation. Read-only runs use the job token and leave no persisted credential.
           token: ${{ inputs.commit && secrets.AUTOMATION_TOKEN || github.token }}
           persist-credentials: ${{ inputs.commit }}
+      - name: Verify acquisition checkout
+        if: ${{ inputs.commit }}
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ needs.plan.outputs.branch_name }}
+          DELIVERY_REF: ${{ needs.plan.outputs.delivery_ref }}
+        run: |
+          set -euo pipefail
+          # Fully qualified checkout must resolve an existing remote head, never a tag/SHA.
+          test "$(git symbolic-ref -q HEAD)" = "$DELIVERY_REF"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse --verify "refs/remotes/origin/$BRANCH_NAME")"
+
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -584,7 +711,7 @@ jobs:
         env:
           AGENT_ID: ${{ inputs.agent_id }}
           VERSION: ${{ inputs.target_version }}
-          REF: ${{ inputs.ref }}
+          REF: ${{ needs.plan.outputs.branch_name }}
         run: |
           set -euo pipefail
           EXPECTED_REF="automation/${AGENT_ID}-maintenance-${VERSION}"
@@ -592,8 +719,8 @@ jobs:
           # The packet branch name is the only thing binding this dispatch to a packet generation.
           # The same prefix is how supersession finds packets (agent-maintenance-open-pr.yml:283)
           # and how the watcher names them (crates/xtask/src/agent_maintenance/watch.rs:307).
-          # A mismatched dispatch (a staging acquisition, or a different version onto an existing
-          # packet branch) therefore never rewrites a request.
+          # A mismatched dispatch (a different version or a custom branch) never rewrites a
+          # request. Both accepted spellings of this packet branch use the canonical name.
           if [ "$REF" != "$EXPECTED_REF" ]; then
             echo "::notice title=Re-freeze skipped::${REF} does not name this version's packet branch ${EXPECTED_REF}, so the request is left as the audit gate will find it."
             echo "refrozen=false" >> "$GITHUB_OUTPUT"
@@ -864,9 +991,17 @@ jobs:
           VERSION: ${{ inputs.target_version }}
           ROOT: ${{ needs.plan.outputs.manifest_root }}
           AGENT_ID: ${{ inputs.agent_id }}
-          BRANCH: ${{ inputs.ref }}
+          BRANCH: ${{ needs.plan.outputs.branch_name }}
+          DELIVERY_REF: ${{ needs.plan.outputs.delivery_ref }}
         run: |
           set -euo pipefail
+          # Check the final write boundary again; never push a raw dispatch ref.
+          case "$BRANCH" in
+            ""|-*|HEAD|@|refs/*|staging|main) exit 1 ;;
+          esac
+          test "$DELIVERY_REF" = "refs/heads/$BRANCH"
+          git check-ref-format "$DELIVERY_REF"
+          test "$(git symbolic-ref -q HEAD)" = "$DELIVERY_REF"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -923,7 +1058,7 @@ jobs:
           # uploaded, and the verdict records the audit and the delivery separately, so the packet
           # PR can say "the audit reached this verdict and it was not delivered" rather than
           # reporting one as the other.
-          if git push origin "HEAD:${BRANCH}"; then
+          if git push origin "HEAD:${DELIVERY_REF}"; then
             emit_delivery "true"
             exit 0
           fi
