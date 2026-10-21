@@ -876,7 +876,23 @@ part of that revision; it was read from the GitHub API on 2026-10-04. Paths are 
 repository root; `xtask/` abbreviates `crates/xtask/src/` and `wf/` abbreviates
 `.github/workflows/`.
 
-No route establishes depth admission today, and no conformance test exists for any route. Every
+MA2 and its relationship to IN1 below are updated for the acquisition destination guard against
+`staging` at `d03e6b6f` on 2026-10-21. This is a bounded update, not the full inventory
+re-establishment required before path enablement. Effective staging rules were also read again
+on that date: none were installed. No branch protection is installed by the destination guard.
+
+Committing acquisition MUST refuse delivery to `staging` or `main` before checkout or acquisition,
+regardless of depth enrollment. It accepts only a literal branch name or `refs/heads/<branch>`;
+both spellings MUST use the same canonical branch for checkout, packet re-freeze and push.
+The branch MUST already exist on the remote; a tag or commit MUST NOT substitute for it.
+Read-only acquisition retains its existing checkout-ref behavior and does not require the
+automation delivery token. Committing acquisition still requires that token. Missing or
+incoherent canonical outputs MUST fail before checkout, including before delivery credentials
+are provided to the union checkout. Preparation branches reach staging through a PR; acquisition
+does not create one or establish integration admission.
+
+No route establishes full depth admission today. MA2 has behavioral destination-refusal tests;
+full route-admission conformance remains unproved. Every
 "Required" cell below is enforcement and test work under [Path enablement](#path-enablement)
 item 4. Until that work lands for a route, the route's required behavior is to refuse every
 depth-gated effect.
@@ -891,7 +907,7 @@ an acceptance effect.
 | Id | Route | Entrypoint and callers | Path | Depth-gated outputs it can change | Reaches the integration branch by |
 | --- | --- | --- | --- | --- | --- |
 | MA1 | `prepare-agent-maintenance` | `wf/agent-maintenance-open-pr.yml:148`, dispatched nightly by `wf/agent-maintenance-release-watch.yml:197-203` or by a maintainer; a maintainer directly | Maintenance | Maintenance request and packet docs (`xtask/agent_maintenance/prepare.rs:253-270`). The open-PR workflow resets the packet branch to `staging` plus the new request (`wf/agent-maintenance-open-pr.yml:209-217,263-272`), which discards earlier MA2, MA3, MA4 and MA5 commits on it | Packet branch, then IN1 |
-| MA2 | Acquisition | `wf/parity-acquire.yml:546-558`, called from the open-PR workflow or dispatched | Maintenance | Version metadata with `--status reported`, which overwrites any earlier status; support publication JSON and Markdown; the request's second freeze when `ref` is the packet branch (`:577-588,623`). It regenerates the runtime-support projection and does not commit it (`:864-872`) | Push to `inputs.ref` (`:854,913`). Called by the open-PR workflow, that is the packet branch. Dispatched with `commit` set and the default `ref`, it is a direct push to `staging` (`:27,62`) |
+| MA2 | Acquisition | `wf/parity-acquire.yml`, called from the open-PR workflow or dispatched; first step `Admit the acquisition destination` | Maintenance | Version metadata with `--status reported`, which overwrites any earlier status; support publication JSON and Markdown; the request's second freeze when the canonical branch is this version's packet branch (`Re-freeze the maintenance request against the acquired artifacts`). It regenerates the runtime-support projection and does not commit it | Preparation branch, then PR through IN1. Committing runs use canonical `HEAD:refs/heads/<branch>` and refuse `staging`/`main` before checkout; default `ref=staging` is read-only unless another destination is supplied. No rebase/retry on rejected delivery |
 | MA3 | `refresh-agent --write` | A maintainer. No workflow runs it | Maintenance | Support publication, runtime-support projection, capability publication (`xtask/agent_maintenance/refresh.rs:137-228`) | Packet branch, then IN1 |
 | MA4 | `execute-agent-maintenance --write` | A maintainer or contributor | Maintenance | Every depth-gated output in its frozen write envelope (`xtask/agent_maintenance/contract_policy.rs:363-386`): `reports/<version>/`, where the depth record lives; the version file; support publication; the runtime-support projection; `crates/agent_api/**`, which carries capability advertising; and the maintenance root, which holds the request and the stand-down markers. Only the closeout is refused (`xtask/agent_maintenance/execute/validate.rs:122-126`). The executor runs unsandboxed (`xtask/agent_maintenance/execute/runtime.rs:205-216`), can call NE1 and NE3, and its envelope is checked after the writes (`validate.rs:110-150`) | Packet branch, then IN1 |
 | MA5 | `close-agent-maintenance`, `prepare-agent-closeout` | A maintainer. No workflow calls either | Maintenance | Maintenance closeout; lifecycle record (`maintenance_closeout_written`, cleared drift) (`xtask/agent_maintenance/closeout/write.rs:41-115`, `xtask/agent_maintenance/prepare_closeout.rs:272-290`) | Packet branch, then IN1 |
@@ -908,13 +924,14 @@ an acceptance effect.
 | NE5 | `manifest-retain`, `codex-retain` | A maintainer. No workflow calls either | Neutral | Removes `reports/<version>/` for versions outside the keep set, the depth record with it (`xtask/manifest_retain.rs:97-126`) | Its caller |
 | NE6 | Snapshot commands in legacy output mode | A maintainer | Neutral | `current.json` when the output directory is a manifest root (`xtask/codex_snapshot/layout.rs:38` and its two siblings) | Its caller |
 | NE7 | `historical-lifecycle-backfill` | A maintainer | Neutral | For several agents already at `closed_baseline`: the publication packet, the proving-run closeout, and the lifecycle record's evidence and references (`xtask/historical_lifecycle_backfill.rs:153-215`) | Its caller |
-| IN1 | Ref update of the integration branch | A pull request merge, or a direct push such as MA2's | Whatever the change carries | Every depth-gated output | The ref update itself |
+| IN1 | Ref update of the integration branch | A pull request merge, or another writer's direct push; MA2 refuses direct staging delivery | Whatever the change carries | Every depth-gated output | The ref update itself |
 | HE1 | Hand edit or unsupported tooling | Anyone with write access to a branch | None | Every depth-gated output | IN1 |
 
 IN1 and HE1 can change every output and are not repeated in each row of A.2. Every other route
 changes a branch, and its writes reach the integration branch only through IN1. Under
 [Final depth admission](#final-depth-admission) those writes prepare a candidate and the gated
-sequence is IN1's integration step. MA2 in its direct-push mode is itself that integration step.
+sequence is IN1's integration step. MA2 only prepares a candidate and refuses direct integration
+delivery; this does not prevent another writer from reaching IN1 without the future host rules.
 
 The publication packet is not a depth-gated output. It is listed because the lifecycle record's
 `published` stage reports it.
@@ -961,7 +978,7 @@ is not serialization against another branch.
 
 | Domain | Members | Present serialization | Required |
 | --- | --- | --- | --- |
-| The integration branch | IN1, and through it every other route. MA2's direct push is a member in its own right | None. `staging` has no branch protection and no ruleset: no required status check, no required pull request and no requirement that a branch be up to date. Only `main` is protected, and its one required check is the source-branch guard | The tip-conditional ref update that [Final depth admission](#final-depth-admission) requires, with depth admission established against the exact merge result, and repository validation of that result under [Complete mediation](#complete-mediation) rule 7. MA2 with `commit` set and `ref` equal to the integration branch is an integration step: it satisfies Final depth admission as one, or refuses |
+| The integration branch | IN1, and through it every other route; MA2 now refuses direct integration delivery | None. `staging` has no branch protection and no ruleset: no required status check, no required pull request and no requirement that a branch be up to date. Only `main` is protected, and its one required check is the source-branch guard | The tip-conditional ref update that [Final depth admission](#final-depth-admission) requires, with depth admission established against the exact merge result, and repository validation of that result under [Complete mediation](#complete-mediation) rule 7. MA2 refuses instead of acting as that integration step |
 | One packet branch | MA1, MA2, MA3, MA4, MA5 for one agent and version | Partial. The open-PR workflow serializes its own runs per packet branch (`wf/agent-maintenance-open-pr.yml:69-71`), and acquisition has its own group (`wf/parity-acquire.yml:70-72`) and fails instead of rebasing when its push is rejected (`:897-920`). MA3, MA4 and MA5 are run by a maintainer with no serialization. The stand-down marker is what stops the workflow from resetting a branch a maintainer is working on (`wf/agent-maintenance-open-pr.yml:101-142,218-258`) | Sufficient for preparing a candidate. It is not depth admission |
 | Promotion of one version | MA6 | Workflow concurrency per agent and version (`wf/parity-promote.yml:50-52`) | Sufficient for preparing a candidate |
 | Aggregate publication | NE1, NE2, MA3, ON4 from different branches | None. Two branches that each regenerate the aggregate conflict textually at merge, or merge cleanly and leave an aggregate that matches neither tip's evidence | Covered by the integration branch domain: each merge result is re-checked against the tip it replaces |
@@ -989,7 +1006,7 @@ route in A.1, and every route in A.1 other than IN1 and HE1 appears under each o
 change. Five writers were
 found from one direction only and are included above: the promotion workflow's shell copy of the
 union to `current.json`, fix mode's pointer creation, the snapshot commands' legacy mode, the
-executor's write envelope, and acquisition's direct push.
+executor's write envelope, and acquisition's former direct staging push (now refused).
 
 Entrypoints checked and found to produce no depth-gated effect in supported use:
 `manifest-union`, `manifest-report`, the wrapper-coverage generators, `manifest-acquisition-plan`,
@@ -1013,9 +1030,10 @@ Present behavior that the required behavior changes:
    output with no check at all, and a pull request can merge while its checks are failing or were
    run against an older tip. Enabling any path requires a tip-conditional, check-enforced ref
    update on the integration branch.
-2. **Acquisition can be the integration step.** Dispatched with `commit` set and the default
-   `ref`, MA2 pushes regenerated publication for every agent and a `reported` version file
-   straight to `staging`.
+2. **Acquisition's direct integration destination is now refused.** MA2 rejects committing runs
+   to `staging` and `main` before checkout, including fully qualified branch spellings. It still
+   regenerates aggregate publication on preparation branches; that preparation does not establish
+   depth admission. Other writers can still reach the unprotected integration step in item 1.
 3. **Pointers, `current.json` and stand-down markers are written by workflow shell.** No shared
    command mediates them. [Complete mediation](#complete-mediation) requires every route to
    establish depth admission before the effect, and [Publication](#publication) forbids workflow

@@ -38,9 +38,9 @@ fn c4_spec_acquisition_refreezes_between_union_and_audit() {
         "stand-down must read the freshly fetched staging base"
     );
     assert!(
-        step.contains("REF: ${{ inputs.ref }}")
+        step.contains("REF: ${{ needs.plan.outputs.branch_name }}")
             && step.contains("EXPECTED_REF=\"automation/${AGENT_ID}-maintenance-${VERSION}\""),
-        "the re-freeze must bind the dispatch ref to this packet generation"
+        "the re-freeze must bind either admitted ref spelling to this packet generation"
     );
 
     for command in [

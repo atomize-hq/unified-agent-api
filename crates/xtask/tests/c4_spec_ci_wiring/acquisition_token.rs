@@ -10,21 +10,25 @@ fn plan(yml: &str) -> &str {
 }
 
 fn guard(plan: &str) -> &str {
-    section_between(plan, GUARD, "      - uses: actions/checkout@", WORKFLOW)
+    section_between(
+        plan,
+        GUARD,
+        "      - name: Check canonical acquisition outputs",
+        WORKFLOW,
+    )
 }
 
 #[test]
 fn committing_acquisition_requires_a_token_before_any_acquisition_work() {
     let yml = read_repo_file(WORKFLOW);
     let plan = plan(&yml);
-    assert!(
-        plan.split_once("    steps:\n")
-            .expect("plan steps")
-            .1
-            .trim_start()
-            .starts_with(GUARD),
-        "credential admission must run before checkout, build or upstream acquisition"
+    assert_text_order(
+        plan,
+        "- name: Admit the acquisition destination",
+        GUARD,
+        WORKFLOW,
     );
+    assert_text_order(plan, GUARD, "      - uses: actions/checkout@", WORKFLOW);
     let guard = guard(plan);
     assert!(guard.contains("COMMIT_ARTIFACTS: ${{ inputs.commit }}"));
     assert!(guard.contains("HAS_AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN != '' }}"));
