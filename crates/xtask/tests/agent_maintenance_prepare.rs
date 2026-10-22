@@ -10,6 +10,10 @@ mod harness;
 mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
+mod depth_record {
+    pub use xtask::depth_record::*;
+}
+
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
@@ -651,3 +655,6 @@ fn automated_request_with_execution_contract_toml() -> String {
         prompt_sha256 = prompt_sha256
     )
 }
+
+#[path = "agent_maintenance_prepare/depth_binding.rs"]
+mod depth_binding;

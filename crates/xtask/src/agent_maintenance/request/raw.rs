@@ -1,8 +1,7 @@
 use serde::Deserialize;
 
-// ponytail: a `[support_depth]` table is rejected as an unknown key, which request contract rule 1
-// requires while no depth enrollment can be declared. Accepting it brings rules 1, 3 and 4; rule 4
-// is `DepthRecord::request_mismatch`, the comparison `manifest-validate` already makes.
+// The shared shape understands frozen bindings; production registry loading still refuses
+// declarations until route admission lands. Private isolated cores exercise the binding rules.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RawMaintenanceRequest {
@@ -19,6 +18,8 @@ pub(super) struct RawMaintenanceRequest {
     pub(super) support_surface_audit: Option<RawSupportSurfaceAudit>,
     #[serde(default)]
     pub(super) execution_contract: Option<RawExecutionContract>,
+    #[serde(default)]
+    pub(super) support_depth: Option<super::SupportDepthBinding>,
     pub(super) request_recorded_at: String,
     pub(super) request_commit: String,
 }

@@ -12,6 +12,10 @@ mod agent_lifecycle {
     pub use xtask::agent_lifecycle::*;
 }
 
+mod depth_record {
+    pub use xtask::depth_record::*;
+}
+
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
