@@ -49,7 +49,7 @@ pub(super) fn validate_wrapper_coverage(ctx: &mut ValidateCtx, violations: &mut 
         }
     };
 
-    let parsed: WrapperCoverageFile = match serde_json::from_value(value) {
+    let parsed: WrapperCoverageFile = match serde_json::from_value(value.clone()) {
         Ok(v) => v,
         Err(e) => {
             violations.push(Violation {
@@ -86,135 +86,41 @@ pub(super) fn validate_wrapper_coverage(ctx: &mut ValidateCtx, violations: &mut 
         });
     }
 
-    validate_wrapper_coverage_exclusions(ctx, violations, &parsed, &path);
-    validate_wrapper_iu_notes(ctx, violations, &parsed, &path);
-    validate_wrapper_scope_overlaps(ctx, violations, &parsed, &path);
-}
-
-fn validate_wrapper_iu_notes(
-    ctx: &ValidateCtx,
-    violations: &mut Vec<Violation>,
-    wc: &WrapperCoverageFile,
-    path: &Path,
-) {
-    for (cmd_idx, cmd) in wc.coverage.iter().enumerate() {
-        if cmd.level == "passthrough" && cmd.note.as_deref().unwrap_or("").trim().is_empty() {
-            violations.push(Violation {
-                code: "PASSTHROUGH_NOTE_MISSING",
-                path: rel_path(&ctx.root, path),
-                json_pointer: Some(format!("/coverage/{cmd_idx}/note")),
-                message: format!(
-                    "passthrough requires non-empty note (unit=command command_path={})",
-                    format_command_path(&cmd.path)
-                ),
-                unit: Some("wrapper_command"),
-                command_path: Some(format_command_path(&cmd.path)),
-                key_or_name: None,
-                field: Some("note"),
-                target_triple: None,
-                details: None,
-            });
-        }
-        if cmd.level == "intentionally_unsupported"
-            && cmd.note.as_deref().unwrap_or("").trim().is_empty()
-        {
-            violations.push(Violation {
-                code: "IU_NOTE_MISSING",
-                path: rel_path(&ctx.root, path),
-                json_pointer: Some(format!("/coverage/{cmd_idx}/note")),
-                message: format!(
-                    "intentionally_unsupported requires non-empty note (unit=command command_path={})",
-                    format_command_path(&cmd.path)
-                ),
-                unit: Some("wrapper_command"),
-                command_path: Some(format_command_path(&cmd.path)),
-                key_or_name: None,
-                field: Some("note"),
-                target_triple: None,
-                details: None,
-            });
-        }
-        for (flag_idx, flag) in cmd.flags.as_deref().unwrap_or(&[]).iter().enumerate() {
-            if flag.level == "passthrough" && flag.note.as_deref().unwrap_or("").trim().is_empty() {
+    let exclusions = ctx
+        .parity_exclusions
+        .as_ref()
+        .map(|_| json!({"schema_version":1,"units":ctx.parity_exclusions_raw}));
+    match xtask::manifest_report::claim_validation::validate(&value, exclusions.as_ref()) {
+        Ok(found) => {
+            for found in found {
                 violations.push(Violation {
-                    code: "PASSTHROUGH_NOTE_MISSING",
-                    path: rel_path(&ctx.root, path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/flags/{flag_idx}/note")),
-                    message: format!(
-                        "passthrough requires non-empty note (unit=flag command_path={} key={})",
-                        format_command_path(&cmd.path),
-                        flag.key
-                    ),
-                    unit: Some("wrapper_flag"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(flag.key.clone()),
-                    field: Some("note"),
-                    target_triple: None,
-                    details: None,
-                });
-            }
-            if flag.level == "intentionally_unsupported"
-                && flag.note.as_deref().unwrap_or("").trim().is_empty()
-            {
-                violations.push(Violation {
-                    code: "IU_NOTE_MISSING",
-                    path: rel_path(&ctx.root, path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/flags/{flag_idx}/note")),
-                    message: format!(
-                        "intentionally_unsupported requires non-empty note (unit=flag command_path={} key={})",
-                        format_command_path(&cmd.path),
-                        flag.key
-                    ),
-                    unit: Some("wrapper_flag"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(flag.key.clone()),
-                    field: Some("note"),
+                    code: found.code,
+                    path: rel_path(&ctx.root, &path),
+                    json_pointer: Some(found.json_pointer),
+                    message: found.message,
+                    unit: Some(found.unit),
+                    command_path: Some(found.command_path),
+                    key_or_name: found.key_or_name,
+                    field: Some(found.field),
                     target_triple: None,
                     details: None,
                 });
             }
         }
-        for (arg_idx, arg) in cmd.args.as_deref().unwrap_or(&[]).iter().enumerate() {
-            if arg.level == "passthrough" && arg.note.as_deref().unwrap_or("").trim().is_empty() {
-                violations.push(Violation {
-                    code: "PASSTHROUGH_NOTE_MISSING",
-                    path: rel_path(&ctx.root, path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/args/{arg_idx}/note")),
-                    message: format!(
-                        "passthrough requires non-empty note (unit=arg command_path={} name={})",
-                        format_command_path(&cmd.path),
-                        arg.name
-                    ),
-                    unit: Some("wrapper_arg"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(arg.name.clone()),
-                    field: Some("note"),
-                    target_triple: None,
-                    details: None,
-                });
-            }
-            if arg.level == "intentionally_unsupported"
-                && arg.note.as_deref().unwrap_or("").trim().is_empty()
-            {
-                violations.push(Violation {
-                    code: "IU_NOTE_MISSING",
-                    path: rel_path(&ctx.root, path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/args/{arg_idx}/note")),
-                    message: format!(
-                        "intentionally_unsupported requires non-empty note (unit=arg command_path={} name={})",
-                        format_command_path(&cmd.path),
-                        arg.name
-                    ),
-                    unit: Some("wrapper_arg"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(arg.name.clone()),
-                    field: Some("note"),
-                    target_triple: None,
-                    details: None,
-                });
-            }
-        }
+        Err(error) => violations.push(Violation {
+            code: "WRAPPER_COVERAGE_PARSE_FAILED",
+            path: rel_path(&ctx.root, &path),
+            json_pointer: None,
+            message: error.to_string(),
+            unit: Some("wrapper_coverage"),
+            command_path: None,
+            key_or_name: None,
+            field: Some("wrapper_coverage"),
+            target_triple: None,
+            details: None,
+        }),
     }
+    validate_wrapper_scope_overlaps(ctx, violations, &parsed, &path);
 }
 
 fn validate_wrapper_scope_overlaps(
@@ -450,80 +356,4 @@ fn scope_to_targets(
 
 fn intersect(a: &BTreeSet<String>, b: &BTreeSet<String>) -> BTreeSet<String> {
     a.intersection(b).cloned().collect()
-}
-
-fn validate_wrapper_coverage_exclusions(
-    ctx: &ValidateCtx,
-    violations: &mut Vec<Violation>,
-    wc: &WrapperCoverageFile,
-    wc_path: &Path,
-) {
-    let Some(index) = ctx.parity_exclusions.as_ref() else {
-        return;
-    };
-
-    for (cmd_idx, cmd) in wc.coverage.iter().enumerate() {
-        if let Some(ex) = index.commands.get(&cmd.path) {
-            violations.push(Violation {
-                code: "WRAPPER_COVERAGE_INCLUDES_EXCLUDED",
-                path: rel_path(&ctx.root, wc_path),
-                json_pointer: Some(format!("/coverage/{cmd_idx}")),
-                message: format!(
-                    "wrapper_coverage includes excluded command_path={} (note={})",
-                    format_command_path(&cmd.path),
-                    ex.note
-                ),
-                unit: Some("wrapper_command"),
-                command_path: Some(format_command_path(&cmd.path)),
-                key_or_name: None,
-                field: Some("coverage"),
-                target_triple: None,
-                details: None,
-            });
-        }
-
-        for (flag_idx, flag) in cmd.flags.as_deref().unwrap_or(&[]).iter().enumerate() {
-            if let Some(ex) = index.flags.get(&(cmd.path.clone(), flag.key.clone())) {
-                violations.push(Violation {
-                    code: "WRAPPER_COVERAGE_INCLUDES_EXCLUDED",
-                    path: rel_path(&ctx.root, wc_path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/flags/{flag_idx}")),
-                    message: format!(
-                        "wrapper_coverage includes excluded flag (command_path={} key={} note={})",
-                        format_command_path(&cmd.path),
-                        flag.key,
-                        ex.note
-                    ),
-                    unit: Some("wrapper_flag"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(flag.key.clone()),
-                    field: Some("flags"),
-                    target_triple: None,
-                    details: None,
-                });
-            }
-        }
-
-        for (arg_idx, arg) in cmd.args.as_deref().unwrap_or(&[]).iter().enumerate() {
-            if let Some(ex) = index.args.get(&(cmd.path.clone(), arg.name.clone())) {
-                violations.push(Violation {
-                    code: "WRAPPER_COVERAGE_INCLUDES_EXCLUDED",
-                    path: rel_path(&ctx.root, wc_path),
-                    json_pointer: Some(format!("/coverage/{cmd_idx}/args/{arg_idx}")),
-                    message: format!(
-                        "wrapper_coverage includes excluded arg (command_path={} name={} note={})",
-                        format_command_path(&cmd.path),
-                        arg.name,
-                        ex.note
-                    ),
-                    unit: Some("wrapper_arg"),
-                    command_path: Some(format_command_path(&cmd.path)),
-                    key_or_name: Some(arg.name.clone()),
-                    field: Some("args"),
-                    target_triple: None,
-                    details: None,
-                });
-            }
-        }
-    }
 }

@@ -543,3 +543,6 @@ fn request_for(agent: &str) -> FreezeRequest {
     req.agent = agent.into();
     req
 }
+
+#[path = "support_depth_freeze/semantics.rs"]
+mod semantics;

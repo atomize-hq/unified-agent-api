@@ -48,6 +48,15 @@ pub(crate) fn validate(
     {
         return Err("unsupported wrapper scope/overlap rules".into());
     }
+    let violations = super::claim_validation::validate(wrapper_value, raw.get("parity_exclusions"))
+        .map_err(|e| e.to_string())?;
+    if !violations.is_empty() {
+        return Err(violations
+            .into_iter()
+            .map(|v| format!("{}: {}", v.code, v.message))
+            .collect::<Vec<_>>()
+            .join("; "));
+    }
     rules::assert_supported_rules(&rules).map_err(|e| e.to_string())?;
     if rules.rules_schema_version != 1
         || rules

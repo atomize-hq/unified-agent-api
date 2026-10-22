@@ -84,8 +84,8 @@ pub fn acquire(root: &Path, agent: &str) {
         &format!("cli_manifests/{agent}/snapshots/1.2.3/{target}.json"),
         serde_json::to_vec_pretty(&shard).unwrap(),
     );
-    let wrapper = json!({"schema_version":1,"coverage":[{"path":["run"],"level":"passthrough","flags":[
-        {"key":"--claimed","level":"explicit"},{"key":"--output","level":"passthrough"}],"args":[{"name":"PROMPT","level":"unsupported"}]}]});
+    let wrapper = json!({"schema_version":1,"coverage":[{"path":["run"],"level":"passthrough","note":"bounded forwarding fixture","flags":[
+        {"key":"--claimed","level":"explicit"},{"key":"--output","level":"passthrough","note":"bounded forwarding fixture"}],"args":[{"name":"PROMPT","level":"unsupported"}]}]});
     write(
         root,
         &format!("cli_manifests/{agent}/wrapper_coverage.json"),

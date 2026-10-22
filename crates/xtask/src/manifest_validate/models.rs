@@ -145,7 +145,7 @@ pub(super) struct RulesParityExclusions {
     pub(super) units: Vec<ParityExclusionUnit>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, serde::Serialize)]
 pub(super) struct ParityExclusionUnit {
     pub(super) unit: String,
     pub(super) path: Vec<String>,

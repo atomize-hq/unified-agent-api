@@ -605,6 +605,8 @@ revalidate under its required ownership boundary.
   the present target set; an incomplete ordinary union is not evidence for an absent target.
 - Intake validates the bound root schema, exact agent/tool/version/target identity, reconstructs
   the union from its shards, and checks coverage reports against the existing neutral report engine.
+  Wrapper note and parity-exclusion claim checks are shared with ordinary manifest validation;
+  report generation alone does not establish those constraints.
   It binds RULES, schema, snapshots, wrapper claims and reports by their bytes. Neither the request
   nor depth record is an acquisition input, so no identity depends on its own output.
 - All observed and claimed units of a selected operation remain attached regardless of coverage
