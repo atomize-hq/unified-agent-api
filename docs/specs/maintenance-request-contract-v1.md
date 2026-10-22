@@ -631,8 +631,28 @@ revalidate under its required ownership boundary.
   earlier targeted work for later command integration; it does not produce replacement request bytes.
 
 This preparatory implementation produces no E or acceptance entry and decides no debt transition.
-The registry's and both validating request loaders' production refusals remain. Request rendering,
-publication, guarded command writes, complete route admission and enablement remain separate slices.
+The registry's and both validating request loaders' production refusals remain. Publication,
+guarded command writes, complete route admission and enablement remain separate slices.
+
+### Preparatory request binding plumbing
+
+The shared request model and internal renderer support the two-field table above. A private
+validating loader core is exercised in isolated fixtures, behind the normal registry loader:
+
+- Both strict and audit-drift-tolerant loading MUST enforce the same table presence, digest form
+  and target-record Event/P/O agreement through `DepthRecord::request_mismatch`. Audit tolerance
+  MUST NOT suppress a binding error. A retained record without current declaration MUST NOT be
+  interpreted as an ordinary request. An unreadable, malformed or symlinked record is an error.
+- A P-only request omits `obligations_identity` and matches a record with obligations not yet
+  produced. This binding match supplies no execution readiness and waives no ordinary audit rule.
+- Artifact version remains `"2"`; the table carries no extra authority field. The `--from-request`
+  reader still transports metadata only, and the renderer adds no table to ordinary request bytes.
+
+Every exported validating loader continues to use `AgentRegistry::load`, whose production refusal
+for depth declarations remains unchanged. No public alternate loader, command flag or environment
+variable selects an unenforced registry. Normal preparation still renders only ordinary requests;
+this plumbing calls no freeze planner and writes no depth record. A matching table certifies only
+what the request/record state, not policy currentness, evidence, actor authority or write admission.
 
 ### Packet freeze
 
@@ -771,8 +791,10 @@ unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down m
 The preparatory read-only planner above is implemented; command write/admission integration is not.
 No production request carries a depth enrollment today. In particular:
 
-- No request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded
-  fields and regenerates the rest. Every validating loader rejects the table as an unknown key.
+- No production request carries `[support_depth]`. The shared model, internal renderer and private
+  validating loader core support it as preparatory plumbing; normal registry loading still refuses
+  depth declarations, and an ordinary request with the table is rejected. `--from-request` reads a
+  fixed list of recorded fields and regenerates the rest; it is not binding validation.
   `manifest-validate` reads the standing request's Event, target version and table without
   validating the rest of it, and compares them with the version's depth record, as rule 4
   compares them; that is check 3 of the support-depth validation test list.

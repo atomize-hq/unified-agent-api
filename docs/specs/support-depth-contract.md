@@ -930,6 +930,13 @@ full route-admission conformance remains unproved. Every
 item 4. Until that work lands for a route, the route's required behavior is to refuse every
 depth-gated effect.
 
+The preparatory C1 request-binding increment adds the optional typed table and a private shared
+binding validator (`xtask/agent_maintenance/request/depth.rs`) plus internal rendering
+(`xtask/agent_maintenance/prepare/render.rs`). Isolated tests cover table presence/form and
+Event/P/O matching under both audit policies. Exported loaders retain the normal registry refusal;
+MA1 renders no production depth table or record, and no route gains write or acceptance authority.
+This changes request plumbing, not the output writers/serialization domains inventoried below.
+
 ### A.1 Routes
 
 Each route is listed once, from its entrypoint forward. "Path" is the lifecycle path whose

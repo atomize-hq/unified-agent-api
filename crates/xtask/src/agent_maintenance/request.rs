@@ -1,5 +1,9 @@
 #[path = "request/automation.rs"]
 mod automation;
+#[path = "request/depth.rs"]
+mod depth;
+pub use depth::SupportDepthBinding;
+
 #[path = "request/paths.rs"]
 mod paths;
 #[path = "request/raw.rs"]
@@ -52,6 +56,7 @@ pub struct MaintenanceRequest {
     pub runtime_followup_required: RuntimeFollowupRequired,
     pub detected_release: Option<DetectedRelease>,
     pub support_surface_audit: Option<SupportSurfaceAudit>,
+    pub support_depth: Option<SupportDepthBinding>,
     pub request_recorded_at: String,
     pub request_commit: String,
 }
@@ -272,6 +277,24 @@ pub fn load_request_envelope_validated_with_policy(
     request_path: &Path,
     audit_drift_policy: AuditDriftPolicy,
 ) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
+    load_request_with_registry(
+        workspace_root,
+        request_path,
+        audit_drift_policy,
+        AgentRegistry::load,
+    )
+}
+
+// Only private isolated tests supply the validating unenforced registry parser. Every exported
+// loader, including drift-tolerant loading, retains the normal production refusal.
+fn load_request_with_registry(
+    workspace_root: &Path,
+    request_path: &Path,
+    audit_drift_policy: AuditDriftPolicy,
+    load_registry: impl FnOnce(
+        &Path,
+    ) -> Result<AgentRegistry, crate::agent_registry::AgentRegistryError>,
+) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
     let workspace_root = fs::canonicalize(workspace_root).map_err(|err| {
         MaintenanceRequestError::Internal(format!(
             "canonicalize {}: {err}",
@@ -334,7 +357,7 @@ pub fn load_request_envelope_validated_with_policy(
         )));
     }
 
-    let registry = AgentRegistry::load(&workspace_root).map_err(|err| {
+    let registry = load_registry(&workspace_root).map_err(|err| {
         MaintenanceRequestError::Internal(format!("load {REGISTRY_RELATIVE_PATH}: {err}"))
     })?;
     let registry_entry = registry.find(&raw.agent_id).ok_or_else(|| {
@@ -358,6 +381,22 @@ pub fn load_request_envelope_validated_with_policy(
         &relative_path,
         trigger_kind,
         raw.detected_release,
+    )?;
+    depth::validate_binding(
+        &jail,
+        &relative_path,
+        registry_entry,
+        &raw.artifact_version,
+        detected_release
+            .as_ref()
+            .map(|release| release.target_version.as_str()),
+        crate::depth_record::Event::Maintenance {
+            request_commit: raw.request_commit.clone(),
+            request_recorded_at: raw.request_recorded_at.clone(),
+            trigger_kind: raw.trigger_kind.clone(),
+            opened_from: raw.opened_from.clone(),
+        },
+        raw.support_depth.as_ref(),
     )?;
     let support_surface_audit_validation = validate_support_surface_audit(
         &workspace_root,
@@ -407,6 +446,7 @@ pub fn load_request_envelope_validated_with_policy(
                 runtime_followup_required,
                 detected_release,
                 support_surface_audit: support_surface_audit_validation.audit,
+                support_depth: raw.support_depth,
                 request_recorded_at: raw.request_recorded_at,
                 request_commit: raw.request_commit,
             },
@@ -417,3 +457,7 @@ pub fn load_request_envelope_validated_with_policy(
             .reconciliation_detail,
     })
 }
+
+#[cfg(test)]
+#[path = "request/depth_tests.rs"]
+mod depth_tests;
