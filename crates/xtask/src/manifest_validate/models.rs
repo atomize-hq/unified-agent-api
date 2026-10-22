@@ -145,7 +145,7 @@ pub(super) struct RulesParityExclusions {
     pub(super) units: Vec<ParityExclusionUnit>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, serde::Serialize)]
 pub(super) struct ParityExclusionUnit {
     pub(super) unit: String,
     pub(super) path: Vec<String>,
@@ -191,8 +191,6 @@ pub(super) struct WrapperCoverageFile {
 #[derive(Debug, Deserialize)]
 pub(super) struct WrapperCommandCoverage {
     pub(super) path: Vec<String>,
-    pub(super) level: String,
-    pub(super) note: Option<String>,
     pub(super) scope: Option<WrapperScope>,
     pub(super) flags: Option<Vec<WrapperFlagCoverage>>,
     pub(super) args: Option<Vec<WrapperArgCoverage>>,
@@ -207,16 +205,12 @@ pub(super) struct WrapperScope {
 #[derive(Debug, Deserialize)]
 pub(super) struct WrapperFlagCoverage {
     pub(super) key: String,
-    pub(super) level: String,
-    pub(super) note: Option<String>,
     pub(super) scope: Option<WrapperScope>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct WrapperArgCoverage {
     pub(super) name: String,
-    pub(super) level: String,
-    pub(super) note: Option<String>,
     pub(super) scope: Option<WrapperScope>,
 }
 

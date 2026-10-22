@@ -1,92 +1,92 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SnapshotV1 {
-    pub(crate) snapshot_schema_version: u32,
-    pub(crate) tool: String,
-    pub(crate) collected_at: String,
-    pub(crate) binary: BinarySnapshot,
-    pub(crate) commands: Vec<CommandSnapshot>,
+pub struct SnapshotV1 {
+    pub snapshot_schema_version: u32,
+    pub tool: String,
+    pub collected_at: String,
+    pub binary: BinarySnapshot,
+    pub commands: Vec<CommandSnapshot>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) features: Option<serde_json::Value>,
+    pub features: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) known_omissions: Option<Vec<String>>,
+    pub known_omissions: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BinarySnapshot {
-    pub(crate) sha256: String,
-    pub(crate) size_bytes: u64,
-    pub(crate) platform: BinaryPlatform,
-    pub(crate) target_triple: String,
-    pub(crate) version_output: String,
+pub struct BinarySnapshot {
+    pub sha256: String,
+    pub size_bytes: u64,
+    pub platform: BinaryPlatform,
+    pub target_triple: String,
+    pub version_output: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) semantic_version: Option<String>,
+    pub semantic_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) channel: Option<String>,
+    pub channel: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) commit: Option<String>,
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BinaryPlatform {
-    pub(crate) os: String,
-    pub(crate) arch: String,
+pub struct BinaryPlatform {
+    pub os: String,
+    pub arch: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CommandSnapshot {
-    pub(crate) path: Vec<String>,
+pub struct CommandSnapshot {
+    pub path: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) about: Option<String>,
+    pub about: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) usage: Option<String>,
+    pub usage: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) stability: Option<String>,
+    pub stability: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) platforms: Option<Vec<String>>,
+    pub platforms: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) args: Option<Vec<ArgSnapshot>>,
+    pub args: Option<Vec<ArgSnapshot>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) flags: Option<Vec<FlagSnapshot>>,
+    pub flags: Option<Vec<FlagSnapshot>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ArgSnapshot {
-    pub(crate) name: String,
-    pub(crate) required: bool,
-    pub(crate) variadic: bool,
+pub struct ArgSnapshot {
+    pub name: String,
+    pub required: bool,
+    pub variadic: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) note: Option<String>,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct FlagSnapshot {
+pub struct FlagSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) long: Option<String>,
+    pub long: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) short: Option<String>,
-    pub(crate) takes_value: bool,
+    pub short: Option<String>,
+    pub takes_value: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) value_name: Option<String>,
+    pub value_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) repeatable: Option<bool>,
+    pub repeatable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) stability: Option<String>,
+    pub stability: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) platforms: Option<Vec<String>>,
+    pub platforms: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct SupplementV1 {
-    pub(crate) version: u32,
-    pub(crate) commands: Vec<SupplementCommand>,
+pub struct SupplementV1 {
+    pub version: u32,
+    pub commands: Vec<SupplementCommand>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct SupplementCommand {
-    pub(crate) path: Vec<String>,
+pub struct SupplementCommand {
+    pub path: Vec<String>,
     #[serde(default)]
-    pub(crate) platforms: Option<Vec<String>>,
-    pub(crate) note: String,
+    pub platforms: Option<Vec<String>>,
+    pub note: String,
 }

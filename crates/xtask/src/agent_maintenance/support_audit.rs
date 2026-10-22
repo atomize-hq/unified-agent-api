@@ -494,7 +494,7 @@ fn load_live_report(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ReportRowShape {
+pub(crate) enum ReportRowShape {
     Command,
     Flag,
     Arg,
@@ -656,7 +656,7 @@ fn surface_from_report_value(
 }
 
 /// Maps a report or union row to its audit identity; `leaf` is the flag key or argument name.
-fn surface_identity(
+pub(crate) fn surface_identity(
     agent_id: &str,
     path: &[String],
     shape: ReportRowShape,
