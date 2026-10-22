@@ -1,8 +1,16 @@
 use super::*;
-use crate::{agent_registry::REGISTRY_RELATIVE_PATH, depth_record::DepthRecord, support_matrix};
+use crate::{
+    agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
+    depth_record::DepthRecord,
+    support_matrix,
+};
+use contract_policy::{dispatch_kind_str, dispatch_workflow_value, opened_from_path};
+use prepare::{
+    isolated_apply, isolated_build as build_with_registry, Error, PreparePlan, PreparedFile,
+};
 use serde_json::json;
-use std::{fs, process::Command};
-#[path = "depth_tests/fixture.rs"]
+use std::{fs, path::PathBuf, process::Command};
+#[path = "depth_core/fixture.rs"]
 mod fixture;
 
 fn git(root: &Path, args: &[&str]) -> String {
@@ -157,7 +165,7 @@ fn private_preparation_plans_p_only_and_coherent_o_for_every_adopted_root() {
             apply_prepare_plan(root.path(), &p).is_err(),
             "public direct apply must refuse"
         );
-        guard::apply(root.path(), &p, &registry).unwrap();
+        isolated_apply(root.path(), &p, &registry).unwrap();
         git(root.path(), &["add", "."]);
         fixture::acquire(root.path(), agent);
         let o = build_with_registry(root.path(), &args, &registry).unwrap();
@@ -179,12 +187,12 @@ fn private_preparation_plans_p_only_and_coherent_o_for_every_adopted_root() {
         assert!(std::str::from_utf8(markdown)
             .unwrap()
             .starts_with("Normative introduction."));
-        guard::apply(root.path(), &o, &registry).unwrap();
+        isolated_apply(root.path(), &o, &registry).unwrap();
         git(root.path(), &["add", "."]);
         let again = build_with_registry(root.path(), &args, &registry).unwrap();
         assert_eq!(again.files, o.files);
         assert_eq!(
-            guard::apply(root.path(), &again, &registry)
+            isolated_apply(root.path(), &again, &registry)
                 .unwrap()
                 .written,
             0
@@ -205,7 +213,7 @@ fn refreeze_retains_due_work_entries_and_clears_e_only_when_o_changes() {
         .unwrap()
         .acceptance_work
         .is_empty());
-    guard::apply(root.path(), &first, &registry).unwrap();
+    isolated_apply(root.path(), &first, &registry).unwrap();
     let mut e = ExecutionPart {
         identity: String::new(),
         policy_identity: prior.policy.identity.clone(),
@@ -261,7 +269,7 @@ fn refreeze_retains_due_work_entries_and_clears_e_only_when_o_changes() {
             .unwrap()
             .required_uplifts_this_run
     );
-    guard::apply(root.path(), &changed, &registry).unwrap();
+    isolated_apply(root.path(), &changed, &registry).unwrap();
     git(root.path(), &["add", "."]);
     args.request_commit = "fedcba0".into();
     let generation = record(&build_with_registry(root.path(), &args, &registry).unwrap());
@@ -309,7 +317,7 @@ fn depth_apply_refuses_stale_bound_bytes_index_membership_and_publication() {
             }
         }
         assert!(
-            guard::apply(root.path(), &plan, &registry).is_err(),
+            isolated_apply(root.path(), &plan, &registry).is_err(),
             "{change}"
         );
         assert!(!root.path().join(&plan.request.relative_path).exists());
@@ -361,7 +369,7 @@ fn modified_owned_paths_and_request_are_not_an_apply_authority() {
 fn a_new_version_displaces_the_request_without_changing_the_old_record() {
     let (root, registry, mut args) = workspace("codex");
     let first = build_with_registry(root.path(), &args, &registry).unwrap();
-    guard::apply(root.path(), &first, &registry).unwrap();
+    isolated_apply(root.path(), &first, &registry).unwrap();
     git(root.path(), &["add", "."]);
     let old_path = root
         .path()
@@ -405,7 +413,7 @@ fn a_new_version_displaces_the_request_without_changing_the_old_record() {
         .contains("same Event"));
     args.request_commit = "fedcba0".into();
     let next = build_with_registry(root.path(), &args, &registry).unwrap();
-    guard::apply(root.path(), &next, &registry).unwrap();
+    isolated_apply(root.path(), &next, &registry).unwrap();
     assert_eq!(fs::read(&old_path).unwrap(), old_bytes);
     assert_eq!(
         next.request
@@ -439,7 +447,7 @@ fn reporting_adapter_rejects_another_agents_new_qualification_even_with_an_old_e
     use crate::depth_record::AcceptanceEntry;
     let (root, registry, args) = workspace("codex");
     let first = build_with_registry(root.path(), &args, &registry).unwrap();
-    guard::apply(root.path(), &first, &registry).unwrap();
+    isolated_apply(root.path(), &first, &registry).unwrap();
     git(root.path(), &["add", "."]);
     let (_other, other_registry, other_args) = workspace("claude_code");
     let depth = other_registry
@@ -469,7 +477,7 @@ fn reporting_adapter_rejects_another_agents_new_qualification_even_with_an_old_e
     git(root.path(), &["add", "."]);
     let registry = AgentRegistry::parse_unenforced(&fs::read_to_string(path).unwrap()).unwrap();
     let other = build_with_registry(root.path(), &other_args, &registry).unwrap();
-    guard::apply(root.path(), &other, &registry).unwrap();
+    isolated_apply(root.path(), &other, &registry).unwrap();
     let mut rec = record(&other);
     rec.acceptance_entries.push(AcceptanceEntry::Promotion {
         record_sha256: rec.stated_sha256().unwrap(),
@@ -528,3 +536,6 @@ fn reporting_adapter_rejects_another_agents_new_qualification_even_with_an_old_e
         "{error}"
     );
 }
+
+#[path = "depth_core/repair_cases.rs"]
+mod repair_cases;

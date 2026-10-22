@@ -1,11 +1,5 @@
 #![allow(dead_code, unused_imports)]
 
-mod manifest_union {
-    pub use xtask::manifest_union::*;
-}
-mod manifest_report {
-    pub use xtask::manifest_report::*;
-}
 mod support_matrix {
     pub use xtask::support_matrix::*;
 }
@@ -679,3 +673,6 @@ mod depth_binding;
 
 #[path = "agent_maintenance_prepare/guarded_apply.rs"]
 mod guarded_apply_tests;
+
+#[path = "agent_maintenance_prepare/depth_core.rs"]
+mod depth_core_tests;

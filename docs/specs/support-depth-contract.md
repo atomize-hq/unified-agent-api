@@ -945,7 +945,10 @@ three adopted roots, stale/modified plans, preserved generations/work/entries, c
 and refusal of new acceptance effects even with old entries and across aggregate agents.
 
 Publication preview reuses `support_matrix`'s loaded-root derivation and renderers; the bounded
-proposed-bytes adapter reuses `depth_acceptance`'s existing check-9 detectors. No candidate files
+proposed-bytes adapter reuses `depth_acceptance`'s existing check-9 detectors. C additionally
+refuses new execution/debt-dependent positive publication facts, including verified results whose
+promises remain unqualified, and refuses P-only replacements that cannot retain prior due targets.
+Input identities use raw bytes and bind directory-prefix index membership. No candidate files
 are written to obtain a preview. `workspace_mutation` rollback preserves observed external edits
 and reports conflicts; it remains best-effort repair, with races/crash limits. These changes prove
 bounded MA1 preparation behavior, not the complete route inventory, actor admission, integration

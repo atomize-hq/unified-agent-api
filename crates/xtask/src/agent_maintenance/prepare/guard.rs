@@ -33,6 +33,7 @@ impl Context {
     pub fn capture(root: &Path, registry: &AgentRegistry, args: &Args) -> Result<Self, Error> {
         let workspace = fs::canonicalize(root).map_err(|e| Error::Internal(e.to_string()))?;
         let source = Source::workspace(root).map_err(Error::Validation)?;
+        let jail = WorkspacePathJail::new(root)?;
         let mut inputs = BTreeMap::new();
         let depth = registry.agents.iter().any(|e| e.support_depth.is_some());
         let mut prefixes = vec![
@@ -69,7 +70,13 @@ impl Context {
                 ),
             ] {
                 let paths = source.paths(&dir).map_err(Error::Validation)?;
-                inputs.insert(format!("directory:{dir}"), Some(paths.join("\n")));
+                inputs.insert(
+                    format!("directory:{dir}"),
+                    Some(
+                        serde_json::to_string(&paths)
+                            .map_err(|e| Error::Internal(e.to_string()))?,
+                    ),
+                );
                 for path in paths {
                     if root.join(&path).is_file() {
                         prefixes.push(path);
@@ -99,11 +106,7 @@ impl Context {
             }
         }
         for path in &prefixes {
-            let bytes = source.optional(path).map_err(Error::Validation)?;
-            inputs.insert(
-                path.clone(),
-                bytes.map(|s| hex::encode(Sha256::digest(s.as_bytes()))),
-            );
+            inputs.insert(path.clone(), digest(&jail, path)?);
         }
         if depth {
             for path in [
@@ -119,26 +122,18 @@ impl Context {
                 "crates/agent_api/.cargo/config",
                 "crates/agent_api/.cargo/config.toml",
             ] {
-                inputs.insert(
-                    path.into(),
-                    source
-                        .optional(path)
-                        .map_err(Error::Validation)?
-                        .map(|s| hex::encode(Sha256::digest(s.as_bytes()))),
-                );
+                inputs.insert(path.into(), digest(&jail, path)?);
             }
-            for path in source
+            let paths = source
                 .paths("crates/agent_api/src")
-                .map_err(Error::Validation)?
-            {
+                .map_err(Error::Validation)?;
+            inputs.insert(
+                "directory:crates/agent_api/src".into(),
+                Some(serde_json::to_string(&paths).map_err(|e| Error::Internal(e.to_string()))?),
+            );
+            for path in paths {
                 if root.join(&path).is_file() {
-                    inputs.insert(
-                        path.clone(),
-                        source
-                            .optional(&path)
-                            .map_err(Error::Validation)?
-                            .map(|s| hex::encode(Sha256::digest(s.as_bytes()))),
-                    );
+                    inputs.insert(path.clone(), digest(&jail, &path)?);
                 }
             }
         }
@@ -153,7 +148,11 @@ impl Context {
                 .arg("-C")
                 .arg(root)
                 .args(["--literal-pathspecs", "ls-files", "--stage", "-z", "--"])
-                .args(inputs.keys().filter(|p| !p.starts_with("directory:")))
+                .args(
+                    inputs
+                        .keys()
+                        .map(|p| p.strip_prefix("directory:").unwrap_or(p)),
+                )
                 .output()
                 .map_err(|e| Error::Internal(e.to_string()))?;
             if !output.status.success() {
@@ -226,4 +225,19 @@ pub(super) fn apply(
         })
         .collect::<Vec<_>>();
     apply_mutations(root, &mutations).map_err(Into::into)
+}
+
+// Identities bind bytes. Only the semantic readers impose a text encoding on their own inputs.
+fn digest(jail: &WorkspacePathJail, path: &str) -> Result<Option<String>, Error> {
+    let full = jail.resolve(Path::new(path))?;
+    match fs::symlink_metadata(&full) {
+        Ok(meta) if meta.is_file() && !meta.file_type().is_symlink() => fs::read(&full)
+            .map(|bytes| Some(hex::encode(Sha256::digest(&bytes))))
+            .map_err(|e| Error::Validation(format!("{path}: {e}"))),
+        Ok(_) => Err(Error::Validation(format!(
+            "{path}: expected regular preparation input"
+        ))),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(Error::Validation(format!("{path}: {e}"))),
+    }
 }

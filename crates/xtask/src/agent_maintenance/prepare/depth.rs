@@ -49,6 +49,9 @@ pub(super) fn freeze(
     )
     .map_err(Error::Validation)?;
     if let Some(plan) = &plan {
+        if plan.record.obligations.is_none() && !plan.carried_work.is_empty() {
+            return Err(Error::Validation("cannot durably preserve prior targeted work in a P-only replacement; restore acquisition before preparing".into()));
+        }
         if let Some(previous) = &plan.previous_record {
             let old = DepthRecord::parse(
                 std::str::from_utf8(previous).map_err(|e| Error::Validation(e.to_string()))?,

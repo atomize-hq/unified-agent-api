@@ -1,7 +1,7 @@
 use super::git;
 use crate::agent_registry::support_depth::SupportDepth;
 use serde_json::{json, Value};
-use std::{fs, path::Path};
+use std::{fs, path::Path, process::Command};
 use tempfile::TempDir;
 
 pub fn write(root: &Path, path: &str, bytes: impl AsRef<[u8]>) {
@@ -13,7 +13,7 @@ pub fn write(root: &Path, path: &str, bytes: impl AsRef<[u8]>) {
 pub fn workspace(agent: &str) -> TempDir {
     let root = tempfile::tempdir().unwrap();
     git(root.path(), &["init", "-q"]);
-    let mut registry: toml_edit::DocumentMut = include_str!("../../../../data/agent_registry.toml")
+    let mut registry: toml_edit::DocumentMut = include_str!("../../../data/agent_registry.toml")
         .parse()
         .unwrap();
     let rules = fs::read_to_string(
@@ -96,22 +96,20 @@ pub fn acquire(root: &Path, agent: &str) {
 
 pub fn regenerate(root: &Path, agent: &str) {
     let manifest = root.join(format!("cli_manifests/{agent}"));
-    for subcommand in ["manifest-union", "manifest-report"] {
-        if subcommand == "manifest-union" {
-            crate::manifest_union::run(crate::manifest_union::Args {
-                root: Some(manifest.clone()),
-                rules: None,
-                version: "1.2.3".into(),
-            })
+    for command in ["manifest-union", "manifest-report"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .args([command, "--root"])
+            .arg(&manifest)
+            .args(["--version", "1.2.3"])
+            .env("SOURCE_DATE_EPOCH", "0")
+            .current_dir(root)
+            .output()
             .unwrap();
-        } else {
-            crate::manifest_report::run(crate::manifest_report::Args {
-                root: Some(manifest.clone()),
-                rules: None,
-                version: "1.2.3".into(),
-            })
-            .unwrap();
-        }
+        assert!(
+            output.status.success(),
+            "fixture {command}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
     git(root, &["add", "."]);
 }

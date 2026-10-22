@@ -627,6 +627,23 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+// This source is also included by the integration harness. These test-only, parent-visible
+// shims exercise private cores without exporting an unchecked production writer.
 #[cfg(test)]
-#[path = "prepare/depth_tests.rs"]
-mod depth_tests;
+#[allow(dead_code)]
+pub(super) fn isolated_build(
+    root: &Path,
+    args: &Args,
+    registry: &AgentRegistry,
+) -> Result<PreparePlan, Error> {
+    build_with_registry(root, args, registry)
+}
+#[cfg(test)]
+#[allow(dead_code)]
+pub(super) fn isolated_apply(
+    root: &Path,
+    plan: &PreparePlan,
+    registry: &AgentRegistry,
+) -> Result<ApplySummary, Error> {
+    guard::apply(root, plan, registry)
+}

@@ -6,10 +6,11 @@ use super::{
         derive_runtime_support_projection_for_loaded_roots,
         render_agent_api_runtime_support_data_from_projection, EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
     },
-    PublicationBundle, MARKDOWN_OUTPUT_PATH,
+    PublicationBundle, SupportMatrixArtifact, SupportRow, JSON_OUTPUT_PATH, MARKDOWN_OUTPUT_PATH,
 };
+use crate::depth_record::DepthResult;
 use crate::{agent_registry::AgentRegistry, depth_record::DepthRecord};
-use std::{fs, path::Path};
+use std::{collections::BTreeSet, fs, path::Path};
 
 /// Proposed data is not admission. Command writers must retain their guarded registry loader.
 pub fn preview_preparation(
@@ -64,6 +65,21 @@ pub fn preview_preparation(
         return Err("depth preparation agent is not published".into());
     }
     let rows = derive_rows_for_loaded_roots(&roots)?;
+    let before: SupportMatrixArtifact = serde_json::from_slice(
+        &fs::read(workspace.join(JSON_OUTPUT_PATH)).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    if let Some(error) = before.revision_error() {
+        return Err(error);
+    }
+    // C can retain E mechanically, but cannot newly assert its execution/reuse/debt verdicts.
+    // These reporting-only limits are stricter than check 9's qualified-acceptance categories.
+    let previous = positive_results(&before.rows)?;
+    if let Some(fact) = positive_results(&rows)?.difference(&previous).next() {
+        return Err(format!(
+            "preparation requires a deferred execution/debt verdict for {fact:?}"
+        ));
+    }
     let projection = derive_runtime_support_projection_for_loaded_roots(&roots)?;
     render_publication_artifacts(
         &fs::read_to_string(workspace.join(MARKDOWN_OUTPUT_PATH)).map_err(|e| e.to_string())?,
@@ -73,4 +89,56 @@ pub fn preview_preparation(
             EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
         ),
     )
+}
+
+type PositiveResult = (String, String, String, String);
+fn positive_results(rows: &[SupportRow]) -> Result<BTreeSet<PositiveResult>, String> {
+    let mut result = BTreeSet::new();
+    for row in rows {
+        let Some(depth) = &row.depth else {
+            continue;
+        };
+        let mut atoms = Vec::new();
+        for promise in &depth.promises {
+            for obligation in &promise.obligations {
+                if matches!(
+                    obligation.result,
+                    DepthResult::Verified | DepthResult::NotApplicable
+                ) {
+                    atoms.push(
+                        serde_json::to_string(&("obligation", &promise.operation, obligation))
+                            .map_err(|e| e.to_string())?,
+                    );
+                }
+            }
+            if promise
+                .outcomes
+                .contains(&super::depth::Outcome::AuthorizedDebt)
+            {
+                atoms.push(
+                    serde_json::to_string(&("authorized_debt", &promise.operation))
+                        .map_err(|e| e.to_string())?,
+                );
+            }
+        }
+        for exclusion in &depth.mode_exclusions {
+            if matches!(
+                exclusion.result,
+                DepthResult::Verified | DepthResult::NotApplicable
+            ) {
+                atoms.push(
+                    serde_json::to_string(&("exclusion", exclusion)).map_err(|e| e.to_string())?,
+                );
+            }
+        }
+        result.extend(atoms.into_iter().map(|atom| {
+            (
+                row.agent.clone(),
+                row.version.clone(),
+                row.target.clone(),
+                atom,
+            )
+        }));
+    }
+    Ok(result)
 }

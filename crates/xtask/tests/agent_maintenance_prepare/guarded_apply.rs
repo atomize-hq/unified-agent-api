@@ -83,3 +83,79 @@ fn ordinary_plan_cannot_survive_a_new_registry_enrollment() {
     assert!(apply_prepare_plan(&fixture, &plan).is_err());
     assert!(!fixture.join(&plan.request.relative_path).exists());
 }
+
+#[test]
+fn binary_report_and_governance_inputs_bind_raw_bytes() {
+    let fixture = fixture_root("prepare-binary-inputs");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+    let report = fixture.join("cli_manifests/codex/reports/0.1.0/raw-evidence.bin");
+    let governance =
+        fixture.join("docs/agents/lifecycle/codex-maintenance/governance/raw-evidence.bin");
+    for path in [&report, &governance] {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, [0xff, 0x00, 0x80]).unwrap();
+    }
+    let plan = build_prepare_plan(&fixture, &args()).unwrap();
+    fs::write(&report, [0xfe, 0x00, 0x80]).unwrap();
+    assert!(apply_prepare_plan(&fixture, &plan).is_err());
+    assert!(!fixture.join(&plan.request.relative_path).exists());
+    let fresh = build_prepare_plan(&fixture, &args()).unwrap();
+    apply_prepare_plan(&fixture, &fresh).unwrap();
+    assert_eq!(fs::read(&report).unwrap(), [0xfe, 0x00, 0x80]);
+    assert_eq!(fs::read(&governance).unwrap(), [0xff, 0x00, 0x80]);
+}
+
+#[test]
+fn index_only_addition_under_a_bound_directory_invalidates_an_ordinary_plan() {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+    let fixture = fixture_root("prepare-index-membership");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+    for args in [vec!["init", "-q"], vec!["add", "."]] {
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(&fixture)
+            .args(args)
+            .status()
+            .unwrap()
+            .success());
+    }
+    let plan = build_prepare_plan(&fixture, &args()).unwrap();
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(&fixture)
+        .args(["hash-object", "-w", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"index-only input")
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let oid = String::from_utf8(out.stdout).unwrap();
+    let path = "cli_manifests/codex/reports/0.98.0/coverage.index-only.json";
+    assert!(Command::new("git")
+        .arg("-C")
+        .arg(&fixture)
+        .args([
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            &format!("100644,{},{}", oid.trim(), path)
+        ])
+        .status()
+        .unwrap()
+        .success());
+    assert!(!fixture.join(path).exists());
+    assert!(apply_prepare_plan(&fixture, &plan).is_err());
+    assert!(!fixture.join(&plan.request.relative_path).exists());
+}
