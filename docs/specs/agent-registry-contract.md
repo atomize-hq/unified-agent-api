@@ -436,9 +436,42 @@ not keep the support-depth contract's qualified forwarding outcome apart from an
 promise, as that contract's Publication section requires. None of these failures can occur before
 the table is in use. They are what the three keys prevent from then on.
 
+### Preparatory pure policy resolution
+
+`xtask::support_depth::resolve_policy` resolves one agent and exact version from the complete
+registry, that root's `RULES.json`, its optional retained depth record and the complete existing
+debt inventory. It performs no filesystem, index, subprocess or host writes. It is an internal
+library foundation; no production command calls it and the registry loader's refusal remains.
+
+- `None` means no declaration and no retained record for the version. Invalid registry/input or
+  a retained record without sufficient registry policy MUST be an error, never the remainder.
+- A disabled lifecycle path remains enrolled, with `path_enabled = false`. The resolver MUST
+  preserve the retained covered modes/targets and claimed capability ids, and refuse a path move.
+- Target authority comes from `RULES.json.union.expected_targets` or retained record coverage.
+  A current snapshot, CLI argument or acquisition observation MUST NOT widen it. The root MUST
+  adopt the canonical Annex B record path; unsupported RULES/record schema or malformed inputs fail.
+- P states the declaration in its existing order, current governing revision, BASE and selected
+  template definitions, path enablement and every debt row in force for the agent. The baseline
+  MUST NOT be filtered by operation, target, version or observed acquisition gaps. Derived sets
+  use Annex B's canonical order and `part_identity` defines P's identity.
+- The first implementation refuses predicate selectors and mode exclusions pending their bounded
+  acquisition/classification intake. Overlapping command scopes on a common target also refuse;
+  different free-form mode labels do not establish disjoint invocations. A declaration's canonical
+  command paths are retained as policy, not certified as upstream alias/effect facts. Mapping
+  declarations are preserved without certifying completeness of the actual adapter's flows.
+- `check_current_policy` checks current governing revision, content identity and equality against
+  a freshly resolved P. Any baseline difference refuses; this slice establishes no debt transition
+  or evidence-reuse verdict. Later transition-aware consumers retain their contract obligations.
+
+These functions MUST NOT be treated as request freezes, execution readiness, qualification,
+validated grants, actor/path authority or depth admission. Predicate/alias/effect intake, O/E,
+request/record writers, guarded acceptance and enablement remain separate work. A caller supplies
+one coherent candidate view; `prior_record = None` MUST mean absent, never unreadable. No bypass
+flag or alternate production loader is introduced by this foundation.
+
 ### Present behavior
 
-Only the loader is implemented. Today:
+Only the loader and the preparatory pure resolver above are implemented. Today:
 
 - The registry loader reads the table and rejects a registry that breaks a field rule above or
   rule 5 or 6 (`crates/xtask/src/agent_registry/support_depth.rs`). It rejects unknown fields in

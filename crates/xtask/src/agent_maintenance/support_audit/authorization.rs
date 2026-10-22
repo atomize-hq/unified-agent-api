@@ -81,6 +81,14 @@ pub(crate) fn load_debt_inventory(workspace_root: &Path) -> Result<Vec<DebtInven
     let path = workspace_root.join(NON_TUI_SUPPORT_DEBT_PATH);
     let text = fs::read_to_string(&path)
         .map_err(|err| inventory_error(format!("read {}: {err}", path.display())))?;
+    parse_debt_inventory(&text, &path)
+}
+
+/// Parse the complete existing inventory without reading files or validating live grants.
+pub(crate) fn parse_debt_inventory(
+    text: &str,
+    path: &Path,
+) -> Result<Vec<DebtInventoryRow>, String> {
     let mut rows = Vec::new();
     let mut current_row_id: Option<String> = None;
     let mut current_fields = BTreeMap::<String, String>::new();
