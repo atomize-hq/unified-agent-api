@@ -9,7 +9,7 @@ use crate::agent_registry::AgentRegistryEntry;
 use super::request::DetectedRelease;
 
 #[path = "support_audit/authorization.rs"]
-mod authorization;
+pub(crate) mod authorization;
 #[path = "support_audit/unmatched_debt.rs"]
 mod unmatched_debt;
 

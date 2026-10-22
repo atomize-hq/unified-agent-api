@@ -22,6 +22,7 @@ pub mod runtime_advertising;
 pub mod runtime_evidence_bundle;
 pub mod runtime_evidence_run;
 pub mod runtime_follow_on;
+pub mod support_depth;
 pub mod support_matrix;
 pub mod workspace_mutation;
 pub mod wrapper_scaffold;
