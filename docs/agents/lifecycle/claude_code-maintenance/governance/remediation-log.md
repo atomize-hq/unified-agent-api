@@ -6,7 +6,7 @@ Refresh planned from `docs/agents/lifecycle/claude_code-maintenance/governance/m
 
 - basis ref: `cli_manifests/claude_code/latest_validated.txt`
 - trigger kind: `upstream_release_detected`
-- request sha256: `62e8a4435907c89b6115e797982cb0d71f1ef7180555320752dbb8e17ae651ad`
+- request sha256: `5c72cd6892310942f61c2ac1b13d5f6d0fcc4ba5a7e5aa69dca3339e44aedae4`
 - canonical handoff: `docs/agents/lifecycle/claude_code-maintenance/HANDOFF.md`
 - derivative pr summary: `docs/agents/lifecycle/claude_code-maintenance/governance/pr-summary.md`
 
