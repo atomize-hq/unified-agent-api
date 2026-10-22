@@ -464,14 +464,16 @@ library foundation; no production command calls it and the registry loader's ref
   or evidence-reuse verdict. Later transition-aware consumers retain their contract obligations.
 
 These functions MUST NOT be treated as request freezes, execution readiness, qualification,
-validated grants, actor/path authority or depth admission. Predicate/alias/effect intake, O/E,
-request/record writers, guarded acceptance and enablement remain separate work. A caller supplies
+validated grants, actor/path authority or depth admission. Predicate selectors, semantic effect/adequacy decisions, E, request/record writers, guarded
+acceptance and enablement remain separate work. The read-only P/O planner is described in the
+[maintenance request contract](maintenance-request-contract-v1.md#preparatory-read-only-freeze-planning). A caller supplies
 one coherent candidate view; `prior_record = None` MUST mean absent, never unreadable. No bypass
 flag or alternate production loader is introduced by this foundation.
 
 ### Present behavior
 
-Only the loader and the preparatory pure resolver above are implemented. Today:
+The loader, preparatory pure resolver and isolated read-only maintenance P/O planner are
+implemented. No command uses the planner. Today:
 
 - The registry loader reads the table and rejects a registry that breaks a field rule above or
   rule 5 or 6 (`crates/xtask/src/agent_registry/support_depth.rs`). It rejects unknown fields in

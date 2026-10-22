@@ -1,8 +1,14 @@
-//! Pure preparatory enrollment/policy resolution. No command calls this module yet.
+//! Preparatory policy resolution and read-only maintenance freeze planning. No command calls this
+//! module yet.
 //!
 //! Inputs describe one candidate; callers remain responsible for acquiring that view. A resolved
 //! policy is neither a freeze nor a verdict about classification, evidence, grants, route authority
 //! or acceptance. Production registry loading deliberately continues to refuse depth declarations.
+
+mod acquisition;
+mod freeze;
+mod git_inputs;
+pub use freeze::{plan_freeze, FreezePlan, FreezeRequest};
 
 use std::{collections::BTreeSet, path::Path};
 

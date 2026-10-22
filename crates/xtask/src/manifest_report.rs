@@ -3,6 +3,7 @@ use std::{fs, io, path::PathBuf};
 use clap::Parser;
 use thiserror::Error;
 
+pub(crate) mod intake;
 mod models;
 mod report;
 mod rules;

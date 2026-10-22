@@ -32,7 +32,7 @@ pub(crate) enum RawHelpLayout {
 /// Everything needed to resolve a raw-help capture reference for one manifest root.
 pub(super) struct HelpEvidenceCtx<'a> {
     pub(super) version: &'a str,
-    pub(super) raw_help_root: &'a Path,
+    pub(super) raw_help_root: Option<&'a Path>,
     pub(super) layout: RawHelpLayout,
 }
 
@@ -85,7 +85,7 @@ pub(super) fn build_union_commands(
     expected_targets: &[String],
     required_target: &str,
     version: &str,
-    raw_help_root: &Path,
+    raw_help_root: Option<&Path>,
     layout: RawHelpLayout,
     present_targets: &[String],
     snapshots_by_target: &BTreeMap<String, SnapshotV1>,
@@ -460,11 +460,12 @@ fn build_help_evidence<'a, I: Iterator<Item = &'a String>>(
     cmd_path: &[String],
     targets: I,
 ) -> Option<UnionConflictEvidenceV2> {
+    let raw_help_root = help.raw_help_root?;
     let mut refs: BTreeMap<String, String> = BTreeMap::new();
     let mut shas: BTreeMap<String, String> = BTreeMap::new();
 
     for target in targets {
-        let (rel, full) = raw_help_paths(help, target, cmd_path);
+        let (rel, full) = raw_help_paths(help, raw_help_root, target, cmd_path);
         if !full.is_file() {
             continue;
         }
@@ -488,6 +489,7 @@ fn build_help_evidence<'a, I: Iterator<Item = &'a String>>(
 
 fn raw_help_paths(
     help: &HelpEvidenceCtx<'_>,
+    raw_help_root: &Path,
     target: &str,
     cmd_path: &[String],
 ) -> (String, PathBuf) {
@@ -509,10 +511,10 @@ fn raw_help_paths(
     };
 
     let full = if cmd_path.is_empty() {
-        help.raw_help_root.join(target).join("help.txt")
+        raw_help_root.join(target).join("help.txt")
     } else {
         push_command_segments(
-            help.raw_help_root.join(target).join("commands"),
+            raw_help_root.join(target).join("commands"),
             help.layout,
             cmd_path,
         )

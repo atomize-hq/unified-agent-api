@@ -11,6 +11,7 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::manifest_snapshot_schema::SnapshotV1;
 
+pub(crate) mod intake;
 mod merge;
 mod schema;
 use merge::build_union_commands;
@@ -238,7 +239,7 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
         &expected_targets,
         &rules.union.required_target,
         &args.version,
-        &raw_help_root,
+        Some(&raw_help_root),
         rules.union.raw_help_layout,
         &present_targets,
         &snapshots_by_target,

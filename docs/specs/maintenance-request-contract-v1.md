@@ -586,6 +586,52 @@ The freeze points are unchanged. For a depth-enrolled generation:
 5. A freeze that records the standing request's Event for another target version is not a
    re-freeze of this generation, and it MUST refuse.
 
+### Preparatory read-only freeze planning
+
+`xtask::support_depth::plan_freeze` is an isolated library planner for the maintenance path.
+It proposes a request binding and Annex B record; it writes neither, and no production command
+calls it. It MUST NOT be used as write admission, execution readiness, or an actor authorization.
+Its Event input identifies proposed preparation, not permission to perform it.
+
+The planner reads only bound repository inputs: regular stage-0 Git files with working bytes equal
+to their staged blobs. Missing, untracked, unmerged, symlinked or divergent bound inputs refuse.
+It rechecks the bound files and acquisition directory membership before returning. Unrelated files
+need not be clean. This check is not a lock or a reusable admission receipt: a future writer MUST
+revalidate under its required ownership boundary.
+
+- No target-version snapshots or coverage reports permits a P-only plan. Any partial or malformed
+  acquisition refuses instead of becoming that state. P/O planning requires snapshots on every
+  selected target, the ordinary required target, and all reports the report engine requires for
+  the present target set; an incomplete ordinary union is not evidence for an absent target.
+- Intake validates the bound root schema, exact agent/tool/version/target identity, reconstructs
+  the union from its shards, and checks coverage reports against the existing neutral report engine.
+  It binds RULES, schema, snapshots, wrapper claims and reports by their bytes. Neither the request
+  nor depth record is an acquisition input, so no identity depends on its own output.
+- All observed and claimed units of a selected operation remain attached regardless of coverage
+  level. The supported boundary is still exact command selectors without predicates or exclusions.
+  Explicit long/short flag aliases are checked for ambiguity; unsupported alias/predicate facts
+  refuse. Global normalization cannot erase the original shard's units.
+- Revision-1 snapshots do not establish semantic effects or independent boundary adequacy. Every
+  acquired/claimed surface attached to a selected operation is conservatively recorded as
+  `classification_required`. Input bytes retain help/value/default changes without inferring
+  safety from their spelling. Optional conflict raw-help provenance is not consumed for derivation;
+  the conflict facts themselves MUST agree with the shards. No forwarding or readiness verdict is
+  inferred. Resolving classification needs a later reviewed policy/adequacy integration.
+- A re-freeze validates the standing request/record Event and P/O bindings and freshly resolves P.
+  It preserves Event/P, refuses policy drift, and refuses the same Event for another version.
+  Unchanged O preserves E mechanically without an admissibility verdict; changed O clears E.
+  A new Event resets working E. Existing acceptance entries are preserved in their existing order.
+- Independently required name-level work and earlier O's due work remain in the plan across
+  generations, including a P-only generation. Where reports exist, observed target applicability
+  takes precedence over a wider wrapper claim. Earlier due targets are never erased by an absent
+  observation. A newly required name without any bound applicability refuses O derivation.
+  Where P-only cannot yet state O, the plan explicitly carries the unresolved required names and
+  earlier targeted work for later command integration; it does not produce replacement request bytes.
+
+This preparatory implementation produces no E or acceptance entry and decides no debt transition.
+The registry's and both validating request loaders' production refusals remain. Request rendering,
+publication, guarded command writes, complete route admission and enablement remain separate slices.
+
 ### Packet freeze
 
 Whoever works one version's packet stands automation down from it by committing a stand-down marker
@@ -720,7 +766,8 @@ unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down m
 
 ### Present behavior
 
-None of this section is implemented, and it has no effect until a depth enrollment exists. Today:
+The preparatory read-only planner above is implemented; command write/admission integration is not.
+No production request carries a depth enrollment today. In particular:
 
 - No request carries `[support_depth]`, and `--from-request` reads a fixed list of recorded
   fields and regenerates the rest. Every validating loader rejects the table as an unknown key.
