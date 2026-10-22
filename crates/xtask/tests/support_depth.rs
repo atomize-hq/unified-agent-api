@@ -392,3 +392,34 @@ fn old_rules_revision_is_not_current_even_with_its_own_valid_digest() {
         .unwrap_err()
         .contains("unsupported"));
 }
+
+#[test]
+fn actual_adopted_rules_contracts_resolve_and_roundtrip_policies() {
+    let cases = [
+        (
+            "codex",
+            include_str!("../../../cli_manifests/codex/RULES.json"),
+        ),
+        (
+            "claude_code",
+            include_str!("../../../cli_manifests/claude_code/RULES.json"),
+        ),
+        (
+            "opencode",
+            include_str!("../../../cli_manifests/opencode/RULES.json"),
+        ),
+    ];
+    for (agent, rules_text) in cases {
+        let r: Value = serde_json::from_str(rules_text).unwrap();
+        let mut d = declaration();
+        d["enrollments"][0]["targets"] = json!([r["union"]["expected_targets"][0]]);
+        let p = resolve_policy(&registry(agent, d), agent, "1.2.3", rules_text, None, DEBT)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            p.selection.enrollment.targets[0],
+            r["union"]["expected_targets"][0].as_str().unwrap()
+        );
+        xtask::depth_record::DepthRecord::parse(&prior(&p), agent, "1.2.3").unwrap();
+    }
+}

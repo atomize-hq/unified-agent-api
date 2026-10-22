@@ -56,3 +56,14 @@ fn missing_marker_malformed_and_duplicate_rows_refuse() {
         assert!(policy(&text).is_err());
     }
 }
+
+#[test]
+fn malformed_debt_targets_refuse_instead_of_producing_an_unreadable_record() {
+    for target in ["bad target", "bad\"target", "bad\\target"] {
+        let inventory = format!("{DEBT}{}", row("bad-scope", "codex", target, "1.2.3"));
+        assert!(
+            policy(&inventory).is_err(),
+            "malformed debt scope {target:?} must refuse"
+        );
+    }
+}

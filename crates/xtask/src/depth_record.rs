@@ -693,7 +693,7 @@ fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String>
 
 /// The row ids, once every row is the agent's under B.6 rule 5 and every target of every row
 /// is one both orders of B.6 rule 1 agree on.
-fn debt_rows<'a>(
+pub(crate) fn debt_rows<'a>(
     field: &str,
     rows: &'a [DebtInventoryRow],
     agent_id: &str,

@@ -16,7 +16,7 @@ use crate::{
         support_depth::{ObligationId, GOVERNING_RULES_REVISION},
         AgentRegistry,
     },
-    depth_record::{part_identity, DepthRecord, PolicyPart, Selection, TemplateRule},
+    depth_record::{debt_rows, part_identity, DepthRecord, PolicyPart, Selection, TemplateRule},
 };
 
 /// Resolve one exact version from complete registry/RULES/inventory contents and its optional
@@ -147,9 +147,9 @@ fn resolve(
     let mut rows = parse_debt_inventory(debt_inventory, Path::new(NON_TUI_SUPPORT_DEBT_PATH))?;
     rows.retain(|row| row.agent_id == agent);
     let mut ids = BTreeSet::new();
-    for row in &rows {
-        if !ids.insert(&row.row_id) || row.command_path.split(' ').next() != Some(agent) {
-            return Err("debt baseline repeats an id or has a foreign command root".into());
+    for row_id in debt_rows("policy.debt_baseline", &rows, agent)? {
+        if !ids.insert(row_id) {
+            return Err("debt baseline repeats an id".into());
         }
     }
     let templates: BTreeSet<_> = declaration
