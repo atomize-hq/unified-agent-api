@@ -52,8 +52,15 @@ struct PreparedMutation<'a> {
 
 #[derive(Debug)]
 enum AppliedMutation {
-    CreatedFile(PathBuf),
-    ReplacedFile { path: PathBuf, backup_path: PathBuf },
+    CreatedFile {
+        path: PathBuf,
+        written: Vec<u8>,
+    },
+    ReplacedFile {
+        path: PathBuf,
+        backup_path: PathBuf,
+        written: Vec<u8>,
+    },
 }
 
 impl fmt::Display for WorkspaceMutationError {
@@ -247,6 +254,14 @@ pub fn apply_mutations(
     workspace_root: &Path,
     mutations: &[PlannedMutation],
 ) -> Result<ApplySummary, WorkspaceMutationError> {
+    apply_with_hook(workspace_root, mutations, |_| Ok(()))
+}
+
+fn apply_with_hook(
+    workspace_root: &Path,
+    mutations: &[PlannedMutation],
+    mut before_write: impl FnMut(usize) -> Result<(), WorkspaceMutationError>,
+) -> Result<ApplySummary, WorkspaceMutationError> {
     let jail = WorkspacePathJail::new(workspace_root)?;
     let mut summary = ApplySummary {
         total: mutations.len(),
@@ -294,6 +309,7 @@ pub fn apply_mutations(
         }
 
         for (index, prepared_mutation) in prepared.iter().enumerate() {
+            before_write(index)?;
             let refreshed = classify_mutation(&jail, prepared_mutation.classified.mutation)?;
             match refreshed.state {
                 MutationState::Identical => {
@@ -337,8 +353,21 @@ pub fn apply_mutations(
         rollback(&applied, &created_dirs)?;
     }
 
+    // A failed immediate restoration may leave the original in a backup. Preserve it for
+    // recovery instead of deleting it with staging files.
+    if let Err(error) = result {
+        let has_backup = fs::read_dir(&temp_root)
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?
+            .iter()
+            .any(|entry| entry.path().extension().is_some_and(|ext| ext == "bak"));
+        if !has_backup {
+            cleanup_temp_root(&temp_root)?;
+        }
+        return Err(error);
+    }
     cleanup_temp_root(&temp_root)?;
-    result?;
     Ok(summary)
 }
 
@@ -478,7 +507,19 @@ fn apply_one(
             ))
         })?;
         if let Err(err) = fs::rename(temp_path, absolute_path) {
-            let _ = fs::rename(backup_path, absolute_path);
+            if fs::symlink_metadata(absolute_path).is_ok() {
+                return Err(WorkspaceMutationError::Internal(format!(
+                    "restore conflict at {}; original retained at {}",
+                    absolute_path.display(),
+                    backup_path.display()
+                )));
+            }
+            fs::rename(backup_path, absolute_path).map_err(|restore| {
+                WorkspaceMutationError::Internal(format!(
+                    "restore {}: {restore}; original apply error: {err}",
+                    absolute_path.display()
+                ))
+            })?;
             return Err(WorkspaceMutationError::Internal(format!(
                 "rename {} -> {}: {err}",
                 temp_path.display(),
@@ -488,6 +529,7 @@ fn apply_one(
         Ok(AppliedMutation::ReplacedFile {
             path: absolute_path.to_path_buf(),
             backup_path: backup_path.to_path_buf(),
+            written: mutation.desired_after.clone(),
         })
     } else {
         fs::rename(temp_path, absolute_path).map_err(|err| {
@@ -497,7 +539,10 @@ fn apply_one(
                 absolute_path.display()
             ))
         })?;
-        Ok(AppliedMutation::CreatedFile(absolute_path.to_path_buf()))
+        Ok(AppliedMutation::CreatedFile {
+            path: absolute_path.to_path_buf(),
+            written: mutation.desired_after.clone(),
+        })
     }
 }
 
@@ -506,8 +551,23 @@ fn rollback(
     created_dirs: &[PathBuf],
 ) -> Result<(), WorkspaceMutationError> {
     for mutation in applied.iter().rev() {
+        let (path, written) = match mutation {
+            AppliedMutation::CreatedFile { path, written }
+            | AppliedMutation::ReplacedFile { path, written, .. } => (path, written),
+        };
+        // Best-effort repair only: never overwrite an observed edit/type change made after
+        // this invocation wrote the path. This comparison is not cross-route serialization.
+        let unchanged = fs::symlink_metadata(path)
+            .is_ok_and(|m| m.is_file() && !m.file_type().is_symlink())
+            && fs::read(path).is_ok_and(|bytes| bytes == *written);
+        if !unchanged {
+            return Err(WorkspaceMutationError::Validation(format!(
+                "rollback conflict at {}; preserving intervening change and recovery files",
+                path.display()
+            )));
+        }
         match mutation {
-            AppliedMutation::CreatedFile(path) => match fs::remove_file(path) {
+            AppliedMutation::CreatedFile { path, .. } => match fs::remove_file(path) {
                 Ok(()) => {}
                 Err(err) if err.kind() == io::ErrorKind::NotFound => {}
                 Err(err) => {
@@ -517,7 +577,9 @@ fn rollback(
                     )));
                 }
             },
-            AppliedMutation::ReplacedFile { path, backup_path } => {
+            AppliedMutation::ReplacedFile {
+                path, backup_path, ..
+            } => {
                 match fs::remove_file(path) {
                     Ok(()) => {}
                     Err(err) if err.kind() == io::ErrorKind::NotFound => {}
@@ -586,6 +648,89 @@ mod tests {
             .resolve(Path::new("linked/file.txt"))
             .expect_err("symlink escape should fail");
         assert!(err.to_string().contains("symlinked component"));
+    }
+
+    #[test]
+    fn rollback_preserves_intervening_file_edits() {
+        for replacing in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("output");
+            let temp = root.path().join("proposed");
+            let backup = root.path().join("backup");
+            fs::write(&temp, b"planned").unwrap();
+            let mutation = if replacing {
+                fs::write(&path, b"before").unwrap();
+                PlannedMutation::replace("output", b"before".to_vec(), b"planned".to_vec())
+            } else {
+                PlannedMutation::create("output", b"planned".to_vec())
+            };
+            let applied = apply_one(&path, &mutation, &temp, &backup).unwrap();
+            fs::write(&path, b"intervening edit").unwrap();
+            assert!(rollback(&[applied], &[]).is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"intervening edit");
+        }
+    }
+
+    #[test]
+    fn injected_write_failure_restores_owned_bytes_but_preserves_observed_conflicts() {
+        for replacing in [false, true] {
+            for conflict in [false, true] {
+                let root = tempfile::tempdir().unwrap();
+                let path = root.path().join("first");
+                let first = if replacing {
+                    fs::write(&path, b"before").unwrap();
+                    PlannedMutation::replace("first", b"before".to_vec(), b"planned".to_vec())
+                } else {
+                    PlannedMutation::create("first", b"planned".to_vec())
+                };
+                let mutations = [first, PlannedMutation::create("second", b"second".to_vec())];
+                let error = apply_with_hook(root.path(), &mutations, |index| {
+                    if index == 1 {
+                        if conflict {
+                            fs::write(&path, b"other writer").unwrap();
+                        }
+                        return Err(WorkspaceMutationError::Internal(
+                            "injected write failure".into(),
+                        ));
+                    }
+                    Ok(())
+                })
+                .unwrap_err();
+                assert!(!root.path().join("second").exists());
+                if conflict {
+                    assert!(error.to_string().contains("rollback conflict"));
+                    assert_eq!(fs::read(&path).unwrap(), b"other writer");
+                } else if replacing {
+                    assert_eq!(fs::read(&path).unwrap(), b"before");
+                } else {
+                    assert!(!path.exists());
+                }
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rollback_refuses_an_intervening_symlink() {
+        use std::os::unix::fs::symlink;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("output");
+        let temp = root.path().join("proposed");
+        fs::write(&temp, b"planned").unwrap();
+        let mutation = PlannedMutation::create("output", b"planned".to_vec());
+        let applied = apply_one(&path, &mutation, &temp, &root.path().join("backup")).unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::write(root.path().join("other"), b"other writer").unwrap();
+        symlink("other", &path).unwrap();
+        assert!(rollback(&[applied], &[]).is_err());
+        assert!(fs::symlink_metadata(&path)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(
+            fs::read(root.path().join("other")).unwrap(),
+            b"other writer"
+        );
     }
 
     fn temp_root() -> PathBuf {

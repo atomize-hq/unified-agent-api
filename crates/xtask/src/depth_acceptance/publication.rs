@@ -147,8 +147,6 @@ fn cells(view: &View) -> Result<BTreeSet<(String, String)>, String> {
     Ok(result)
 }
 pub(super) fn detect(
-    _workspace: &Path,
-    _commit: &str,
     before: &View,
     after: &View,
     effects: &mut BTreeSet<Effect>,

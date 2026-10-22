@@ -36,6 +36,43 @@ pub struct Comparison {
 pub fn compare(workspace: &Path, commit: &str, agent: &str) -> Result<Comparison, String> {
     let before = View::load(Source::tip(workspace, commit)?, agent)?;
     let after = View::load(Source::workspace(workspace)?, agent)?;
+    let mut comparison = compare_views(&before, &after)?;
+    if !before.records.is_empty() || !after.records.is_empty() {
+        comparison.input_issues = publication::validate_current(workspace, &after)
+            .err()
+            .into_iter()
+            .collect();
+    }
+    Ok(comparison)
+}
+
+/// Read-only preparation adapter. Supplied registry/proposed bytes confer no write admission.
+/// Rejects effects themselves, including effects already carrying an acceptance entry.
+pub fn check_reporting_preparation(
+    workspace: &Path,
+    registry: &crate::agent_registry::AgentRegistry,
+    proposed: BTreeMap<String, String>,
+) -> Result<(), String> {
+    for entry in &registry.agents {
+        let before = View::with_registry(Source::workspace(workspace)?, registry, &entry.agent_id)?;
+        let after = View::with_registry(
+            Source::proposed(workspace, proposed.clone())?,
+            registry,
+            &entry.agent_id,
+        )?;
+        let comparison = compare_views(&before, &after)?;
+        if !comparison.effects.is_empty() {
+            return Err(format!(
+                "reporting-only preparation agent={} would create acceptance effects: {:?}",
+                entry.agent_id, comparison.effects
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn compare_views(before: &View, after: &View) -> Result<Comparison, String> {
+    let agent = &after.entry.agent_id;
     if before.records.is_empty() && after.records.is_empty() {
         return Ok(Comparison::default());
     }
@@ -48,9 +85,9 @@ pub fn compare(workspace: &Path, commit: &str, agent: &str) -> Result<Comparison
         }
     }
     let mut effects = BTreeSet::new();
-    manifest::detect(&before, &after, &mut effects)?;
-    artifacts::detect(&before, &after, &mut effects)?;
-    publication::detect(workspace, commit, &before, &after, &mut effects)?;
+    manifest::detect(before, after, &mut effects)?;
+    artifacts::detect(before, after, &mut effects)?;
+    publication::detect(before, after, &mut effects)?;
     let mut by_version: BTreeMap<String, Vec<Effect>> = BTreeMap::new();
     let effects: Vec<_> = effects
         .into_iter()
@@ -83,14 +120,10 @@ pub fn compare(workspace: &Path, commit: &str, agent: &str) -> Result<Comparison
             });
         }
     }
-    let input_issues = publication::validate_current(workspace, &after)
-        .err()
-        .into_iter()
-        .collect();
     Ok(Comparison {
         effects,
         missing_entries: missing,
-        input_issues,
+        input_issues: Vec::new(),
     })
 }
 fn effect(out: &mut BTreeSet<Effect>, version: &str, target: Option<&str>, path: &str, kind: &str) {

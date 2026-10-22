@@ -1,5 +1,17 @@
 #![allow(dead_code, unused_imports)]
 
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
+mod support_depth {
+    pub use xtask::support_depth::*;
+}
+mod depth_acceptance {
+    pub use xtask::depth_acceptance::*;
+}
+mod runtime_advertising {
+    pub use xtask::runtime_advertising::*;
+}
 use std::{fs, path::Path};
 
 use sha2::{Digest, Sha256};
@@ -658,3 +670,9 @@ fn automated_request_with_execution_contract_toml() -> String {
 
 #[path = "agent_maintenance_prepare/depth_binding.rs"]
 mod depth_binding;
+
+#[path = "agent_maintenance_prepare/guarded_apply.rs"]
+mod guarded_apply_tests;
+
+#[path = "agent_maintenance_prepare/depth_core.rs"]
+mod depth_core_tests;

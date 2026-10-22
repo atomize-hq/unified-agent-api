@@ -12,8 +12,11 @@ mod consistency;
 pub mod depth;
 #[path = "support_matrix/derive.rs"]
 mod derive;
+#[path = "support_matrix/preparation.rs"]
+mod preparation;
 #[path = "support_matrix/publication.rs"]
 mod publication;
+pub use preparation::preview_preparation;
 #[path = "support_matrix/runtime_support.rs"]
 mod runtime_support;
 

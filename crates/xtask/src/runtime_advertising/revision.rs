@@ -35,7 +35,10 @@ impl Revision {
         let registry =
             AgentRegistry::parse(&source.read(crate::agent_registry::REGISTRY_RELATIVE_PATH)?)
                 .map_err(|e| e.to_string())?;
-        let models = projection::project(&registry)?;
+        Self::with_registry(source, &registry)
+    }
+    pub(crate) fn with_registry(source: &Source, registry: &AgentRegistry) -> Result<Self, String> {
+        let models = projection::project(registry)?;
         if normalized(&source.read(DATA)?)? != normalized(&projection::render(&models))? {
             return Err("runtime advertising data is stale or unsupported".into());
         }
