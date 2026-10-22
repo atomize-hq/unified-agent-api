@@ -546,3 +546,65 @@ fn request_for(agent: &str) -> FreezeRequest {
 
 #[path = "support_depth_freeze/semantics.rs"]
 mod semantics;
+
+#[test]
+fn fixture_generation_is_deterministic_in_ci_without_an_inherited_epoch() {
+    const CHILD: &str = "UAA_DEPTH_FIXTURE_CI_CHILD";
+    const NAME: &str = "fixture_generation_is_deterministic_in_ci_without_an_inherited_epoch";
+    if std::env::var_os(CHILD).is_none() {
+        // Model GitHub's test environment in a separate process; parallel tests keep their own
+        // environment, and fixture generation must not depend on the developer's epoch setting.
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", NAME, "--nocapture"])
+            .env(CHILD, "1")
+            .env("CI", "true")
+            .env_remove("SOURCE_DATE_EPOCH")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "CI fixture regression:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
+    assert_eq!(std::env::var("CI").unwrap(), "true");
+    assert!(std::env::var_os("SOURCE_DATE_EPOCH").is_none());
+    for agent in ["codex", "claude_code", "opencode"] {
+        let root = fixture::workspace(agent);
+        fixture::acquire(root.path(), agent);
+        let before = plan_freeze(root.path(), &request_for(agent))
+            .unwrap()
+            .unwrap()
+            .record;
+        for (path, field) in [
+            (
+                format!("cli_manifests/{agent}/snapshots/1.2.3/union.json"),
+                "collected_at",
+            ),
+            (
+                format!("cli_manifests/{agent}/reports/1.2.3/coverage.any.json"),
+                "generated_at",
+            ),
+        ] {
+            let value: serde_json::Value =
+                serde_json::from_slice(&fs::read(root.path().join(path)).unwrap()).unwrap();
+            assert_eq!(value[field], "1970-01-01T00:00:00Z");
+        }
+        fixture::regenerate(root.path(), agent);
+        let after = plan_freeze(root.path(), &request_for(agent))
+            .unwrap()
+            .unwrap()
+            .record;
+        assert_eq!(
+            before, after,
+            "{agent}: regenerated acquisition changed P/O"
+        );
+        assert!(
+            std::env::var_os("SOURCE_DATE_EPOCH").is_none(),
+            "fixture changed its parent environment"
+        );
+    }
+}

@@ -1,6 +1,6 @@
 use super::git;
 use serde_json::{json, Value};
-use std::{fs, path::Path};
+use std::{fs, path::Path, process::Command};
 use tempfile::TempDir;
 use xtask::agent_registry::support_depth::SupportDepth;
 
@@ -96,18 +96,23 @@ pub fn acquire(root: &Path, agent: &str) {
 
 pub fn regenerate(root: &Path, agent: &str) {
     let manifest = root.join(format!("cli_manifests/{agent}"));
-    xtask::manifest_union::run(xtask::manifest_union::Args {
-        root: Some(manifest.clone()),
-        rules: None,
-        version: "1.2.3".into(),
-    })
-    .unwrap();
-    xtask::manifest_report::run(xtask::manifest_report::Args {
-        root: Some(manifest),
-        rules: None,
-        version: "1.2.3".into(),
-    })
-    .unwrap();
+    for subcommand in ["manifest-union", "manifest-report"] {
+        // Keep the epoch local to each generator, including when tests run concurrently in CI.
+        let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .args([subcommand, "--root"])
+            .arg(&manifest)
+            .args(["--version", "1.2.3"])
+            .env("SOURCE_DATE_EPOCH", "0")
+            .current_dir(root)
+            .output()
+            .expect("run fixture acquisition");
+        assert!(
+            output.status.success(),
+            "fixture {subcommand} failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     git(root, &["add", "."]);
 }
 
