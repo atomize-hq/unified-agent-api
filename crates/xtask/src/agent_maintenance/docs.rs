@@ -81,7 +81,7 @@ fn build_automated_packet_docs(
         Some(contract) if contract.executor == EXECUTE_HOST_SURFACE => contract,
         _ => &derived_contract,
     };
-    build_automated_packet_docs_from_contract(workspace_root, request, execution_contract)
+    build_preparation_packet_docs(workspace_root, request, execution_contract, &entry)
 }
 
 fn build_manual_packet_docs(request: &MaintenanceRequest) -> Vec<RenderedPacketDoc> {
@@ -202,6 +202,16 @@ pub fn render_execution_packet(
     request: &MaintenanceRequest,
     execution_contract: &ExecutionContract,
 ) -> Result<RenderedExecutionPacket, String> {
+    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
+    render_execution_packet_with_entry(workspace_root, request, execution_contract, &entry)
+}
+
+fn render_execution_packet_with_entry(
+    workspace_root: &Path,
+    request: &MaintenanceRequest,
+    execution_contract: &ExecutionContract,
+    entry: &AgentRegistryEntry,
+) -> Result<RenderedExecutionPacket, String> {
     if !request.is_automated_watch_request() {
         return Err(format!(
             "execution packet renderer requires trigger_kind `upstream_release_detected` for `{}`",
@@ -215,10 +225,9 @@ pub fn render_execution_packet(
             request.relative_path
         )
     })?;
-    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
     let prompt_contents = render_prompt_template_for_contract(
         workspace_root,
-        &entry,
+        entry,
         &request.maintenance_root,
         &execution_contract.prompt_template_path,
         &detected_release.target_version,
@@ -331,15 +340,16 @@ pub fn render_execution_packet(
     })
 }
 
-fn build_automated_packet_docs_from_contract(
+pub(crate) fn build_preparation_packet_docs(
     workspace_root: &Path,
     request: &MaintenanceRequest,
     execution_contract: &ExecutionContract,
+    entry: &AgentRegistryEntry,
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     let rendered_execution_packet =
-        render_execution_packet(workspace_root, request, execution_contract)?;
+        render_execution_packet_with_entry(workspace_root, request, execution_contract, entry)?;
     let packet_owned_contract_inputs =
-        build_packet_owned_contract_inputs(workspace_root, request, execution_contract)?;
+        build_packet_owned_contract_inputs(request, execution_contract, entry)?;
     let root = &request.maintenance_root;
     let trigger_context = render_trigger_context(request);
     let support_audit = render_support_surface_audit(request);
@@ -421,16 +431,15 @@ fn build_automated_packet_docs_from_contract(
 }
 
 fn build_packet_owned_contract_inputs(
-    workspace_root: &Path,
     request: &MaintenanceRequest,
     execution_contract: &ExecutionContract,
+    entry: &AgentRegistryEntry,
 ) -> Result<Vec<RenderedPacketDoc>, String> {
     let prompt_path = packet_owned_prompt_template_path(&request.maintenance_root);
     if execution_contract.prompt_template_path != prompt_path {
         return Ok(Vec::new());
     }
 
-    let entry = load_registry_entry(workspace_root, &request.agent_id)?;
     let detected_release = request.detected_release.as_ref().ok_or_else(|| {
         format!(
             "packet-owned contract inputs require detected_release metadata for `{}`",
@@ -466,7 +475,7 @@ fn build_packet_owned_contract_inputs(
         },
         RenderedPacketDoc {
             relative_path: prompt_path,
-            contents: packet_pr_prompt_template(&entry, &request.maintenance_root),
+            contents: packet_pr_prompt_template(entry, &request.maintenance_root),
         },
     ])
 }

@@ -37,7 +37,17 @@ pub fn plan_freeze(
     workspace: &Path,
     request: &FreezeRequest,
 ) -> Result<Option<FreezePlan>, String> {
-    plan(workspace, request).map_err(|e| {
+    plan_freeze_with_work(workspace, request, &[])
+}
+
+/// Preparation may retain additional name-level due work from its freshly derived audit.
+/// These names are conservative work, not evidence, applicability or write admission.
+pub fn plan_freeze_with_work(
+    workspace: &Path,
+    request: &FreezeRequest,
+    required: &[(String, String, String)],
+) -> Result<Option<FreezePlan>, String> {
+    plan(workspace, request, required).map_err(|e| {
         format!(
             "support depth freeze agent={} version={}: {e}",
             request.agent, request.version
@@ -45,7 +55,11 @@ pub fn plan_freeze(
     })
 }
 
-fn plan(workspace: &Path, request: &FreezeRequest) -> Result<Option<FreezePlan>, String> {
+fn plan(
+    workspace: &Path,
+    request: &FreezeRequest,
+    fresh_required: &[(String, String, String)],
+) -> Result<Option<FreezePlan>, String> {
     let version = semver::Version::parse(&request.version).map_err(|e| e.to_string())?;
     if !version.pre.is_empty()
         || !version.build.is_empty()
@@ -93,7 +107,10 @@ fn plan(workspace: &Path, request: &FreezeRequest) -> Result<Option<FreezePlan>,
             toml_edit::de::from_str::<StandingRequest>(text(raw)?).map_err(|e| e.to_string())
         })
         .transpose()?;
-    let mut required = BTreeSet::new();
+    let mut required: BTreeSet<_> = fresh_required
+        .iter()
+        .map(|(kind, command, id)| SurfaceIdentity::new(kind.clone(), command.clone(), id.clone()))
+        .collect();
     if let Some(standing) = &standing {
         if standing.agent_id != request.agent {
             return Err("standing request names another agent".into());
@@ -243,6 +260,7 @@ struct FrozenTable {
 }
 #[derive(Default, Deserialize)]
 struct RequiredAudit {
+    #[serde(default)]
     required_uplifts_this_run: Vec<RequiredSurface>,
 }
 #[derive(Deserialize)]

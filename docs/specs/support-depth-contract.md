@@ -937,6 +937,20 @@ Event/P/O matching under both audit policies. Exported loaders retain the normal
 MA1 renders no production depth table or record, and no route gains write or acceptance authority.
 This changes request plumbing, not the output writers/serialization domains inventoried below.
 
+The preparatory C2 increment connects that plumbing to the shared freeze planner through the
+private `prepare/depth.rs` core. `prepare/guard.rs` binds the workspace, inputs/index membership
+and expected-before outputs and independently rebuilds the proposal at apply. Public builder and
+apply both retain the registry refusal and reject retained depth scope. Isolated fixtures cover all
+three adopted roots, stale/modified plans, preserved generations/work/entries, coherent publication
+and refusal of new acceptance effects even with old entries and across aggregate agents.
+
+Publication preview reuses `support_matrix`'s loaded-root derivation and renderers; the bounded
+proposed-bytes adapter reuses `depth_acceptance`'s existing check-9 detectors. No candidate files
+are written to obtain a preview. `workspace_mutation` rollback preserves observed external edits
+and reports conflicts; it remains best-effort repair, with races/crash limits. These changes prove
+bounded MA1 preparation behavior, not the complete route inventory, actor admission, integration
+serialization predicate or enablement. MA2 transport is separate C3 work; D/E proof remains due.
+
 ### A.1 Routes
 
 Each route is listed once, from its entrypoint forward. "Path" is the lifecycle path whose

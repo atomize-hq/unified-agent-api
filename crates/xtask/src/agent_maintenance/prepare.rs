@@ -1,3 +1,7 @@
+#[path = "prepare/depth.rs"]
+mod depth;
+#[path = "prepare/guard.rs"]
+mod guard;
 #[path = "prepare/render.rs"]
 mod render;
 pub(super) use render::render_request_toml;
@@ -15,8 +19,7 @@ use crate::{
     agent_lifecycle::maintenance_request_path,
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     workspace_mutation::{
-        apply_mutations, plan_create_or_replace, ApplySummary, WorkspaceMutationError,
-        WorkspacePathJail,
+        apply_mutations, ApplySummary, WorkspaceMutationError, WorkspacePathJail,
     },
 };
 
@@ -25,12 +28,11 @@ use super::{
         build_execution_contract, derive_detected_release_fields, dispatch_kind_str,
         dispatch_workflow_value, opened_from_path,
     },
-    docs::build_packet_docs_from_envelope,
+    docs::build_preparation_packet_docs,
     request::{
         self, validate_commit_value, validate_non_empty_scalar, validate_repo_relative_reference,
         DetectedRelease, ExecutionContract, MaintenanceAction, MaintenanceRequest,
-        MaintenanceRequestEnvelope, RuntimeFollowupRequired, TriggerKind,
-        AUTOMATED_ARTIFACT_VERSION,
+        RuntimeFollowupRequired, TriggerKind, AUTOMATED_ARTIFACT_VERSION,
     },
     support_audit::{derive_support_surface_audit, SupportSurfaceAudit},
 };
@@ -108,6 +110,7 @@ impl From<request::MaintenanceRequestError> for Error {
 pub struct PreparePlan {
     pub request: MaintenanceRequest,
     pub files: Vec<PreparedFile>,
+    context: guard::Context,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +165,16 @@ pub fn run_in_workspace<W: Write>(
 pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PreparePlan, Error> {
     let registry = AgentRegistry::load(workspace_root)
         .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
+    guard::refuse_retained_depth(workspace_root, &registry)?;
+    build_with_registry(workspace_root, args, &registry)
+}
+
+fn build_with_registry(
+    workspace_root: &Path,
+    args: &Args,
+    registry: &AgentRegistry,
+) -> Result<PreparePlan, Error> {
+    let mut context = guard::Context::capture(workspace_root, registry, args)?;
     let entry = registry.find(&args.agent).ok_or_else(|| {
         Error::Validation(format!(
             "prepare-agent-maintenance references unknown agent_id `{}`",
@@ -203,16 +216,21 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
         &args.branch_name,
     )
     .map_err(Error::Internal)?;
-    let support_surface_audit =
+    let mut support_surface_audit =
         derive_support_surface_audit(workspace_root, entry, &detected_release)
             .map_err(Error::Internal)?;
+    let freeze = depth::freeze(workspace_root, entry, args, &mut support_surface_audit)?;
+    let support_depth = freeze.as_ref().map(|plan| request::SupportDepthBinding {
+        policy_identity: plan.record.policy.identity.clone(),
+        obligations_identity: plan.record.obligations.as_ref().map(|o| o.identity.clone()),
+    });
     let request_bytes = render_request_toml(
         args,
         &basis_ref,
         &detected_release,
         &support_surface_audit,
         &execution_contract,
-        None,
+        support_depth.as_ref(),
     )?
     .into_bytes();
     let request = MaintenanceRequest {
@@ -232,20 +250,15 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
         },
         detected_release: Some(detected_release),
         support_surface_audit: Some(support_surface_audit),
-        support_depth: None,
+        support_depth,
         request_recorded_at: args.request_recorded_at.clone(),
         request_commit: args.request_commit.clone(),
     };
-    let envelope = MaintenanceRequestEnvelope {
-        request: request.clone(),
-        execution_contract: Some(execution_contract),
-    };
-
     let mut files = vec![PreparedFile {
         relative_path: request.relative_path.clone(),
         contents: request_bytes,
     }];
-    for doc in build_packet_docs_from_envelope(workspace_root, &envelope)
+    for doc in build_preparation_packet_docs(workspace_root, &request, &execution_contract, entry)
         .map_err(|err| Error::Internal(format!("render maintenance packet docs: {err}")))?
     {
         files.push(PreparedFile {
@@ -253,27 +266,31 @@ pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PrepareP
             contents: doc.contents.into_bytes(),
         });
     }
-    Ok(PreparePlan { request, files })
+    if let Some(freeze) = &freeze {
+        depth::append(workspace_root, registry, freeze, &mut files)?;
+    }
+    context.bind_outputs(workspace_root, &files)?;
+    let after = guard::Context::capture(workspace_root, registry, args)?;
+    if context.inputs != after.inputs || context.index != after.index {
+        return Err(Error::Validation(
+            "preparation inputs changed during planning".into(),
+        ));
+    }
+    Ok(PreparePlan {
+        request,
+        files,
+        context,
+    })
 }
 
 pub fn apply_prepare_plan(
     workspace_root: &Path,
     plan: &PreparePlan,
 ) -> Result<ApplySummary, Error> {
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    let mutations = plan
-        .files
-        .iter()
-        .map(|file| {
-            plan_create_or_replace(
-                &jail,
-                PathBuf::from(&file.relative_path),
-                file.contents.clone(),
-            )
-            .map_err(Error::from)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    apply_mutations(workspace_root, &mutations).map_err(Into::into)
+    let registry = AgentRegistry::load(workspace_root)
+        .map_err(|err| Error::Validation(format!("load agent registry: {err}")))?;
+    guard::refuse_retained_depth(workspace_root, &registry)?;
+    guard::apply(workspace_root, plan, &registry)
 }
 
 fn validate_prepare_args(
@@ -609,3 +626,7 @@ fn repo_root() -> PathBuf {
         .expect("xtask crate should live under crates/xtask")
         .to_path_buf()
 }
+
+#[cfg(test)]
+#[path = "prepare/depth_tests.rs"]
+mod depth_tests;

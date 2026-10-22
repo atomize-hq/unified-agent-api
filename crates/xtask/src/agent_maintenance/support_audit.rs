@@ -90,7 +90,8 @@ pub struct EligibleSurface {
     pub eligibility_reason: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RequiredUplift {
     pub surface_kind: String,
     pub command_path: String,

@@ -150,8 +150,8 @@ pub(super) fn advertising(
     after: &View,
     effects: &mut BTreeSet<Effect>,
 ) -> Result<(), String> {
-    let old = Revision::load(&before.source)?;
-    let now = Revision::load(&after.source)?;
+    let old = Revision::with_registry(&before.source, &before.registry)?;
+    let now = Revision::with_registry(&after.source, &after.registry)?;
     for added in now.additions(&old)? {
         if added.agent != after.entry.agent_id {
             continue;

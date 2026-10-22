@@ -35,7 +35,7 @@ pub(super) struct AgentRoot {
 }
 
 impl AgentRoot {
-    fn new(workspace_root: &Path, agent: &str, manifest_root: &str) -> Self {
+    pub(super) fn new(workspace_root: &Path, agent: &str, manifest_root: &str) -> Self {
         Self {
             agent: agent.to_string(),
             root: workspace_root.join(manifest_root),
@@ -52,7 +52,8 @@ pub(super) struct LoadedAgentRoot {
     pub(super) pointers: PointerSet,
     pub(super) layout: RootIntakeLayout,
     pub(super) versions: Vec<VersionMetadata>,
-    records: BTreeMap<String, DepthRecord>,
+    pub(super) records: BTreeMap<String, DepthRecord>,
+    pub(super) declared: BTreeMap<String, BTreeSet<String>>,
     /// The content identity of each file the records bind, where the revision holds it.
     evidence: BTreeMap<String, String>,
 }
@@ -306,6 +307,7 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
         .keys()
         .copied()
         .chain(root.records.keys().map(String::as_str))
+        .chain(root.declared.keys().map(String::as_str))
         .collect::<BTreeSet<_>>();
     let evidence = |path: &str| root.evidence.get(path).cloned();
     let mut rows = Vec::new();
@@ -316,6 +318,9 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
         // Support depth rule 4: a target the record covers implies a row, whether or not the
         // version has metadata and whether or not `expected_targets` lists the target.
         let mut targets = record.map(depth::covered_targets).unwrap_or_default();
+        if let Some(declared) = root.declared.get(version) {
+            targets.extend(declared.iter().map(String::as_str));
+        }
         if metadata.is_some() {
             targets.extend(root.posture.expected_targets.iter().map(String::as_str));
         }
@@ -339,15 +344,20 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
             let pointer_promotion = classify_pointer_promotion(&root.pointers, target, version);
             let evidence_notes =
                 build_evidence_notes(report.as_ref(), &root.posture, target, version);
-            // ponytail: `declared` is false until the registry admits a depth declaration, which
-            // route wiring brings; rule 4's declared rows come with it.
-            let depth =
-                depth::derive_depth_facts(record, false, target, &evidence).map_err(|err| {
-                    format!(
-                        "agent `{}` version `{version}` target `{target}`: {err}",
-                        root.agent
-                    )
-                })?;
+            let depth = depth::derive_depth_facts(
+                record,
+                root.declared
+                    .get(version)
+                    .is_some_and(|t| t.contains(target)),
+                target,
+                &evidence,
+            )
+            .map_err(|err| {
+                format!(
+                    "agent `{}` version `{version}` target `{target}`: {err}",
+                    root.agent
+                )
+            })?;
             let uaa_support = depth::apply_depth(
                 classify_uaa_support(manifest_support, backend_support, &evidence_notes),
                 depth.as_ref(),
@@ -390,6 +400,7 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
         layout,
         versions,
         records,
+        declared: BTreeMap::new(),
         evidence,
     })
 }

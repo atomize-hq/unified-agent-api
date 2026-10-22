@@ -95,6 +95,13 @@ impl View {
     pub fn load(source: Source, agent: &str) -> Result<Self, String> {
         let registry = AgentRegistry::parse(&source.read(REGISTRY_RELATIVE_PATH)?)
             .map_err(|e| e.to_string())?;
+        Self::with_registry(source, &registry, agent)
+    }
+    pub(super) fn with_registry(
+        source: Source,
+        registry: &AgentRegistry,
+        agent: &str,
+    ) -> Result<Self, String> {
         let entry = registry
             .find(agent)
             .ok_or("record lost its registry anchor")?
@@ -114,7 +121,7 @@ impl View {
         }
         Ok(Self {
             source,
-            registry,
+            registry: registry.clone(),
             entry,
             records,
         })

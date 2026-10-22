@@ -1,5 +1,23 @@
 #![allow(dead_code, unused_imports)]
 
+mod manifest_union {
+    pub use xtask::manifest_union::*;
+}
+mod manifest_report {
+    pub use xtask::manifest_report::*;
+}
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
+mod support_depth {
+    pub use xtask::support_depth::*;
+}
+mod depth_acceptance {
+    pub use xtask::depth_acceptance::*;
+}
+mod runtime_advertising {
+    pub use xtask::runtime_advertising::*;
+}
 use std::{
     fs,
     path::{Path, PathBuf},

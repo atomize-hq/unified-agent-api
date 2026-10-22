@@ -1,6 +1,7 @@
 use quote::{quote, ToTokens};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Component, Path, PathBuf},
     process::Command,
@@ -10,6 +11,7 @@ use std::{
 pub struct Source {
     root: PathBuf,
     commit: Option<String>,
+    proposed: BTreeMap<String, String>,
 }
 
 impl Source {
@@ -17,7 +19,18 @@ impl Source {
         Ok(Self {
             root: root.canonicalize().map_err(|e| e.to_string())?,
             commit: None,
+            proposed: BTreeMap::new(),
         })
+    }
+
+    /// A bounded read-only candidate; it never materializes proposed files in the workspace.
+    pub(crate) fn proposed(root: &Path, files: BTreeMap<String, String>) -> Result<Self, String> {
+        let mut source = Self::workspace(root)?;
+        for path in files.keys() {
+            source.optional(path)?;
+        }
+        source.proposed = files;
+        Ok(source)
     }
 
     pub fn tip(root: &Path, revision: &str) -> Result<Self, String> {
@@ -59,6 +72,9 @@ impl Source {
                 .any(|p| !matches!(p, Component::Normal(_)))
         {
             return Err(format!("invalid source path: {path}"));
+        }
+        if let Some(raw) = self.proposed.get(path) {
+            return Ok(Some(raw.clone()));
         }
         if let Some(commit) = &self.commit {
             // ls-tree does not follow a symlink ancestor. Distinguish that unsupported binding
@@ -112,6 +128,12 @@ impl Source {
                 Err(e) => return Err(format!("{path}: {e}")),
             }
         }
+        if !fs::symlink_metadata(&cursor)
+            .map_err(|e| e.to_string())?
+            .is_file()
+        {
+            return Err(format!("{path}: expected a regular source file"));
+        }
         fs::read_to_string(&cursor)
             .map(Some)
             .map_err(|e| format!("{path}: {e}"))
@@ -156,6 +178,12 @@ impl Source {
                         entry.path().display()
                     ));
                 }
+                if !kind.is_dir() && !kind.is_file() {
+                    return Err(format!(
+                        "{}: unsupported source file type",
+                        entry.path().display()
+                    ));
+                }
                 let path = entry.path();
                 result.push(
                     path.strip_prefix(root)
@@ -172,6 +200,15 @@ impl Source {
         }
         let mut result = Vec::new();
         walk(&self.root, &self.root.join(prefix), &mut result)?;
+        for path in self
+            .proposed
+            .keys()
+            .filter(|p| p.starts_with(&format!("{prefix}/")))
+        {
+            if !result.contains(path) {
+                result.push(path.clone());
+            }
+        }
         result.sort();
         Ok(result)
     }
