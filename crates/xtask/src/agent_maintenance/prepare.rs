@@ -4,6 +4,8 @@ mod depth;
 mod guard;
 #[path = "prepare/render.rs"]
 mod render;
+#[path = "prepare/report.rs"]
+mod report;
 pub(super) use render::render_request_toml;
 
 use std::{
@@ -138,9 +140,13 @@ impl PreparePlan {
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
+    run_with_report(args, None)
+}
+
+pub fn run_with_report(args: Args, report_path: Option<&Path>) -> Result<(), Error> {
     let workspace_root = repo_root();
     let mut stdout = io::stdout();
-    run_in_workspace(&workspace_root, args, &mut stdout)
+    run_in_workspace_with_report(&workspace_root, args, &mut stdout, report_path)
 }
 
 pub fn run_in_workspace<W: Write>(
@@ -148,6 +154,18 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    run_in_workspace_with_report(workspace_root, args, writer, None)
+}
+
+pub fn run_in_workspace_with_report<W: Write>(
+    workspace_root: &Path,
+    args: Args,
+    writer: &mut W,
+    report_path: Option<&Path>,
+) -> Result<(), Error> {
+    let report_path = report_path
+        .map(|path| report::destination(workspace_root, path))
+        .transpose()?;
     let plan = build_prepare_plan(workspace_root, &args)?;
     write_preview(writer, &plan, args.write)?;
     if args.write {
@@ -158,6 +176,9 @@ pub fn run_in_workspace<W: Write>(
             summary.total, summary.written, summary.identical
         )
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
+    if let Some(path) = report_path {
+        report::write(&path, &plan, args.write)?;
     }
     Ok(())
 }

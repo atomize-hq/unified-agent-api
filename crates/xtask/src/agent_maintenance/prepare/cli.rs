@@ -12,6 +12,9 @@ use super::{args_from_request, Args, Error};
         .multiple(false)
 ))]
 pub struct Cli {
+    /// Write planned delivery paths and SHA-256 hashes to a new file outside the workspace.
+    #[arg(long)]
+    emit_json: Option<PathBuf>,
     #[arg(long, conflicts_with_all = ["agent", "current_version", "latest_stable", "target_version", "opened_from", "detected_by", "dispatch_kind", "dispatch_workflow", "branch_name", "request_recorded_at", "request_commit"])]
     from_request: Option<PathBuf>,
     #[arg(long, required_unless_present = "from_request")]
@@ -43,6 +46,11 @@ pub struct Cli {
 }
 
 impl Cli {
+    pub fn run(self) -> Result<(), Error> {
+        let report = self.emit_json.clone();
+        super::run_with_report(self.into_args()?, report.as_deref())
+    }
+
     pub fn into_args(self) -> Result<Args, Error> {
         if let Some(path) = self.from_request {
             return args_from_request(&path, self.dry_run, self.write);

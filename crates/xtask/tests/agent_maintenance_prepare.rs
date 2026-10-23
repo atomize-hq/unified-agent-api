@@ -676,3 +676,53 @@ mod guarded_apply_tests;
 
 #[path = "agent_maintenance_prepare/depth_core.rs"]
 mod depth_core_tests;
+
+#[test]
+fn preparation_cli_offers_machine_readable_delivery_output() {
+    use clap::Parser;
+    let error = prepare::Cli::try_parse_from(["prepare-agent-maintenance", "--help"])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("--emit-json"), "{error}");
+}
+
+#[test]
+fn delivery_report_names_exact_applied_bytes_and_cannot_overwrite_the_workspace() {
+    let fixture = fixture_root("prepare-delivery-report");
+    seed_registry(&fixture);
+    seed_support_files(&fixture);
+    let reports = tempfile::tempdir().unwrap();
+    let path = reports.path().join("prepared.json");
+    let mut stdout = Vec::new();
+    let mut write_args = args();
+    write_args.write = true;
+    write_args.dry_run = false;
+    prepare::run_in_workspace_with_report(&fixture, write_args, &mut stdout, Some(&path)).unwrap();
+    let report: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(report["applied"], true);
+    for file in report["files"].as_array().unwrap() {
+        let bytes = fs::read(fixture.join(file["path"].as_str().unwrap())).unwrap();
+        assert_eq!(file["sha256"], hex::encode(Sha256::digest(bytes)));
+    }
+    let before = fs::read(&path).unwrap();
+    assert!(
+        prepare::run_in_workspace_with_report(&fixture, args(), &mut stdout, Some(&path)).is_err()
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let request =
+        fixture.join("docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml");
+    let before = fs::read(&request).unwrap();
+    assert!(
+        prepare::run_in_workspace_with_report(&fixture, args(), &mut stdout, Some(&request))
+            .is_err()
+    );
+    assert_eq!(fs::read(&request).unwrap(), before);
+    let mut invalid = args();
+    invalid.agent = "unknown".into();
+    let failure = reports.path().join("failure.json");
+    assert!(
+        prepare::run_in_workspace_with_report(&fixture, invalid, &mut stdout, Some(&failure))
+            .is_err()
+    );
+    assert!(!failure.exists());
+}

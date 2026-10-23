@@ -402,11 +402,7 @@ fn main() {
         },
         Command::PrepareAgentMaintenance(cli_args) => run_write_side_lifecycle(
             "prepare-agent-maintenance",
-            || {
-                cli_args
-                    .into_args()
-                    .and_then(agent_maintenance_prepare::run)
-            },
+            || cli_args.run(),
             |err| err.exit_code(),
         ),
         Command::ExecuteAgentMaintenance(args) => run_write_side_lifecycle(

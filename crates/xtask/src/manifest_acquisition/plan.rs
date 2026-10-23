@@ -38,6 +38,11 @@ pub struct AcquisitionPlan {
     pub wrapper_coverage_command: Option<String>,
     pub validation_commands: Vec<String>,
     pub include: Vec<PlannedTarget>,
+    /// Literal generator-owned files to stage before maintenance freeze. Missing optional
+    /// target/report files remain absent; no directory conveys ownership of evidence within it.
+    pub input_paths: Vec<String>,
+    /// All acquisition-owned delivery files, including metadata and lock provenance.
+    pub output_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -134,6 +139,24 @@ pub fn resolve(
         )?);
     }
 
+    // These are the canonical paths written by manifest-union/report and the wrapper generator.
+    // Keep the target set from RULES rather than discovering files in a report directory.
+    let mut input_paths = vec![
+        format!("{manifest_root}/snapshots/{version}/union.json"),
+        format!("{manifest_root}/wrapper_coverage.json"),
+        format!("{manifest_root}/reports/{version}/coverage.any.json"),
+        format!("{manifest_root}/reports/{version}/coverage.all.json"),
+    ];
+    for target in expected_targets {
+        input_paths.push(format!("{manifest_root}/snapshots/{version}/{target}.json"));
+        input_paths.push(format!(
+            "{manifest_root}/reports/{version}/coverage.{target}.json"
+        ));
+    }
+    let mut output_paths = input_paths.clone();
+    output_paths.push(format!("{manifest_root}/versions/{version}.json"));
+    output_paths.push(format!("{manifest_root}/artifacts.lock.json"));
+
     Ok(AcquisitionPlan {
         plan_schema_version: 1,
         agent_id: agent_id.to_string(),
@@ -163,6 +186,8 @@ pub fn resolve(
         wrapper_coverage_command: descriptor.wrapper_coverage_command.clone(),
         validation_commands: descriptor.validation.commands.clone(),
         include,
+        input_paths,
+        output_paths,
     })
 }
 
