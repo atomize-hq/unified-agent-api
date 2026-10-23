@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::process::{Command, Output};
 
@@ -5,7 +6,7 @@ use super::*;
 
 const WORKFLOW: &str = ".github/workflows/parity-acquire.yml";
 
-fn shell(step: &str) -> String {
+pub(super) fn shell(step: &str) -> String {
     step.split_once("        run: |\n")
         .expect("workflow shell")
         .1
@@ -126,7 +127,7 @@ fn read_only_acquisition_does_not_restrict_the_checkout_ref_or_emit_delivery_out
     }
 }
 
-fn job<'a>(yml: &'a str, name: &str) -> &'a str {
+pub(super) fn job<'a>(yml: &'a str, name: &str) -> &'a str {
     let tail = yml.split_once(&format!("\n  {name}:\n")).unwrap().1;
     let end = tail
         .find("\n  snapshot:\n")
@@ -134,7 +135,7 @@ fn job<'a>(yml: &'a str, name: &str) -> &'a str {
     &tail[..end.unwrap_or(tail.len())]
 }
 
-fn step<'a>(job: &'a str, name: &str) -> &'a str {
+pub(super) fn step<'a>(job: &'a str, name: &str) -> &'a str {
     let tail = job
         .split_once(&format!("      - name: {name}\n"))
         .unwrap()
@@ -142,7 +143,7 @@ fn step<'a>(job: &'a str, name: &str) -> &'a str {
     &tail[..tail.find("\n      - ").unwrap_or(tail.len())]
 }
 
-fn run(script: &str, cwd: &Path, env: &[(&str, &str)]) -> Output {
+pub(super) fn run(script: &str, cwd: &Path, env: &[(&str, &str)]) -> Output {
     Command::new("bash")
         .args(["--noprofile", "--norc", "-c", script])
         .current_dir(cwd)
@@ -219,7 +220,7 @@ fn every_checkout_checks_outputs_before_using_the_canonical_full_ref() {
     assert!(plan.contains("delivery_ref: ${{ steps.destination.outputs.delivery_ref }}"));
 }
 
-fn git(cwd: &Path, args: &[&str]) -> String {
+pub(super) fn git(cwd: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
         .current_dir(cwd)
         .args(args)
@@ -229,7 +230,7 @@ fn git(cwd: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap().trim().to_string()
 }
 
-fn repository() -> tempfile::TempDir {
+pub(super) fn repository() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-b", "custom"]);
     git(dir.path(), &["config", "user.name", "Acquisition test"]);
@@ -373,6 +374,16 @@ fn commit_shell_pushes_only_the_canonical_head_and_rechecks_its_destination() {
     git(dir.path(), &["push", "origin", "refs/tags/custom"]);
     let before = git(remote.path(), &["rev-parse", "refs/heads/custom"]);
     let output_file = dir.path().join("outputs");
+    let transport = tempfile::tempdir().unwrap();
+    let helper = dir.path().join("scripts/maintenance_transport.py");
+    fs::create_dir_all(helper.parent().unwrap()).unwrap();
+    fs::copy(
+        repo_root().join("scripts/maintenance_transport.py"),
+        &helper,
+    )
+    .unwrap();
+    let report = transport.path().join("prepared.json");
+    let state = transport.path().join("delivery.json");
     let deliver = |branch, reference| {
         run(
             &script,
@@ -384,6 +395,7 @@ fn commit_shell_pushes_only_the_canonical_head_and_rechecks_its_destination() {
                 ("BRANCH", branch),
                 ("DELIVERY_REF", reference),
                 ("GITHUB_OUTPUT", output_file.to_str().unwrap()),
+                ("TRANSPORT_DIR", transport.path().to_str().unwrap()),
             ],
         )
     };
@@ -392,6 +404,21 @@ fn commit_shell_pushes_only_the_canonical_head_and_rechecks_its_destination() {
         "acquired\n",
     )
     .unwrap();
+    fs::write(&report, serde_json::to_vec(&serde_json::json!({
+        "applied": true,
+        "files": [{"path": "manifest/artifacts.lock.json", "sha256": hex::encode(Sha256::digest(b"acquired\n"))}]
+    })).unwrap()).unwrap();
+    let stage = Command::new("python3")
+        .arg(&helper)
+        .arg("stage-delivery")
+        .arg("--preparation")
+        .arg(&report)
+        .arg("--state")
+        .arg(&state)
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    assert!(stage.status.success(), "{stage:?}");
     for (branch, reference) in [
         ("", ""),
         ("custom", ""),

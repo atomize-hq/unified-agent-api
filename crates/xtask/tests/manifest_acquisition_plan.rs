@@ -476,3 +476,47 @@ fn promotion_stance_is_carried_from_the_manifest_not_assumed() {
         "an agent with no declared promotion policy must not be permitted an incomplete promotion"
     );
 }
+
+#[test]
+fn acquisition_transport_lists_only_exact_owned_files() {
+    for agent in ["codex", "claude_code", "opencode"] {
+        let plan = plan_for_agent(&repo_root(), agent, "1.2.3").unwrap();
+        let json = serde_json::to_value(&plan).unwrap();
+        let inputs = json["input_paths"]
+            .as_array()
+            .expect("exact freeze input paths");
+        let outputs = json["output_paths"]
+            .as_array()
+            .expect("exact acquisition outputs");
+        let root = format!("cli_manifests/{agent}");
+        for target in expected_targets(agent) {
+            assert!(inputs.contains(&serde_json::json!(format!(
+                "{root}/snapshots/1.2.3/{target}.json"
+            ))));
+            assert!(inputs.contains(&serde_json::json!(format!(
+                "{root}/reports/1.2.3/coverage.{target}.json"
+            ))));
+        }
+        for path in [
+            format!("{root}/snapshots/1.2.3/union.json"),
+            format!("{root}/wrapper_coverage.json"),
+            format!("{root}/reports/1.2.3/coverage.any.json"),
+            format!("{root}/reports/1.2.3/coverage.all.json"),
+        ] {
+            assert!(inputs.contains(&serde_json::json!(path)));
+        }
+        for path in inputs {
+            assert!(outputs.contains(path));
+        }
+        assert!(outputs.contains(&serde_json::json!(format!("{root}/artifacts.lock.json"))));
+        assert!(outputs.contains(&serde_json::json!(format!("{root}/versions/1.2.3.json"))));
+        assert!(outputs
+            .iter()
+            .all(|p| p.as_str().unwrap().ends_with(".json")));
+        assert!(!outputs
+            .iter()
+            .any(|p| p.as_str().unwrap().contains("depth-record")));
+        assert_eq!(inputs.len(), 4 + expected_targets(agent).len() * 2);
+        assert_eq!(outputs.len(), inputs.len() + 2);
+    }
+}

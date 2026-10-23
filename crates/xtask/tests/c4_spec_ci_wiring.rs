@@ -13,6 +13,8 @@ mod acquisition_refreeze;
 mod acquisition_token;
 #[path = "c4_spec_ci_wiring/maintenance_audit_gate.rs"]
 mod maintenance_audit_gate;
+#[path = "c4_spec_ci_wiring/workflow_transport.rs"]
+mod workflow_transport;
 
 #[path = "c4_spec_ci_wiring/depth_merge.rs"]
 mod depth_merge;
@@ -83,7 +85,7 @@ fn c4_spec_agent_maintenance_workflows_share_the_release_watch_and_packet_only_p
         "--dispatch-kind",
         "--branch-name",
         "base: staging",
-        "add-paths: ${{ inputs.add_paths }}",
+        "add-paths: ${{ steps.delivery.outputs.paths }}",
         "body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md",
         "concurrency:",
         "group: agent-maintenance-${{ inputs.branch_name }}",
@@ -338,16 +340,16 @@ fn c4_spec_legacy_per_agent_parity_workflows_are_retired() {
 fn c4_spec_acquisition_commits_the_paths_support_matrix_actually_publishes() {
     let yml = read_repo_file(".github/workflows/parity-acquire.yml");
 
-    // `git add` fails the entire commit on a pathspec that matches nothing, so a wrong path here
-    // does not degrade gracefully: it throws away a full acquisition run — every download,
-    // snapshot, union and report — at the very last step. Bind the workflow to the constants the
-    // publisher actually writes so renaming one without updating the other fails here instead.
+    // Bind the shared exact-file transport to all publication outputs, including runtime data.
+    let transport = read_repo_file("scripts/maintenance_transport.py");
+    assert!(yml.contains("scripts/maintenance_transport.py"));
     for published in [
         xtask::support_matrix::JSON_OUTPUT_PATH,
         xtask::support_matrix::MARKDOWN_OUTPUT_PATH,
+        "crates/agent_api/src/runtime_support_data.rs",
     ] {
         assert!(
-            yml.contains(published),
+            transport.contains(published),
             "parity-acquire must commit the support publication path `{published}`"
         );
     }
@@ -600,7 +602,7 @@ fn c4_spec_every_destructive_packet_step_is_gated_on_a_fresh_stand_down_check() 
     let recheck = section_between(
         &packet_pr,
         "- name: Check packet stand-down before replacing the branch",
-        "- name: Create PR",
+        "- name: Verify checked packet bytes before delivery",
         "agent-maintenance-open-pr.yml",
     );
 

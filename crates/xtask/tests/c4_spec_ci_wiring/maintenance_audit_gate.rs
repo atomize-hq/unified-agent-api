@@ -218,8 +218,8 @@ fn c4_spec_maintenance_audit_artifact_bundle_upload_is_always() {
     );
 
     assert!(
-        upload_section.contains("if: ${{ always() }}"),
-        "the committed artifact bundle upload must use if: always()"
+        upload_section.contains("if: ${{ always() && steps.delivery.outcome == 'success' }}"),
+        "a checked bundle survives blocking audit/failed push, but never claims incomplete preparation"
     );
 }
 

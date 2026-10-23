@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use super::*;
 
 const WORKFLOW: &str = ".github/workflows/parity-acquire.yml";
@@ -81,81 +79,36 @@ fn c4_spec_acquisition_refreezes_between_union_and_audit() {
 }
 
 #[test]
-fn c4_spec_acquisition_commit_and_bundle_name_the_same_paths() {
+fn c4_spec_acquisition_commit_and_bundle_use_the_same_checked_delivery() {
     let yml = read_repo_file(WORKFLOW);
+    let stage = section_between(
+        &yml,
+        "- name: Stage the complete checked delivery",
+        "- name: Maintenance audit gate",
+        WORKFLOW,
+    );
+    assert!(stage.contains("id: delivery"));
+    assert!(stage.contains("stage-delivery --plan _ci_tmp/acquisition-plan.json"));
+    assert!(stage.contains("--input-state \"$TRANSPORT_DIR/inputs.json\""));
+    assert!(stage.contains("--preparation \"$PREPARATION_REPORT\""));
+    assert!(stage.contains("--bundle-dir \"$TRANSPORT_DIR/bundle\""));
     let commit = section_between(
         &yml,
         "- name: Commit the acquired artifacts onto the packet branch",
         "- name: Upload the committed artifact bundle",
         WORKFLOW,
     );
+    assert!(commit.contains("verify --state \"$TRANSPORT_DIR/delivery.json\""));
     assert!(
-        commit.contains("\"docs/agents/lifecycle/${AGENT_ID}-maintenance\""),
-        "the commit must stage regenerated request and packet docs"
+        !commit.contains("git add"),
+        "commit cannot recapture or broaden the checked path set"
     );
-
     let upload = section_between(
         &yml,
         "- name: Upload the committed artifact bundle",
         "- name: Record the maintenance audit verdict",
         WORKFLOW,
     );
-    let committed = git_add_paths(commit);
-    let bundled = upload_paths(upload);
-    assert_eq!(
-        bundled, committed,
-        "the committed artifact bundle must name exactly the staged path set"
-    );
-}
-
-fn git_add_paths(step: &str) -> BTreeSet<String> {
-    let mut paths = Vec::new();
-    let mut in_paths = false;
-    for line in step.lines() {
-        let trimmed = line.trim();
-        if trimmed == "PATHS=(" {
-            in_paths = true;
-            continue;
-        }
-        if in_paths {
-            if trimmed == ")" {
-                in_paths = false;
-            } else {
-                paths.push(trimmed);
-            }
-            continue;
-        }
-        if let Some(path) = trimmed
-            .strip_prefix("PATHS+=(")
-            .and_then(|value| value.strip_suffix(')'))
-        {
-            paths.push(path);
-        }
-    }
-    assert!(
-        step.contains("git add \"${PATHS[@]}\""),
-        "git add must stage PATHS"
-    );
-    assert!(!paths.is_empty(), "PATHS array");
-    paths.into_iter().map(normalize_path).collect()
-}
-
-fn upload_paths(step: &str) -> BTreeSet<String> {
-    step.lines()
-        .skip_while(|line| line.trim() != "path: |")
-        .skip(1)
-        .take_while(|line| line.starts_with("            ") && !line.trim().is_empty())
-        .map(|line| normalize_path(line.trim()))
-        .collect()
-}
-
-fn normalize_path(path: &str) -> String {
-    path.trim_end_matches('\\')
-        .trim()
-        .trim_matches('"')
-        .replace("${{ needs.plan.outputs.manifest_root }}", "${ROOT}")
-        .replace("${{ inputs.target_version }}", "${VERSION}")
-        .replace("${{ inputs.agent_id }}", "${AGENT_ID}")
-        .trim_end_matches('/')
-        .to_string()
+    assert!(upload.contains("path: ${{ runner.temp }}/maintenance-transport/bundle/"));
+    assert!(upload.contains("always() && steps.delivery.outcome == 'success'"));
 }

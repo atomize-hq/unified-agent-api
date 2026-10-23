@@ -952,7 +952,24 @@ Input identities use raw bytes and bind directory-prefix index membership. No ca
 are written to obtain a preview. `workspace_mutation` rollback preserves observed external edits
 and reports conflicts; it remains best-effort repair, with races/crash limits. These changes prove
 bounded MA1 preparation behavior, not the complete route inventory, actor admission, integration
-serialization predicate or enablement. MA2 transport is separate C3 work; D/E proof remains due.
+serialization predicate or enablement. D/E proof remains due.
+
+The bounded C3 increment updates MA1/MA2 transport against the C2 staging baseline `68a4c0e7`.
+`manifest_acquisition/plan.rs` supplies exact generator-owned input/output lists;
+`prepare/report.rs` emits planned paths/hashes after successful guarded apply. Initial packet
+creation requires `AUTOMATION_TOKEN` and uses the computed preparation output set. In
+`wf/parity-acquire.yml`, `Stage exact acquisition inputs before freeze` precedes re-freeze;
+publication follows it and `Stage the complete checked delivery` precedes audit. The shared
+`scripts/maintenance_transport.py` stages literal files, rejects pre-existing/unmerged index work,
+checks bytes before commit, and copies the same checked set for the diagnostic bundle. All three
+publication outputs, including the runtime projection, are delivered together.
+
+Real-Git transport tests and executable workflow-shell fixtures cover unrelated staged/untracked
+work, extra report evidence, partial/symlinked inputs, stage-before-freeze ordering, failed
+preparation, token/stand-down refusal, missing runtime projection, changed checked bytes and a
+rejected push without retry. Shell fixtures stub the external freeze command; C2's isolated core
+suites separately prove freeze semantics. This is bounded transport conformance, not full Annex A
+re-establishment, actor admission or serialization proof. Exported production depth refusal remains.
 
 ### A.1 Routes
 
@@ -963,8 +980,8 @@ an acceptance effect.
 
 | Id | Route | Entrypoint and callers | Path | Depth-gated outputs it can change | Reaches the integration branch by |
 | --- | --- | --- | --- | --- | --- |
-| MA1 | `prepare-agent-maintenance` | `wf/agent-maintenance-open-pr.yml:148`, dispatched nightly by `wf/agent-maintenance-release-watch.yml:197-203` or by a maintainer; a maintainer directly | Maintenance | Maintenance request and packet docs (`xtask/agent_maintenance/prepare.rs:253-270`). The open-PR workflow resets the packet branch to `staging` plus the new request (`wf/agent-maintenance-open-pr.yml:209-217,263-272`), which discards earlier MA2, MA3, MA4 and MA5 commits on it | Packet branch, then IN1 |
-| MA2 | Acquisition | `wf/parity-acquire.yml`, called from the open-PR workflow or dispatched; first step `Admit the acquisition destination` | Maintenance | Version metadata with `--status reported`, which overwrites any earlier status; support publication JSON and Markdown; the request's second freeze when the canonical branch is this version's packet branch (`Re-freeze the maintenance request against the acquired artifacts`). It regenerates the runtime-support projection and does not commit it | Preparation branch, then PR through IN1. Committing runs use canonical `HEAD:refs/heads/<branch>` and refuse `staging`/`main` before checkout; default `ref=staging` is read-only unless another destination is supplied. No rebase/retry on rejected delivery |
+| MA1 | `prepare-agent-maintenance` | `wf/agent-maintenance-open-pr.yml` (`Prepare maintenance packet`, `Stage the computed packet delivery`, `Create PR`), dispatched nightly by `wf/agent-maintenance-release-watch.yml` or by a maintainer; a maintainer directly | Maintenance | The exact computed preparation outputs: request/packet and, in the private depth core, record plus complete publication (`xtask/agent_maintenance/prepare.rs`, `prepare/report.rs`). The open-PR workflow resets the packet branch to `staging` plus those computed outputs, which discards earlier MA2, MA3, MA4 and MA5 commits on it | Packet branch, then IN1 |
+| MA2 | Acquisition | `wf/parity-acquire.yml`, called from the open-PR workflow or dispatched; first step `Admit the acquisition destination` | Maintenance | Version metadata with `--status reported`, which overwrites any earlier status; support publication JSON and Markdown; the request's second freeze when the canonical branch is this version's packet branch (`Re-freeze the maintenance request against the acquired artifacts`). It delivers the runtime-support projection with both support publications through the exact checked delivery set | Preparation branch, then PR through IN1. Committing runs use canonical `HEAD:refs/heads/<branch>` and refuse `staging`/`main` before checkout; default `ref=staging` is read-only unless another destination is supplied. No rebase/retry on rejected delivery |
 | MA3 | `refresh-agent --write` | A maintainer. No workflow runs it | Maintenance | Support publication, runtime-support projection, capability publication (`xtask/agent_maintenance/refresh.rs:137-228`) | Packet branch, then IN1 |
 | MA4 | `execute-agent-maintenance --write` | A maintainer or contributor | Maintenance | Every depth-gated output in its frozen write envelope (`xtask/agent_maintenance/contract_policy.rs:363-386`): `reports/<version>/`, where the depth record lives; the version file; support publication; the runtime-support projection; `crates/agent_api/**`, which carries capability advertising; and the maintenance root, which holds the request and the stand-down markers. Only the closeout is refused (`xtask/agent_maintenance/execute/validate.rs:122-126`). The executor runs unsandboxed (`xtask/agent_maintenance/execute/runtime.rs:205-216`), can call NE1 and NE3, and its envelope is checked after the writes (`validate.rs:110-150`) | Packet branch, then IN1 |
 | MA5 | `close-agent-maintenance`, `prepare-agent-closeout` | A maintainer. No workflow calls either | Maintenance | Maintenance closeout; lifecycle record (`maintenance_closeout_written`, cleared drift) (`xtask/agent_maintenance/closeout/write.rs:41-115`, `xtask/agent_maintenance/prepare_closeout.rs:272-290`) | Packet branch, then IN1 |

@@ -696,7 +696,48 @@ Apply uses the existing workspace mutation path. On failure, rollback MUST prese
 observed intervening changes to bytes or file type, retaining recovery backups where needed. This
 is best-effort candidate repair, with race and crash limitations; it is neither an atomic multi-file
 transaction nor depth admission or serialization across routes. A failed candidate MUST NOT be
-delivered. Workflow transport, full route admission and production enablement remain later work.
+delivered. The bounded workflow transport below adds no full route admission or production enablement.
+
+### Preparation delivery transport
+
+`prepare-agent-maintenance --emit-json <path>` MAY emit a JSON object with `applied` and `files`.
+Each file has its exact repository-relative `path` and the SHA-256 of its planned bytes. This is
+transport data, never write admission or an evidence verdict. Emit only after successful planning
+and, for `--write`, successful guarded apply; `applied` is false for a dry run. The destination MUST
+be a new file outside the workspace so reporting cannot overwrite a bound input or output. A failed
+invocation MUST NOT be consumed as a successful preparation report.
+
+Initial packet delivery MUST use the computed preparation files instead of a caller-supplied
+maintenance directory. It MUST require `AUTOMATION_TOKEN` before mutation/delivery, declare that
+secret for reusable callers, and use it for packet PR creation/update. Read-only API work retains
+`GITHUB_TOKEN`. A skipped or failed preparation MUST NOT authorize branch replacement.
+
+In acquisition's disposable checkout, stage only the exact generator-owned input files from
+`manifest-acquisition-plan` before re-freezing. These are the planned per-target/union snapshots,
+wrapper claims and coverage JSON reports; absent optional files remain absent. The acquisition
+output list additionally owns the version metadata and lockfile. A directory, wildcard or extra
+report/evidence file supplies no ownership. Registry, RULES, SCHEMA, debt, standing request/record
+and other tracked inputs MUST already be coherent; staging MUST NOT hide their drift. Reject a
+pre-existing changed/unmerged index, symlinked/nonregular owned files or divergent checked bytes;
+leave unrelated paths untouched on refusal. This automation MUST NOT repair a maintainer's index.
+Read-only acquisition MUST NOT stage files or freeze a request.
+
+Publication follows the proposed freeze. When preparation already supplies publication, retain its
+checked hashes; otherwise ordinary acquisition uses the existing guarded publisher. Delivery MUST
+include the complete checked request/record/packet and all three publication outputs together:
+`cli_manifests/support_matrix/current.json`, the generated support-matrix Markdown, and
+`crates/agent_api/src/runtime_support_data.rs`. Preserve normative Markdown outside its block.
+Before the audit, stage the exact delivery files and capture their checked bytes/absence; before
+commit, verify those same working-tree and stage-0 bytes and reject unexpected staged paths.
+Never recapture or restage changed bytes to bless them. The diagnostic bundle MUST use that same
+checked file set, excluding unrelated evidence, and survives a blocking audit or rejected push.
+A failed preparation supplies no deliverable bundle. Rejected acquisition delivery MUST fail
+without rebase/retry. Keep fresh stand-down checks before regeneration, branch replacement and
+re-freeze; transport never writes a stand-down marker.
+
+These checks protect a disposable preparation candidate. They add no cross-route lock, crash-atomic
+bundle, execution/debt verdict or acceptance authority. Production depth refusal remains in place
+pending the remaining route enforcement and complete-chain proof.
 
 ### Packet freeze
 

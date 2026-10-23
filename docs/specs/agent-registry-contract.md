@@ -188,6 +188,14 @@ distinct error for each reason (`UnknownAgent`, `NotEnrolled`, `NoAcquisitionBlo
 gate, so committed truth is the only input. An agent that satisfies neither condition keeps the
 docs-only maintenance path with no behavior change.
 
+The acquisition plan also emits additive `input_paths` and `output_paths` arrays of exact,
+repository-relative generator-owned files. Input paths name target/union snapshots, wrapper claims
+and coverage reports in the manifest's canonical layout, using the RULES target set; output paths
+add version metadata and lock provenance. Optional missing target/report files remain absent.
+Neither list owns a directory, a depth record, unrelated execution evidence or a policy input.
+Workflow transport stages inputs before freeze and uses the prepared output report for packet,
+depth-record and publication delivery. These lists are transport data, not route admission.
+
 Watch and acquire are independent. `maintenance.release_watch.upstream.source_kind` governs
 release *detection*; `acquisition.source_kind` in the manifest governs where *binaries* come from.
 An agent may legitimately watch one source and acquire from another.
