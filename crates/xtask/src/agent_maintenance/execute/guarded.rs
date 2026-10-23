@@ -87,43 +87,7 @@ pub(super) fn execute_write_mode<W: Write>(
     } else {
         vec![]
     };
-    let status = build_run_status(
-        context,
-        "write",
-        if passed {
-            "write_validated"
-        } else {
-            "write_failed"
-        },
-        passed,
-        written.clone(),
-        report.errors.clone(),
-    )?;
-    // Diagnostics remain inside the private candidate until expected-before delivery.
-    let packet_result = persist_run_packet(
-        &candidate.context,
-        &report,
-        &status,
-        &written,
-        report.codex_execution.as_ref(),
-        "write",
-    );
-    if let Err(e) = packet_result {
-        return Err(Error::Validation(format!(
-            "{e}; candidate retained at {}",
-            candidate.recovery().display()
-        )));
-    }
-    packet::write_string(
-        &candidate.context.run_dir.join("recovery-candidate.txt"),
-        &format!("{}\n", candidate.recovery().display()),
-    )?;
-    let diagnostics = candidate.diagnostic_tree().map_err(|e| {
-        Error::Validation(format!(
-            "{e}; candidate retained at {}",
-            candidate.recovery().display()
-        ))
-    })?;
+    let diagnostics = persist_diagnostics(&candidate, &report, passed, &written)?;
     let mut delivery = if passed {
         observation.unwrap_or_default()
     } else {
@@ -132,8 +96,23 @@ pub(super) fn execute_write_mode<W: Write>(
     delivery.extend(diagnostics);
     let copied = candidate.deliver(caller, &delivery, passed);
     if let Err(e) = copied {
+        report.status = "fail".into();
+        report.errors.push(format!("delivery refused: {e}"));
+        report.checks.push(ValidationCheck {
+            name: "relay_delivery".into(),
+            ok: false,
+            message: e.to_string(),
+        });
+        let diagnostics = persist_diagnostics(&candidate, &report, false, &[])?;
+        let mut failed = candidate.before.clone();
+        failed.extend(diagnostics);
+        let diagnostic_error = candidate
+            .deliver(caller, &failed, false)
+            .err()
+            .map(|e| format!("; failure diagnostics not delivered: {e}"))
+            .unwrap_or_default();
         return Err(Error::Validation(format!(
-            "{e}; candidate retained at {}",
+            "{e}{diagnostic_error}; candidate retained at {}",
             candidate.recovery().display()
         )));
     }
@@ -154,4 +133,45 @@ pub(super) fn execute_write_mode<W: Write>(
         .map_err(|e| Error::Internal(e.to_string()))?;
     // Keep the independently validated candidate for diagnostics/recovery; it is never integrated.
     Ok(())
+}
+
+fn persist_diagnostics(
+    candidate: &Candidate,
+    report: &ValidationReport,
+    passed: bool,
+    written: &[String],
+) -> Result<tree::Tree, Error> {
+    let attempt = || {
+        let status = build_run_status(
+            &candidate.context,
+            "write",
+            if passed {
+                "write_validated"
+            } else {
+                "write_failed"
+            },
+            passed,
+            written.to_vec(),
+            report.errors.clone(),
+        )?;
+        persist_run_packet(
+            &candidate.context,
+            report,
+            &status,
+            written,
+            report.codex_execution.as_ref(),
+            "write",
+        )?;
+        packet::write_string(
+            &candidate.context.run_dir.join("recovery-candidate.txt"),
+            &format!("{}\n", candidate.recovery().display()),
+        )?;
+        candidate.diagnostic_tree()
+    };
+    attempt().map_err(|e| {
+        Error::Validation(format!(
+            "{e}; candidate retained at {}",
+            candidate.recovery().display()
+        ))
+    })
 }

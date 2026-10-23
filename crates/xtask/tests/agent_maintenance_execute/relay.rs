@@ -232,3 +232,106 @@ fn spawn_failure_after_candidate_preflight_still_finalizes_without_delivery() {
     );
     assert_eq!(report["status"], "fail");
 }
+
+#[test]
+fn similarly_named_runtime_files_are_delivered() {
+    let fixture = prepare_execute_fixture("relay-runtime-packet-names");
+    let base = "docs/agents/lifecycle/codex-maintenance";
+    let binary = executor(&fixture, &format!("printf runtime > '{base}/input-contract.json'; printf prompt > '{base}/codex-prompt.md'"));
+    prepare(&fixture, &binary);
+    let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+    assert_eq!(out.exit_code, 0, "{}", out.stderr);
+    assert_eq!(
+        fs::read(fixture.join(base).join("input-contract.json")).unwrap(),
+        b"runtime"
+    );
+    assert_eq!(
+        fs::read(fixture.join(base).join("codex-prompt.md")).unwrap(),
+        b"prompt"
+    );
+}
+#[cfg(unix)]
+#[test]
+fn literal_backslash_input_cannot_substitute_for_canonical_caller_path() {
+    let fixture = prepare_execute_fixture("relay-literal-path");
+    let binary = fake_execute_codex_binary(&fixture);
+    prepare(&fixture, &binary);
+    fs::write(
+        fixture.join("docs\\agents\\lifecycle\\codex-maintenance\\gate-input.txt"),
+        b"forged input",
+    )
+    .unwrap();
+    write_fake_execute_codex_scenario(&fixture, "success");
+    let before = snapshot_without_execute_runs(&fixture);
+    let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+    assert_ne!(out.exit_code, 0);
+    assert!(out.stderr.contains("literal backslash"), "{}", out.stderr);
+    assert_eq!(snapshot_without_execute_runs(&fixture), before);
+    assert!(!fixture
+        .join("docs/agents/lifecycle/codex-maintenance/gate-input.txt")
+        .exists());
+}
+#[test]
+fn delivery_refusal_records_failure_in_caller_and_recovery_candidate() {
+    let fixture = prepare_execute_fixture("relay-failed-delivery-status");
+    let binary = executor(
+        &fixture,
+        &format!(
+            "printf concurrent > '{}'",
+            fixture.join("operator.txt").display()
+        ),
+    );
+    prepare(&fixture, &binary);
+    let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+    assert_ne!(out.exit_code, 0);
+    let run = fixture.join(EXECUTE_RUNS_ROOT).join(EXECUTE_WRITE_RUN_ID);
+    let recovery = fs::read_to_string(run.join("recovery-candidate.txt")).unwrap();
+    for dir in [
+        run,
+        Path::new(recovery.trim())
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID),
+    ] {
+        let report = read_json(&dir.join("validation-report.json"));
+        assert_eq!(report["status"], "fail");
+        let status = read_json(&dir.join("run-status.json"));
+        assert_eq!(status["status"], "write_failed");
+        assert_eq!(status["written_paths"], serde_json::json!([]));
+    }
+    assert!(!fixture.join(NOTE).exists());
+    assert_eq!(
+        fs::read(fixture.join("operator.txt")).unwrap(),
+        b"concurrent"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
+    use std::os::unix::fs::symlink;
+    let fixture = prepare_execute_fixture("relay-gate-spawn-error");
+    let binary = executor(&fixture, ":");
+    prepare(&fixture, &binary);
+    let path = tempfile::tempdir().unwrap();
+    for name in ["git", "bash", "mkdir", "cat", "dirname", "tr"] {
+        symlink(format!("/usr/bin/{name}"), path.path().join(name)).unwrap();
+    }
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .current_dir(&fixture)
+        .env("PATH", path.path())
+        .args(execute_args("--write", Some(&binary)).into_iter().skip(1))
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("spawn green gate"), "{stderr}");
+    assert!(stderr.contains("candidate retained"));
+    assert!(!fixture.join(NOTE).exists());
+    let report = read_json(
+        &fixture
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID)
+            .join("validation-report.json"),
+    );
+    assert_eq!(report["status"], "fail");
+}

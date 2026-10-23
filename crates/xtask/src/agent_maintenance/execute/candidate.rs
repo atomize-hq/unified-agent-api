@@ -34,13 +34,14 @@ impl Candidate {
         let root = holder.join("candidate");
         candidate_git::initialize(caller, &root, caller_git.is_some())?;
         tree::materialize(&root, &before)?;
-        let probe = root.join(".relay-mode-probe");
+        let probe = holder.join("mode-probe");
         fs::write(&probe, []).map_err(tree::io)?;
         let default_mode = tree::mode(&fs::metadata(&probe).map_err(tree::io)?);
         fs::remove_file(&probe).map_err(tree::io)?;
         fs::create_dir(&probe).map_err(tree::io)?;
         let default_dir_mode = tree::mode(&fs::metadata(&probe).map_err(tree::io)?);
         fs::remove_dir(probe).map_err(tree::io)?;
+        super::delivery_index::import(caller, &root, caller_git.as_ref())?;
         let baseline = candidate_git::baseline(&root)?;
         let config = fs::read(root.join(".git/config")).map_err(tree::io)?;
         let mut ctx = context.clone();
@@ -151,12 +152,14 @@ impl Candidate {
         if !errors.is_empty() {
             return Err(Error::Validation(errors.join("\n")));
         }
-        crate::depth_acceptance::check_captured_relay(
-            tree::source(&self.root, &self.before)?,
-            tree::source(&self.root, after)?,
-            &self.root,
-        )
-        .map_err(Error::Validation)?;
+        super::delivery_index::validate(&self.root, self.caller_git.as_ref(), || {
+            crate::depth_acceptance::check_captured_relay(
+                tree::source(&self.root, &self.before)?,
+                tree::source(&self.root, after)?,
+                &self.root,
+            )
+            .map_err(Error::Validation)
+        })?;
         // Live publisher validators ran above. Refuse if any executor-visible file changed during them.
         if &self.observe()? != after {
             return Err(Error::Validation(
@@ -181,7 +184,9 @@ impl Candidate {
             if !passed && !diagnostic {
                 continue;
             }
-            if path.ends_with(INPUT_CONTRACT_FILE_NAME) || path.ends_with(PROMPT_FILE_NAME) {
+            if path == format!("{}/{INPUT_CONTRACT_FILE_NAME}", self.context.run_dir_rel)
+                || path == format!("{}/{PROMPT_FILE_NAME}", self.context.run_dir_rel)
+            {
                 continue;
             }
             let Some(Node::File(bytes, _)) = after.get(&path) else {

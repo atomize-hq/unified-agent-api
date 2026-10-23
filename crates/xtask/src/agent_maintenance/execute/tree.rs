@@ -17,6 +17,17 @@ pub(super) type Tree = BTreeMap<String, Node>;
 pub(super) fn capture(root: &Path, tracked: &BTreeSet<String>) -> Result<Tree, Error> {
     fn walk(root: &Path, path: &Path, out: &mut Tree, size: &mut usize) -> Result<(), Error> {
         let meta = fs::symlink_metadata(path).map_err(io)?;
+        #[cfg(unix)]
+        if path
+            .strip_prefix(root)
+            .map_err(|e| Error::Internal(e.to_string()))?
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy().contains('\\'))
+        {
+            return Err(Error::Validation(
+                "literal backslash relay paths are unsupported".into(),
+            ));
+        }
         let relative = path
             .strip_prefix(root)
             .map_err(|e| Error::Internal(e.to_string()))?
@@ -42,8 +53,8 @@ pub(super) fn capture(root: &Path, tracked: &BTreeSet<String>) -> Result<Tree, E
             )));
         };
         let directory = matches!(node, Node::Directory(_));
-        if !relative.is_empty() {
-            out.insert(relative, node);
+        if !relative.is_empty() && out.insert(relative, node).is_some() {
+            return Err(Error::Validation("relay snapshot path collision".into()));
         }
         if out.len() > 50_000 {
             return Err(Error::Validation(
@@ -63,6 +74,11 @@ pub(super) fn capture(root: &Path, tracked: &BTreeSet<String>) -> Result<Tree, E
     // Ignored caches never conceal a tracked evidence/dependency input.
     let jail = crate::workspace_mutation::WorkspacePathJail::new(root)?;
     for path in tracked {
+        if path.contains('\\') {
+            return Err(Error::Validation(
+                "literal backslash relay paths are unsupported".into(),
+            ));
+        }
         if !tree.contains_key(path) {
             let full = jail.resolve(Path::new(path))?;
             let meta = match fs::symlink_metadata(&full) {

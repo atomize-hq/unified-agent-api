@@ -9,7 +9,7 @@ fn prompt_pipe_error_terminates_and_reaps_started_child() {
     let binary = root.path().join("close-stdin.sh");
     fs::write(
         &binary,
-        "#!/bin/sh\nexec 0<&-\nprintf '%s' $$ > child-pid\nexec sleep 30\n",
+        "#!/bin/sh\nprintf '%s' $$ > child-pid\nexec 0<&-\nexec sleep 30\n",
     )
     .unwrap();
     fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
@@ -27,4 +27,38 @@ fn prompt_pipe_error_terminates_and_reaps_started_child() {
         !alive.status.success(),
         "child still running after failed prompt delivery"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn wait_error_after_child_writes_terminates_and_reaps_it() {
+    let root = tempfile::tempdir().unwrap();
+    let mut child = Command::new("sh")
+        .args([
+            "-c",
+            "printf output > candidate-output; printf r; exec sleep 30",
+        ])
+        .current_dir(root.path())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let pid = child.id().to_string();
+    let mut ready = [0];
+    child.stdout.take().unwrap().read_exact(&mut ready).unwrap();
+    assert_eq!(
+        fs::read(root.path().join("candidate-output")).unwrap(),
+        b"output"
+    );
+    let result = wait_for_codex(&mut child, |_| {
+        Err(std::io::Error::other("injected wait failure"))
+    });
+    assert!(
+        matches!(result, Err(Error::Internal(message)) if message.contains("wait for codex exec"))
+    );
+    assert!(!Command::new("kill")
+        .args(["-0", &pid])
+        .output()
+        .unwrap()
+        .status
+        .success());
 }

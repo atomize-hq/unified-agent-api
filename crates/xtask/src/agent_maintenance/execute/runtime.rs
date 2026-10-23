@@ -167,7 +167,11 @@ pub(super) fn run_green_gates(
     for command in commands {
         let mut gate = Command::new("sh");
         for (key, _) in std::env::vars_os() {
-            if key.to_string_lossy().starts_with("GIT_") {
+            if key.to_string_lossy().starts_with("GIT_")
+                || key
+                    .to_string_lossy()
+                    .starts_with("XTASK_AGENT_MAINTENANCE_")
+            {
                 gate.env_remove(key);
             }
         }
@@ -229,7 +233,11 @@ fn spawn_codex_exec(
     let mut stderr_file = tempfile::tempfile().map_err(|e| Error::Internal(e.to_string()))?;
     let mut command = Command::new(binary);
     for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("GIT_") {
+        if key.to_string_lossy().starts_with("GIT_")
+            || key
+                .to_string_lossy()
+                .starts_with("XTASK_AGENT_MAINTENANCE_")
+        {
             command.env_remove(key);
         }
     }
@@ -267,14 +275,7 @@ fn spawn_codex_exec(
         let _ = child.wait();
         return Err(error);
     }
-    let status = match child.wait() {
-        Ok(status) => status,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(Error::Internal(format!("wait for codex exec: {error}")));
-        }
-    };
+    let status = wait_for_codex(&mut child, |child| child.wait())?;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     stdout_file
@@ -291,6 +292,21 @@ fn spawn_codex_exec(
         stderr,
     };
     Ok((argv, output))
+}
+
+/// Keep cleanup identical for OS wait failures and the injected error regression.
+fn wait_for_codex(
+    child: &mut std::process::Child,
+    wait: impl FnOnce(&mut std::process::Child) -> std::io::Result<std::process::ExitStatus>,
+) -> Result<std::process::ExitStatus, Error> {
+    match wait(child) {
+        Ok(status) => Ok(status),
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(Error::Internal(format!("wait for codex exec: {error}")))
+        }
+    }
 }
 
 #[cfg(test)]

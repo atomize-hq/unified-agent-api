@@ -2,6 +2,8 @@
 mod candidate;
 #[path = "execute/candidate_git.rs"]
 mod candidate_git;
+#[path = "execute/delivery_index.rs"]
+mod delivery_index;
 #[path = "execute/guarded.rs"]
 mod guarded;
 #[path = "execute/packet.rs"]

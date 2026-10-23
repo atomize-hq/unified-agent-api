@@ -11,6 +11,7 @@ pub(super) fn check(before: Source, after: Source, workspace: &Path) -> Result<(
         return Err("relay cannot change registry authority".into());
     }
     let registry = AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?;
+    let mut publication = None;
     for entry in &registry.agents {
         let old = View::with_registry(before.clone(), &registry, &entry.agent_id)?;
         let new = View::with_registry(after.clone(), &registry, &entry.agent_id)?;
@@ -61,8 +62,12 @@ pub(super) fn check(before: Source, after: Source, workspace: &Path) -> Result<(
             ));
         }
         if !new.records.is_empty() {
-            publication::validate_current(workspace, &new)?;
+            publication = Some(new);
         }
+    }
+    // One aggregate freshness check, after every agent's acceptance effects have been mediated.
+    if let Some(view) = publication {
+        publication::validate_current(workspace, &view)?;
     }
     Ok(())
 }
