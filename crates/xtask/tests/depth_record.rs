@@ -3,6 +3,9 @@ use xtask::depth_record::{part_identity, AcceptanceEntry, DepthRecord};
 
 const SHA: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
+#[path = "depth_record/bindings.rs"]
+mod bindings;
+
 fn debt_row(row_id: &str, version: &str) -> Value {
     json!({
         "row_id": row_id, "agent_id": "aider", "surface_kind": "flags",

@@ -162,13 +162,14 @@ fn depth_facts_lower_a_supported_row_and_never_raise_one() {
     // depth qualification, and the row falls to `partial`.
     let temp = workspace(record(), true);
     write(&temp.path().join(EVIDENCE), "fn run() { changed() }\n");
+    git(temp.path(), &["add", EVIDENCE]);
     let rows = self::rows(temp.path()).unwrap();
     let linux = row(&rows, LINUX);
     assert!(!qualified(linux));
     assert_eq!(linux.uaa_support, UaaSupportState::Partial);
 
-    // Evidence the revision does not hold is absent, whatever is at its path: a file git does not
-    // track, a tracked symlink, and git's own files.
+    // Present files without a regular stage-0 binding refuse the observation. They cannot be
+    // qualified by hashing their working bytes: untracked, a tracked link, and Git's own files.
     for (path, prepare) in [
         ("crates/aider/tests/untracked.rs", "write"),
         ("crates/aider/tests/link.rs", "symlink"),
@@ -189,11 +190,13 @@ fn depth_facts_lower_a_supported_row_and_never_raise_one() {
             temp.path(),
             &sealed_json(bound_to(record(), path, &digest(&held)), true),
         );
-        let rows = self::rows(temp.path()).unwrap();
-        assert!(
-            !qualified(row(&rows, LINUX)),
-            "{path} is not in the revision"
-        );
+        let error = self::rows(temp.path()).unwrap_err();
+        let expected = match prepare {
+            "write" => "untracked",
+            "symlink" => "symlink",
+            _ => "invalid repository-relative",
+        };
+        assert!(error.contains(expected), "{path}: {error}");
     }
 
     // A qualified capability over an unsupported backend leaves the row `unsupported`.
@@ -373,7 +376,8 @@ fn evidence_is_a_regular_file_in_the_index_and_in_the_working_tree() {
             temp.path(),
             &sealed_json(bound_to(record(), path, &digest(&held)), true),
         );
-        qualified(row(&rows(temp.path()).unwrap(), LINUX))
+        let rows = rows(temp.path())?;
+        Ok::<bool, String>(qualified(row(&rows, LINUX)))
     };
 
     // An executable file is a regular file.
@@ -382,23 +386,28 @@ fn evidence_is_a_regular_file_in_the_index_and_in_the_working_tree() {
         write(&workspace.join(script), "echo run\n");
         fs::set_permissions(workspace.join(script), fs::Permissions::from_mode(0o755)).unwrap();
         git(workspace, &["add", script]);
-    }));
+    })
+    .unwrap());
 
     // A regular file in the index that the working tree holds as a link.
-    assert!(!qualified_with(EVIDENCE, &|workspace| {
+    assert!(qualified_with(EVIDENCE, &|workspace| {
         let moved = workspace.join("moved.rs");
         fs::rename(workspace.join(EVIDENCE), &moved).unwrap();
         symlink(&moved, workspace.join(EVIDENCE)).unwrap();
-    }));
+    })
+    .unwrap_err()
+    .contains("symlink"));
 
     // A link in the index that the working tree holds as a regular file.
     let link = "crates/aider/tests/link.rs";
-    assert!(!qualified_with(link, &|workspace| {
+    assert!(qualified_with(link, &|workspace| {
         symlink(workspace.join(EVIDENCE), workspace.join(link)).unwrap();
         git(workspace, &["add", link]);
         fs::remove_file(workspace.join(link)).unwrap();
         write(&workspace.join(link), "fn run() {}\n");
-    }));
+    })
+    .unwrap_err()
+    .contains("regular stage-0"));
 }
 
 #[test]
@@ -406,7 +415,7 @@ fn publication_fails_where_git_cannot_say_what_the_revision_holds() {
     let temp = workspace(record(), true);
     fs::remove_dir_all(temp.path().join(".git")).unwrap();
     let err = rows(temp.path()).unwrap_err();
-    assert!(err.contains("list the files git tracks in"), "{err}");
+    assert!(err.contains("git rev-parse"), "{err}");
 }
 
 #[test]

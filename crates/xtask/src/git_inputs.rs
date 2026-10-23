@@ -14,14 +14,14 @@ struct Input {
     bytes: Option<Vec<u8>>,
 }
 
-pub(super) struct GitInputs {
+pub(crate) struct GitInputs {
     root: PathBuf,
     files: BTreeMap<String, Input>,
     directories: BTreeMap<String, Vec<String>>,
 }
 
 impl GitInputs {
-    pub(super) fn new(root: &Path) -> Result<Self, String> {
+    pub(crate) fn new(root: &Path) -> Result<Self, String> {
         let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
         let top = git(&root, &["rev-parse", "--show-toplevel"])?;
         if Path::new(std::str::from_utf8(&top).map_err(|e| e.to_string())?.trim()) != root {
@@ -34,7 +34,7 @@ impl GitInputs {
         })
     }
 
-    pub(super) fn optional(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
+    pub(crate) fn optional(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
         let input = read(&self.root, path)?;
         if self
             .files
@@ -48,12 +48,12 @@ impl GitInputs {
         Ok(bytes)
     }
 
-    pub(super) fn required(&mut self, path: &str) -> Result<Vec<u8>, String> {
+    pub(crate) fn required(&mut self, path: &str) -> Result<Vec<u8>, String> {
         self.optional(path)?
             .ok_or_else(|| format!("missing bound input: {path}"))
     }
 
-    pub(super) fn list(&mut self, path: &str) -> Result<Vec<String>, String> {
+    pub(crate) fn list(&mut self, path: &str) -> Result<Vec<String>, String> {
         let names = list(&self.root, path)?;
         if self
             .directories
@@ -68,7 +68,7 @@ impl GitInputs {
         Ok(names)
     }
 
-    pub(super) fn reference(&self, path: &str) -> Result<FileRef, String> {
+    pub(crate) fn reference(&self, path: &str) -> Result<FileRef, String> {
         let bytes = self
             .files
             .get(path)
@@ -80,7 +80,7 @@ impl GitInputs {
         })
     }
 
-    pub(super) fn verify(&self) -> Result<(), String> {
+    pub(crate) fn verify(&self) -> Result<(), String> {
         for (path, expected) in &self.files {
             if read(&self.root, path)? != *expected {
                 return Err(format!("bound input changed during freeze: {path}"));
@@ -204,6 +204,7 @@ fn list(root: &Path, path: &str) -> Result<Vec<String>, String> {
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let output = Command::new("git")
+        .arg("--no-replace-objects")
         .arg("-C")
         .arg(root)
         .args(args)

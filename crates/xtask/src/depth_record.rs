@@ -10,7 +10,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use serde::{Deserialize, Deserializer, Serialize};
@@ -46,10 +45,9 @@ pub fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
     files
 }
 
-/// The content identity of each file the records bind, as the revision holds it: the SHA-256 of a
-/// regular file git tracks at that path in `workspace`. A path the revision does not hold has none
-/// however it reads: an ignored build output, git's own files, a tracked symlink, or a file reached
-/// through one.
+/// SHA-256 identities of evidence held as regular stage-0 files with matching working bytes.
+/// Missing paths have no identity. Unsafe, untracked, conflicted or divergent inputs refuse;
+/// a working file cannot confer an identity the index does not hold. No proof is admitted here.
 pub fn bound_evidence<'a>(
     workspace: &Path,
     records: impl IntoIterator<Item = &'a DepthRecord>,
@@ -64,36 +62,14 @@ pub fn bound_evidence<'a>(
     if paths.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(workspace)
-        .args(["--literal-pathspecs", "ls-files", "--stage", "-z", "--"])
-        .args(&paths)
-        .output()
-        .map_err(|err| format!("run git ls-files in {}: {err}", workspace.display()))?;
-    if !output.status.success() {
-        return Err(format!(
-            "list the files git tracks in {}: {}",
-            workspace.display(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
+    let mut inputs = crate::git_inputs::GitInputs::new(workspace)?;
     let mut identities = BTreeMap::new();
-    // Each entry is `<mode> <object> <stage>\t<path>`.
-    for entry in output.stdout.split(|byte| *byte == 0) {
-        let entry = String::from_utf8_lossy(entry);
-        let Some((meta, path)) = entry.split_once('\t') else {
-            continue;
-        };
-        let regular = meta.starts_with("100644 ") || meta.starts_with("100755 ");
-        let full = workspace.join(path);
-        if regular && paths.contains(path) && fs::symlink_metadata(&full).is_ok_and(|m| m.is_file())
-        {
-            if let Ok(bytes) = fs::read(&full) {
-                identities.insert(path.to_string(), hex::encode(Sha256::digest(bytes)));
-            }
+    for path in paths {
+        if inputs.optional(path)?.is_some() {
+            identities.insert(path.into(), inputs.reference(path)?.sha256);
         }
     }
+    inputs.verify()?;
     Ok(identities)
 }
 
@@ -655,7 +631,7 @@ fn identity<T: Serialize>(part: &str, stated: &str, value: &T) -> Result<(), Str
     Ok(())
 }
 
-fn sha256(field: &str, value: &str) -> Result<(), String> {
+pub(crate) fn sha256(field: &str, value: &str) -> Result<(), String> {
     let ok = value.len() == 64
         && value
             .bytes()
@@ -669,7 +645,7 @@ fn sha256(field: &str, value: &str) -> Result<(), String> {
     }
 }
 
-fn file_ref(field: &str, file: &FileRef) -> Result<(), String> {
+pub(crate) fn file_ref(field: &str, file: &FileRef) -> Result<(), String> {
     let path = &file.path;
     // An empty segment covers an empty path, a leading `/`, a trailing `/` and `//`.
     if path.contains('\\') || path.split('/').any(|part| matches!(part, "" | "." | "..")) {
@@ -680,7 +656,7 @@ fn file_ref(field: &str, file: &FileRef) -> Result<(), String> {
     sha256(&format!("{field}: sha256 of `{path}`"), &file.sha256)
 }
 
-fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String> {
+pub(crate) fn obligation_ref(field: &str, obligation: &ObligationRef) -> Result<(), String> {
     if obligation.id.is_some() == obligation.capability.is_some() {
         return Err(format!(
             "{field}: an obligation of `{}` states exactly one of `id` and `capability`, the \
