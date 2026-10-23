@@ -6,6 +6,12 @@ use crate::{
 };
 use std::process::Command;
 
+pub(super) const OPTIONAL: [&str; 4] = [
+    ".cargo/config",
+    ".cargo/config.toml",
+    "rust-toolchain",
+    "rust-toolchain.toml",
+];
 pub(super) const WORKFLOW: &str = ".github/workflows/ci.yml";
 pub(super) const EXECUTOR: &str = "github-actions:rust-tests/isolated-channel-v1";
 pub(super) const TRUST: &str = "github-actions-channel-v1";
@@ -46,7 +52,14 @@ pub(super) fn approved(
     anchor: &str,
 ) -> Result<(), String> {
     for commit in [built, workflow, anchor] {
-        source(root, commit)?;
+        let source = source(root, commit)?;
+        for path in OPTIONAL {
+            if source.optional_bytes(path)?.is_some() {
+                return Err(
+                    "initial producer requires absent root Cargo/toolchain configuration".into(),
+                );
+            }
+        }
     }
     for path in [
         "crates",

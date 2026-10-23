@@ -54,6 +54,14 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
             return Err("current producer is not the reviewed staging profile".into());
         }
     }
+    for path in profile::OPTIONAL {
+        if view.optional(path)?.is_some() || anchor_source.optional_bytes(path)?.is_some() {
+            return Err(
+                "initial producer requires absent root Cargo/toolchain configuration".into(),
+            );
+        }
+    }
+    let decoder = anchor_source.read(depth_ci::ARCHIVE)?;
     let (request, date) = match &original.event {
         Event::Maintenance {
             request_commit,
@@ -109,6 +117,9 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
         ) {
             return Err("unhandled applicable producer event".into());
         }
+        // Approve the API-derived execution head before trusting any witness source claims.
+        let head_sha = sha(required_string(run, "head_sha")?)?;
+        profile::approved(root, head_sha, head_sha, anchor)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
         let count = run["run_attempt"]
             .as_u64()
@@ -125,7 +136,7 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
             {
                 return Err("missing/unstable/nonterminal applicable attempt".into());
             }
-            let w = artifact::witness(api, root, &attempt_run, attempt)?;
+            let w = artifact::witness(api, &decoder, &attempt_run, attempt)?;
             let built_original =
                 profile::validate_witness(root, &w, &attempt_run, attempt, anchor)?;
             if built_original != original {

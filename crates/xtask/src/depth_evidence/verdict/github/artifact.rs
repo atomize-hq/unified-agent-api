@@ -7,7 +7,7 @@ use std::{
 
 pub(super) fn witness(
     api: &impl Api,
-    root: &Path,
+    approved_helper: &str,
     run: &Value,
     attempt: u64,
 ) -> Result<Witness, String> {
@@ -121,9 +121,8 @@ pub(super) fn witness(
     let mut input = tempfile::tempfile().map_err(|e| e.to_string())?;
     input.write_all(&zip).map_err(|e| e.to_string())?;
     std::io::Seek::rewind(&mut input).map_err(|e| e.to_string())?;
-    let helper = source(root, required_string(run, "head_sha")?)?.read(depth_ci::ARCHIVE)?;
     let result = Command::new("/usr/bin/timeout")
-        .args(["30", "python3", "-c", &helper, "witness"])
+        .args(["30", "python3", "-c", approved_helper, "witness"])
         .stdin(Stdio::from(input))
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

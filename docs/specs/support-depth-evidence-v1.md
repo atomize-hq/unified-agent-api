@@ -328,3 +328,11 @@ coherent staged evidence; other attempts are corroborated directly from their au
 immutable host payloads, so a packet cannot omit an unfavorable attempt. No canonical report,
 acceptance entry, registry enrollment, workflow policy or production pointer is written. Before
 implementation integration or exact maintainer adoption, this diagnostic cannot report verified.
+
+Producer approval includes the presence/absence of root `.cargo/config`, `.cargo/config.toml`,
+`rust-toolchain` and `rust-toolchain.toml`; the initial profile requires all four absent. Before
+artifact processing the adapter approves the independently authenticated run/attempt head's
+producer/workflow closure as well as the separately checked actual checkout. A witness-provided
+synthetic merge cannot approve an unreviewed executed workflow. Artifact decoding executes only
+the helper read from the immutable independently approved staging anchor, never executable bytes
+from a discovered candidate head.

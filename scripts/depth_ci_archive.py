@@ -12,16 +12,18 @@ import zipfile
 MAX=1048576
 
 def registry(archive, source, expected):
-    raw=Path(archive).read_bytes()
+    with Path(archive).open("rb") as stream:
+        raw=stream.read(64*MAX+1)
     if len(raw)>64*MAX or hashlib.sha256(raw).hexdigest()!=expected:
         raise ValueError('registry archive identity mismatch')
     directory=Path(source).resolve()
     expected_files=set()
-    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as tar:
-        members=tar.getmembers()
-        if len(members)>16384 or sum(m.size for m in members)>256*MAX:
-            raise ValueError('registry archive bounds exceeded')
-        for member in members:
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r|gz') as tar:
+        expanded=0
+        for count,member in enumerate(tar,1):
+            expanded+=member.size
+            if count>16384 or expanded>256*MAX:
+                raise ValueError('registry archive bounds exceeded')
             parts=member.name.split('/')
             if len(parts)<2 or any(p in ('','..','.') or '\\' in p for p in parts):
                 raise ValueError('unsafe registry entry')

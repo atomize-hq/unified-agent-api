@@ -454,3 +454,64 @@ fn tampered_payload_or_workflow_or_case_population_is_rejected() {
         );
     }
 }
+
+#[test]
+fn unapproved_head_decoder_and_workflow_never_execute_or_replay_approved_merge() {
+    let mut f = Fixture::new();
+    let marker = f.root.path().join("unapproved-executed");
+    write(
+        f.root.path(),
+        depth_ci::ARCHIVE,
+        format!(
+            "from pathlib import Path\nPath({:?}).write_text('executed')\n",
+            marker.to_str().unwrap()
+        ),
+    );
+    write(
+        f.root.path(),
+        profile::WORKFLOW,
+        "unapproved replay workflow",
+    );
+    git(f.root.path(), &["add", "."]);
+    git(f.root.path(), &["commit", "-qm", "unapproved head"]);
+    let unapproved = git(f.root.path(), &["rev-parse", "HEAD"]);
+    // The local evaluator itself is the approved anchor, not the unapproved discovered head.
+    git(f.root.path(), &["checkout", "-q", "--detach", &f.commit]);
+    // Leave witness/artifact bytes naming the approved source. Only authenticated execution
+    // metadata names the unapproved head, reproducing the synthetic-source substitution boundary.
+    f.api.change(
+        "actions/workflows/ci.yml/runs?created=%3E%3D2026-10-23&per_page=100&page=1",
+        |v| v["workflow_runs"][0]["head_sha"] = json!(unapproved),
+    );
+    f.api.change("actions/runs/1/attempts/1", |v| {
+        v["head_sha"] = json!(unapproved)
+    });
+    f.api
+        .change("actions/runs/1/artifacts?per_page=100&page=1", |v| {
+            v["artifacts"][0]["workflow_run"]["head_sha"] = json!(unapproved)
+        });
+    assert!(resolve(&f.api, f.root.path())
+        .unwrap_err()
+        .contains("not approved"));
+    assert!(!marker.exists(), "unapproved head helper was executed");
+    // Safe decoding also has no dependency on the discovered head helper at all.
+    let helper = source(f.root.path(), &f.commit)
+        .unwrap()
+        .read(depth_ci::ARCHIVE)
+        .unwrap();
+    let run = f.api.json(&endpoint("actions/runs/1/attempts/1")).unwrap();
+    assert!(artifact::witness(&f.api, &helper, &run, 1).is_ok());
+    assert!(!marker.exists());
+}
+#[test]
+fn root_cargo_and_toolchain_configuration_is_inside_producer_approval() {
+    for path in profile::OPTIONAL {
+        let f = Fixture::new();
+        write(f.root.path(), path, "candidate compilation configuration");
+        git(f.root.path(), &["add", "."]);
+        git(f.root.path(), &["commit", "-qm", "config"]);
+        let candidate = git(f.root.path(), &["rev-parse", "HEAD"]);
+        assert!(profile::approved(f.root.path(), &candidate, &candidate, &f.commit).is_err());
+        assert!(resolve(&f.api, f.root.path()).is_err());
+    }
+}
