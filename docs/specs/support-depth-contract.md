@@ -466,6 +466,36 @@ delegation** is the set of debt rows and renewal permissions in force when P was
 An unsupported or unproved transition MUST fail closed. Execution never closes or promotes its own
 work.
 
+### Read-only delegated-debt planning
+
+The D3 planner reconciles the complete agent debt inventory with P's frozen baseline and E's
+materialized grants/retirements, including rows outside the selected version or targets. It MUST
+match row ids and full immutable row contents, reject duplicate ids and overlapping grants, and
+permit renewal changes only to the three fields listed above. Undeclared additions, deletions or
+changes MUST refuse; candidate inventory never redefines P. Other agents' rows confer no authority.
+
+Renewal MUST stay within the frozen row's targets and current same-surface coverage observations.
+Whole-row retirement MUST account for every frozen target using exact-target reports; a remaining
+gap or missing/contradictory report refuses. A report observation of coverage, exclusion or absence
+is a claim requiring corroboration, not proof of semantic coverage, valid exclusion or upstream
+removal. Absence from help MUST NOT be treated as upstream removal.
+
+A read-only plan MUST expose unresolved proof requirements: renewal owes current evidence that
+the unchanged blocker holds, with its owner, milestone and follow-on; retirement owes live
+coverage/exclusion proof or explicit upstream-removal proof for every target. Content hashes and
+report observations alone MUST NOT discharge these requirements. D3 installs no new semantic
+proof producer. Conditional planning success MUST NOT authorize writes, closeout, promotion,
+publication upgrades or debt waivers. Owning routes MUST independently establish these facts
+before admission; unsupported proof stays unresolved. No second inventory, evidence schema,
+permission token or automatic maintainer endorsement is introduced.
+
+The planner MUST preserve Event, P, O, acceptance entries and unrelated E results. Materialized
+debt edits change E and the stated record digest; an earlier entry cannot accept the new state.
+Strict audit reconciliation and audit-status MUST compare the same debt baseline projection,
+including contributing row references, deferral reason/follow-on and counts. Projection equality
+does not replace full inventory comparison. Surface counts remain aggregated; when grants
+contribute, only the smallest contributing grant supplies rendered metadata.
+
 ## Depth enrollment
 
 1. A depth enrollment is a positive selection that binds the agent, the lifecycle path, one exact

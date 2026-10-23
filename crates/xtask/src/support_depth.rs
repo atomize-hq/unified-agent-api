@@ -6,6 +6,7 @@
 //! or acceptance. Production registry loading deliberately continues to refuse depth declarations.
 
 mod acquisition;
+pub mod debt;
 mod freeze;
 use crate::git_inputs;
 pub use freeze::{plan_freeze, plan_freeze_with_work, FreezePlan, FreezeRequest};

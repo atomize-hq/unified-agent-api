@@ -241,7 +241,7 @@ fn support_surface_audit_satisfied(
     if !live.unbaselined_gap_surface.is_empty() || !live.required_uplifts_this_run.is_empty() {
         return false;
     }
-    if live.deferred_preexisting_gaps != frozen.deferred_preexisting_gaps {
+    if super::super::support_audit::debt_baseline_drift(frozen, live).is_some() {
         return false;
     }
     if live.pre_run_debt_count != frozen.deferred_preexisting_gaps.len() {

@@ -372,3 +372,110 @@ fn run_gate(root: &Path) -> Result<(AuditStatusOutcome, Value), Error> {
     let projection = serde_json::from_slice(&stdout).expect("parse audit status projection");
     Ok((outcome, projection))
 }
+
+#[test]
+fn strict_reconciliation_and_audit_status_both_refuse_changed_contributing_row_id() {
+    let root = seeded_workspace("strict-debt-ref-parity", "requires_new_architectural_seam");
+    write_evidence(
+        &root,
+        json!([{"path": ["status"]}]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
+    freeze(&root);
+    write_evidence(
+        &root,
+        json!([]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
+    // An ordinary resolved uplift is valid before debt identity changes.
+    xtask::agent_maintenance::request::load_request_envelope(&root, Path::new(REQUEST_PATH))
+        .unwrap();
+    write_text(
+        &root.join(DEBT_PATH),
+        &debt_inventory(
+            "aaa-replaced-id",
+            "requires_new_architectural_seam",
+            "TODOS.md#close-codex-legacy-gap",
+            false,
+        ),
+    );
+    let strict =
+        xtask::agent_maintenance::request::load_request_envelope(&root, Path::new(REQUEST_PATH));
+    assert!(
+        strict.is_err(),
+        "strict loader accepted a different contributing debt identity"
+    );
+    assert!(run_gate(&root).is_err());
+}
+
+#[test]
+fn dormant_earlier_grant_cannot_override_the_contributing_row() {
+    let root = seeded_workspace(
+        "contributing-grant-metadata",
+        "requires_new_architectural_seam",
+    );
+    let live = debt_inventory(
+        "codex-exec-legacy-flag",
+        "requires_new_architectural_seam",
+        "TODOS.md#close-codex-legacy-gap",
+        false,
+    );
+    let older = live[live.find("### `codex-exec-legacy-flag`").unwrap()..]
+        .replace("codex-exec-legacy-flag", "aaa-dormant-row")
+        .replace("0.98.0", "0.97.0");
+    write_text(&root.join(DEBT_PATH), &format!("{live}\n{older}"));
+    let source = root.join("cli_manifests/codex/reports/0.98.0/coverage.authorization.json");
+    let mut report: Value =
+        serde_json::from_str(&std::fs::read_to_string(source).unwrap()).unwrap();
+    report["inputs"]["upstream"]["semantic_version"] = json!("0.97.0");
+    write_text(
+        &root.join("cli_manifests/codex/reports/0.97.0/coverage.authorization.json"),
+        &report.to_string(),
+    );
+    write_evidence(
+        &root,
+        json!([]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
+    freeze(&root);
+    let request = std::fs::read_to_string(root.join(REQUEST_PATH)).unwrap();
+    assert!(request.contains("#codex-exec-legacy-flag"));
+    assert!(!request.contains("#aaa-dormant-row"));
+    assert_eq!(
+        run_gate(&root).unwrap().1["preexisting_unsupported_surface"],
+        json!(1)
+    );
+}
+
+#[test]
+fn duplicated_frozen_debt_projection_cannot_be_hidden_by_set_comparison() {
+    let root = seeded_workspace(
+        "duplicate-debt-projection",
+        "requires_new_architectural_seam",
+    );
+    write_evidence(
+        &root,
+        json!([{"path": ["status"]}]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
+    freeze(&root);
+    write_evidence(
+        &root,
+        json!([]),
+        json!([{"path": ["exec"], "key": "--legacy"}]),
+    );
+    let path = root.join(REQUEST_PATH);
+    let mut doc: toml_edit::DocumentMut = std::fs::read_to_string(&path).unwrap().parse().unwrap();
+    let rows = doc["support_surface_audit"]["preexisting_unsupported_surface"]
+        .as_array_of_tables_mut()
+        .unwrap();
+    let duplicate = rows.get(0).unwrap().clone();
+    rows.push(duplicate);
+    write_text(&path, &doc.to_string());
+    assert!(xtask::agent_maintenance::request::load_request_envelope(
+        &root,
+        Path::new(REQUEST_PATH)
+    )
+    .is_err());
+    assert!(run_gate(&root).is_err());
+}

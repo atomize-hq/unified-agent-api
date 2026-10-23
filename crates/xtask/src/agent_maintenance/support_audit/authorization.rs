@@ -149,7 +149,80 @@ pub(crate) fn parse_debt_inventory(
             path.display()
         )));
     }
+    validate_row_ids(&rows)?;
     Ok(rows)
+}
+
+fn validate_row_ids(rows: &[DebtInventoryRow]) -> Result<(), String> {
+    let mut ids = BTreeSet::new();
+    if rows
+        .iter()
+        .any(|row| row.row_id.trim().is_empty() || !ids.insert(&row.row_id))
+    {
+        return Err(inventory_error("empty or duplicate debt row id"));
+    }
+    Ok(())
+}
+
+/// Full row identities and grants, including rows outside the selected report.
+pub(crate) fn validate_row_set(rows: &[DebtInventoryRow]) -> Result<(), String> {
+    validate_row_ids(rows)?;
+    let mut grants = BTreeSet::new();
+    for row in rows {
+        if row.scope_target_triples.is_empty()
+            || row.scope_target_triples.iter().any(|t| {
+                t.is_empty()
+                    || !t
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+            })
+            || row.agent_id.is_empty()
+            || row.command_path.split(' ').next() != Some(row.agent_id.as_str())
+            || !super::SURFACE_KINDS.contains(&row.surface_kind.as_str())
+        {
+            return Err(inventory_error("invalid row agent/surface/target scope"));
+        }
+        let fields = BTreeMap::from([
+            ("agent_id".into(), row.agent_id.clone()),
+            ("surface_kind".into(), row.surface_kind.clone()),
+            ("command_path".into(), row.command_path.clone()),
+            ("surface_id".into(), row.surface_id.clone()),
+            ("current_reason".into(), row.current_reason.clone()),
+            ("blocker_class".into(), row.blocker_class.clone()),
+            ("owner".into(), row.owner.clone()),
+            ("milestone".into(), row.milestone.clone()),
+            ("follow_on".into(), row.follow_on.clone()),
+            ("evidence_ref".into(), row.evidence_ref.clone()),
+            (
+                "scope_target_triples".into(),
+                row.scope_target_triples
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
+            (
+                "authorized_at_version".into(),
+                row.authorized_at_version.clone(),
+            ),
+            (
+                "authorization_evidence_ref".into(),
+                row.authorization_evidence_ref.clone(),
+            ),
+        ]);
+        build_debt_row(&row.row_id, &fields)?;
+        for target in &row.scope_target_triples {
+            if !grants.insert((
+                &row.agent_id,
+                row.identity(),
+                &row.authorized_at_version,
+                target,
+            )) {
+                return Err(inventory_error("debt grants overlap"));
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn validate_authorizations(
@@ -367,6 +440,16 @@ fn validate_authorization_evidence(
     entry: &AgentRegistryEntry,
     row: &DebtInventoryRow,
 ) -> Result<(), String> {
+    validate_authorization_evidence_with(&entry.manifest_root, row, &|relative| {
+        read_json(&workspace_root.join(relative))
+    })
+}
+
+pub(crate) fn validate_authorization_evidence_with(
+    manifest_root: &str,
+    row: &DebtInventoryRow,
+    read: &impl Fn(&str) -> Result<serde_json::Value, String>,
+) -> Result<(), String> {
     let relative = Path::new(&row.authorization_evidence_ref);
     if relative.is_absolute()
         || relative
@@ -378,7 +461,7 @@ fn validate_authorization_evidence(
             row.row_id
         )));
     }
-    let expected_prefix = Path::new(&entry.manifest_root)
+    let expected_prefix = Path::new(manifest_root)
         .join("reports")
         .join(&row.authorized_at_version);
     if relative.parent() != Some(expected_prefix.as_path())
@@ -394,9 +477,9 @@ fn validate_authorization_evidence(
             row.row_id, row.authorization_evidence_ref, row.agent_id, row.authorized_at_version
         )));
     }
-    let path = workspace_root.join(relative);
-    let json = read_json(&path)?;
-    require_report_version(&path, &json, &row.authorized_at_version)?;
+    let path = relative;
+    let json = read(&row.authorization_evidence_ref)?;
+    require_report_version(path, &json, &row.authorized_at_version)?;
     let report_targets = json
         .pointer("/inputs/upstream/targets")
         .and_then(serde_json::Value::as_array)
@@ -434,7 +517,7 @@ fn validate_authorization_evidence(
             ))
         })?;
         for report_row in rows {
-            let (_, identity) = surface_from_report_value(&entry.agent_id, report_row)?;
+            let (_, identity) = surface_from_report_value(&row.agent_id, report_row)?;
             if identity != row.identity() {
                 continue;
             }

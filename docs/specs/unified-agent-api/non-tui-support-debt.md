@@ -53,12 +53,16 @@ Row ids are the canonical `debt_ref` anchors used by `support_surface_audit`.
 
 A maintenance run carries a preexisting row to its target version by updating that row in place:
 `scope_target_triples`, `authorized_at_version`, and `authorization_evidence_ref`. It does so only
-while the row's `blocker_class` still holds; otherwise the surface is uplifted. Adding a second row
-for the same identity remains valid. Both gates render the lexicographically smallest row id, but
-they compare it differently: `maintenance-audit-status` compares `debt_ref` (the row id), while
-strict reconciliation compares only the deferral reason and follow-on. Until `uaa-0059` is resolved,
-an added row whose id sorts first therefore makes the gates disagree, so maintenance runs update in
-place.
+while the row's `blocker_class` still holds; otherwise the surface is uplifted. For depth-enrolled
+work the complete frozen agent baseline and E transitions MUST also reconcile under the
+[support-depth debt rules](../support-depth-contract.md#debt-operations). A read-only conditional
+plan is not proof that a blocker still holds or that a row may retire.
+
+Adding a second disjoint row is valid inventory form, but an executor MUST NOT create one outside
+its frozen delegation. When grants contribute to the current gap, the smallest contributing row
+supplies the rendered reference/reason/follow-on. Before a grant applies, the smallest existing
+same-surface row keeps preexisting work visible. Strict reconciliation and audit-status compare
+the same projected baseline; a rendered reference does not substitute for full frozen row content.
 
 ## Contract marker
 

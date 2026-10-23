@@ -10,8 +10,11 @@ use super::request::DetectedRelease;
 
 #[path = "support_audit/authorization.rs"]
 pub(crate) mod authorization;
+#[path = "support_audit/debt_baseline.rs"]
+mod debt_baseline;
 #[path = "support_audit/unmatched_debt.rs"]
 mod unmatched_debt;
+pub(crate) use debt_baseline::debt_baseline_drift;
 
 use authorization::{authorize_gap, validate_authorizations, TargetedGap};
 pub(crate) use authorization::{load_debt_inventory, load_targeted_gaps, DebtInventoryRow};
@@ -280,14 +283,14 @@ pub(crate) fn derive_support_surface_audit(
             surface_doc: SUPPORT_MATRIX_DOC_PATH.to_string(),
         });
         let authorization = authorize_gap(gap, &detected_release.target_version, &debt_rows);
-        // The contract (maintenance-request-contract-v1.md) says the smallest contributing grant
-        // supplies debt_ref, reason, and follow-on; this selects over every row of the identity.
-        // Aligning them changes debt_ref across re-authorization, which debt_baseline_drift compares.
-        // Tracked as uaa-0059; the relay prompt re-authorizes in place until it is resolved.
-        let debt_row = debt_rows
-            .iter()
-            .filter(|row| row.identity() == *surface)
-            .min_by(|left, right| left.row_id.cmp(&right.row_id));
+        // Prefer the smallest contributing grant. Before authorization, retain the frozen
+        // identity as visible due work; an earlier-version row cannot override a live grant.
+        let debt_row = authorization.applicable_rows.first().copied().or_else(|| {
+            debt_rows
+                .iter()
+                .filter(|row| row.identity() == *surface)
+                .min_by(|left, right| left.row_id.cmp(&right.row_id))
+        });
         // Without per-target report evidence, an inventory identity keeps the pre-acquisition
         // packet visible but no authorization grant is allowed to apply.
         let fully_authorized = report.is_some()
