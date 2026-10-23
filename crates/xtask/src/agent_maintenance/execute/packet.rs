@@ -302,6 +302,14 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Error> {
 }
 
 fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), Error> {
+    for ancestor in path.ancestors() {
+        if fs::symlink_metadata(ancestor).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(Error::Validation(format!(
+                "run packet symlink: {}",
+                ancestor.display()
+            )));
+        }
+    }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .map_err(|err| Error::Internal(format!("create {}: {err}", parent.display())))?;

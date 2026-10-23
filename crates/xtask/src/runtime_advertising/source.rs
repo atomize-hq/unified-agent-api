@@ -5,13 +5,18 @@ use std::{
     fs,
     path::{Component, Path, PathBuf},
     process::Command,
+    sync::Arc,
 };
 
 /// All reads in a baseline view refer to one resolved commit, never the candidate filesystem.
+type CapturedFiles = BTreeMap<String, (Vec<u8>, bool)>;
+
+#[derive(Clone)]
 pub struct Source {
     root: PathBuf,
     commit: Option<String>,
     proposed: BTreeMap<String, String>,
+    captured: Option<Arc<CapturedFiles>>,
 }
 
 impl Source {
@@ -20,7 +25,15 @@ impl Source {
             root: root.canonicalize().map_err(|e| e.to_string())?,
             commit: None,
             proposed: BTreeMap::new(),
+            captured: None,
         })
+    }
+
+    /// Invocation-local observations held by the host, independent of executor-writable Git objects.
+    pub(crate) fn captured(root: &Path, files: CapturedFiles) -> Result<Self, String> {
+        let mut source = Self::workspace(root)?;
+        source.captured = Some(Arc::new(files));
+        Ok(source)
     }
 
     /// A bounded read-only candidate; it never materializes proposed files in the workspace.
@@ -83,6 +96,9 @@ impl Source {
                 .any(|p| !matches!(p, Component::Normal(_)))
         {
             return Err(format!("invalid source path: {path}"));
+        }
+        if let Some(files) = &self.captured {
+            return Ok(files.get(path).map(|(bytes, _)| bytes.clone()));
         }
         if let Some(raw) = self.proposed.get(path) {
             return Ok(Some(raw.as_bytes().to_vec()));
@@ -153,6 +169,25 @@ impl Source {
     /// Enumerate this revision without following directory symlinks or treating read errors as absence.
     pub fn paths(&self, prefix: &str) -> Result<Vec<String>, String> {
         self.optional(&format!("{prefix}/.source-directory-probe"))?;
+        if let Some(files) = &self.captured {
+            let mut paths = std::collections::BTreeSet::new();
+            for path in files
+                .keys()
+                .filter(|p| p.starts_with(&format!("{prefix}/")))
+            {
+                paths.insert(path.clone());
+                let mut parent = Path::new(path).parent();
+                while let Some(p) = parent {
+                    let p = p.to_str().ok_or("non-UTF8 captured parent")?;
+                    if p.len() <= prefix.len() {
+                        break;
+                    }
+                    paths.insert(p.to_owned());
+                    parent = Path::new(p).parent();
+                }
+            }
+            return Ok(paths.into_iter().collect());
+        }
         if let Some(commit) = &self.commit {
             let rows = self.git(&[
                 "ls-tree",
@@ -235,6 +270,12 @@ impl Source {
     pub(crate) fn executable(&self, path: &str) -> Result<bool, String> {
         // Reuse regular-file/path validation rather than introducing a second object reader.
         self.optional_bytes(path)?.ok_or("missing source mode")?;
+        if let Some(files) = &self.captured {
+            return files
+                .get(path)
+                .map(|(_, executable)| *executable)
+                .ok_or("missing captured mode".into());
+        }
         let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
         let row = self.git(&["ls-tree", "-z", "--full-tree", commit, "--", path])?;
         Ok(row.starts_with("100755 blob "))
@@ -327,4 +368,27 @@ pub(crate) fn same<T: ToTokens>(item: &T, expected: &str, label: &str) -> Result
 
 pub(crate) fn fingerprint(raw: &str) -> Result<String, String> {
     Ok(hex::encode(Sha256::digest(normalized(raw)?.as_bytes())))
+}
+
+#[cfg(test)]
+mod captured_tests {
+    use super::*;
+    #[test]
+    fn captured_views_never_reopen_executor_files_or_git_objects() {
+        let root = tempfile::tempdir().unwrap();
+        let files = BTreeMap::from([("reports/1/input.bin".into(), (vec![0, 255, 4], true))]);
+        let source = Source::captured(root.path(), files).unwrap();
+        fs::write(root.path().join("reports"), "now a file, not a directory").unwrap();
+        assert_eq!(
+            source.optional_bytes("reports/1/input.bin").unwrap(),
+            Some(vec![0, 255, 4])
+        );
+        assert!(source.executable("reports/1/input.bin").unwrap());
+        assert_eq!(
+            source.paths("reports").unwrap(),
+            ["reports/1", "reports/1/input.bin"]
+        );
+        assert!(source.optional("reports/missing").unwrap().is_none());
+        assert!(source.optional("reports/../elsewhere").is_err());
+    }
 }

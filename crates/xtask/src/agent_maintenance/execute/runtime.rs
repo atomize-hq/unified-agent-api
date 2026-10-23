@@ -1,5 +1,5 @@
 use std::{
-    io::Write,
+    io::{Read, Seek, SeekFrom, Write},
     path::Path,
     process::{Command, Output, Stdio},
 };
@@ -165,7 +165,13 @@ pub(super) fn run_green_gates(
 ) -> Result<Vec<GateEvidence>, Error> {
     let mut results = Vec::new();
     for command in commands {
-        let output = Command::new("sh")
+        let mut gate = Command::new("sh");
+        for (key, _) in std::env::vars_os() {
+            if key.to_string_lossy().starts_with("GIT_") {
+                gate.env_remove(key);
+            }
+        }
+        let output = gate
             .current_dir(workspace_root)
             .arg("-lc")
             .arg(command)
@@ -219,30 +225,74 @@ fn spawn_codex_exec(
         workspace_root.to_string_lossy().into_owned(),
     ]);
 
+    let mut stdout_file = tempfile::tempfile().map_err(|e| Error::Internal(e.to_string()))?;
+    let mut stderr_file = tempfile::tempfile().map_err(|e| Error::Internal(e.to_string()))?;
     let mut command = Command::new(binary);
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(key);
+        }
+    }
     command
         .current_dir(workspace_root)
         .args(&argv)
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::from(
+            stdout_file
+                .try_clone()
+                .map_err(|e| Error::Internal(e.to_string()))?,
+        ))
+        .stderr(Stdio::from(
+            stderr_file
+                .try_clone()
+                .map_err(|e| Error::Internal(e.to_string()))?,
+        ));
     for (key, value) in envs {
         command.env(key, value);
     }
     let mut child = command
         .spawn()
         .map_err(|err| Error::Internal(format!("spawn codex binary `{binary}`: {err}")))?;
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| Error::Internal("codex exec stdin was not captured".to_string()))?;
-        stdin
-            .write_all(prompt.as_bytes())
-            .map_err(|err| Error::Internal(format!("write codex prompt to stdin: {err}")))?;
+    let write_prompt = child
+        .stdin
+        .take()
+        .ok_or_else(|| Error::Internal("codex exec stdin was not captured".into()))
+        .and_then(|mut stdin| {
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|e| Error::Internal(format!("write codex prompt to stdin: {e}")))
+        });
+    if let Err(error) = write_prompt {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(error);
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|err| Error::Internal(format!("wait for codex exec: {err}")))?;
+    let status = match child.wait() {
+        Ok(status) => status,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Internal(format!("wait for codex exec: {error}")));
+        }
+    };
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    stdout_file
+        .seek(SeekFrom::Start(0))
+        .and_then(|_| stdout_file.read_to_end(&mut stdout))
+        .map_err(|e| Error::Internal(e.to_string()))?;
+    stderr_file
+        .seek(SeekFrom::Start(0))
+        .and_then(|_| stderr_file.read_to_end(&mut stderr))
+        .map_err(|e| Error::Internal(e.to_string()))?;
+    let output = Output {
+        status,
+        stdout,
+        stderr,
+    };
     Ok((argv, output))
 }
+
+#[cfg(test)]
+#[path = "runtime_tests.rs"]
+mod tests;

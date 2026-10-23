@@ -1,7 +1,15 @@
+#[path = "execute/candidate.rs"]
+mod candidate;
+#[path = "execute/candidate_git.rs"]
+mod candidate_git;
+#[path = "execute/guarded.rs"]
+mod guarded;
 #[path = "execute/packet.rs"]
 mod packet;
 #[path = "execute/runtime.rs"]
 mod runtime;
+#[path = "execute/tree.rs"]
+mod tree;
 #[path = "execute/types.rs"]
 mod types;
 #[path = "execute/validate.rs"]
@@ -126,7 +134,7 @@ pub fn run_in_workspace<W: Write>(
         return workflow::execute_dry_run(workspace_root, &context, writer);
     }
 
-    workflow::execute_write_mode(workspace_root, &context, writer)
+    guarded::execute_write_mode(workspace_root, &context, writer)
 }
 
 fn validate_args(args: &Args) -> Result<(), Error> {
