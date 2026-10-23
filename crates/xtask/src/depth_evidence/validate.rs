@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use super::*;
-use crate::depth_record::{file_ref, obligation_ref, sha256};
+pub(super) use crate::depth_record::sha256;
+use crate::depth_record::{file_ref, obligation_ref};
 
 impl EvidenceReceipt {
     pub(super) fn validate(&self) -> Result<(), String> {
@@ -132,14 +133,14 @@ impl EvidenceReceipt {
     }
 }
 
-fn text(value: &str) -> Result<(), String> {
+pub(super) fn text(value: &str) -> Result<(), String> {
     if value.trim().is_empty() || value.len() > 4096 || value.contains('\0') {
         return Err("evidence string must be nonblank, NUL-free and at most 4096 bytes".into());
     }
     Ok(())
 }
 
-fn path(value: &str) -> Result<(), String> {
+pub(super) fn path(value: &str) -> Result<(), String> {
     text(value)?;
     if value.contains('\\')
         || value
@@ -151,12 +152,12 @@ fn path(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn file(value: &FileRef) -> Result<(), String> {
+pub(super) fn file(value: &FileRef) -> Result<(), String> {
     path(&value.path)?;
     file_ref("depth evidence", value)
 }
 
-fn unique<'a, T, K: Ord + ?Sized + 'a>(
+pub(super) fn unique<'a, T, K: Ord + ?Sized + 'a>(
     values: &'a [T],
     key: impl Fn(&'a T) -> &'a K,
 ) -> Result<(), String> {
@@ -167,7 +168,7 @@ fn unique<'a, T, K: Ord + ?Sized + 'a>(
     Ok(())
 }
 
-fn strings(values: &[String]) -> Result<(), String> {
+pub(super) fn strings(values: &[String]) -> Result<(), String> {
     unique(values, |v| v)?;
     for value in values {
         text(value)?;
@@ -175,7 +176,7 @@ fn strings(values: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn files(values: &[FileRef]) -> Result<(), String> {
+pub(super) fn files(values: &[FileRef]) -> Result<(), String> {
     unique(values, |v| &v.path)?;
     for value in values {
         file(value)?;
@@ -198,7 +199,7 @@ fn case_identity(value: &CaseIdentity) -> Result<(), String> {
     sha256("case executable_sha256", &value.executable_sha256)
 }
 
-fn git_identity(value: &str) -> Result<(), String> {
+pub(super) fn git_identity(value: &str) -> Result<(), String> {
     if value.len() != 40
         || !value
             .bytes()

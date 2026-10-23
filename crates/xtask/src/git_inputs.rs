@@ -68,6 +68,23 @@ impl GitInputs {
         Ok(names)
     }
 
+    /// Observe every file and directory in a relevant build scope, including untracked additions.
+    pub(crate) fn files_under(&mut self, path: &str) -> Result<Vec<String>, String> {
+        let mut result = Vec::new();
+        for name in self.list(path)? {
+            let child = format!("{path}/{name}");
+            let full = safe_path(&self.root, &child)?;
+            if fs::symlink_metadata(full).is_ok_and(|m| m.is_dir()) {
+                result.extend(self.files_under(&child)?);
+            } else {
+                self.required(&child)?;
+                result.push(child);
+            }
+        }
+        result.sort();
+        Ok(result)
+    }
+
     pub(crate) fn reference(&self, path: &str) -> Result<FileRef, String> {
         let bytes = self
             .files
