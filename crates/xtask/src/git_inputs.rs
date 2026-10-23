@@ -242,11 +242,20 @@ fn list(root: &Path, path: &str) -> Result<Vec<String>, String> {
     Ok(names.into_iter().collect())
 }
 
+/// Git state belongs to the explicit root, never an inherited index/object/worktree redirect.
+pub(crate) fn command(root: &Path) -> Command {
+    let mut command = Command::new("git");
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(key);
+        }
+    }
+    command.arg("--no-replace-objects").arg("-C").arg(root);
+    command
+}
+
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
-    let output = Command::new("git")
-        .arg("--no-replace-objects")
-        .arg("-C")
-        .arg(root)
+    let output = command(root)
         .args(args)
         .output()
         .map_err(|e| e.to_string())?;

@@ -851,7 +851,8 @@ rechecked before delivery. A candidate snapshot commit is an observation, never 
 before/after file observations; candidate Git objects cannot redefine the baseline. This delivery
 path refuses candidate HEAD or Git-configuration changes; index staging alone is permitted.
 Evidence/publication binding is validated against a private copy of the caller index that delivery
-will preserve. Candidate-only staging, including the invocation snapshot commit, MUST NOT make
+will preserve. The relay's Git-dependent observation and admission readers MUST ignore inherited Git index,
+object-store and worktree redirections. Candidate-only staging, including the invocation snapshot commit, MUST NOT make
 an untracked or divergent caller receipt/dependency admissible. E reporting may reference inputs
 already coherent in the caller index; this path does not stage caller inputs.
 

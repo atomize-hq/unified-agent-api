@@ -9,18 +9,13 @@ pub(super) struct GitState {
 }
 /// Ignore inherited Git redirections; candidate Git metadata is never shared with the caller.
 pub(super) fn command(root: &Path) -> Command {
-    let mut c = Command::new("git");
-    for (k, _) in std::env::vars_os() {
-        if k.to_string_lossy().starts_with("GIT_") {
-            c.env_remove(k);
-        }
-    }
+    let mut c = crate::git_inputs::command(root);
     c.env(
         "GIT_CONFIG_GLOBAL",
         if cfg!(windows) { "NUL" } else { "/dev/null" },
     )
     .env("GIT_CONFIG_NOSYSTEM", "1");
-    c.arg("--no-replace-objects").arg("-C").arg(root).args([
+    c.args([
         "-c",
         "core.hooksPath=/dev/null",
         "-c",

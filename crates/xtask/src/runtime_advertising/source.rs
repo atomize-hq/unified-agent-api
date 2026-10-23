@@ -4,7 +4,6 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Component, Path, PathBuf},
-    process::Command,
     sync::Arc,
 };
 
@@ -302,10 +301,7 @@ impl Source {
     }
 
     fn git_bytes(&self, args: &[&str]) -> Result<Vec<u8>, String> {
-        let out = Command::new("git")
-            .arg("--no-replace-objects")
-            .arg("-C")
-            .arg(&self.root)
+        let out = crate::git_inputs::command(&self.root)
             .arg("--literal-pathspecs")
             .args(args)
             .output()

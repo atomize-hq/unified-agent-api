@@ -237,3 +237,49 @@ fn ordinary_run_rejects_other_agent_aggregate_qualification() {
     assert_eq!(fs::read(path).unwrap(), before);
     assert!(!temp.path().join(NOTE).exists());
 }
+
+#[test]
+fn inherited_alternate_index_cannot_supply_missing_caller_evidence_binding() {
+    let action = format!("cp next-depth.json '{}'; git add .", record_path());
+    let (temp, root, binary, _) = fixture(&action, "untracked");
+    let alternate = tempfile::tempdir().unwrap();
+    let index = alternate.path().join("index");
+    for args in [vec!["read-tree", "HEAD"], vec!["add", EVIDENCE]] {
+        let out = Command::new("git")
+            .current_dir(temp.path())
+            .env("GIT_INDEX_FILE", &index)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+    }
+    let before = fs::read(root.join(format!("reports/{VERSION}/depth-record.json"))).unwrap();
+    let caller_index = fs::read(temp.path().join(".git/index")).unwrap();
+    let alternate_index = fs::read(&index).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .current_dir(temp.path())
+        .env("GIT_INDEX_FILE", &index)
+        .args(
+            mh::execute_args("--write", Some(&binary))
+                .into_iter()
+                .skip(1),
+        )
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "alternate index supplied caller authority"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("untracked bound input"), "{stderr}");
+    assert_eq!(
+        fs::read(root.join(format!("reports/{VERSION}/depth-record.json"))).unwrap(),
+        before
+    );
+    assert_eq!(
+        fs::read(temp.path().join(".git/index")).unwrap(),
+        caller_index
+    );
+    assert_eq!(fs::read(index).unwrap(), alternate_index);
+    assert!(!temp.path().join(NOTE).exists());
+}
