@@ -9,6 +9,7 @@ pub struct PlannedMutation {
     relative_path: PathBuf,
     expected_before: Option<Vec<u8>>,
     desired_after: Vec<u8>,
+    expected_mode: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,11 +56,13 @@ enum AppliedMutation {
     CreatedFile {
         path: PathBuf,
         written: Vec<u8>,
+        permissions: fs::Permissions,
     },
     ReplacedFile {
         path: PathBuf,
         backup_path: PathBuf,
         written: Vec<u8>,
+        permissions: fs::Permissions,
     },
 }
 
@@ -77,6 +80,7 @@ impl PlannedMutation {
             relative_path: relative_path.into(),
             expected_before: None,
             desired_after,
+            expected_mode: None,
         }
     }
 
@@ -89,7 +93,14 @@ impl PlannedMutation {
             relative_path: relative_path.into(),
             expected_before: Some(expected_before),
             desired_after,
+            expected_mode: None,
         }
+    }
+
+    /// Optional mode precondition for invocation snapshots; bytes alone cannot detect chmod.
+    pub(crate) fn with_expected_mode(mut self, mode: u32) -> Self {
+        self.expected_mode = Some(mode);
+        self
     }
 
     pub fn relative_path(&self) -> &Path {
@@ -350,7 +361,7 @@ fn apply_with_hook(
     }
 
     if rollback_needed {
-        rollback(&applied, &created_dirs)?;
+        rollback(&jail, &applied, &created_dirs)?;
     }
 
     // A failed immediate restoration may leave the original in a backup. Preserve it for
@@ -441,6 +452,16 @@ fn cleanup_temp_root(temp_root: &Path) -> Result<(), WorkspaceMutationError> {
     Ok(())
 }
 
+#[cfg(unix)]
+fn file_mode(metadata: &fs::Metadata) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o7777
+}
+#[cfg(not(unix))]
+fn file_mode(metadata: &fs::Metadata) -> u32 {
+    u32::from(metadata.permissions().readonly())
+}
+
 fn classify_mutation<'a>(
     jail: &WorkspacePathJail,
     mutation: &'a PlannedMutation,
@@ -448,7 +469,12 @@ fn classify_mutation<'a>(
     let absolute_path = jail.resolve(mutation.relative_path())?;
     let state = match fs::symlink_metadata(&absolute_path) {
         Ok(metadata) => {
-            if metadata.file_type().is_symlink() || !metadata.is_file() {
+            if metadata.file_type().is_symlink()
+                || !metadata.is_file()
+                || mutation
+                    .expected_mode
+                    .is_some_and(|m| file_mode(&metadata) != m)
+            {
                 MutationState::Divergent
             } else {
                 let current = fs::read(&absolute_path).map_err(|err| {
@@ -499,6 +525,11 @@ fn apply_one(
     backup_path: &Path,
 ) -> Result<AppliedMutation, WorkspaceMutationError> {
     if mutation.expected_before.is_some() {
+        let permissions = fs::symlink_metadata(absolute_path)
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?
+            .permissions();
+        fs::set_permissions(temp_path, permissions.clone())
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?;
         fs::rename(absolute_path, backup_path).map_err(|err| {
             WorkspaceMutationError::Internal(format!(
                 "rename {} -> {}: {err}",
@@ -530,8 +561,12 @@ fn apply_one(
             path: absolute_path.to_path_buf(),
             backup_path: backup_path.to_path_buf(),
             written: mutation.desired_after.clone(),
+            permissions,
         })
     } else {
+        let permissions = fs::symlink_metadata(temp_path)
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?
+            .permissions();
         fs::rename(temp_path, absolute_path).map_err(|err| {
             WorkspaceMutationError::Internal(format!(
                 "rename {} -> {}: {err}",
@@ -542,45 +577,49 @@ fn apply_one(
         Ok(AppliedMutation::CreatedFile {
             path: absolute_path.to_path_buf(),
             written: mutation.desired_after.clone(),
+            permissions,
         })
     }
 }
 
 fn rollback(
+    jail: &WorkspacePathJail,
     applied: &[AppliedMutation],
     created_dirs: &[PathBuf],
 ) -> Result<(), WorkspaceMutationError> {
+    let mut errors = Vec::new();
     for mutation in applied.iter().rev() {
-        let (path, written) = match mutation {
-            AppliedMutation::CreatedFile { path, written }
-            | AppliedMutation::ReplacedFile { path, written, .. } => (path, written),
-        };
-        // Best-effort repair only: never overwrite an observed edit/type change made after
-        // this invocation wrote the path. This comparison is not cross-route serialization.
-        let unchanged = fs::symlink_metadata(path)
-            .is_ok_and(|m| m.is_file() && !m.file_type().is_symlink())
-            && fs::read(path).is_ok_and(|bytes| bytes == *written);
-        if !unchanged {
-            return Err(WorkspaceMutationError::Validation(format!(
-                "rollback conflict at {}; preserving intervening change and recovery files",
-                path.display()
-            )));
-        }
-        match mutation {
-            AppliedMutation::CreatedFile { path, .. } => match fs::remove_file(path) {
-                Ok(()) => {}
-                Err(err) if err.kind() == io::ErrorKind::NotFound => {}
-                Err(err) => {
-                    return Err(WorkspaceMutationError::Internal(format!(
-                        "rollback remove {}: {err}",
-                        path.display()
-                    )));
+        let attempt = (|| -> Result<(), WorkspaceMutationError> {
+            let (path, written, permissions) = match mutation {
+                AppliedMutation::CreatedFile {
+                    path,
+                    written,
+                    permissions,
                 }
-            },
-            AppliedMutation::ReplacedFile {
-                path, backup_path, ..
-            } => {
-                match fs::remove_file(path) {
+                | AppliedMutation::ReplacedFile {
+                    path,
+                    written,
+                    permissions,
+                    ..
+                } => (path, written, permissions),
+            };
+            // Best-effort repair only: never overwrite an observed edit/type change made after
+            // this invocation wrote the path. This comparison is not cross-route serialization.
+            let relative = path
+                .strip_prefix(&jail.canonical_root)
+                .map_err(|e| WorkspaceMutationError::Validation(e.to_string()))?;
+            jail.resolve(relative)?;
+            let unchanged = fs::symlink_metadata(path).is_ok_and(|m| {
+                m.is_file() && !m.file_type().is_symlink() && &m.permissions() == permissions
+            }) && fs::read(path).is_ok_and(|bytes| bytes == *written);
+            if !unchanged {
+                return Err(WorkspaceMutationError::Validation(format!(
+                    "rollback conflict at {}; preserving intervening change and recovery files",
+                    path.display()
+                )));
+            }
+            match mutation {
+                AppliedMutation::CreatedFile { path, .. } => match fs::remove_file(path) {
                     Ok(()) => {}
                     Err(err) if err.kind() == io::ErrorKind::NotFound => {}
                     Err(err) => {
@@ -589,160 +628,69 @@ fn rollback(
                             path.display()
                         )));
                     }
+                },
+                AppliedMutation::ReplacedFile {
+                    path, backup_path, ..
+                } => {
+                    match fs::remove_file(path) {
+                        Ok(()) => {}
+                        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+                        Err(err) => {
+                            return Err(WorkspaceMutationError::Internal(format!(
+                                "rollback remove {}: {err}",
+                                path.display()
+                            )));
+                        }
+                    }
+                    fs::rename(backup_path, path).map_err(|err| {
+                        WorkspaceMutationError::Internal(format!(
+                            "rollback rename {} -> {}: {err}",
+                            backup_path.display(),
+                            path.display()
+                        ))
+                    })?;
                 }
-                fs::rename(backup_path, path).map_err(|err| {
-                    WorkspaceMutationError::Internal(format!(
-                        "rollback rename {} -> {}: {err}",
-                        backup_path.display(),
-                        path.display()
-                    ))
-                })?;
             }
+            Ok(())
+        })();
+        if let Err(e) = attempt {
+            errors.push(e.to_string());
         }
     }
 
     for dir in created_dirs.iter().rev() {
-        match fs::remove_dir(dir) {
-            Ok(()) => {}
-            Err(err)
-                if matches!(
-                    err.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::DirectoryNotEmpty
-                ) => {}
-            Err(err) => {
-                return Err(WorkspaceMutationError::Internal(format!(
-                    "rollback remove {}: {err}",
+        let attempt = (|| -> Result<(), WorkspaceMutationError> {
+            let relative = dir
+                .strip_prefix(&jail.canonical_root)
+                .map_err(|e| WorkspaceMutationError::Validation(e.to_string()))?;
+            jail.resolve(relative)?;
+            match fs::remove_dir(dir) {
+                Ok(()) => Ok(()),
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::NotFound | io::ErrorKind::DirectoryNotEmpty
+                    ) =>
+                {
+                    Ok(())
+                }
+                Err(e) => Err(WorkspaceMutationError::Internal(format!(
+                    "rollback remove {}: {e}",
                     dir.display()
-                )));
+                ))),
             }
+        })();
+        if let Err(e) = attempt {
+            errors.push(e.to_string());
         }
     }
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(WorkspaceMutationError::Validation(errors.join("\n")))
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolve_rejects_parent_dir_escape() {
-        let root = temp_root();
-        let jail = WorkspacePathJail::new(&root).expect("build jail");
-        let err = jail
-            .resolve(Path::new("../escape.txt"))
-            .expect_err("parent-dir escape should fail");
-        assert!(err.to_string().contains("must stay repo-relative"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn resolve_rejects_symlink_escape() {
-        use std::os::unix::fs::symlink;
-
-        let root = temp_root();
-        let outside = temp_root();
-        symlink(&outside, root.join("linked")).expect("create symlink");
-
-        let jail = WorkspacePathJail::new(&root).expect("build jail");
-        let err = jail
-            .resolve(Path::new("linked/file.txt"))
-            .expect_err("symlink escape should fail");
-        assert!(err.to_string().contains("symlinked component"));
-    }
-
-    #[test]
-    fn rollback_preserves_intervening_file_edits() {
-        for replacing in [false, true] {
-            let root = tempfile::tempdir().unwrap();
-            let path = root.path().join("output");
-            let temp = root.path().join("proposed");
-            let backup = root.path().join("backup");
-            fs::write(&temp, b"planned").unwrap();
-            let mutation = if replacing {
-                fs::write(&path, b"before").unwrap();
-                PlannedMutation::replace("output", b"before".to_vec(), b"planned".to_vec())
-            } else {
-                PlannedMutation::create("output", b"planned".to_vec())
-            };
-            let applied = apply_one(&path, &mutation, &temp, &backup).unwrap();
-            fs::write(&path, b"intervening edit").unwrap();
-            assert!(rollback(&[applied], &[]).is_err());
-            assert_eq!(fs::read(&path).unwrap(), b"intervening edit");
-        }
-    }
-
-    #[test]
-    fn injected_write_failure_restores_owned_bytes_but_preserves_observed_conflicts() {
-        for replacing in [false, true] {
-            for conflict in [false, true] {
-                let root = tempfile::tempdir().unwrap();
-                let path = root.path().join("first");
-                let first = if replacing {
-                    fs::write(&path, b"before").unwrap();
-                    PlannedMutation::replace("first", b"before".to_vec(), b"planned".to_vec())
-                } else {
-                    PlannedMutation::create("first", b"planned".to_vec())
-                };
-                let mutations = [first, PlannedMutation::create("second", b"second".to_vec())];
-                let error = apply_with_hook(root.path(), &mutations, |index| {
-                    if index == 1 {
-                        if conflict {
-                            fs::write(&path, b"other writer").unwrap();
-                        }
-                        return Err(WorkspaceMutationError::Internal(
-                            "injected write failure".into(),
-                        ));
-                    }
-                    Ok(())
-                })
-                .unwrap_err();
-                assert!(!root.path().join("second").exists());
-                if conflict {
-                    assert!(error.to_string().contains("rollback conflict"));
-                    assert_eq!(fs::read(&path).unwrap(), b"other writer");
-                } else if replacing {
-                    assert_eq!(fs::read(&path).unwrap(), b"before");
-                } else {
-                    assert!(!path.exists());
-                }
-            }
-        }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn rollback_refuses_an_intervening_symlink() {
-        use std::os::unix::fs::symlink;
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("output");
-        let temp = root.path().join("proposed");
-        fs::write(&temp, b"planned").unwrap();
-        let mutation = PlannedMutation::create("output", b"planned".to_vec());
-        let applied = apply_one(&path, &mutation, &temp, &root.path().join("backup")).unwrap();
-        fs::remove_file(&path).unwrap();
-        fs::write(root.path().join("other"), b"other writer").unwrap();
-        symlink("other", &path).unwrap();
-        assert!(rollback(&[applied], &[]).is_err());
-        assert!(fs::symlink_metadata(&path)
-            .unwrap()
-            .file_type()
-            .is_symlink());
-        assert_eq!(
-            fs::read(root.path().join("other")).unwrap(),
-            b"other writer"
-        );
-    }
-
-    fn temp_root() -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "xtask-workspace-mutation-{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("system time after unix epoch")
-                .as_nanos()
-        ));
-        fs::create_dir_all(&root).expect("create temp root");
-        root
-    }
-}
+#[path = "workspace_mutation/tests.rs"]
+mod tests;

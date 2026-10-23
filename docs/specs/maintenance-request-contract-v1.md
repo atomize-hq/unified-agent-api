@@ -843,6 +843,36 @@ Rules 2 to 5 are shared policy for every agent. `writable_surfaces` is unchanged
 limit what a run may change inside it, as the exclusion of the closeout path already does. They
 are not a second envelope derived from `agent_id`.
 
+D4 executes write-mode preflight, executor and gates in an invocation-private candidate. Its
+baseline is a content/type/mode snapshot of the caller's actual starting files, not the dry-run
+digests or caller HEAD. Candidate Git metadata MUST be independent of the caller; staged or
+committed edits MUST NOT hide changed files. Caller HEAD/index and input/output states are
+rechecked before delivery. A candidate snapshot commit is an observation, never upstream proof. The guard uses host-held
+before/after file observations; candidate Git objects cannot redefine the baseline. This delivery
+path refuses candidate HEAD or Git-configuration changes; index staging alone is permitted.
+Evidence/publication binding is validated against a private copy of the caller index that delivery
+will preserve. The relay's Git-dependent observation and admission readers MUST ignore inherited Git index,
+object-store and worktree redirections. Candidate-only staging, including the invocation snapshot commit, MUST NOT make
+an untracked or divergent caller receipt/dependency admissible. E reporting may reference inputs
+already coherent in the caller index; this path does not stage caller inputs.
+
+Every possible post-spawn error MUST pass through finalization. A failed candidate MUST NOT
+deliver runtime outputs; it is retained for recovery and caller files remain as before execution.
+A successful candidate is checked for reporting-only effects across all agents and retained
+versions, including requests, markers and referenced evidence regardless of directory exclusions.
+P/O/Event/acceptance entries MUST remain unchanged. Unsupported debt corroboration, malformed
+bindings, stale publication or unknown effects refuse delivery. No local command success
+authenticates execution evidence or enables production depth.
+
+The initial copy-back path supports regular file creates/replacements with ordinary file modes.
+Replacements preserve existing file permissions. Deletions, symlink/type changes, nonordinary new
+file/directory modes and changes to existing modes MUST refuse before applying any output. Empty
+new directories and untracked caches are not copied back. Relevant tracked cache inputs remain
+observable; untracked build/bytecode caches supply no evidence authority. Delivery uses captured
+expected-before values and existing conflict-preserving rollback. An intervening caller edit
+refuses delivery and is preserved. This is candidate repair, not crash atomicity or integration
+serialization. The final integration admission remains independently required.
+
 ### Closeout
 
 `prepare-agent-closeout` generates the closeout artifact that `close-agent-maintenance` records,
@@ -890,9 +920,10 @@ No production request carries a depth enrollment today. In particular:
   it. The acquisition commit carries `reports/<version>/`; on the docs-only lane nothing does.
 - `writable_surfaces` cover the request and the stand-down markers through
   `{maintenance_root}/**`.
-- The relay checks the executor's writes against `writable_surfaces` after the executor has
-  written. It takes its baseline at the dry run, as digests without content, and it leaves a
-  failed run's changes in place.
+- D4 runs the write-mode host preflight, executor and gates in an independent candidate based
+  on invocation-start file observations. It checks writable surfaces and reporting-only effects
+  before delivery, finalizes failed execution paths, and retains rejected candidate outputs for
+  recovery. The dry-run digest remains prepared-packet validation, not restoration authority.
 - `prepare-agent-closeout` writes the closeout artifact, then validates it through the
   validator's own input path, and leaves a rejected artifact in place when no closeout existed
   before.

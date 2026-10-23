@@ -3,6 +3,7 @@ mod artifacts;
 mod input;
 mod manifest;
 mod publication;
+mod relay;
 mod runtime;
 use crate::runtime_advertising::source::Source;
 use input::View;
@@ -133,4 +134,22 @@ fn effect(out: &mut BTreeSet<Effect>, version: &str, target: Option<&str>, path:
         path: path.into(),
         kind: kind.into(),
     });
+}
+
+/// Read-only relay comparison; success supplies no write or integration authority.
+pub fn check_reporting_relay(workspace: &Path, baseline: &str) -> Result<(), String> {
+    relay::check(
+        Source::tip(workspace, baseline)?,
+        Source::workspace(workspace)?,
+        workspace,
+    )
+}
+
+/// Host-memory relay views; neither side is read from executor-writable Git objects.
+pub(crate) fn check_captured_relay(
+    before: Source,
+    after: Source,
+    workspace: &Path,
+) -> Result<(), String> {
+    relay::check(before, after, workspace)
 }

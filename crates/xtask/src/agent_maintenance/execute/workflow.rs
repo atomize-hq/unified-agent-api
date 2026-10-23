@@ -9,8 +9,7 @@ use super::{
     runtime::{execute_codex_write, run_codex_preflight, run_green_gates},
     types::{Context, InputContract, RecoveryContract, ValidationCheck, ValidationReport},
     validate::{
-        diff_snapshots, exclude_explicit_diff_paths, operator_governance_diff_exclusions,
-        snapshot_workspace, validate_prepared_packet, validate_written_paths,
+        diff_snapshots, snapshot_workspace, validate_prepared_packet, validate_written_paths,
     },
     Args, Error, EXECUTION_RUNS_ROOT, WORKFLOW_VERSION,
 };
@@ -170,13 +169,15 @@ pub(super) fn execute_dry_run<W: Write>(
     Ok(())
 }
 
-pub(super) fn execute_write_mode<W: Write>(
+pub(super) fn execute_candidate_write<W: Write>(
     workspace_root: &Path,
     context: &Context,
     writer: &mut W,
 ) -> Result<(), Error> {
-    let (prepared_contract, frozen_prompt) = load_prepared_packet(context)?;
+    let (mut prepared_contract, frozen_prompt) = load_prepared_packet(context)?;
     validate_prepared_packet(context, &prepared_contract, &frozen_prompt)?;
+    prepared_contract.baseline =
+        snapshot_workspace(workspace_root, &[Path::new(EXECUTION_RUNS_ROOT)])?;
 
     let preflight = run_codex_preflight(workspace_root, context)?;
     let mut checks = preflight.checks.clone();
@@ -184,8 +185,6 @@ pub(super) fn execute_write_mode<W: Write>(
     let mut gate_results = Vec::new();
     let mut post_write_reconciliation =
         load_current_support_surface_reconciliation(workspace_root, context)?;
-    let diff_exclusions =
-        operator_governance_diff_exclusions(&context.envelope.request.maintenance_root);
 
     let codex_execution = if errors.is_empty() {
         Some(execute_codex_write(
@@ -219,10 +218,7 @@ pub(super) fn execute_write_mode<W: Write>(
 
         let snapshot_after_codex =
             snapshot_workspace(workspace_root, &[Path::new(EXECUTION_RUNS_ROOT)])?;
-        let diff_after_codex = exclude_explicit_diff_paths(
-            &diff_snapshots(&prepared_contract.baseline, &snapshot_after_codex),
-            &diff_exclusions,
-        );
+        let diff_after_codex = diff_snapshots(&prepared_contract.baseline, &snapshot_after_codex);
         validate_written_paths(
             workspace_root,
             context,
@@ -241,10 +237,7 @@ pub(super) fn execute_write_mode<W: Write>(
             )?;
             let snapshot_after_gates =
                 snapshot_workspace(workspace_root, &[Path::new(EXECUTION_RUNS_ROOT)])?;
-            written_paths = exclude_explicit_diff_paths(
-                &diff_snapshots(&prepared_contract.baseline, &snapshot_after_gates),
-                &diff_exclusions,
-            );
+            written_paths = diff_snapshots(&prepared_contract.baseline, &snapshot_after_gates);
             validate_written_paths(
                 workspace_root,
                 context,

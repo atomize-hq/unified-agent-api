@@ -140,3 +140,9 @@ mod attribution;
 
 #[path = "acceptance/projections.rs"]
 mod projections;
+
+#[path = "acceptance/relay.rs"]
+mod relay;
+
+#[path = "acceptance/relay_boundary.rs"]
+mod relay_boundary;

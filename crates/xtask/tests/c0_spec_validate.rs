@@ -620,3 +620,14 @@ mod happy_path;
 mod reported_versions;
 #[path = "c0_spec_validate/validation_errors.rs"]
 mod validation_errors;
+
+#[path = "support/onboard_agent_harness.rs"]
+mod harness;
+mod release_doc {
+    pub use xtask::release_doc::*;
+}
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
+#[path = "support/agent_maintenance_harness.rs"]
+mod maintenance_harness;

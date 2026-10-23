@@ -538,3 +538,30 @@ fn execute_agent_maintenance_closeout_harness_keeps_claude_code_recovery_parity(
         "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode."
     ));
 }
+
+#[test]
+fn rejected_executor_request_edit_is_restored_even_on_nonzero_exit() {
+    let fixture = prepare_execute_fixture("relay-failed-request-restoration");
+    let binary = fake_execute_codex_binary(&fixture);
+    let original = fs::read_to_string(&binary).unwrap();
+    harness::write_text(&binary, &original.replace("  success)", "  failed_request)\n    printf 'forged request\\n' > \"$workspace_root/docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml\"\n    printf 'failed output\\n' > \"$workspace_root/docs/agents/lifecycle/codex-maintenance/runtime-note.md\"\n    exit 23\n    ;;\n  success)"));
+    let dry = run_execute_cli(execute_args("--dry-run", Some(&binary)), &fixture);
+    assert_eq!(dry.exit_code, 0, "{}", dry.stderr);
+    let request =
+        fixture.join("docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml");
+    let before = fs::read(&request).unwrap();
+    write_fake_execute_codex_scenario(&fixture, "failed_request");
+    let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+    assert_ne!(out.exit_code, 0);
+    assert_eq!(
+        fs::read(&request).unwrap(),
+        before,
+        "rejected request edit leaked into caller"
+    );
+    assert!(!fixture
+        .join("docs/agents/lifecycle/codex-maintenance/runtime-note.md")
+        .exists());
+}
+
+#[path = "agent_maintenance_execute/relay.rs"]
+mod relay;
