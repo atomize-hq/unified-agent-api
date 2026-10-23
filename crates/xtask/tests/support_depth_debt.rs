@@ -396,3 +396,55 @@ fn all_adopted_roots_use_the_same_debt_transition_rules() {
         }
     }
 }
+
+#[test]
+fn repair_stale_policy_obligation_and_execution_bindings_refuse() {
+    for part in ["o-p", "e-p", "e-o"] {
+        let mut r = record(vec![row("legacy", &["linux"])]);
+        let g = renewal(&mut r, "legacy", &["linux"]);
+        match part {
+            "o-p" => {
+                let o = r.obligations.as_mut().unwrap();
+                o.policy_identity = "a".repeat(64);
+                o.identity = part_identity(o).unwrap();
+                r.execution.as_mut().unwrap().obligations_identity = o.identity.clone();
+            }
+            "e-p" => r.execution.as_mut().unwrap().policy_identity = "a".repeat(64),
+            "e-o" => r.execution.as_mut().unwrap().obligations_identity = "a".repeat(64),
+            _ => unreachable!(),
+        }
+        seal(&mut r);
+        // The form parser intentionally does not establish these semantic cross-part bindings.
+        DepthRecord::parse(&serde_json::to_string(&r).unwrap(), "codex", "0.0.0").unwrap();
+        assert!(
+            plan_debt_transition(&r, &inventory(&[g]), &reports(&["linux"], true)).is_err(),
+            "allowed stale {part}"
+        );
+    }
+}
+#[test]
+fn repair_target_gap_must_actually_observe_the_granted_target() {
+    for availability in [json!([]), json!(["mac"]), Value::Null] {
+        let mut r = record(vec![row("legacy", &["linux"])]);
+        let g = renewal(&mut r, "legacy", &["linux"]);
+        let mut rs = reports(&["linux"], true);
+        let path = "cli_manifests/codex/reports/0.0.0/coverage.linux.json";
+        let mut v: Value = serde_json::from_str(&rs[path]).unwrap();
+        v["deltas"]["missing_flags"][0]["upstream_available_on"] = availability;
+        rs.insert(path.into(), v.to_string());
+        assert!(
+            plan_debt_transition(&r, &inventory(&[g]), &rs).is_err(),
+            "accepted contradictory target observation"
+        );
+    }
+    let mut r = record(vec![row("legacy", &["linux"])]);
+    let g = renewal(&mut r, "legacy", &["linux"]);
+    let mut rs = reports(&["linux"], true);
+    let path = "cli_manifests/codex/reports/0.0.0/coverage.linux.json";
+    let mut v: Value = serde_json::from_str(&rs[path]).unwrap();
+    v["deltas"]["missing_flags"][0]["upstream_available_on"] = json!(["linux", "mac"]);
+    rs.insert(path.into(), v.to_string());
+    assert!(plan_debt_transition(&r, &inventory(&[g]), &rs)
+        .unwrap()
+        .requires_corroboration());
+}

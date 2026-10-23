@@ -479,7 +479,7 @@ pub(crate) fn validate_authorization_evidence_with(
     }
     let path = relative;
     let json = read(&row.authorization_evidence_ref)?;
-    require_report_version(&path, &json, &row.authorized_at_version)?;
+    require_report_version(path, &json, &row.authorized_at_version)?;
     let report_targets = json
         .pointer("/inputs/upstream/targets")
         .and_then(serde_json::Value::as_array)

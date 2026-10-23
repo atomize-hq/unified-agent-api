@@ -71,6 +71,22 @@ pub fn plan_debt_transition(
     if !matches!(record.event, Event::Maintenance { .. }) {
         return Err("debt planning requires the maintenance lifecycle".into());
     }
+    if record
+        .obligations
+        .as_ref()
+        .is_some_and(|o| o.policy_identity != record.policy.identity)
+    {
+        return Err("debt O is not bound to the stated P".into());
+    }
+    if let Some(e) = &record.execution {
+        let o = record
+            .obligations
+            .as_ref()
+            .ok_or("debt execution requires frozen O")?;
+        if e.policy_identity != record.policy.identity || e.obligations_identity != o.identity {
+            return Err("debt E is not bound to the stated P/O".into());
+        }
+    }
     let baseline = &record.policy.debt_baseline;
     validate_row_set(baseline)?;
     let all = parse_debt_inventory(inventory, Path::new(NON_TUI_SUPPORT_DEBT_PATH))?;
@@ -109,6 +125,14 @@ pub fn plan_debt_transition(
                 if !has_gap(agent, &path, &json, grant)? {
                     return Err("renewed debt is not a current same-surface target gap".into());
                 }
+                // Exact-target rows may retain the union's broader availability list, but
+                // the selected target must actually be among those same-surface observations.
+                let mut per_target = grant.clone();
+                per_target.scope_target_triples = BTreeSet::from([target.clone()]);
+                per_target.authorization_evidence_ref = path.clone();
+                validate_authorization_evidence_with(&root, &per_target, &|p| {
+                    read_report(reports, p)
+                })?;
                 target_reports.push(reference(&path, reports)?);
             }
             requirements.push(DebtRequirement::Renewal {

@@ -369,11 +369,6 @@ fn derive_audit_status(
     })
 }
 
-/// Names drift that uplifts cannot explain, which must fail the gate even when uplifts remain. A
-/// nightly packet freezes its request before acquisition, so new uplifts always drift it; a debt
-/// row that matches no live gap, or a debt baseline that changed since the freeze, never comes
-/// from them.
-
 fn validate_expected_target_version_before_load(
     workspace_root: &Path,
     request_path: &Path,

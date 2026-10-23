@@ -2,6 +2,10 @@
 //! debt planner; a rendered row reference is not a frozen row identity.
 use super::SupportSurfaceAudit;
 
+/// Names drift that uplifts cannot explain, which must fail the gate even when uplifts remain. A
+/// nightly packet freezes its request before acquisition, so new uplifts always drift it; a debt
+/// row that matches no live gap, or a debt baseline that changed since the freeze, never comes
+/// from them.
 pub(crate) fn debt_baseline_drift(
     frozen: &SupportSurfaceAudit,
     live: &SupportSurfaceAudit,
