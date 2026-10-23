@@ -173,7 +173,6 @@ jobs:
           BRANCH_NAME: ${{ matrix.branch_name }}
           DETECTED_BY: ${{ matrix.detected_by }}
           OPENED_FROM: ${{ matrix.opened_from }}
-          MAINTENANCE_ROOT: ${{ matrix.maintenance_root }}
         with:
           script: |
             const inputs = {
@@ -186,7 +185,6 @@ jobs:
               dispatch_kind: process.env.DISPATCH_KIND,
               dispatch_workflow: process.env.DISPATCH_WORKFLOW,
               branch_name: process.env.BRANCH_NAME,
-              add_paths: `${process.env.MAINTENANCE_ROOT}\n`,
             };
 
             const workflowId =

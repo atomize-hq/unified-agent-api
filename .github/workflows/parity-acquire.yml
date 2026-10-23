@@ -618,6 +618,9 @@ jobs:
           test "$(git symbolic-ref -q HEAD)" = "$DELIVERY_REF"
           test "$(git rev-parse HEAD)" = "$(git rev-parse --verify "refs/remotes/origin/$BRANCH_NAME")"
 
+      - name: Initialize transport scratch
+        shell: bash
+        run: echo "TRANSPORT_DIR=$RUNNER_TEMP/maintenance-transport" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -694,8 +697,16 @@ jobs:
 
           cargo run -p xtask -- manifest-report --root "$ROOT" --version "$VERSION"
           cargo run -p xtask -- manifest-version-metadata --root "$ROOT" --version "$VERSION" --status reported
-          cargo run -p xtask -- support-matrix
           cargo run -p xtask -- manifest-validate --root "$ROOT"
+
+      - name: Stage exact acquisition inputs before freeze
+        if: ${{ inputs.commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$TRANSPORT_DIR"
+          python3 scripts/maintenance_transport.py stage-inputs \
+            --plan _ci_tmp/acquisition-plan.json --state "$TRANSPORT_DIR/inputs.json"
 
       # Destructive boundary 4 of 4: request re-freeze. The packet was frozen before its target
       # artifacts existed, so its frozen audit is a placeholder that no strict loader accepts
@@ -760,8 +771,42 @@ jobs:
               ;;
           esac
 
-          ./target/debug/xtask prepare-agent-maintenance --from-request "$REQUEST_PATH" --write
+          ./target/debug/xtask prepare-agent-maintenance --from-request "$REQUEST_PATH" \
+            --emit-json "$TRANSPORT_DIR/prepared.json" --write
+          echo "preparation_report=$TRANSPORT_DIR/prepared.json" >> "$GITHUB_OUTPUT"
           echo "refrozen=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish acquisition support outputs after freeze
+        shell: bash
+        env:
+          PREPARATION_REPORT: ${{ steps.refreeze.outputs.preparation_report }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PREPARATION_REPORT" ] && jq -e '.files | map(.path) | index("cli_manifests/support_matrix/current.json") != null' "$PREPARATION_REPORT" >/dev/null; then
+            echo "Preparation already produced the complete publication."
+          else
+            cargo run -p xtask -- support-matrix
+          fi
+
+      - name: Stage the complete checked delivery
+        id: delivery
+        shell: bash
+        env:
+          COMMIT: ${{ inputs.commit }}
+          PREPARATION_REPORT: ${{ steps.refreeze.outputs.preparation_report }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$TRANSPORT_DIR"
+          ARGS=(stage-delivery --plan _ci_tmp/acquisition-plan.json --state "$TRANSPORT_DIR/delivery.json" --bundle-dir "$TRANSPORT_DIR/bundle")
+          if [ "$COMMIT" = "true" ]; then
+            ARGS+=(--input-state "$TRANSPORT_DIR/inputs.json")
+          else
+            ARGS+=(--read-only)
+          fi
+          if [ -n "$PREPARATION_REPORT" ]; then
+            ARGS+=(--preparation "$PREPARATION_REPORT")
+          fi
+          python3 scripts/maintenance_transport.py "${ARGS[@]}"
 
       - name: Maintenance audit gate
         id: maintenance_audit
@@ -1005,23 +1050,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # These include the two paths `xtask support-matrix` actually publishes
-          # (support_matrix::JSON_OUTPUT_PATH and MARKDOWN_OUTPUT_PATH). `git add` fails the whole
-          # commit on a pathspec that matches nothing, so append the optional maintenance directory
-          # only when a packet exists instead of discarding an otherwise complete acquisition.
-          PATHS=(
-            "${ROOT}/snapshots/${VERSION}"
-            "${ROOT}/reports/${VERSION}"
-            "${ROOT}/versions/${VERSION}.json"
-            "${ROOT}/wrapper_coverage.json"
-            "${ROOT}/artifacts.lock.json"
-            cli_manifests/support_matrix/current.json
-            docs/specs/unified-agent-api/support-matrix.md
-          )
-          if [ -d "docs/agents/lifecycle/${AGENT_ID}-maintenance" ]; then
-            PATHS+=("docs/agents/lifecycle/${AGENT_ID}-maintenance")
-          fi
-          git add "${PATHS[@]}"
+          # Audit judged this staged candidate. Do not recapture or restage changed bytes.
+          python3 scripts/maintenance_transport.py verify --state "$TRANSPORT_DIR/delivery.json"
 
           # The verdict artifact reports the audit and the delivery separately, so a blocking
           # verdict is never mistaken for a failed push and a failed push never masquerades as a
@@ -1068,20 +1098,12 @@ jobs:
           exit 1
 
       - name: Upload the committed artifact bundle
-        if: ${{ always() }}
+        if: ${{ always() && steps.delivery.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: "parity-acquire-artifacts-${{ inputs.agent_id }}-${{ inputs.target_version }}"
           if-no-files-found: error
-          path: |
-            ${{ needs.plan.outputs.manifest_root }}/snapshots/${{ inputs.target_version }}/
-            ${{ needs.plan.outputs.manifest_root }}/reports/${{ inputs.target_version }}/
-            ${{ needs.plan.outputs.manifest_root }}/versions/${{ inputs.target_version }}.json
-            ${{ needs.plan.outputs.manifest_root }}/wrapper_coverage.json
-            ${{ needs.plan.outputs.manifest_root }}/artifacts.lock.json
-            cli_manifests/support_matrix/current.json
-            docs/specs/unified-agent-api/support-matrix.md
-            docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/
+          path: ${{ runner.temp }}/maintenance-transport/bundle/
 
       # The one durable channel for this run's verdict. A blocking verdict fails this job by
       # design, and GitHub empties a failed job's outputs, so a caller cannot learn exit 2, exit 4

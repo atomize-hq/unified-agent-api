@@ -30,9 +30,10 @@ on:
       branch_name:
         required: true
         type: string
-      add_paths:
+    secrets:
+      AUTOMATION_TOKEN:
+        description: "Required for unattended packet PR delivery and validation"
         required: true
-        type: string
   workflow_dispatch:
     inputs:
       agent_id:
@@ -62,9 +63,6 @@ on:
       branch_name:
         required: true
         type: string
-      add_paths:
-        required: true
-        type: string
 
 concurrency:
   group: agent-maintenance-${{ inputs.branch_name }}
@@ -86,9 +84,22 @@ jobs:
       # PR: `parity-acquire` is handed a ref, not a number. Export it here, where it is known.
       pull_request_number: ${{ steps.create_pr.outputs.pull-request-number }}
     steps:
+      - name: Require an automation token for packet delivery
+        shell: bash
+        env:
+          HAS_AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [ "$HAS_AUTOMATION_TOKEN" != "true" ]; then
+            echo "::error title=Missing automation token::Packet delivery requires AUTOMATION_TOKEN so validation runs." >&2
+            exit 1
+          fi
       - uses: actions/checkout@v5
         with:
           ref: staging
+      - name: Initialize transport scratch
+        shell: bash
+        run: echo "TRANSPORT_DIR=$RUNNER_TEMP/maintenance-transport" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
       # Destructive boundary 1 of 4: request regeneration. `prepare-agent-maintenance --write`
       # rewrites `request_recorded_at`, and `request.rs` digests the whole request file, so this
@@ -141,10 +152,12 @@ jobs:
             exit 1
           fi
       - name: Prepare maintenance packet
+        id: prepare
         if: ${{ steps.stand_down.outputs.stand_down != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$TRANSPORT_DIR"
           cargo run -p xtask -- prepare-agent-maintenance \
             --agent "${{ inputs.agent_id }}" \
             --current-version "${{ inputs.current_version }}" \
@@ -161,7 +174,17 @@ jobs:
             --branch-name "${{ inputs.branch_name }}" \
             --request-recorded-at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             --request-commit "${{ github.sha }}" \
+            --emit-json "$TRANSPORT_DIR/prepared.json" \
             --write
+      - name: Stage the computed packet delivery
+        id: delivery
+        if: ${{ steps.prepare.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/maintenance_transport.py stage-delivery \
+            --preparation "$TRANSPORT_DIR/prepared.json" \
+            --state "$TRANSPORT_DIR/delivery.json" --github-output "$GITHUB_OUTPUT"
       - name: Decide whether this agent takes the multi-target acquisition lane
         id: acquisition_gate
         shell: bash
@@ -256,24 +279,30 @@ jobs:
             echo "::error title=Stand-down check failed::Treating ${AGENT_ID} ${TARGET_VERSION} as frozen, because the guard exited ${status} instead of answering." >&2
             exit 1
           fi
+      - name: Verify checked packet bytes before delivery
+        if: ${{ steps.delivery.outcome == 'success' && steps.stand_down_recheck.outputs.stand_down != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/maintenance_transport.py verify --state "$TRANSPORT_DIR/delivery.json"
       - name: Create PR
         id: create_pr
-        if: ${{ steps.stand_down_recheck.outputs.stand_down != 'true' }}
+        if: ${{ steps.delivery.outcome == 'success' && steps.stand_down_recheck.outputs.stand_down != 'true' }}
         continue-on-error: true
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          token: ${{ secrets.AUTOMATION_TOKEN }}
           base: staging
           branch: ${{ inputs.branch_name }}
           commit-message: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
           title: "chore: open maintenance packet for ${{ inputs.agent_id }} ${{ inputs.target_version }}"
           body-path: docs/agents/lifecycle/${{ inputs.agent_id }}-maintenance/governance/pr-summary.md
-          add-paths: ${{ inputs.add_paths }}
+          add-paths: ${{ steps.delivery.outputs.paths }}
           delete-branch: true
       - name: Close superseded same-agent PRs
         if: ${{ steps.create_pr.outcome == 'success' && steps.create_pr.outputs.pull-request-number != '' }}
         env:
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
           AGENT_ID: ${{ inputs.agent_id }}
           TARGET_VERSION: ${{ inputs.target_version }}
           NEW_PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
