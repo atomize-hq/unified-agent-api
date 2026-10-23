@@ -261,3 +261,70 @@ public `Verdict` object nor a hash callback can manufacture that result set. Off
 requires production-origin evidence; this isolated profile cannot qualify a production row.
 Existing acceptance-entry and qualification rules still apply after verification. Non-enrolled
 publication remains unchanged; raw E success labels or acceptance entries cannot replace proof.
+
+### Initial host-resolution and adoption details
+
+The adapter's repository is fixed to `atomize-hq/unified-agent-api`, workflow
+`.github/workflows/ci.yml`, job `rust-tests`. Its complete local producer closure is the workspace
+`crates/` inventory, Cargo.toml, Cargo.lock, that workflow and `scripts/depth_ci_archive.py`.
+These cover xtask's compiled workspace dependencies and the controlled subject. Current indexed
+bytes/modes and actual built/workflow implementation must match the independently obtained
+protected-staging source. This initial profile conservatively refuses changes to that closure;
+it does not infer approval from candidate hashes. Locked registry archives, extracted contents
+and complete inventories are checked before build-time code executes and again after compilation.
+The reviewed `build-profile.json` fixes the selected package/feature/build-script populations.
+Only the six explicitly listed registry build scripts are supported; native linkage refuses.
+
+The generation's Event request commit resolves exactly one canonical staging packet PR through
+GitHub's commit-to-PR association. Execution discovery exhausts the workflow's runs since the
+Event's date, without filtering on a selected receipt or success. A canonical-repository head
+with the same frozen Event/P/O is applicable before artifact inspection, across pull_request,
+merge_group, workflow_dispatch and push. Every attempt from 1 through the authenticated attempt
+count is included. Unknown applicable events, missing/nonterminal attempts, absent/expired
+witnesses, changing totals/populations, duplicates or the 1,000-row/100-attempt bounds refuse
+verification. Foreign-repository heads are outside this producer profile. The approved collector
+records checkout HEAD; a PR checkout must be the host head or a two-parent test merge whose second
+parent is that head. Workflow implementation and checkout commit agree. The adapter confirms
+source/tree, reviewed implementation, graph/configuration and current scoped inputs separately.
+
+Successful collection/upload/binding steps in the exact attempt's `Rust tests (workspace)` job
+must expose exactly one timestamped `DEPTH_ARTIFACT_BINDING=` JSON log record within the binding
+step. Its `id`, `name`, and `digest` agree with immutable API artifact metadata and the downloaded
+ZIP's SHA-256 and size. A failure elsewhere in that job does not erase a faithfully collected
+counterexample. All applicable attempts must agree on environment and content-addressed toolchain
+report; a favorable run never selects those current inputs by itself.
+
+The maintainer review/comment body contains exactly one fenced `depth-adequacy-v1` JSON object:
+
+```json
+{
+  "schema_version": 1,
+  "source_commit": "<full reviewed source commit>",
+  "mappings": [{
+    "mapping_sha256": "<canonical adequacy mapping SHA-256>",
+    "reviewer_identity": "<actual independent review invocation>",
+    "executor_identity": "github-actions:rust-tests/isolated-channel-v1",
+    "independence_attested": true,
+    "counterfactual_adopted": true
+  }]
+}
+```
+
+The executor identity names this stable CI producer; the receipt separately binds exact run and
+attempt ids. A review must be submitted (approved or commented), not pending/dismissed, and its
+commit id must match the body's reviewed source. A comment is obtained from that exact packet PR.
+Its actual GitHub author currently has write, maintain or admin authority on the canonical repo.
+The complete body digest, exact mapping digest, actual source, author and host id form the
+endorsement. Reused mappings retain their original reviewed source and require unchanged
+assertion/production bytes/modes, source contract and original P/O; unrelated commits alone do not
+require a new endorsement. The trust/review revisions are `github-actions-channel-v1` and
+`maintainer-mapping-v1`. This is maintainer adoption of an independent review, not an executor's
+self-assertion or proof against a dishonest authorized maintainer.
+
+`cargo run -p xtask -- depth-ci-prove` resolves this proof read-only. It creates receipt/payload
+material only in a disposable checkout, invokes the same evaluator and publisher JSON/Markdown
+renderer, and reports isolated results. The selected receipt and its referenced payloads remain
+coherent staged evidence; other attempts are corroborated directly from their authenticated
+immutable host payloads, so a packet cannot omit an unfavorable attempt. No canonical report,
+acceptance entry, registry enrollment, workflow policy or production pointer is written. Before
+implementation integration or exact maintainer adoption, this diagnostic cannot report verified.

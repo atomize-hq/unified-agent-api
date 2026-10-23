@@ -41,8 +41,9 @@ mod request;
 mod root_intake_layout;
 #[path = "../src/agent_maintenance/support_audit.rs"]
 mod support_audit;
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
 #[path = "../src/workspace_mutation.rs"]
 mod workspace_mutation;
 

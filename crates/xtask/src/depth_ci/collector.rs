@@ -76,8 +76,8 @@ impl BuildEnv {
             .env(
                 "CARGO_ENCODED_RUSTFLAGS",
                 format!(
-                    "--remap-path-prefix={}=/depth-input\u{1f}-Cdebuginfo=0",
-                    self.root.display()
+                    "--remap-path-prefix={}=/depth-input\u{1f}--remap-path-prefix={}=/depth-target\u{1f}--remap-path-prefix={}=/depth-cargo\u{1f}-Cdebuginfo=0",
+                    self.root.display(), self.target.path().display(), self.cargo_home.display()
                 ),
             )
             .env("CARGO_NET_OFFLINE", "true")
@@ -279,6 +279,7 @@ fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String>
     ))
 }
 fn witness(root: &Path) -> Result<Witness, String> {
+    let (run_id, run_attempt, workflow_commit) = host_header()?;
     let mut view = GitInputs::new(root)?;
     let original =
         record(std::str::from_utf8(&view.required(FIXTURE)?).map_err(|e| e.to_string())?)?;
@@ -333,6 +334,13 @@ fn witness(root: &Path) -> Result<Witness, String> {
         16777216,
     )?)
     .map_err(|e| e.to_string())?;
+    // Check locked source contents/inventories before allowing their build-time code to run.
+    super::graph::resolve(
+        root,
+        &mut view,
+        &metadata,
+        &super::graph::expected(&metadata)?,
+    )?;
     let built = required(
         env.command(&env.cargo).args([
             "test",
@@ -351,11 +359,20 @@ fn witness(root: &Path) -> Result<Witness, String> {
         16777216,
     )?;
     let mut compiled = BTreeSet::new();
+    let mut features = BTreeMap::new();
     let mut executable = None;
     let mut scripts = vec![];
     for line in built.lines() {
         let m: Value = serde_json::from_str(line).map_err(|_| "unrecognized Cargo output")?;
         if m["reason"] == "compiler-artifact" {
+            let id = super::graph::normalize(m["package_id"].as_str().ok_or("missing package id")?);
+            let current = m["features"].clone();
+            if features
+                .insert(id, current.clone())
+                .is_some_and(|old| old != current)
+            {
+                return Err("unsupported multiple feature units".into());
+            }
             compiled.insert(
                 m["package_id"]
                     .as_str()
@@ -373,6 +390,17 @@ fn witness(root: &Path) -> Result<Witness, String> {
         }
     }
     let executable = executable.ok_or("no selected test executable")?;
+    let profile: Value = serde_json::from_slice(
+        &view.required("crates/xtask/tests/fixtures/depth-ci/build-profile.json")?,
+    )
+    .map_err(|e| e.to_string())?;
+    let mut script_ids: Vec<_> = scripts.iter().map(|s| s["package_id"].clone()).collect();
+    script_ids.sort_by_key(Value::to_string);
+    if serde_json::to_value(&features).map_err(|e| e.to_string())? != profile["features"]
+        || json!(script_ids) != profile["build_scripts"]
+    {
+        return Err("compiled features/build scripts are outside the reviewed profile".into());
+    }
     let graph = super::graph::resolve(root, &mut view, &metadata, &compiled)?;
     for file in &graph.inputs {
         if source.optional_bytes(&file.path)?.as_deref()
@@ -384,14 +412,6 @@ fn witness(root: &Path) -> Result<Witness, String> {
     }
     let report = toolchain(&env, &executable, &scripts)?;
     let (mut cases, raw) = execute(&env, &executable)?;
-    let run_id = std::env::var("GITHUB_RUN_ID")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .ok_or("collector requires a host run id")?;
-    let run_attempt = std::env::var("GITHUB_RUN_ATTEMPT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .ok_or("collector requires a host attempt")?;
     let prefix =
         format!("cli_manifests/codex/reports/0.0.0/evidence/channel-v1/{run_id}-{run_attempt}");
     cases.raw_output = reference(format!("{prefix}/raw.txt"), raw.as_bytes());
@@ -411,7 +431,7 @@ fn witness(root: &Path) -> Result<Witness, String> {
             ("RUSTC", "pinned rustc executable"),
             (
                 "CARGO_ENCODED_RUSTFLAGS",
-                "--remap-path-prefix=${WORKSPACE}=/depth-input;-Cdebuginfo=0",
+                "remap WORKSPACE=/depth-input,TARGET=/depth-target,CARGO_HOME=/depth-cargo;debuginfo=0",
             ),
             ("CARGO_NET_OFFLINE", "true"),
             ("CARGO_INCREMENTAL", "0"),
@@ -432,7 +452,13 @@ fn witness(root: &Path) -> Result<Witness, String> {
         source_commit: commit,
         source_tree: source.tree()?,
         host_target: TARGET.into(),
-        toolchain: reference(format!("{prefix}/toolchain.json"), report.as_bytes()),
+        toolchain: reference(
+            format!(
+                "cli_manifests/codex/reports/0.0.0/evidence/channel-v1/toolchains/{}.json",
+                reference("", report.as_bytes()).sha256
+            ),
+            report.as_bytes(),
+        ),
         features: vec![],
         environment: reference(
             format!("{prefix}/environment.json"),
@@ -446,8 +472,6 @@ fn witness(root: &Path) -> Result<Witness, String> {
         absent_inputs: absent,
     };
     view.verify()?;
-    let workflow_commit = std::env::var("DEPTH_WORKFLOW_SHA")
-        .map_err(|_| "missing workflow implementation identity")?;
     Ok(Witness {
         schema_version: 1,
         run_id,
@@ -484,4 +508,27 @@ pub(super) fn collect(workspace: &Path) -> Result<(), String> {
         eprintln!("isolated depth witness unavailable: {reason}");
     }
     Ok(())
+}
+
+fn host_header() -> Result<(u64, u64, String), String> {
+    let positive = |name| {
+        std::env::var(name)
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .filter(|v| *v > 0)
+            .ok_or_else(|| format!("missing positive {name}"))
+    };
+    let workflow = std::env::var("DEPTH_WORKFLOW_SHA").map_err(|_| "missing workflow SHA")?;
+    if workflow.len() != 40
+        || !workflow
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return Err("invalid workflow implementation SHA".into());
+    }
+    Ok((
+        positive("GITHUB_RUN_ID")?,
+        positive("GITHUB_RUN_ATTEMPT")?,
+        workflow,
+    ))
 }

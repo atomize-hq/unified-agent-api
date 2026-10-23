@@ -14,6 +14,7 @@ pub use results::EvidenceVerdicts;
 pub mod payload;
 mod validate;
 mod verdict;
+pub use verdict::prove_isolated_ci;
 pub use verdict::{evaluate_workspace, Evaluation, Verdict};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

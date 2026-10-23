@@ -44,3 +44,15 @@ pub(crate) fn test_results(record: Option<&DepthRecord>) -> EvidenceVerdicts {
             .collect(),
     }
 }
+
+/// Only the evaluator's private host path may seal a result. A public Verdict grants no authority.
+pub(super) fn evaluated(
+    record: &DepthRecord,
+    obligation: ObligationRef,
+    result: DepthResult,
+) -> Result<EvidenceVerdicts, String> {
+    Ok(EvidenceVerdicts {
+        record_sha256: Some(record.stated_sha256()?),
+        results: BTreeMap::from([(obligation, result)]),
+    })
+}

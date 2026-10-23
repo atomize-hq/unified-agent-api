@@ -455,7 +455,7 @@ impl<'a> Facts<'a> {
             return DepthResult::Unverified;
         };
         match stated.result {
-            DepthResult::Verified | DepthResult::Failed => {
+            DepthResult::Verified => {
                 let bound = !stated.evidence.is_empty()
                     && stated.evidence.iter().all(|file| {
                         (self.evidence_sha256)(&file.path).as_deref() == Some(file.sha256.as_str())

@@ -1,4 +1,4 @@
-//! Pure evidence decisions. Host facts stay private; there is no live producer profile in D1b.
+//! Read-only evidence decisions. Only the private host adapter supplies authenticated facts.
 use super::{payload::*, *};
 use crate::{
     depth_record::{DepthRecord, DepthResult, FileRef},
@@ -30,13 +30,18 @@ impl Verdict {
 }
 
 /// Read a bound receipt and evaluate without installing a producer or granting write authority.
-/// D2 will provide the private authenticated host adapter. Public claims cannot substitute for it.
+/// The isolated CI profile resolves authority independently; public claims cannot substitute for it.
 pub fn evaluate_workspace(
     workspace: &Path,
     evidence: &FileRef,
     current: &Evaluation,
 ) -> Result<Verdict, String> {
-    evaluate(workspace, evidence, current, &Unavailable)
+    evaluate(
+        workspace,
+        evidence,
+        current,
+        &github::Adapter { root: workspace },
+    )
 }
 
 // Only the selected repository adapter may construct these facts. No serialized `trusted` flag,
@@ -44,12 +49,6 @@ pub fn evaluate_workspace(
 // for the independently established generation/obligation/build, not just the E-selected run.
 trait Host {
     fn population(&self, current: &Evaluation) -> Result<Option<Population>, String>;
-}
-struct Unavailable;
-impl Host for Unavailable {
-    fn population(&self, _: &Evaluation) -> Result<Option<Population>, String> {
-        Ok(None)
-    }
 }
 struct Population {
     current: Scope,
@@ -69,6 +68,7 @@ struct Run {
     provenance: Vec<Provenance>,
     cases: Cases,
     adoption: Option<Adoption>,
+    hosted: Option<EvidenceReceipt>,
 }
 // Constructed only after authenticated maintainer permission, reviewed source, exact digest,
 // independent invocations and substantive per-assertion counterfactual adoption are established.
@@ -217,14 +217,41 @@ fn reconcile(
         )) {
             return Ok(Verdict::unverified("duplicate host run/attempt/job"));
         }
-        let Some(bytes) = read(view, &run.evidence)? else {
-            incomplete = true;
-            continue;
-        };
-        let receipt = EvidenceReceipt::parse(text(&bytes)?)?;
-        let Some((graph, environment)) = load_payloads(view, &receipt)? else {
-            incomplete = true;
-            continue;
+        let (receipt, graph, environment) = if let Some(receipt) = &run.hosted {
+            let bytes = serde_json::to_vec(receipt).map_err(|e| e.to_string())?;
+            if crate::depth_ci::reference(&run.evidence.path, &bytes) != run.evidence {
+                incomplete = true;
+                continue;
+            }
+            // The selected receipt/payloads remain coherent workspace evidence. Other attempts
+            // come directly from authenticated immutable host payloads, not an E-selected list.
+            if run.evidence == *selected
+                && read(view, selected)?.as_deref() != Some(bytes.as_slice())
+            {
+                incomplete = true;
+                continue;
+            }
+            if run.evidence == *selected
+                && (load_payloads(view, receipt)?
+                    != Some((run.graph.clone(), run.environment.clone()))
+                    || read(view, &receipt.build.toolchain)?.is_none()
+                    || read(view, &receipt.cases.raw_output)?.is_none())
+            {
+                incomplete = true;
+                continue;
+            }
+            (receipt.clone(), run.graph.clone(), run.environment.clone())
+        } else {
+            let Some(bytes) = read(view, &run.evidence)? else {
+                incomplete = true;
+                continue;
+            };
+            let receipt = EvidenceReceipt::parse(text(&bytes)?)?;
+            let Some((graph, environment)) = load_payloads(view, &receipt)? else {
+                incomplete = true;
+                continue;
+            };
+            (receipt, graph, environment)
         };
         if let Err(_reason) = qualifying(
             workspace,
@@ -357,10 +384,31 @@ fn qualifying(
         || adoption.reviewer == adoption.executor
         || mapping.obligation != c.obligation
         || mapping.assertions.is_empty()
-        || adoption.endorsement.source_commit != r.build.source_commit
         || adoption.endorsement.repository != r.producer.repository
     {
         return Err("adequacy adoption does not bind this execution/mapping".into());
+    }
+    // Reuse unchanged mappings across unrelated source commits. The authenticated endorsement
+    // names its actual reviewed source; assertion and production bytes/modes must still agree.
+    let reviewed = crate::runtime_advertising::source::Source::tip(
+        workspace,
+        &adoption.endorsement.source_commit,
+    )?;
+    let built = crate::runtime_advertising::source::Source::tip(workspace, &r.build.source_commit)?;
+    for file in mapping
+        .assertions
+        .iter()
+        .flat_map(|a| std::iter::once(&a.assertion).chain(&a.production_inputs))
+    {
+        let bytes = reviewed
+            .optional_bytes(&file.path)?
+            .ok_or("missing reviewed assertion/dependency")?;
+        if crate::depth_ci::reference(&file.path, &bytes) != *file
+            || built.optional_bytes(&file.path)?.as_deref() != Some(bytes.as_slice())
+            || reviewed.executable(&file.path)? != built.executable(&file.path)?
+        {
+            return Err("reviewed mapping source is no longer current".into());
+        }
     }
     let mapped: BTreeSet<_> = mapping.assertions.iter().map(|a| &a.case).collect();
     if mapped != r.cases.requested.iter().collect() {
@@ -380,8 +428,11 @@ fn qualifying(
     if r.provenance.iter().any(|p| !inputs.contains(&p.file)) {
         return Err("upstream provenance is not covered".into());
     }
-    super::currentness::check(workspace, view, r, graph)
+    super::currentness::check(workspace, view, r, graph, run.hosted.is_some())
 }
 
 #[cfg(test)]
 mod tests;
+
+mod github;
+pub use github::prove as prove_isolated_ci;

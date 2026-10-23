@@ -50,9 +50,15 @@ def witness(raw):
         if len(entries)!=1 or entries[0].filename!='witness.json' or entries[0].file_size>MAX:
             raise ValueError('artifact must contain exactly one bounded witness.json')
         entry=entries[0]
-        if entry.flag_bits&1 or stat.S_ISLNK(entry.external_attr>>16):
+        if entry.flag_bits&1 or stat.S_IFMT(entry.external_attr>>16) not in (0,stat.S_IFREG):
             raise ValueError('unsupported artifact entry')
-        value=json.loads(archive.read(entry))
+        def unique(pairs):
+            result={}
+            for key,value in pairs:
+                if key in result:raise ValueError('duplicate witness JSON member')
+                result[key]=value
+            return result
+        value=json.loads(archive.read(entry),object_pairs_hook=unique)
         if not isinstance(value,dict):raise ValueError('witness requires an object')
         return value
 

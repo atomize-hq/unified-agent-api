@@ -8,6 +8,7 @@ pub(super) fn check(
     view: &mut GitInputs,
     receipt: &EvidenceReceipt,
     graph: &DependencyGraph,
+    hosted: bool,
 ) -> Result<(), String> {
     let source = Source::tip(workspace, &receipt.build.source_commit)?;
     if source.tree()? != receipt.build.source_tree {
@@ -25,11 +26,16 @@ pub(super) fn check(
             return Err(format!("changed built/current dependency: {}", file.path));
         }
     }
-    for file in [
-        &receipt.build.toolchain,
-        &receipt.cases.raw_output,
-        &receipt.producer.collector,
-    ] {
+    let files = if hosted {
+        vec![&receipt.producer.collector]
+    } else {
+        vec![
+            &receipt.build.toolchain,
+            &receipt.cases.raw_output,
+            &receipt.producer.collector,
+        ]
+    };
+    for file in files {
         let current = view.required(&file.path)?;
         if hex::encode(Sha256::digest(&current)) != file.sha256 {
             return Err(format!("changed referenced evidence: {}", file.path));
