@@ -135,6 +135,15 @@ impl Fixture {
             inputs,
             scopes: vec!["crates/codex".into(), "docs/requirements".into()],
         };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(
+                path.join("crates/codex/tests/fixtures/synthetic.sh"),
+                fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+        }
         git(path, &["add", "."]);
         git(path, &["commit", "-qm", "built inputs"]);
         receipt.build.source_commit = git(path, &["rev-parse", "HEAD"]);
@@ -635,3 +644,5 @@ fn a_new_po_can_reuse_only_exact_scope_and_current_inputs() {
         f.update();
     }
 }
+
+mod regressions;

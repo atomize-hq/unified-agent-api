@@ -97,6 +97,14 @@ impl GitInputs {
         })
     }
 
+    pub(crate) fn executable(&self, path: &str) -> Result<bool, String> {
+        let input = self.files.get(path).ok_or("unread input mode")?;
+        if input.bytes.is_none() {
+            return Err("absent input has no mode".into());
+        }
+        Ok(input.index.starts_with(b"100755 "))
+    }
+
     pub(crate) fn verify(&self) -> Result<(), String> {
         for (path, expected) in &self.files {
             if read(&self.root, path)? != *expected {
@@ -176,6 +184,21 @@ fn read(root: &Path, path: &str) -> Result<Input, String> {
         .is_file()
     {
         return Err(format!("non-file input: {path}"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let working_executable = fs::metadata(&full)
+            .map_err(|e| e.to_string())?
+            .permissions()
+            .mode()
+            & 0o100
+            != 0;
+        if working_executable != (meta[0] == "100755") {
+            return Err(format!(
+                "working executable mode disagrees with index: {path}"
+            ));
+        }
     }
     let bytes = fs::read(full).map_err(|e| format!("{path}: {e}"))?;
     let staged = git(root, &["cat-file", "blob", meta[1]])?;

@@ -18,7 +18,10 @@ pub(super) fn check(
         let built = source
             .optional_bytes(&file.path)?
             .ok_or("missing built dependency")?;
-        if hex::encode(Sha256::digest(&current)) != file.sha256 || built != current {
+        if hex::encode(Sha256::digest(&current)) != file.sha256
+            || built != current
+            || source.executable(&file.path)? != view.executable(&file.path)?
+        {
             return Err(format!("changed built/current dependency: {}", file.path));
         }
     }

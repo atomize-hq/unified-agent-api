@@ -49,3 +49,14 @@ fn unmerged_index_and_missing_working_file_refuse() {
     let mut view = GitInputs::new(root.path()).unwrap();
     assert!(view.required("bound").is_err());
 }
+
+#[cfg(unix)]
+#[test]
+fn executable_mode_changes_are_part_of_the_coherent_recheck() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = fixture();
+    let mut view = GitInputs::new(root.path()).unwrap();
+    view.required("bound").unwrap();
+    fs::set_permissions(root.path().join("bound"), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(view.verify().unwrap_err().contains("executable mode"));
+}

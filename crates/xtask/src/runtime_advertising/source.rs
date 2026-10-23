@@ -232,6 +232,14 @@ impl Source {
             .into())
     }
 
+    pub(crate) fn executable(&self, path: &str) -> Result<bool, String> {
+        // Reuse regular-file/path validation rather than introducing a second object reader.
+        self.optional_bytes(path)?.ok_or("missing source mode")?;
+        let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
+        let row = self.git(&["ls-tree", "-z", "--full-tree", commit, "--", path])?;
+        Ok(row.starts_with("100755 blob "))
+    }
+
     pub(crate) fn committed_files(&self, prefix: &str) -> Result<Vec<String>, String> {
         self.optional_bytes(&format!("{prefix}/.source-directory-probe"))?;
         let commit = self.commit.as_ref().ok_or("expected an immutable source")?;

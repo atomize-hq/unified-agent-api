@@ -147,11 +147,20 @@ fn generation(record: &DepthRecord, scope: &Scope) -> bool {
                 && o.targets.contains(&scope.obligation.target)
                 && o.operations.iter().any(|op| {
                     op.id == scope.obligation.operation
-                        && scope
-                            .obligation
-                            .id
-                            .as_ref()
-                            .map_or(true, |id| op.obligations.contains(id))
+                        && match (&scope.obligation.id, &scope.obligation.capability) {
+                            (Some(id), None) => op.obligations.contains(id),
+                            (None, Some(capability)) => {
+                                record.policy.selection.enrollment.capabilities.iter().any(
+                                    |mapping| {
+                                        &mapping.id == capability
+                                            && mapping
+                                                .operations
+                                                .contains(&scope.obligation.operation)
+                                    },
+                                )
+                            }
+                            _ => false,
+                        }
                 })
         })
 }

@@ -169,9 +169,10 @@ The graph is a claim, not proof of completeness. A private independently resolvi
 adapter MUST corroborate the full graph against actual resolved build provenance, including
 external packages and inputs outside package directories; unsupported build scripts, environment,
 external paths or incomplete dependency discovery cannot verify. Empty/missing provenance never
-means an empty closure. Readers compare all covered bytes and scoped inventories with both the
+means an empty closure. Readers compare all covered bytes, Git executable modes and scoped inventories with both the
 actual built commit/tree and the current coherent indexed workspace. Missing or changed inputs,
-new files in a relevant scope, or an absent input becoming present invalidate the result. Changes
+new files in a relevant scope, executable-mode changes (including working/index disagreement on
+platforms with executable permissions), or an absent input becoming present invalidate the result. Changes
 outside that dependency set do not. No current profile permits cross-version or cross-target reuse.
 
 The referenced `build.environment` is exactly `{ "schema_version": 1, "target", "features",
@@ -187,7 +188,8 @@ string/list and 1 MiB bounds. Structurally valid incomplete claims remain readab
 
 The evaluator distinguishes malformed form (an error), `unverified` (missing, stale, mismatched or
 untrusted proof), `failed` (a qualifying counterexample) and `verified` (all predicates established).
-It never trusts the E result label. A complete independently discovered population includes all
+It never trusts the E result label. An id obligation must be selected by O; an M/capability
+obligation must have the exact capability-to-operation mapping in P and the operation in O. A complete independently discovered population includes all
 applicable runs and attempts, including missing or nonterminal ones. Each referenced receipt must
 match its authenticated artifact bytes, original Event/P/O/enrollment, actual source commit/tree,
 resolved graph, toolchain, environment, provenance, requested/executed cases and raw output. A PR
