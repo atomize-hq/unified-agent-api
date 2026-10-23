@@ -334,6 +334,11 @@ Contradictory qualifying runs require investigation. A favorable run MUST NOT be
 silently. A CI conclusion associated with a pull request head establishes that association. It
 does not establish which tree was built.
 
+The [revision-1 evidence receipt contract](support-depth-evidence-v1.md) specifies the typed
+execution/adequacy receipt, strict workspace file binding and the approved initial CI producer
+and authenticated maintainer-endorsement profiles. Its preparatory reader establishes form and
+internal content identity only; it does not supply the verification or admission predicate here.
+
 ### Adequacy
 
 An obligation is `verified` only when a reviewer independent of the executor has bound that

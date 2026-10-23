@@ -7,7 +7,7 @@
 
 mod acquisition;
 mod freeze;
-mod git_inputs;
+use crate::git_inputs;
 pub use freeze::{plan_freeze, plan_freeze_with_work, FreezePlan, FreezeRequest};
 
 use std::{collections::BTreeSet, path::Path};

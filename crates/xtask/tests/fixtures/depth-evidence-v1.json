@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "agent_id": "codex",
+    "version": "1.2.3",
+    "event": {
+      "lifecycle_path": "maintenance",
+      "request_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "request_recorded_at": "2026-10-23T00:00:00Z",
+      "trigger_kind": "upstream_release_detected",
+      "opened_from": ".github/workflows/agent-maintenance-open-pr.yml"
+    },
+    "enrollment_origin": "isolated",
+    "obligation": {
+      "operation": "run",
+      "id": "R1",
+      "target": "x86_64-unknown-linux-gnu"
+    },
+    "policy_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "obligations_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rules_revision": "1",
+    "trust_revision": "1",
+    "review_revision": "1"
+  },
+  "producer": {
+    "kind": "github_actions",
+    "repository": "atomize-hq/unified-agent-api",
+    "workflow_path": ".github/workflows/ci.yml",
+    "workflow_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "collector": {
+      "path": "scripts/depth_collector.py",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "run_id": 123,
+    "run_attempt": 2,
+    "job": "rust-tests",
+    "artifact_name": "depth-evidence-123-2"
+  },
+  "build": {
+    "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "source_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "host_target": "x86_64-unknown-linux-gnu",
+    "toolchain": {
+      "path": "reports/toolchain.txt",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "features": [
+      "codex"
+    ],
+    "environment": {
+      "path": "reports/environment.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "dependency_graph": {
+      "path": "reports/dependencies.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "covered_inputs": [
+      {
+        "path": "Cargo.lock",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "path": "crates/codex/src/lib.rs",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "absent_inputs": [
+      ".cargo/config.toml"
+    ]
+  },
+  "provenance": [
+    {
+      "kind": "fixture",
+      "origin": "controlled synthetic CLI; mechanics only",
+      "file": {
+        "path": "crates/codex/tests/fixtures/synthetic.sh",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "cases": {
+    "requested": [
+      {
+        "name": "request_reaches_production",
+        "executable_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "executed": [
+      {
+        "case": {
+          "name": "request_reaches_production",
+          "executable_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "outcome": "passed"
+      }
+    ],
+    "raw_output": {
+      "path": "reports/results.txt",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  },
+  "adequacy": {
+    "mapping": {
+      "obligation": {
+        "operation": "run",
+        "id": "R1",
+        "target": "x86_64-unknown-linux-gnu"
+      },
+      "reviewer_identity": "reviewer-run-2",
+      "executor_identity": "executor-run-1",
+      "assertions": [
+        {
+          "case": {
+            "name": "request_reaches_production",
+            "executable_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "assertion": {
+            "path": "crates/codex/tests/request.rs",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "production_inputs": [
+            {
+              "path": "crates/codex/src/lib.rs",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "counterfactual": "Removing request forwarding fails the sentinel assertion."
+        }
+      ]
+    },
+    "endorsement": {
+      "kind": "issue_comment",
+      "repository": "atomize-hq/unified-agent-api",
+      "pull_request": 123,
+      "id": 456,
+      "author": "maintainer",
+      "source_commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "body_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mapping_sha256": "0dcd00bde9fb09151b6524b244fb55bd1e3fe3db4263e976cda78a0d43684358"
+    }
+  }
+}
