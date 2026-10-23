@@ -162,6 +162,20 @@ class TransportTests(unittest.TestCase):
             transport.stage_inputs(self.plan, self.state)
         self.assertEqual(Path('tracked').read_text(), 'baseline')
 
+    def test_rename_source_deletion_cannot_hide_behind_an_owned_destination(self):
+        self.git('config', 'diff.renames', 'true')
+        report = self.prepare(False)
+        path = report['files'][0]['path']
+        self.write(path, 'baseline')
+        report['files'][0]['sha256'] = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        transport.stage_delivery(None, report, None, self.delivery, False)
+        self.git('rm', 'tracked')
+        self.assertIn('R100', self.git('diff', '--cached', '--name-status').decode())
+        before = self.git('ls-files', '--stage', '-z')
+        with self.assertRaisesRegex(ValueError, 'unexpected staged paths'):
+            transport.verify(self.delivery)
+        self.assertEqual(before, self.git('ls-files', '--stage', '-z'))
+
     def test_failed_or_dry_run_preparation_cannot_be_delivered(self):
         with self.assertRaisesRegex(ValueError, 'applied'):
             transport.stage_delivery(None, {'applied': False, 'files': []}, None, self.delivery, False)

@@ -47,7 +47,7 @@ def fingerprint(path):
 
 
 def changed(staged=False):
-    args = ['diff', '--name-only', '-z']
+    args = ['diff', '--no-renames', '--name-only', '-z']
     if staged:
         args += ['--cached']
     return set(git(*args, 'HEAD', '--').decode().rstrip('\0').split('\0')) - {''}
