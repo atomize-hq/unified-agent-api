@@ -229,6 +229,7 @@ impl Fixture {
     }
     fn run(&self) -> Run {
         Run {
+            hosted: None,
             evidence: self.selected.clone(),
             scope: self.receipt.scope.clone(),
             definition_sha256: self.current.definition_sha256.clone(),
@@ -646,3 +647,25 @@ fn a_new_po_can_reuse_only_exact_scope_and_current_inputs() {
 }
 
 mod regressions;
+
+#[test]
+fn unchanged_adequacy_mapping_survives_an_unrelated_source_commit() {
+    let mut fixture = Fixture::new();
+    let reviewed = fixture.receipt.adequacy.endorsement.source_commit.clone();
+    write(
+        fixture.root.path(),
+        "docs/unrelated.md",
+        "unrelated documentation",
+    );
+    git(fixture.root.path(), &["add", "."]);
+    git(fixture.root.path(), &["commit", "-qm", "unrelated"]);
+    fixture.receipt.build.source_commit = git(fixture.root.path(), &["rev-parse", "HEAD"]);
+    fixture.receipt.build.source_tree = git(fixture.root.path(), &["rev-parse", "HEAD^{tree}"]);
+    fixture.update();
+    assert_ne!(reviewed, fixture.receipt.build.source_commit);
+    let population = fixture.population();
+    assert_eq!(
+        fixture.evaluate(population).unwrap().result,
+        DepthResult::Verified
+    );
+}

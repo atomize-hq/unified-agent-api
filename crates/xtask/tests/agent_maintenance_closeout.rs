@@ -61,8 +61,9 @@ mod request;
 mod root_intake_layout;
 #[path = "../src/agent_maintenance/support_audit.rs"]
 mod support_audit;
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
 
 #[path = "support/agent_maintenance_closeout_harness.rs"]
 mod closeout_harness;

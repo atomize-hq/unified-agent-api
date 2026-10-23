@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "agent_id": "codex",
+  "version": "0.0.0",
+  "target": "x86_64-unknown-linux-gnu",
+  "operation": "controlled_channel",
+  "obligation": "V1",
+  "origin": "isolated",
+  "source_contract": "crates/xtask/tests/fixtures/depth-ci/contract.md",
+  "recorded_at": "2026-10-23T13:58:53.527221+00:00"
+}

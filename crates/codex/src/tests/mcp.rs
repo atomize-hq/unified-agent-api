@@ -3,6 +3,7 @@ use super::*;
 #[cfg(unix)]
 #[tokio::test]
 async fn mcp_list_get_and_add_map_args_and_parse_json() {
+    let _guard = env_guard_async().await;
     let dir = tempfile::tempdir().unwrap();
     let script_path = write_fake_codex(
         dir.path(),
@@ -44,6 +45,7 @@ JSON
 #[cfg(unix)]
 #[tokio::test]
 async fn mcp_add_maps_transports_and_validates_required_fields() {
+    let _guard = env_guard_async().await;
     let dir = tempfile::tempdir().unwrap();
     let script_path = write_fake_codex(
         dir.path(),

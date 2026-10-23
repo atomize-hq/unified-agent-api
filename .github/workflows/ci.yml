@@ -176,6 +176,44 @@ jobs:
           set -euo pipefail
           cargo test --workspace --all-targets
 
+      # Isolated source-contract evidence; this never enrolls a production version.
+      - name: Install isolated depth toolchain
+        if: ${{ always() }}
+        run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo +1.89.0 fetch --locked --target x86_64-unknown-linux-gnu
+      - name: Collect isolated depth witness
+        if: ${{ always() }}
+        env:
+          DEPTH_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: cargo run -p xtask -- depth-ci-collect
+      - name: Upload isolated depth witness
+        if: ${{ always() }}
+        id: depth-upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: depth-channel-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/depth-ci/witness.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Bind isolated depth artifact
+        if: ${{ always() && steps.depth-upload.outcome == 'success' }}
+        env:
+          DEPTH_ARTIFACT_ID: ${{ steps.depth-upload.outputs.artifact-id }}
+          DEPTH_ARTIFACT_DIGEST: ${{ steps.depth-upload.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          binding = {
+              "id": int(os.environ["DEPTH_ARTIFACT_ID"]),
+              "digest": os.environ["DEPTH_ARTIFACT_DIGEST"],
+              "name": f'depth-channel-v1-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}',
+          }
+          print("DEPTH_ARTIFACT_BINDING=" + json.dumps(binding, separators=(",", ":")))
+          PY
+
   agent-api-all-features:
     name: Agent API tests (all features)
     runs-on: ubuntu-latest

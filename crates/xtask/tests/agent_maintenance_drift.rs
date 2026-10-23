@@ -37,8 +37,9 @@ mod finding_signature;
 mod release_doc;
 #[path = "../src/root_intake_layout.rs"]
 mod root_intake_layout;
-#[path = "../src/support_matrix.rs"]
-mod support_matrix;
+mod support_matrix {
+    pub use xtask::support_matrix::*;
+}
 
 use drift::{check_agent_drift, DriftCategory, DriftCheckError};
 use drift_harness::{

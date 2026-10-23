@@ -4,8 +4,8 @@
 
 use std::{fs, path::Path, process::Command};
 
+use crate::support_matrix::{derive_rows, derive_rows_for_test_roots};
 use sha2::{Digest, Sha256};
-use xtask::support_matrix::{derive_rows, derive_rows_for_test_roots};
 
 use super::*;
 
@@ -102,11 +102,10 @@ fn a_record_publishes_its_facts_and_the_rows_it_implies() {
     let rows = rows(temp.path()).unwrap();
     assert_eq!(rows.len(), 2, "{rows:#?}");
 
-    // Every result verified on linux, the evidence held and an entry made: the capability is
-    // depth-qualified and the row stays `supported`.
+    // Hash-bound claims and an acceptance entry cannot substitute for evaluated host proof.
     let linux = row(&rows, LINUX);
-    assert!(qualified(linux));
-    assert_eq!(linux.uaa_support, UaaSupportState::Supported);
+    assert!(!qualified(linux));
+    assert_eq!(linux.uaa_support, UaaSupportState::Partial);
     assert!(linux.evidence_notes.is_empty());
 
     // Darwin is not expected and has no metadata for it, and the record covers it, so it has a
@@ -208,7 +207,7 @@ fn depth_facts_lower_a_supported_row_and_never_raise_one() {
     )
     .unwrap();
     let rows = self::rows(temp.path()).unwrap();
-    assert!(qualified(row(&rows, LINUX)));
+    assert!(!qualified(row(&rows, LINUX)));
     assert_eq!(row(&rows, LINUX).uaa_support, UaaSupportState::Unsupported);
 }
 
@@ -259,7 +258,7 @@ fn publication_fails_on_a_record_it_cannot_read_or_that_its_root_does_not_adopt(
     // A root the support matrix does not publish holds no record, since its depth facts would be
     // published nowhere.
     let temp = workspace(record(), true);
-    let registry = include_str!("../../data/agent_registry.toml");
+    let registry = include_str!("../../../../data/agent_registry.toml");
     let at = registry.find("agent_id = \"aider\"").unwrap();
     let unpublished = format!(
         "{}{}",
@@ -376,13 +375,26 @@ fn evidence_is_a_regular_file_in_the_index_and_in_the_working_tree() {
             temp.path(),
             &sealed_json(bound_to(record(), path, &digest(&held)), true),
         );
+        let record = DepthRecord::parse(
+            &fs::read_to_string(
+                temp.path()
+                    .join(ROOT)
+                    .join("reports/1.2.3/depth-record.json"),
+            )
+            .unwrap(),
+            "aider",
+            "1.2.3",
+        )
+        .unwrap();
+        let bound = crate::depth_record::bound_evidence(temp.path(), [&record])?;
+        assert_eq!(bound.get(path), Some(&digest(&held)));
         let rows = rows(temp.path())?;
         Ok::<bool, String>(qualified(row(&rows, LINUX)))
     };
 
     // An executable file is a regular file.
     let script = "crates/aider/tests/run.sh";
-    assert!(qualified_with(script, &|workspace| {
+    assert!(!qualified_with(script, &|workspace| {
         write(&workspace.join(script), "echo run\n");
         fs::set_permissions(workspace.join(script), fs::Permissions::from_mode(0o755)).unwrap();
         git(workspace, &["add", script]);
@@ -437,7 +449,7 @@ fn evidence_in_several_files_and_several_records_is_all_looked_up() {
         ],
     );
     write_record(temp.path(), &sealed_json(both, true));
-    assert!(qualified(row(&rows(temp.path()).unwrap(), LINUX)));
+    assert!(!qualified(row(&rows(temp.path()).unwrap(), LINUX)));
 
     // The record of another version of the root binds its own file.
     let mut later = bound_to(record(), third, &digest(&format!("// {third}\n")));
@@ -450,10 +462,32 @@ fn evidence_in_several_files_and_several_records_is_all_looked_up() {
         &sealed_json_for(later, true, "1.2.4").to_string(),
     );
     let rows = self::rows(temp.path()).unwrap();
-    assert!(qualified(row(&rows, LINUX)));
+    assert!(!qualified(row(&rows, LINUX)));
     let later = rows
         .iter()
         .find(|row| row.version == "1.2.4" && row.target == LINUX)
         .expect("the later record implies a row");
-    assert!(qualified(later));
+    assert!(!qualified(later));
+    let records = ["1.2.3", "1.2.4"].map(|v| {
+        DepthRecord::parse(
+            &fs::read_to_string(
+                temp.path()
+                    .join(ROOT)
+                    .join(format!("reports/{v}/depth-record.json")),
+            )
+            .unwrap(),
+            "aider",
+            v,
+        )
+        .unwrap()
+    });
+    let bound = crate::depth_record::bound_evidence(temp.path(), records.iter()).unwrap();
+    for path in [EVIDENCE, second, third] {
+        assert_eq!(
+            bound.get(path),
+            Some(&digest(
+                &fs::read_to_string(temp.path().join(path)).unwrap()
+            ))
+        );
+    }
 }

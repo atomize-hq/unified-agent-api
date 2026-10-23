@@ -33,3 +33,5 @@ pub mod workspace_mutation;
 pub mod wrapper_scaffold;
 
 pub mod depth_acceptance;
+
+pub mod depth_ci;
