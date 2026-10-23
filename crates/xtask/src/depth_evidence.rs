@@ -27,27 +27,37 @@ impl EvidenceReceipt {
             return Err("depth evidence exceeds 1048576 bytes".into());
         }
         let receipt: Self = serde_json::from_str(raw).map_err(|e| e.to_string())?;
-        // Annex B's reusable obligation reference has optional fields. Explicit null must not
-        // become omission in this format, including inside its otherwise strict nested objects.
-        reject_null(&serde_json::from_str(raw).map_err(|e| e.to_string())?)?;
+        // Deserialize first so duplicate fields are still rejected. Serde structs also accept
+        // positional sequences; compare container shapes to their named-object representation.
+        // This also rejects explicit null in Annex B's reused optional obligation members.
+        check_shape(
+            &serde_json::from_str(raw).map_err(|e| e.to_string())?,
+            &serde_json::to_value(&receipt).map_err(|e| e.to_string())?,
+        )?;
         receipt.validate()?;
         Ok(receipt)
     }
 }
 
-fn reject_null(value: &serde_json::Value) -> Result<(), String> {
+fn check_shape(raw: &serde_json::Value, typed: &serde_json::Value) -> Result<(), String> {
     use serde_json::Value;
-    match value {
-        Value::Null => return Err("depth evidence does not permit null members".into()),
-        Value::Array(values) => {
-            for value in values {
-                reject_null(value)?;
+    match (raw, typed) {
+        (Value::Null, _) => return Err("depth evidence does not permit null members".into()),
+        (Value::Array(values), Value::Array(expected)) => {
+            for (value, expected) in values.iter().zip(expected) {
+                check_shape(value, expected)?;
             }
         }
-        Value::Object(values) => {
-            for value in values.values() {
-                reject_null(value)?;
+        (Value::Object(values), Value::Object(expected)) => {
+            for (name, value) in values {
+                check_shape(
+                    value,
+                    expected.get(name).ok_or("unexpected evidence member")?,
+                )?;
             }
+        }
+        (Value::Array(_) | Value::Object(_), _) | (_, Value::Array(_) | Value::Object(_)) => {
+            return Err("depth evidence requires named objects, not positional arrays".into());
         }
         _ => {}
     }

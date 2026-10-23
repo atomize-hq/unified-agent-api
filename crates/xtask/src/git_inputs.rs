@@ -204,6 +204,7 @@ fn list(root: &Path, path: &str) -> Result<Vec<String>, String> {
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let output = Command::new("git")
+        .arg("--no-replace-objects")
         .arg("-C")
         .arg(root)
         .args(args)

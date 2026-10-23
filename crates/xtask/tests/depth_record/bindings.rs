@@ -129,3 +129,22 @@ fn bound_evidence_uses_literal_paths_and_ignores_unrelated_dirty_files() {
     assert_eq!(actual.len(), 1);
     assert!(actual.contains_key(path));
 }
+
+#[test]
+fn bound_evidence_does_not_replace_the_indexed_blob_with_another_object() {
+    let (root, record) = fixture();
+    let original = git(root.path(), &["rev-parse", ":proof/result.json"]);
+    fs::write(root.path().join("proof/result.json"), "forged success").unwrap();
+    let replacement = git(root.path(), &["hash-object", "-w", "proof/result.json"]);
+    git(
+        root.path(),
+        &["replace", original.trim(), replacement.trim()],
+    );
+    assert_eq!(
+        git(root.path(), &["cat-file", "blob", original.trim()]),
+        "forged success"
+    );
+    assert!(bound_evidence(root.path(), [&record])
+        .unwrap_err()
+        .contains("disagree"));
+}

@@ -25,6 +25,8 @@ have no binding. Invalid paths, present untracked files, unmerged entries, missi
 non-regular modes, symlinks and working/index disagreement MUST refuse the binding operation.
 Recheck the bound inputs before returning. This is a coherent observation, not serialization or
 an authorization receipt; immutable integration readers still use that exact tree's blobs.
+Object replacement MUST be disabled when resolving an indexed blob; a replacement reference
+does not change the object's indexed content identity.
 
 ## Encoding and limits
 

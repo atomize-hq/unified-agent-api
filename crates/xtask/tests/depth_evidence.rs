@@ -154,6 +154,111 @@ fn null_optional_obligation_members_do_not_become_omitted_members() {
 }
 
 #[test]
+fn positional_arrays_cannot_replace_named_objects() {
+    let golden: Value = serde_json::from_str(GOLDEN).unwrap();
+    let mut accepted = vec![];
+    for (path, keys) in [
+        (
+            "",
+            vec![
+                "schema_version",
+                "scope",
+                "producer",
+                "build",
+                "provenance",
+                "cases",
+                "adequacy",
+            ],
+        ),
+        (
+            "/scope",
+            vec![
+                "agent_id",
+                "version",
+                "event",
+                "enrollment_origin",
+                "obligation",
+                "policy_identity",
+                "obligations_identity",
+                "rules_revision",
+                "trust_revision",
+                "review_revision",
+            ],
+        ),
+        (
+            "/producer",
+            vec![
+                "kind",
+                "repository",
+                "workflow_path",
+                "workflow_commit",
+                "collector",
+                "run_id",
+                "run_attempt",
+                "job",
+                "artifact_name",
+            ],
+        ),
+        (
+            "/build",
+            vec![
+                "source_commit",
+                "source_tree",
+                "host_target",
+                "toolchain",
+                "features",
+                "environment",
+                "dependency_graph",
+                "covered_inputs",
+                "absent_inputs",
+            ],
+        ),
+        ("/build/toolchain", vec!["path", "sha256"]),
+        ("/cases", vec!["requested", "executed", "raw_output"]),
+        ("/cases/requested/0", vec!["name", "executable_sha256"]),
+        ("/cases/executed/0", vec!["case", "outcome"]),
+        ("/adequacy", vec!["mapping", "endorsement"]),
+        (
+            "/adequacy/mapping",
+            vec![
+                "obligation",
+                "reviewer_identity",
+                "executor_identity",
+                "assertions",
+            ],
+        ),
+        (
+            "/adequacy/mapping/assertions/0",
+            vec!["case", "assertion", "production_inputs", "counterfactual"],
+        ),
+        (
+            "/adequacy/endorsement",
+            vec![
+                "kind",
+                "repository",
+                "pull_request",
+                "id",
+                "author",
+                "source_commit",
+                "body_sha256",
+                "mapping_sha256",
+            ],
+        ),
+    ] {
+        let mut value = golden.clone();
+        let object = value.pointer_mut(path).unwrap();
+        *object = Value::Array(keys.iter().map(|key| object[*key].clone()).collect());
+        if check(&value).is_ok() {
+            accepted.push(path);
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "accepted positional object encodings at {accepted:?}"
+    );
+}
+
+#[test]
 fn alternate_event_mapping_and_endorsement_forms_parse_without_granting_trust() {
     let mut value: Value = serde_json::from_str(GOLDEN).unwrap();
     value["scope"]["event"] = json!({
