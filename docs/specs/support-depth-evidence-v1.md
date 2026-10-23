@@ -210,3 +210,54 @@ D1b installs the pure predicate with private host fixtures. Its public workspace
 recognized live producer until the following CI adapter slice; it reports unverified rather than
 accepting caller-supplied host assertions. It supplies no writer admission or production enrollment.
 Publisher consumption follows with that adapter, keeping existing production enrollment refusal.
+
+## D2 isolated CI producer
+
+The initial live producer is deliberately limited to the isolated channel-validation source
+contract under `crates/xtask/tests/fixtures/depth-ci/`. Its canonical version is `0.0.0`, target
+`x86_64-unknown-linux-gnu`, agent `codex` and operation `controlled_channel`, obligation `V1`.
+It exercises `wrapper_events::ValidatedChannelString::new`; it is not a Codex CLI grammar,
+production enrollment or verification of other obligations. The existing `rust-tests` job runs
+the normal full workspace tests and the dedicated collector/cases; no new CI job or required
+status check is introduced. The producer's child build uses pinned Rust 1.89.0; project source
+continues to meet the workspace MSRV. Unknown harness/configuration/native linkage refuses proof.
+
+The collector emits one immutable `witness.json` in an Actions artifact named
+`depth-channel-v1-<run_id>-<run_attempt>`. It contains schema version 1, run/attempt, workflow
+implementation commit, actual `build`, `graph`, `environment`, `provenance`, `cases`, and the
+referenced `toolchain_report` and `raw_output` bytes as strings. The complete JSON is at most
+1 MiB. Payload objects use the revision-1 forms above; witness report/output strings are bounded
+payload bytes, not receipt attribution strings. The artifact contains exactly that one regular
+file. ZIP traversal, duplicate/extra/encrypted entries, symlinks, oversized archives or payloads,
+missing host digest and digest mismatch cannot qualify. No executable is committed or uploaded.
+
+This witness is execution output, separate from a candidate receipt. The private adapter derives
+scope/definition from the actual built frozen fixture and coherent current indexed fixture,
+corroborates each receipt field against authenticated witness data and source, resolves every
+applicable run and attempt independently of E, and establishes exact approved job/upload-step/
+artifact correspondence. An artifact name alone does not bind it to a job. The approved upload
+and binding steps expose the host-assigned artifact id/digest; their successful authenticated
+job/attempt logs and artifact metadata must agree. Missing/nonterminal applicable attempts and
+incomplete or saturated pagination remain unverified.
+
+Producer approval is rooted in canonical repository protected staging obtained independently
+from GitHub, not a local remote, a receipt or a candidate digest. The complete behavior-affecting
+collector/helper/dependency closure and workflow bytes must match that approved source. The
+first candidate run cannot qualify before those implementation bytes have been integrated.
+Supported registry sources must match locked crate archive checksums, contents and inventories;
+resolved Cargo metadata and actual compiled package populations must agree. Build configuration
+and relevant environment must be closed and captured. No missing input is an empty dependency set.
+
+Upload execution proof first. After compilation, independently review the exact content-bound
+mapping (including executable identity), then obtain existing maintainer adoption on the packet
+PR. General D2 authorization is not a fabricated host endorsement. Unchanged admissible mappings
+can be reused across executions after their reviewed source inputs and applicable definitions/
+trust/review are checked; a different unrelated source commit alone does not require another
+review. Receipt proof material remains under existing report paths; diagnostic materialization
+occurs only in a disposable checkout and grants no canonical write authority.
+
+Official publication consumes opaque evaluated results bound to the record state. Neither a
+public `Verdict` object nor a hash callback can manufacture that result set. Official publication
+requires production-origin evidence; this isolated profile cannot qualify a production row.
+Existing acceptance-entry and qualification rules still apply after verification. Non-enrolled
+publication remains unchanged; raw E success labels or acceptance entries cannot replace proof.

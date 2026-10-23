@@ -1,0 +1,487 @@
+use super::*;
+use crate::{
+    depth_evidence::{payload::Variable, CaseIdentity, CaseOutcome, CaseResult, ProvenanceKind},
+    git_inputs::GitInputs,
+    runtime_advertising::source::Source,
+};
+use serde_json::{json, Value};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    io::Read,
+    path::PathBuf,
+    process::Stdio,
+};
+
+struct BuildEnv {
+    rustc: PathBuf,
+    cargo: PathBuf,
+    sysroot: PathBuf,
+    cargo_home: PathBuf,
+    home: tempfile::TempDir,
+    target: tempfile::TempDir,
+    root: PathBuf,
+}
+impl BuildEnv {
+    fn new(root: &Path) -> Result<Self, String> {
+        let which = |binary: &str| -> Result<PathBuf, String> {
+            let bytes =
+                output(Command::new("rustup").args(["which", "--toolchain", TOOLCHAIN, binary]))?;
+            fs::canonicalize(
+                std::str::from_utf8(&bytes)
+                    .map_err(|e| e.to_string())?
+                    .trim(),
+            )
+            .map_err(|e| e.to_string())
+        };
+        let cargo_home = std::env::var_os("CARGO_HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".cargo")
+            });
+        for path in [cargo_home.join("config"), cargo_home.join("config.toml")] {
+            if fs::symlink_metadata(path).is_ok() {
+                return Err("unsupported Cargo-home configuration".into());
+            }
+        }
+        let rustc = which("rustc")?;
+        let cargo = which("cargo")?;
+        let raw = output(Command::new(&rustc).args(["--print", "sysroot"]))?;
+        let sysroot = PathBuf::from(std::str::from_utf8(&raw).map_err(|e| e.to_string())?.trim());
+        Ok(Self {
+            rustc,
+            cargo,
+            sysroot,
+            cargo_home: fs::canonicalize(cargo_home).map_err(|e| e.to_string())?,
+            home: tempfile::tempdir().map_err(|e| e.to_string())?,
+            target: tempfile::tempdir().map_err(|e| e.to_string())?,
+            root: root.into(),
+        })
+    }
+    fn command(&self, program: &Path) -> Command {
+        let mut c = Command::new("/usr/bin/timeout");
+        c.args(["--kill-after=5", "180"])
+            .arg(program)
+            .current_dir(&self.root)
+            .env_clear()
+            .env("HOME", self.home.path())
+            .env("CARGO_HOME", &self.cargo_home)
+            .env("CARGO_TARGET_DIR", self.target.path())
+            .env(
+                "PATH",
+                format!("{}:/usr/bin:/bin", self.sysroot.join("bin").display()),
+            )
+            .env("RUSTC", &self.rustc)
+            .env("RUSTUP_TOOLCHAIN", TOOLCHAIN)
+            .env(
+                "CARGO_ENCODED_RUSTFLAGS",
+                format!(
+                    "--remap-path-prefix={}=/depth-input\u{1f}-Cdebuginfo=0",
+                    self.root.display()
+                ),
+            )
+            .env("CARGO_NET_OFFLINE", "true")
+            .env("CARGO_INCREMENTAL", "0")
+            .env("SOURCE_DATE_EPOCH", "0")
+            .env("LANG", "C")
+            .env("LC_ALL", "C")
+            .env("TZ", "UTC");
+        c
+    }
+}
+fn capture(c: &mut Command, limit: u64) -> Result<(bool, String), String> {
+    let mut child = c
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let mut bytes = vec![];
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .take(limit + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > limit {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("producer output bounds exceeded".into());
+    }
+    let status = child.wait().map_err(|e| e.to_string())?;
+    Ok((
+        status.success(),
+        String::from_utf8(bytes).map_err(|e| e.to_string())?,
+    ))
+}
+fn required(c: &mut Command, limit: u64) -> Result<String, String> {
+    let (ok, raw) = capture(c, limit)?;
+    if !ok {
+        return Err("isolated producer command failed".into());
+    }
+    Ok(raw)
+}
+fn identity(path: &Path) -> Result<String, String> {
+    Ok(reference("", &fs::read(path).map_err(|e| e.to_string())?).sha256)
+}
+fn fingerprint(path: &Path, base: &Path, rows: &mut Vec<(String, String)>) -> Result<(), String> {
+    for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_dir() {
+            fingerprint(&entry.path(), base, rows)?
+        } else if kind.is_file() {
+            rows.push((
+                entry
+                    .path()
+                    .strip_prefix(base)
+                    .map_err(|e| e.to_string())?
+                    .to_string_lossy()
+                    .into_owned(),
+                identity(&entry.path())?,
+            ));
+        } else {
+            return Err("unsupported toolchain/output symlink or file type".into());
+        }
+        if rows.len() > 4096 {
+            return Err("toolchain/output inventory bounds exceeded".into());
+        }
+    }
+    Ok(())
+}
+fn toolchain(env: &BuildEnv, executable: &Path, scripts: &[Value]) -> Result<String, String> {
+    let mut standard = vec![];
+    let stdlib = env.sysroot.join("lib/rustlib").join(TARGET).join("lib");
+    fingerprint(&stdlib, &stdlib, &mut standard)?;
+    standard.sort();
+    let version = required(env.command(&env.rustc).arg("-Vv"), 65536)?;
+    if !version
+        .lines()
+        .any(|l| l == format!("release: {TOOLCHAIN}"))
+    {
+        return Err("unrecognized Rust release".into());
+    }
+    let mut native = BTreeMap::new();
+    for tool in ["cc", "ld"] {
+        let path = PathBuf::from("/usr/bin").join(tool);
+        native.insert(tool.to_owned(),json!({"sha256":identity(&fs::canonicalize(&path).map_err(|e|e.to_string())?)?,"version":required(env.command(&path).arg("--version"),65536)?}));
+    }
+    let libraries = required(
+        env.command(Path::new("/usr/bin/ldd")).arg(executable),
+        65536,
+    )?;
+    let mut linked = BTreeMap::new();
+    for word in libraries.split_whitespace().filter(|s| s.starts_with('/')) {
+        let path = Path::new(word);
+        linked.insert(
+            path.file_name()
+                .ok_or("invalid linked library")?
+                .to_string_lossy()
+                .into_owned(),
+            identity(path)?,
+        );
+    }
+    let mut generated = vec![];
+    for script in scripts {
+        if !script["linked_libs"].as_array().is_some_and(Vec::is_empty)
+            || !script["linked_paths"].as_array().is_some_and(Vec::is_empty)
+        {
+            return Err("native build script linkage is unsupported".into());
+        }
+        let out = Path::new(
+            script["out_dir"]
+                .as_str()
+                .ok_or("missing build script outputs")?,
+        );
+        let mut files = vec![];
+        fingerprint(out, out, &mut files)?;
+        files.sort();
+        generated.push(json!({"package_id":script["package_id"],"cfgs":script["cfgs"],"env":script["env"],"files":files}));
+    }
+    generated.sort_by_key(Value::to_string);
+    serde_json::to_string(&json!({"rustc":version,"rustc_sha256":identity(&env.rustc)?,"cargo":required(env.command(&env.cargo).arg("-Vv"),65536)?,"cargo_sha256":identity(&env.cargo)?,"standard_library":standard,"native_tools":native,"runtime_libraries":linked,"build_scripts":generated})).map_err(|e|e.to_string())
+}
+fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String> {
+    let listed = required(
+        env.command(executable)
+            .args(["--list", "--format", "terse"]),
+        1048576,
+    )?;
+    let listed: BTreeSet<_> = listed
+        .lines()
+        .filter_map(|s| s.strip_suffix(": test"))
+        .collect();
+    if listed != CASES.into_iter().collect() {
+        return Err("unrecognized test executable population".into());
+    }
+    let digest = identity(executable)?;
+    let requested: Vec<_> = CASES
+        .iter()
+        .map(|name| CaseIdentity {
+            name: (*name).into(),
+            executable_sha256: digest.clone(),
+        })
+        .collect();
+    let mut raw = String::new();
+    let mut executed = vec![];
+    for case in &requested {
+        let (success, output) = capture(
+            env.command(executable).args([
+                "--exact",
+                &case.name,
+                "--format",
+                "pretty",
+                "--color",
+                "never",
+                "--test-threads",
+                "1",
+            ]),
+            1048576,
+        )?;
+        let outcome = if success
+            && output.contains(&format!("test {} ... ok", case.name))
+            && output.contains(
+                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out",
+            ) {
+            CaseOutcome::Passed
+        } else if !success
+            && output.contains(&format!("test {} ... FAILED", case.name))
+            && output.contains(
+                "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out",
+            )
+        {
+            CaseOutcome::Failed
+        } else if output.contains("1 ignored;") {
+            CaseOutcome::Ignored
+        } else if output.contains("running 0 tests") {
+            CaseOutcome::Skipped
+        } else {
+            CaseOutcome::Aborted
+        };
+        if output.matches("test result:").count() != 1 {
+            return Err("unrecognized harness output".into());
+        }
+        raw.push_str(&format!("=== {} ===\n{}", case.name, output));
+        executed.push(CaseResult {
+            case: case.clone(),
+            outcome,
+        });
+    }
+    let raw_output = reference("", raw.as_bytes());
+    Ok((
+        Cases {
+            requested,
+            executed,
+            raw_output,
+        },
+        raw,
+    ))
+}
+fn witness(root: &Path) -> Result<Witness, String> {
+    let mut view = GitInputs::new(root)?;
+    let original =
+        record(std::str::from_utf8(&view.required(FIXTURE)?).map_err(|e| e.to_string())?)?;
+    if original.execution.is_some() || !original.acceptance_entries.is_empty() {
+        return Err("source fixture must contain only frozen P/O".into());
+    }
+    let commit = String::from_utf8(output(
+        Command::new("git")
+            .arg("--no-replace-objects")
+            .arg("-C")
+            .arg(root)
+            .args(["rev-parse", "HEAD"]),
+    )?)
+    .map_err(|e| e.to_string())?
+    .trim()
+    .to_owned();
+    let source = Source::tip(root, &commit)?;
+    let absent = [
+        ".cargo/config",
+        ".cargo/config.toml",
+        "rust-toolchain",
+        "rust-toolchain.toml",
+        "crates/wrapper_events/build.rs",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    for path in &absent {
+        if view.optional(path)?.is_some() || source.optional_bytes(path)?.is_some() {
+            return Err("initial producer does not support additional build configuration".into());
+        }
+    }
+    // Ancestor Cargo config can alter an otherwise clean checkout.
+    for parent in root.ancestors().skip(1) {
+        for name in [".cargo/config", ".cargo/config.toml"] {
+            if fs::symlink_metadata(parent.join(name)).is_ok() {
+                return Err("unsupported ancestor Cargo configuration".into());
+            }
+        }
+    }
+    let env = BuildEnv::new(root)?;
+    let metadata: Value = serde_json::from_str(&required(
+        env.command(&env.cargo).args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--locked",
+            "--offline",
+            "--no-default-features",
+            "--filter-platform",
+            TARGET,
+        ]),
+        16777216,
+    )?)
+    .map_err(|e| e.to_string())?;
+    let built = required(
+        env.command(&env.cargo).args([
+            "test",
+            "--locked",
+            "--offline",
+            "-p",
+            "unified-agent-api-wrapper-events",
+            "--no-default-features",
+            "--target",
+            TARGET,
+            "--test",
+            "depth_ci_channel",
+            "--no-run",
+            "--message-format=json",
+        ]),
+        16777216,
+    )?;
+    let mut compiled = BTreeSet::new();
+    let mut executable = None;
+    let mut scripts = vec![];
+    for line in built.lines() {
+        let m: Value = serde_json::from_str(line).map_err(|_| "unrecognized Cargo output")?;
+        if m["reason"] == "compiler-artifact" {
+            compiled.insert(
+                m["package_id"]
+                    .as_str()
+                    .ok_or("missing built package identity")?
+                    .to_owned(),
+            );
+            if m["target"]["name"] == "depth_ci_channel" {
+                executable = Some(PathBuf::from(
+                    m["executable"].as_str().ok_or("missing executable")?,
+                ));
+            }
+        }
+        if m["reason"] == "build-script-executed" {
+            scripts.push(m);
+        }
+    }
+    let executable = executable.ok_or("no selected test executable")?;
+    let graph = super::graph::resolve(root, &mut view, &metadata, &compiled)?;
+    for file in &graph.inputs {
+        if source.optional_bytes(&file.path)?.as_deref()
+            != Some(view.required(&file.path)?.as_slice())
+            || source.executable(&file.path)? != view.executable(&file.path)?
+        {
+            return Err("build inputs differ from source commit".into());
+        }
+    }
+    let report = toolchain(&env, &executable, &scripts)?;
+    let (mut cases, raw) = execute(&env, &executable)?;
+    let run_id = std::env::var("GITHUB_RUN_ID")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .ok_or("collector requires a host run id")?;
+    let run_attempt = std::env::var("GITHUB_RUN_ATTEMPT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .ok_or("collector requires a host attempt")?;
+    let prefix =
+        format!("cli_manifests/codex/reports/0.0.0/evidence/channel-v1/{run_id}-{run_attempt}");
+    cases.raw_output = reference(format!("{prefix}/raw.txt"), raw.as_bytes());
+    let environment = Environment {
+        schema_version: 1,
+        target: TARGET.into(),
+        features: vec![],
+        variables: [
+            (
+                "CARGO_CONFIG_POLICY",
+                "no repository/ancestor/home configuration",
+            ),
+            ("CARGO_HOME", "verified locked registry cache"),
+            ("HOME", "fresh empty directory"),
+            ("PATH", "pinned Rust toolchain bin:/usr/bin:/bin"),
+            ("RUSTUP_TOOLCHAIN", TOOLCHAIN),
+            ("RUSTC", "pinned rustc executable"),
+            (
+                "CARGO_ENCODED_RUSTFLAGS",
+                "--remap-path-prefix=${WORKSPACE}=/depth-input;-Cdebuginfo=0",
+            ),
+            ("CARGO_NET_OFFLINE", "true"),
+            ("CARGO_INCREMENTAL", "0"),
+            ("SOURCE_DATE_EPOCH", "0"),
+            ("LANG", "C"),
+            ("LC_ALL", "C"),
+            ("TZ", "UTC"),
+        ]
+        .into_iter()
+        .map(|(name, value)| Variable {
+            name: name.into(),
+            value: value.into(),
+        })
+        .collect(),
+    };
+    view.required(COLLECTOR)?;
+    let build = Build {
+        source_commit: commit,
+        source_tree: source.tree()?,
+        host_target: TARGET.into(),
+        toolchain: reference(format!("{prefix}/toolchain.json"), report.as_bytes()),
+        features: vec![],
+        environment: reference(
+            format!("{prefix}/environment.json"),
+            serde_json::to_string(&environment).unwrap().as_bytes(),
+        ),
+        dependency_graph: reference(
+            format!("{prefix}/graph.json"),
+            serde_json::to_string(&graph).unwrap().as_bytes(),
+        ),
+        covered_inputs: graph.inputs.clone(),
+        absent_inputs: absent,
+    };
+    view.verify()?;
+    let workflow_commit = std::env::var("DEPTH_WORKFLOW_SHA")
+        .map_err(|_| "missing workflow implementation identity")?;
+    Ok(Witness {
+        schema_version: 1,
+        run_id,
+        run_attempt,
+        workflow_commit,
+        build,
+        graph,
+        environment,
+        provenance: vec![Provenance {
+            kind: ProvenanceKind::Source,
+            origin: "isolated channel-validation source contract 0.0.0; not a CLI release".into(),
+            file: original.obligations.unwrap().acquired_inputs[0].clone(),
+        }],
+        cases,
+        toolchain_report: report,
+        raw_output: raw,
+    })
+}
+pub(super) fn collect(workspace: &Path) -> Result<(), String> {
+    let root = fs::canonicalize(workspace).map_err(|e| e.to_string())?;
+    let result = witness(&root);
+    let value = match &result {
+        Ok(w) => serde_json::to_value(w).map_err(|e| e.to_string())?,
+        Err(reason) => json!({"schema_version":1,"unavailable":reason}),
+    };
+    let bytes = serde_json::to_vec(&value).map_err(|e| e.to_string())?;
+    if bytes.len() > 1048576 {
+        return Err("witness bounds exceeded".into());
+    }
+    let destination = root.join("target/depth-ci");
+    fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
+    fs::write(destination.join("witness.json"), bytes).map_err(|e| e.to_string())?;
+    if let Err(reason) = result {
+        eprintln!("isolated depth witness unavailable: {reason}");
+    }
+    Ok(())
+}

@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
-use serde_json::{json, Value};
-use xtask::depth_record::{part_identity, DepthRecord};
-use xtask::support_matrix::depth::{apply_depth, derive_depth_facts, DepthFacts, Outcome};
-use xtask::support_matrix::{
+use crate::depth_record::{part_identity, DepthRecord};
+use crate::support_matrix::depth::{apply_depth, DepthFacts, Outcome};
+use crate::support_matrix::{
     render_publication_bundle, BackendSupportState, ManifestSupportState, PointerPromotionState,
     SupportRow, UaaSupportState,
 };
+use serde_json::{json, Value};
 
 const LINUX: &str = "linux-x64";
 const DARWIN: &str = "darwin-arm64";
@@ -255,7 +255,7 @@ fn a_result_is_published_as_unverified_where_invariant_3_says() {
         assert!(!linux.capabilities[0].depth_qualified);
         assert_eq!(
             linux.mode_exclusions[0].result,
-            xtask::depth_record::DepthResult::Unverified
+            crate::depth_record::DepthResult::Unverified
         );
     }
 
@@ -568,7 +568,35 @@ fn revision_2_rows_carry_depth_facts_and_other_rows_are_unchanged() {
     assert!(bundle.markdown.ends_with(expected), "{}", bundle.markdown);
 }
 
-#[path = "support_matrix_depth/generator.rs"]
+#[path = "tests/generator.rs"]
 mod generator;
-#[path = "support_matrix_depth/more.rs"]
+#[path = "tests/more.rs"]
 mod more;
+
+#[test]
+fn hash_only_success_and_acceptance_cannot_verify_a_published_obligation() {
+    let r = sealed(record(), true);
+    let published =
+        crate::support_matrix::depth::derive_depth_facts(Some(&r), false, LINUX, &|_| {
+            Some(sha('e'))
+        })
+        .unwrap()
+        .unwrap();
+    assert!(!published.promises[0].qualified);
+    assert!(published.promises[0]
+        .obligations
+        .iter()
+        .all(|o| o.result == crate::depth_record::DepthResult::Unverified));
+}
+
+// These are pure publication-model fixtures, not authenticated host facts. The public path
+// rejection test above deliberately calls the real public hash-only API directly.
+fn derive_depth_facts(
+    record: Option<&DepthRecord>,
+    declared: bool,
+    target: &str,
+    hashes: &dyn Fn(&str) -> Option<String>,
+) -> Result<Option<DepthFacts>, String> {
+    let results = crate::depth_evidence::test_results(record);
+    super::derive_evaluated_depth_facts(record, declared, target, hashes, &results)
+}

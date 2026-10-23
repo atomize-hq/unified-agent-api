@@ -78,7 +78,7 @@ fn many() -> Value {
     r
 }
 
-fn name_of(o: &xtask::support_matrix::depth::PublishedObligation) -> String {
+fn name_of(o: &crate::support_matrix::depth::PublishedObligation) -> String {
     o.id.map(|id| {
         serde_json::to_value(id)
             .unwrap()
@@ -161,7 +161,7 @@ fn a_capability_is_depth_qualified_only_when_every_operation_of_its_mapping_is_q
 
 #[test]
 fn a_supported_row_is_lowered_unless_every_claimed_capability_is_depth_qualified() {
-    use xtask::support_matrix::depth::CapabilityFacts;
+    use crate::support_matrix::depth::CapabilityFacts;
     let with = |states: &[bool]| DepthFacts {
         obligations_frozen: true,
         promises: Vec::new(),
@@ -444,7 +444,7 @@ fn markdown_lists_a_promises_templates_in_declaration_order() {
 /// the revision.
 #[test]
 fn a_result_stated_for_a_target_o_is_not_frozen_for_is_unverified() {
-    use xtask::depth_record::DepthResult;
+    use crate::depth_record::DepthResult;
     let mut r = record();
     r["policy"]["selection"]["enrollment"]["modes"][1]
         .as_object_mut()

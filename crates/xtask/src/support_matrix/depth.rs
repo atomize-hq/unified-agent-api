@@ -79,6 +79,8 @@ pub struct CapabilityFacts {
 /// lists the target) is false. `evidence_sha256` gives the content identity of a committed file,
 /// or `None` when the revision does not hold it.
 ///
+/// Hashes establish integrity only. This compatibility entry has no authenticated evaluated
+/// results and cannot publish verification. The existing publisher uses its private evaluated path.
 /// `record` MUST come from `DepthRecord::parse` with the row's agent and version: nothing here
 /// repeats the reader's checks or compares the record's selection with the row.
 pub fn derive_depth_facts(
@@ -87,10 +89,28 @@ pub fn derive_depth_facts(
     target: &str,
     evidence_sha256: &dyn Fn(&str) -> Option<String>,
 ) -> Result<Option<DepthFacts>, String> {
+    derive_evaluated_depth_facts(
+        record,
+        declared,
+        target,
+        evidence_sha256,
+        &crate::depth_evidence::EvidenceVerdicts::default(),
+    )
+}
+
+pub(crate) fn derive_evaluated_depth_facts(
+    record: Option<&DepthRecord>,
+    declared: bool,
+    target: &str,
+    evidence_sha256: &dyn Fn(&str) -> Option<String>,
+    verdicts: &crate::depth_evidence::EvidenceVerdicts,
+) -> Result<Option<DepthFacts>, String> {
     let covered = record.is_some_and(|record| covers(record, target));
     match record {
         // A declared target the record does not cover still lists the record's capabilities.
-        Some(record) if covered || declared => Facts::new(record, target, evidence_sha256).derive(),
+        Some(record) if covered || declared => {
+            Facts::new(record, target, evidence_sha256, verdicts).derive()
+        }
         None if declared => Ok(Some(not_yet_frozen())),
         _ => Ok(None),
     }
@@ -137,6 +157,7 @@ fn not_yet_frozen() -> DepthFacts {
 
 struct Facts<'a> {
     record: &'a DepthRecord,
+    verdicts: &'a crate::depth_evidence::EvidenceVerdicts,
     target: &'a str,
     evidence_sha256: &'a dyn Fn(&str) -> Option<String>,
     frozen: bool,
@@ -150,6 +171,7 @@ impl<'a> Facts<'a> {
         record: &'a DepthRecord,
         target: &'a str,
         evidence_sha256: &'a dyn Fn(&str) -> Option<String>,
+        verdicts: &'a crate::depth_evidence::EvidenceVerdicts,
     ) -> Self {
         let obligations = record.obligations.as_ref();
         // O frozen for a target the selection does not cover freezes nothing that row publishes.
@@ -171,6 +193,7 @@ impl<'a> Facts<'a> {
         });
         Self {
             record,
+            verdicts,
             target,
             evidence_sha256,
             frozen,
@@ -432,13 +455,13 @@ impl<'a> Facts<'a> {
             return DepthResult::Unverified;
         };
         match stated.result {
-            DepthResult::Verified => {
+            DepthResult::Verified | DepthResult::Failed => {
                 let bound = !stated.evidence.is_empty()
                     && stated.evidence.iter().all(|file| {
                         (self.evidence_sha256)(&file.path).as_deref() == Some(file.sha256.as_str())
                     });
                 if bound {
-                    DepthResult::Verified
+                    self.verdicts.result(self.record, reference)
                 } else {
                     DepthResult::Unverified
                 }
@@ -536,3 +559,7 @@ fn list_or_dash(items: impl Iterator<Item = String>) -> String {
         items.join("; ")
     }
 }
+
+#[cfg(test)]
+#[path = "depth/tests.rs"]
+mod tests;

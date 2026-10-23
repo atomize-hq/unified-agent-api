@@ -58,6 +58,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::enum_variant_names)]
 enum Command {
+    /// Collect an isolated CI witness into target/depth-ci; grants no admission.
+    DepthCiCollect,
     /// Generate or check the restricted runtime capability model.
     RuntimeAdvertisingModel(runtime_advertising::Args),
     /// Guard against backend crate types leaking into the public agent_api surface.
@@ -170,6 +172,14 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
+        Command::DepthCiCollect => {
+            xtask::depth_ci::collect(&std::env::current_dir().expect("working directory"))
+                .unwrap_or_else(|e| {
+                    eprintln!("{e}");
+                    std::process::exit(1)
+                });
+            0
+        }
         Command::AgentApiBackendTypeLeakGuard(args) => {
             match agent_api_backend_type_leak_guard::run(args) {
                 Ok(()) => 0,

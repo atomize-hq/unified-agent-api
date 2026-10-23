@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "event": {
+    "lifecycle_path": "maintenance",
+    "request_commit": "3f404a76e5d2b31d525416d790b5b0a108399408",
+    "request_recorded_at": "2026-10-23T13:58:53.527221+00:00",
+    "trigger_kind": "isolated_source_contract",
+    "opened_from": ".github/workflows/ci.yml"
+  },
+  "policy": {
+    "identity": "776b3bb983379d727c39054de2256d74e9b769b81daa964cae3bd900bac5ca3e",
+    "selection": {
+      "agent_id": "codex",
+      "enrollment": {
+        "lifecycle_path": "maintenance",
+        "version": "0.0.0",
+        "targets": [
+          "x86_64-unknown-linux-gnu"
+        ],
+        "modes": [
+          {
+            "selector": "controlled-channel",
+            "command_path": "codex exec",
+            "mode": "headless",
+            "predicates": [
+              {
+                "flag": "--isolated-channel",
+                "value": "source-contract-v1"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "controlled_channel",
+            "serves": [
+              "controlled-channel"
+            ],
+            "templates": [
+              "OPAQUE"
+            ],
+            "shared_mapping": "wrapper_only",
+            "forwarding": false,
+            "not_applicable_permitted": [],
+            "promise": {
+              "r1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "v1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "g1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "e1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "a1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "x1": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "x2": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "x3": "Isolated source-contract fixture; see contract.md. Other obligations are unverified.",
+              "x4": "Isolated source-contract fixture; see contract.md. Other obligations are unverified."
+            }
+          }
+        ],
+        "capabilities": []
+      }
+    },
+    "rules_revision": "1",
+    "base": [
+      "A1",
+      "E1",
+      "G1",
+      "R1",
+      "V1",
+      "X1",
+      "X2",
+      "X3",
+      "X4"
+    ],
+    "templates": [
+      {
+        "template": "OPAQUE",
+        "obligations": [
+          "LC1",
+          "OUT1"
+        ]
+      }
+    ],
+    "path_enabled": true,
+    "debt_baseline": []
+  },
+  "obligations": {
+    "identity": "91837b545e67ac5e0c7dfa5116fc4a21277e7f323d6339fc2235867b24eb7aff",
+    "policy_identity": "776b3bb983379d727c39054de2256d74e9b769b81daa964cae3bd900bac5ca3e",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ],
+    "acquired_inputs": [
+      {
+        "path": "crates/xtask/tests/fixtures/depth-ci/contract.md",
+        "sha256": "4329ae549773098845892539b0ff1d48d7f3ca5a3284bacff71caf7e151169d6"
+      }
+    ],
+    "operations": [
+      {
+        "id": "controlled_channel",
+        "surfaces": [],
+        "obligations": [
+          "A1",
+          "E1",
+          "G1",
+          "LC1",
+          "OUT1",
+          "R1",
+          "V1",
+          "X1",
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    ],
+    "classification_required": [],
+    "acceptance_work": []
+  },
+  "execution": null,
+  "acceptance_entries": []
+}

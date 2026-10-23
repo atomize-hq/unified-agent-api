@@ -56,6 +56,7 @@ pub(super) struct LoadedAgentRoot {
     pub(super) declared: BTreeMap<String, BTreeSet<String>>,
     /// The content identity of each file the records bind, where the revision holds it.
     evidence: BTreeMap<String, String>,
+    verdicts: BTreeMap<String, crate::depth_evidence::EvidenceVerdicts>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -344,13 +345,14 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
             let pointer_promotion = classify_pointer_promotion(&root.pointers, target, version);
             let evidence_notes =
                 build_evidence_notes(report.as_ref(), &root.posture, target, version);
-            let depth = depth::derive_depth_facts(
+            let depth = depth::derive_evaluated_depth_facts(
                 record,
                 root.declared
                     .get(version)
                     .is_some_and(|t| t.contains(target)),
                 target,
                 &evidence,
+                &root.verdicts.get(version).cloned().unwrap_or_default(),
             )
             .map_err(|err| {
                 format!(
@@ -393,6 +395,13 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
     let layout = RootIntakeLayout::new(root.root.clone());
     let versions = read_version_metadata(&layout)?;
 
+    let verdicts = records
+        .iter()
+        .map(|(version, record)| {
+            crate::depth_evidence::production_results(&root.workspace, record)
+                .map(|v| (version.clone(), v))
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
     Ok(LoadedAgentRoot {
         agent: root.agent.clone(),
         posture,
@@ -400,6 +409,7 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
         layout,
         versions,
         records,
+        verdicts,
         declared: BTreeMap::new(),
         evidence,
     })

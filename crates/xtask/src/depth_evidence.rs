@@ -6,6 +6,11 @@ use serde::{Deserialize, Serialize};
 use crate::depth_record::{Event, FileRef, ObligationRef};
 
 mod currentness;
+mod results;
+pub(crate) use results::production_results;
+#[cfg(test)]
+pub(crate) use results::test_results;
+pub use results::EvidenceVerdicts;
 pub mod payload;
 mod validate;
 mod verdict;
