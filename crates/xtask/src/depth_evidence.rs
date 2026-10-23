@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::depth_record::{Event, FileRef, ObligationRef};
 
+mod currentness;
+pub mod payload;
 mod validate;
+mod verdict;
+pub use verdict::{evaluate_workspace, Evaluation, Verdict};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

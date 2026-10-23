@@ -138,3 +138,75 @@ promotion. Secrets, unbounded raw output and real credentials MUST NOT enter the
 sanitized environment descriptions and synthetic credential sentinels. Exact-version/target
 reuse, production-enrollment origin and complete current dependencies remain governed by the
 support-depth contract; no compatibility rule, debt waiver or acceptance authority is added.
+
+## Revision-1 dependency and environment payloads
+
+The referenced `build.dependency_graph` is a named JSON object with exactly
+`{ "schema_version": 1, "roots", "packages", "inputs", "scopes" }`.
+`roots` is a nonempty unique list of resolved package ids for the affected crates. Each package is
+`{ "id", "origin", "dependencies" }`; dependencies are unique resolved ids. Every referenced id
+must exist, and every package must be reachable from a root. Cycles are permitted (the resolved
+build graph can include separate build/dev units). Origin is one of:
+
+- `{ "kind": "local", "directory" }`: a repository-relative package directory, including its
+  Cargo.toml and every regular file below it in `inputs` and `scopes`.
+- `{ "kind": "registry", "source", "checksum" }`: an immutable resolved package id, registry
+  source identity and SHA-256 package checksum, corroborated by the host's resolved graph.
+- `{ "kind": "git", "source", "commit" }`: an immutable resolved package id, repository source
+  identity and full lowercase Git commit, corroborated by the host's resolved graph.
+
+`inputs` is a nonempty unique-path list of file references. It includes Cargo.toml, Cargo.lock,
+all local package files, build/config inputs, and every explicitly referenced implementation,
+adapter, protocol, assertion, fixture, upstream and requirement input. `scopes` is a unique list
+of repository-relative directories whose complete regular-file inventories are included. Local
+package directories MUST be scopes. Relevant shared input directories MUST also be scopes when
+adding a file can affect the obligation. Absent relevant optional configuration inputs are bound
+by `build.absent_inputs`. At minimum `.cargo/config`, `.cargo/config.toml`, `rust-toolchain`,
+`rust-toolchain.toml` and each local package's `build.rs` MUST be covered or explicitly absent.
+The build's covered-input set is exactly the graph's input set.
+
+The graph is a claim, not proof of completeness. A private independently resolving producer
+adapter MUST corroborate the full graph against actual resolved build provenance, including
+external packages and inputs outside package directories; unsupported build scripts, environment,
+external paths or incomplete dependency discovery cannot verify. Empty/missing provenance never
+means an empty closure. Readers compare all covered bytes, Git executable modes and scoped inventories with both the
+actual built commit/tree and the current coherent indexed workspace. Missing or changed inputs,
+new files in a relevant scope, executable-mode changes (including working/index disagreement on
+platforms with executable permissions), or an absent input becoming present invalidate the result. Changes
+outside that dependency set do not. No current profile permits cross-version or cross-target reuse.
+
+The referenced `build.environment` is exactly `{ "schema_version": 1, "target", "features",
+"variables" }`. Features are unique strings. Variables is a unique-name list of
+`{ "name", "value" }` containing the complete relevant sanitized environment. No secret is stored;
+if relevant values cannot safely be represented and corroborated, evidence remains unverified.
+The producer adapter must corroborate this payload and the toolchain report against the actual
+build, and evaluation compares it with the independently selected current build environment.
+Variable values may be empty. These payloads use the receipt's named-object, unknown-member, duplicate, null, safe-path, digest,
+string/list and 1 MiB bounds. Structurally valid incomplete claims remain readable but unverified.
+
+## Read-only verdict evaluation
+
+The evaluator distinguishes malformed form (an error), `unverified` (missing, stale, mismatched or
+untrusted proof), `failed` (a qualifying counterexample) and `verified` (all predicates established).
+It never trusts the E result label. An id obligation must be selected by O; an M/capability
+obligation must have the exact capability-to-operation mapping in P and the operation in O. A complete independently discovered population includes all
+applicable runs and attempts, including missing or nonterminal ones. Each referenced receipt must
+match its authenticated artifact bytes, original Event/P/O/enrollment, actual source commit/tree,
+resolved graph, toolchain, environment, provenance, requested/executed cases and raw output. A PR
+head association alone is insufficient. Missing population facts or an unsupported producer yields
+unverified; a favorable selected receipt cannot hide another qualifying run. Contradictory passing
+and failing qualifying attempts yield unverified pending investigation.
+
+An authenticated authorized maintainer adoption must bind the exact mapping digest, reviewed
+source and reviewer/executor invocations, and attest independence and the substantive counterfactual
+for each assertion. The evaluator requires nonempty assertion/production bindings, complete case
+coverage and current files. Nonblank prose or a matching digest alone does not establish adequacy.
+Original and current scopes, obligation definitions and applicable trust/review revisions must be
+independently established. A changed P/O needs the original P/O reuse binding in current E; Event
+changes require that binding even when P/O content is identical. Production use requires original
+production enrollment. Neither isolated nor legacy proof can acquire production origin by reuse.
+
+D1b installs the pure predicate with private host fixtures. Its public workspace reader has no
+recognized live producer until the following CI adapter slice; it reports unverified rather than
+accepting caller-supplied host assertions. It supplies no writer admission or production enrollment.
+Publisher consumption follows with that adapter, keeping existing production enrollment refusal.

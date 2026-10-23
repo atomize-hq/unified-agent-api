@@ -63,10 +63,21 @@ impl Source {
     }
 
     pub fn optional(&self, path: &str) -> Result<Option<String>, String> {
+        self.optional_bytes(path)?
+            .map(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
+            .transpose()
+    }
+
+    /// Raw regular-file bytes from the same pinned view; binary fixtures are not lossy UTF-8.
+    pub(crate) fn optional_bytes(&self, path: &str) -> Result<Option<Vec<u8>>, String> {
         if path.is_empty()
-            || path
-                .split('/')
-                .any(|part| part.is_empty() || part == "." || part == ".." || part.contains('\\'))
+            || path.split('/').any(|part| {
+                part.is_empty()
+                    || part == "."
+                    || part == ".."
+                    || part == ".git"
+                    || part.contains('\\')
+            })
             || Path::new(path)
                 .components()
                 .any(|p| !matches!(p, Component::Normal(_)))
@@ -74,7 +85,7 @@ impl Source {
             return Err(format!("invalid source path: {path}"));
         }
         if let Some(raw) = self.proposed.get(path) {
-            return Ok(Some(raw.clone()));
+            return Ok(Some(raw.as_bytes().to_vec()));
         }
         if let Some(commit) = &self.commit {
             // ls-tree does not follow a symlink ancestor. Distinguish that unsupported binding
@@ -114,7 +125,7 @@ impl Source {
             {
                 return Err(format!("{path}: expected a regular source blob"));
             }
-            return self.git(&["cat-file", "blob", fields[2]]).map(Some);
+            return self.git_bytes(&["cat-file", "blob", fields[2]]).map(Some);
         }
         let mut cursor = self.root.clone();
         for component in Path::new(path).components() {
@@ -134,7 +145,7 @@ impl Source {
         {
             return Err(format!("{path}: expected a regular source file"));
         }
-        fs::read_to_string(&cursor)
+        fs::read(&cursor)
             .map(Some)
             .map_err(|e| format!("{path}: {e}"))
     }
@@ -213,8 +224,45 @@ impl Source {
         Ok(result)
     }
 
+    pub(crate) fn tree(&self) -> Result<String, String> {
+        let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
+        Ok(self
+            .git(&["rev-parse", &format!("{commit}^{{tree}}")])?
+            .trim()
+            .into())
+    }
+
+    pub(crate) fn executable(&self, path: &str) -> Result<bool, String> {
+        // Reuse regular-file/path validation rather than introducing a second object reader.
+        self.optional_bytes(path)?.ok_or("missing source mode")?;
+        let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
+        let row = self.git(&["ls-tree", "-z", "--full-tree", commit, "--", path])?;
+        Ok(row.starts_with("100755 blob "))
+    }
+
+    pub(crate) fn committed_files(&self, prefix: &str) -> Result<Vec<String>, String> {
+        self.optional_bytes(&format!("{prefix}/.source-directory-probe"))?;
+        let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
+        self.git(&["ls-tree", "-r", "-z", "--full-tree", commit, "--", prefix])?
+            .split('\0')
+            .filter(|r| !r.is_empty())
+            .map(|row| {
+                let (meta, path) = row.split_once('\t').ok_or("invalid Git tree row")?;
+                if !(meta.starts_with("100644 blob ") || meta.starts_with("100755 blob ")) {
+                    return Err(format!("{path}: unsupported scoped source entry"));
+                }
+                Ok(path.to_owned())
+            })
+            .collect()
+    }
+
     fn git(&self, args: &[&str]) -> Result<String, String> {
+        String::from_utf8(self.git_bytes(args)?).map_err(|e| e.to_string())
+    }
+
+    fn git_bytes(&self, args: &[&str]) -> Result<Vec<u8>, String> {
         let out = Command::new("git")
+            .arg("--no-replace-objects")
             .arg("-C")
             .arg(&self.root)
             .arg("--literal-pathspecs")
@@ -228,7 +276,7 @@ impl Source {
                 String::from_utf8_lossy(&out.stderr)
             ));
         }
-        String::from_utf8(out.stdout).map_err(|e| e.to_string())
+        Ok(out.stdout)
     }
 }
 
