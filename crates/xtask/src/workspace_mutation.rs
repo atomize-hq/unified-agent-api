@@ -275,6 +275,7 @@ impl WorkspacePathJail {
     }
 }
 
+#[path = "workspace_mutation/delivery.rs"]
 mod delivery;
 pub(crate) use delivery::apply_admitted_mutations;
 pub use delivery::apply_mutations;

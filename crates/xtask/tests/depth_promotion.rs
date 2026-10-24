@@ -319,3 +319,28 @@ fn nested_standalone_manifest_root_cannot_hide_retained_reports() {
     assert!(result.is_err());
     assert_eq!(fs::read(nested.join("target.txt")).unwrap(), b"old\n");
 }
+
+#[test]
+fn empty_inner_anchor_cannot_hide_an_outer_retained_record() {
+    let root = tempfile::tempdir().unwrap();
+    write(
+        root.path(),
+        "cli_manifests/codex/reports/1.2.3/depth-record.json",
+        "retained",
+    );
+    let nested = root
+        .path()
+        .join("cli_manifests/codex/pointers/latest_validated");
+    fs::create_dir_all(nested.join("cli_manifests")).unwrap();
+    fs::write(nested.join("target.txt"), "old\n").unwrap();
+    assert!(apply_mutations(
+        &nested,
+        &[PlannedMutation::replace(
+            "target.txt",
+            b"old\n".to_vec(),
+            b"1.2.3\n".to_vec()
+        )]
+    )
+    .is_err());
+    assert_eq!(fs::read(nested.join("target.txt")).unwrap(), b"old\n");
+}

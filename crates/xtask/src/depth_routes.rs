@@ -9,20 +9,14 @@ use std::path::Path;
 pub fn refuse_workspace(root: &Path, route: &str) -> Result<(), String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     refuse_here(&root, route)?;
-    // Public writers accept a directory, not proof that it is the authority root. Standalone
-    // manifest reports also anchor retained scope. Stop at a real enclosing workspace so unrelated
-    // directories above that workspace cannot supply authority or hide its records.
-    let anchored =
-        |p: &Path| p.join(REGISTRY_RELATIVE_PATH).exists() || p.join("cli_manifests").is_dir();
-    if anchored(&root) {
-        return Ok(());
-    }
+    // A caller-supplied inner directory cannot establish a stopping boundary. Inspect every
+    // enclosing retained scope, including standalone manifests and outer registered workspaces.
     for parent in root.ancestors().skip(1) {
-        if anchored(parent) || parent.join("reports").is_dir() {
+        if parent.join(REGISTRY_RELATIVE_PATH).exists()
+            || parent.join("cli_manifests").is_dir()
+            || parent.join("reports").is_dir()
+        {
             refuse_here(parent, route)?;
-        }
-        if anchored(parent) {
-            break;
         }
     }
     Ok(())
