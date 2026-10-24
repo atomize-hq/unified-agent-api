@@ -289,3 +289,155 @@ fn automated_request_execution_contract_still_supports_manual_closeout() {
         "Manual closeout remained an explicit maintainer action recorded with `close-agent-maintenance`"
     ));
 }
+
+fn lower_writer_fixture(
+    name: &str,
+) -> (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf) {
+    let root = fixture_root(name);
+    seed_opencode_basis(&root);
+    let request =
+        Path::new("docs/agents/lifecycle/opencode-maintenance/governance/maintenance-request.toml")
+            .to_path_buf();
+    let closeout = Path::new(
+        "docs/agents/lifecycle/opencode-maintenance/governance/maintenance-closeout.json",
+    )
+    .to_path_buf();
+    write_text(
+        &root.join(&request),
+        &maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+    write_text(
+        &root.join(&closeout),
+        &valid_closeout_json(&root.join(&request), &request),
+    );
+    (root, request, closeout)
+}
+
+#[test]
+fn lower_planner_revalidates_bytes_and_derives_paths_instead_of_trusting_constructed_linkage() {
+    let (root, request, closeout) = lower_writer_fixture("d5-lower-planner");
+    let mut linked = load_linked_closeout(&root, &request, &closeout).unwrap();
+    linked.maintenance_pack_root = "docs/agents/lifecycle/codex-maintenance".into();
+    linked.request.agent_id = "codex".into();
+    let plans = crate::closeout::plan_closeout_mutations(&root, &linked).unwrap();
+    assert!(plans
+        .paths()
+        .all(|p| p.starts_with("docs/agents/lifecycle/opencode-maintenance")));
+    let prior = fs::read(root.join(&closeout)).unwrap();
+    linked.closeout.recorded_at = "invalid".into();
+    let error = crate::closeout::plan_closeout_mutations(&root, &linked)
+        .err()
+        .expect("must refuse");
+    assert!(error.to_string().contains("recorded_at"), "{error}");
+    assert_eq!(fs::read(root.join(closeout)).unwrap(), prior);
+}
+
+#[test]
+fn lower_writer_refuses_unresolved_retained_depth_ownership_and_preserves_outputs() {
+    let (root, request, closeout) = lower_writer_fixture("d5-lower-retained-depth");
+    let mut record: serde_json::Value = serde_json::from_str(
+        &include_str!("../fixtures/depth-ci/record.json").replace("codex", "opencode"),
+    )
+    .unwrap();
+    record["policy"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["policy"]).unwrap());
+    record["obligations"]["policy_identity"] = record["policy"]["identity"].clone();
+    record["obligations"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["obligations"]).unwrap());
+    let record_path = "cli_manifests/opencode/reports/0.0.0/depth-record.json";
+    write_text(
+        &root.join(record_path),
+        &serde_json::to_string_pretty(&record).unwrap(),
+    );
+    crate::depth_record::DepthRecord::parse(&record.to_string(), "opencode", "0.0.0").unwrap();
+    let handoff = "docs/agents/lifecycle/opencode-maintenance/HANDOFF.md";
+    let remediation = "docs/agents/lifecycle/opencode-maintenance/governance/remediation-log.md";
+    write_text(&root.join(handoff), "old handoff");
+    write_text(&root.join(remediation), "old log");
+    let live = crate::drift::check_agent_drift(&root, "opencode").unwrap();
+    let mut artifact: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join(&closeout)).unwrap()).unwrap();
+    artifact
+        .as_object_mut()
+        .unwrap()
+        .remove("explicit_none_reason");
+    artifact["deferred_findings"] = json!(live
+        .findings
+        .iter()
+        .map(|f| json!({"category_id":f.category_id(), "summary":f.summary, "surfaces":f.surfaces}))
+        .collect::<Vec<_>>());
+    write_text(&root.join(&closeout), &artifact.to_string());
+    load_linked_closeout(&root, &request, &closeout)
+        .expect("legacy closeout validates before the depth guard");
+    let paths = [
+        &closeout,
+        Path::new(record_path),
+        Path::new(handoff),
+        Path::new(remediation),
+    ];
+    let before: Vec<_> = paths
+        .iter()
+        .map(|p| fs::read(root.join(p)).unwrap())
+        .collect();
+    let error = write_closeout_outputs(&root, &request, &closeout).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("request has no exact target version"),
+        "{error}"
+    );
+    for (path, previous) in paths.into_iter().zip(before) {
+        assert_eq!(fs::read(root.join(path)).unwrap(), previous);
+    }
+}
+
+#[test]
+fn delayed_closeout_plan_refuses_retained_depth_appearing_before_apply() {
+    let (root, request, closeout) = lower_writer_fixture("d5-delayed-ordinary-plan");
+    write_text(
+        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet worker\n",
+    );
+    write_text(
+        &root.join(&request),
+        &automated_maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+    write_text(
+        &root.join(&closeout),
+        &valid_closeout_json(&root.join(&request), &request),
+    );
+    let previous = fs::read(root.join(&closeout)).unwrap();
+    let mut linked = load_linked_closeout(&root, &request, &closeout).unwrap();
+    linked.closeout.recorded_at = "2026-10-23T14:00:00Z".into();
+    let plan = crate::closeout::plan_closeout_mutations(&root, &linked).unwrap();
+
+    let mut record: serde_json::Value = serde_json::from_str(
+        &include_str!("../fixtures/depth-ci/record.json").replace("codex", "opencode"),
+    )
+    .unwrap();
+    record["policy"]["selection"]["enrollment"]["version"] = json!("1.14.47");
+    record["event"] = json!({"lifecycle_path":"maintenance", "request_commit":"abcdef1", "request_recorded_at":"2026-05-05T15:00:00Z", "trigger_kind":"upstream_release_detected", "opened_from":".github/workflows/agent-maintenance-open-pr.yml"});
+    record["policy"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["policy"]).unwrap());
+    record["obligations"]["policy_identity"] = record["policy"]["identity"].clone();
+    record["obligations"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["obligations"]).unwrap());
+    crate::depth_record::DepthRecord::parse(&record.to_string(), "opencode", "1.14.47").unwrap();
+    let record_path = "cli_manifests/opencode/reports/1.14.47/depth-record.json";
+    let record_bytes = serde_json::to_vec_pretty(&record).unwrap();
+    fs::write(root.join(record_path), &record_bytes).unwrap();
+    write_closeout_outputs(&root, &request, &closeout)
+        .expect_err("fresh writer refuses retained depth without its policy/bindings");
+    let error = plan
+        .apply(&root)
+        .expect_err("a saved plan must not bypass fresh depth admission");
+    assert!(error.to_string().contains("inputs changed"), "{error}");
+    assert_eq!(fs::read(root.join(closeout)).unwrap(), previous);
+    assert_eq!(fs::read(root.join(record_path)).unwrap(), record_bytes);
+}

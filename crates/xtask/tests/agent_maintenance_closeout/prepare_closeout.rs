@@ -333,3 +333,83 @@ fn a_request_without_a_detected_release_refuses_with_the_reason() {
 
     assert!(err.contains("no detected release"), "{err}");
 }
+
+#[test]
+fn validator_refusal_leaves_no_new_closeout_artifact() {
+    let (fixture, head) = seed_packet("d5-rejected-new-artifact", &[]);
+    let mut out = Vec::new();
+    let page = runs_page(&head, "success");
+    let error = crate::prepare_closeout::run_in_workspace_with_fetcher(
+        &fixture,
+        crate::prepare_closeout::Args {
+            request: Path::new(REQUEST_PATH).into(),
+            commit: head,
+            recorded_at: "not-a-timestamp".into(),
+            write: true,
+        },
+        &mut out,
+        |_| Ok(page.clone()),
+    )
+    .expect_err("invalid timestamp must refuse");
+    assert!(error.to_string().contains("recorded_at"), "{error}");
+    assert!(
+        !fixture.join(CLOSEOUT_PATH).exists(),
+        "refusal left a rejected artifact"
+    );
+}
+
+#[test]
+fn validator_refusal_preserves_prior_closeout_bytes_and_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+    let (fixture, head) = seed_packet("d5-rejected-existing-artifact", &[]);
+    prepare(&fixture, &head, "success", true).unwrap();
+    let path = fixture.join(CLOSEOUT_PATH);
+    let before = std::fs::read(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+    let page = runs_page(&head, "success");
+    let error = crate::prepare_closeout::run_in_workspace_with_fetcher(
+        &fixture,
+        crate::prepare_closeout::Args {
+            request: REQUEST_PATH.into(),
+            commit: head,
+            recorded_at: "invalid timestamp".into(),
+            write: true,
+        },
+        &mut Vec::new(),
+        |_| Ok(page.clone()),
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("recorded_at"), "{error}");
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+        0o640
+    );
+}
+
+#[test]
+fn concurrent_closeout_edit_during_ci_resolution_is_preserved() {
+    let (fixture, head) = seed_packet("d5-concurrent-prepare-output", &[]);
+    let page = runs_page(&head, "success");
+    let concurrent = "{\"wrapper_only_dispositions\": []}";
+    let error = crate::prepare_closeout::run_in_workspace_with_fetcher(
+        &fixture,
+        crate::prepare_closeout::Args {
+            request: REQUEST_PATH.into(),
+            commit: head,
+            recorded_at: RECORDED_AT.into(),
+            write: true,
+        },
+        &mut Vec::new(),
+        |_| {
+            write_text(&fixture.join(CLOSEOUT_PATH), concurrent);
+            Ok(page.clone())
+        },
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("inputs changed"), "{error}");
+    assert_eq!(
+        std::fs::read_to_string(fixture.join(CLOSEOUT_PATH)).unwrap(),
+        concurrent
+    );
+}

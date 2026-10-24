@@ -4,6 +4,10 @@ use std::{fs, os::unix::fs::symlink, path::Path};
 
 use serde_json::json;
 
+mod closeout_proposal {
+    pub use xtask::agent_maintenance::closeout_proposal::*;
+}
+
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }

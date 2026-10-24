@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use crate::workspace_mutation::{
-    apply_mutations, plan_create_or_replace, PlannedMutation, WorkspacePathJail,
-};
+use crate::workspace_mutation::{ApplySummary, WorkspacePathJail};
 use crate::{
     agent_lifecycle::{self, load_lifecycle_state, EvidenceId, SideState},
     agent_registry::AgentRegistry,
@@ -16,25 +14,63 @@ use super::{
     CloseoutWriteSummary, LinkedMaintenanceCloseout, MaintenanceCloseoutError,
 };
 
+/// A prospective closeout owns its invocation snapshot. It exposes no independently applicable
+/// mutation list; every caller must use the owning apply, which rechecks inputs and admission.
+pub struct CloseoutPlan {
+    proposal: super::super::closeout_proposal::Proposal,
+    files: Vec<(std::path::PathBuf, Vec<u8>)>,
+}
+impl CloseoutPlan {
+    /// Rendered artifact/doc paths; admission may additionally extend the depth record.
+    pub fn paths(&self) -> impl Iterator<Item = &Path> {
+        self.files.iter().map(|(path, _)| path.as_path())
+    }
+    pub fn apply(self, workspace_root: &Path) -> Result<ApplySummary, MaintenanceCloseoutError> {
+        self.proposal
+            .apply(workspace_root, self.files)
+            .map_err(MaintenanceCloseoutError::Validation)
+    }
+}
+
 pub fn plan_closeout_mutations(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
-) -> Result<Vec<PlannedMutation>, MaintenanceCloseoutError> {
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    let handoff_path = linked.maintenance_pack_root.join("HANDOFF.md");
-    let remediation_log_path = linked
-        .maintenance_pack_root
-        .join("governance/remediation-log.md");
+) -> Result<CloseoutPlan, MaintenanceCloseoutError> {
+    let proposal = super::super::closeout_proposal::Proposal::capture(workspace_root)
+        .map_err(MaintenanceCloseoutError::Validation)?;
+    let files = closeout_files(workspace_root, linked)?;
+    proposal
+        .check(workspace_root, &files)
+        .map_err(MaintenanceCloseoutError::Validation)?;
+    Ok(CloseoutPlan { proposal, files })
+}
 
+fn closeout_files(
+    workspace_root: &Path,
+    linked: &LinkedMaintenanceCloseout,
+) -> Result<Vec<(std::path::PathBuf, Vec<u8>)>, MaintenanceCloseoutError> {
     let closeout_bytes = serialize_closeout_json(&linked.closeout)?;
-    let handoff_bytes = render_markdown_file(render_handoff_body(linked)).into_bytes();
-    let remediation_log_bytes =
-        render_markdown_file(render_remediation_log_body(linked)).into_bytes();
-
+    // A caller reaching the lower planner with a constructed LinkedMaintenanceCloseout must
+    // satisfy the same canonical linkage and live truth checks as the file-addressed entry.
+    let validated = super::load_linked_closeout_bytes(
+        workspace_root,
+        &linked.request_path,
+        &linked.closeout_path,
+        &closeout_bytes,
+    )?;
+    let linked = &validated;
     Ok(vec![
-        plan_create_or_replace(&jail, linked.closeout_path.clone(), closeout_bytes)?,
-        plan_create_or_replace(&jail, handoff_path, handoff_bytes)?,
-        plan_create_or_replace(&jail, remediation_log_path, remediation_log_bytes)?,
+        (linked.closeout_path.clone(), closeout_bytes),
+        (
+            linked.maintenance_pack_root.join("HANDOFF.md"),
+            render_markdown_file(render_handoff_body(linked)).into_bytes(),
+        ),
+        (
+            linked
+                .maintenance_pack_root
+                .join("governance/remediation-log.md"),
+            render_markdown_file(render_remediation_log_body(linked)).into_bytes(),
+        ),
     ])
 }
 
@@ -43,14 +79,14 @@ pub fn write_closeout_outputs(
     request_path: &Path,
     closeout_path: &Path,
 ) -> Result<CloseoutWriteSummary, MaintenanceCloseoutError> {
+    let proposal = super::super::closeout_proposal::Proposal::capture(workspace_root)
+        .map_err(MaintenanceCloseoutError::Validation)?;
     let linked = super::load_linked_closeout(workspace_root, request_path, closeout_path)?;
-    let mut mutations = plan_closeout_mutations(workspace_root, &linked)?;
-    if let Some(lifecycle_mutation) =
-        plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)?
-    {
-        mutations.push(lifecycle_mutation);
+    let mut files = closeout_files(workspace_root, &linked)?;
+    if let Some(file) = plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)? {
+        files.push(file);
     }
-    let apply = apply_mutations(workspace_root, &mutations)?;
+    let apply = CloseoutPlan { proposal, files }.apply(workspace_root)?;
     Ok(CloseoutWriteSummary {
         agent_id: linked.request.agent_id.clone(),
         maintenance_pack_prefix: linked.maintenance_pack_prefix.clone(),
@@ -63,7 +99,7 @@ pub fn write_closeout_outputs(
 fn plan_lifecycle_state_after_maintenance_closeout(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
-) -> Result<Option<PlannedMutation>, MaintenanceCloseoutError> {
+) -> Result<Option<(std::path::PathBuf, Vec<u8>)>, MaintenanceCloseoutError> {
     let registry = AgentRegistry::load(workspace_root).map_err(|err| {
         MaintenanceCloseoutError::Validation(format!("load agent registry: {err}"))
     })?;
@@ -107,10 +143,6 @@ fn plan_lifecycle_state_after_maintenance_closeout(
         MaintenanceCloseoutError::Internal(format!("serialize lifecycle state: {err}"))
     })?;
     bytes.push(b'\n');
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    Ok(Some(plan_create_or_replace(
-        &jail,
-        lifecycle_state_path,
-        bytes,
-    )?))
+    WorkspacePathJail::new(workspace_root)?.resolve(Path::new(&lifecycle_state_path))?;
+    Ok(Some((lifecycle_state_path.into(), bytes)))
 }

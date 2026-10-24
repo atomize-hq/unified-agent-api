@@ -1171,22 +1171,19 @@ Present behavior that the required behavior changes:
 6. **`manifest-retain` deletes depth records.** It removes `reports/<version>/` wholesale.
 7. **Version status is a caller-supplied argument.** [Depth enrollment](#depth-enrollment) rule 7
    excludes a caller-supplied argument as authority.
-8. **`prepare-agent-closeout` writes before it validates.** When no closeout existed, a rejected
-   one is left in place (`xtask/agent_maintenance/prepare_closeout.rs:325-330`). A failed depth
-   admission MUST leave every depth-gated output unchanged.
+8. **Manual closeout now validates before delivery (D5).** The maintenance writers and their
+   lower boundaries use a checked proposal and preserve a prior artifact, or absence, on refusal.
+   Their owning depth guard and same-batch entry behavior are described in the maintenance request
+   contract's [manual closeout implementation](maintenance-request-contract-v1.md#manual-closeout-implementation-d5).
+   Production depth loading still refuses; this is not full path enablement.
 9. **Two manifest roots have no validator spec.** `cli_manifests/aider` and
    `cli_manifests/gemini_cli` hold none, and CI validates three roots. Neither may hold a depth
    record until it has one that adopts Annex B.
-10. **No route decides which generation a stand-down marker names.** `close-agent-maintenance` asks
-    whether a marker for the agent and version is on `origin/staging`
-    (`xtask/agent_maintenance/closeout.rs:174-241`). The check it calls reports whether the
-    marker's `request_recorded_at` or `request_sha256` matches the request and answers the same
-    either way (`xtask/agent_maintenance/stand_down.rs:443-481`). `prepare-agent-closeout` does not
-    ask at all, and `prepare-agent-maintenance` reads no marker: only the workflows ask before they
-    call it (`wf/agent-maintenance-open-pr.yml:101-142`, `wf/parity-acquire.yml:560-624`). The
-    [maintenance request contract](maintenance-request-contract-v1.md#packet-freeze) requires the
-    closeout commands and the integration step to establish that the marker names the generation
-    they accept.
+10. **D5 adds generation-specific manual closeout authority.** Its depth guard requires the marker
+    for the exact generation on the pinned integration tip. The automation stand-down predicate
+    still treats a version-level marker protectively when its generation binding differs.
+    Preparation and final integration retain their separate enforcement work; D5 does not enable
+    production depth or replace the independent integration check.
 
 ### A.5 Promotion after the working files were replaced
 

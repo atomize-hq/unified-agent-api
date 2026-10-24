@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeSet,
-    fs, io,
+    fs,
     path::{Component, Path, PathBuf},
 };
 
@@ -55,6 +55,22 @@ pub fn load_linked_closeout(
     request_path: &Path,
     closeout_path: &Path,
 ) -> Result<LinkedMaintenanceCloseout, MaintenanceCloseoutError> {
+    let jail = WorkspacePathJail::new(workspace_root)?;
+    let resolved = jail.resolve(closeout_path)?;
+    let bytes = fs::read(&resolved).map_err(|err| {
+        MaintenanceCloseoutError::Validation(format!("read {}: {err}", closeout_path.display()))
+    })?;
+    load_linked_closeout_bytes(workspace_root, request_path, closeout_path, &bytes)
+}
+
+/// Validate prospective bytes with the same canonical path, linkage and live truth checks.
+/// The artifact does not need to be written before the owning route can validate it.
+pub(crate) fn load_linked_closeout_bytes(
+    workspace_root: &Path,
+    request_path: &Path,
+    closeout_path: &Path,
+    bytes: &[u8],
+) -> Result<LinkedMaintenanceCloseout, MaintenanceCloseoutError> {
     let loaded_request = load_request_artifact(workspace_root, request_path)?;
     let request_path = loaded_request.request_path.clone();
     let maintenance_pack_prefix = loaded_request.maintenance_pack_prefix.clone();
@@ -68,21 +84,12 @@ pub fn load_linked_closeout(
         )));
     }
 
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    let resolved_closeout_path = jail.resolve(&closeout_path)?;
-    let closeout_text =
-        fs::read_to_string(&resolved_closeout_path).map_err(|err| match err.kind() {
-            io::ErrorKind::NotFound => MaintenanceCloseoutError::Validation(format!(
-                "read {}: {err}",
-                closeout_path.display()
-            )),
-            _ => MaintenanceCloseoutError::Validation(format!(
-                "read {}: {err}",
-                closeout_path.display()
-            )),
-        })?;
+    WorkspacePathJail::new(workspace_root)?.resolve(&closeout_path)?;
+    let closeout_text = std::str::from_utf8(bytes).map_err(|err| {
+        MaintenanceCloseoutError::Validation(format!("read {}: {err}", closeout_path.display()))
+    })?;
     let raw_closeout =
-        serde_json::from_str::<RawMaintenanceCloseout>(&closeout_text).map_err(|err| {
+        serde_json::from_str::<RawMaintenanceCloseout>(closeout_text).map_err(|err| {
             MaintenanceCloseoutError::Validation(format!(
                 "parse {}: {err}",
                 closeout_path.display()
