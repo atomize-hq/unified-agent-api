@@ -20,11 +20,3 @@ pub fn apply_mutations(
     }
     apply_admitted_mutations(workspace_root, mutations)
 }
-
-/// Only owning routes which independently admit their whole proposal may use this boundary.
-pub(crate) fn apply_admitted_mutations(
-    workspace_root: &Path,
-    mutations: &[PlannedMutation],
-) -> Result<ApplySummary, WorkspaceMutationError> {
-    apply_with_hook(workspace_root, mutations, |_| Ok(()))
-}

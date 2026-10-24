@@ -277,8 +277,15 @@ impl WorkspacePathJail {
 
 #[path = "workspace_mutation/delivery.rs"]
 mod delivery;
-pub(crate) use delivery::apply_admitted_mutations;
 pub use delivery::apply_mutations;
+
+/// Only owning routes which independently admit their whole proposal may use this boundary.
+pub(crate) fn apply_admitted_mutations(
+    workspace_root: &Path,
+    mutations: &[PlannedMutation],
+) -> Result<ApplySummary, WorkspaceMutationError> {
+    apply_with_hook(workspace_root, mutations, |_| Ok(()))
+}
 
 fn apply_with_hook(
     workspace_root: &Path,
