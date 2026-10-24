@@ -1,7 +1,10 @@
 //! Invocation-local closeout proposal. Observation and expected-before repair are not a lock.
 use crate::{
     runtime_advertising::source::Source,
-    workspace_mutation::{apply_mutations, ApplySummary, PlannedMutation, WorkspacePathJail},
+    workspace_mutation::{
+        apply_admitted_mutations as apply_mutations, ApplySummary, PlannedMutation,
+        WorkspacePathJail,
+    },
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -59,6 +62,24 @@ impl Proposal {
             &BTreeSet<String>,
         ) -> Result<BTreeMap<String, Vec<u8>>, String>,
     ) -> Result<Vec<PlannedMutation>, String> {
+        self.plan_changes(
+            root,
+            files.into_iter().map(|(p, b)| (p, Some(b))).collect(),
+            admit,
+        )
+    }
+
+    pub(crate) fn plan_changes(
+        &self,
+        root: &Path,
+        files: Vec<(PathBuf, Option<Vec<u8>>)>,
+        admit: impl FnOnce(
+            &Path,
+            Source,
+            Source,
+            &BTreeSet<String>,
+        ) -> Result<BTreeMap<String, Vec<u8>>, String>,
+    ) -> Result<Vec<PlannedMutation>, String> {
         let mut proposed = BTreeMap::new();
         let mut after = self.before.files.clone();
         for (path, bytes) in files {
@@ -83,7 +104,11 @@ impl Proposal {
                 .get(&name)
                 .map(|(_, m)| *m)
                 .unwrap_or(0o644);
-            after.insert(name, (bytes, mode));
+            if let Some(bytes) = bytes {
+                after.insert(name, (bytes, mode));
+            } else {
+                after.remove(&name);
+            }
         }
         let entries = admit(
             root,
@@ -92,7 +117,7 @@ impl Proposal {
             &proposed.keys().cloned().collect(),
         )?;
         for (path, bytes) in entries {
-            if proposed.insert(path, bytes).is_some() {
+            if proposed.insert(path, Some(bytes)).is_some() {
                 return Err("acceptance entry overwrites another proposed output".into());
             }
         }
@@ -105,13 +130,34 @@ impl Proposal {
             .into_iter()
             .map(|(path, bytes)| {
                 Ok(match self.before.files.get(&path) {
-                    Some((old, mode)) => {
-                        PlannedMutation::replace(path, old.clone(), bytes).with_expected_mode(*mode)
+                    Some((old, mode)) => match bytes {
+                        Some(bytes) => PlannedMutation::replace(path, old.clone(), bytes),
+                        None => PlannedMutation::remove(path, old.clone()),
                     }
-                    None => PlannedMutation::create(path, bytes),
+                    .with_expected_mode(*mode),
+                    None => {
+                        PlannedMutation::create(path, bytes.ok_or("cannot retire an absent file")?)
+                    }
                 })
             })
             .collect()
+    }
+
+    /// Materialize only observed regular inputs for existing file-based renderers. No caller writes.
+    pub(crate) fn materialize(&self, destination: &Path) -> Result<(), String> {
+        for (path, (bytes, mode)) in &self.before.files {
+            let target = destination.join(path);
+            fs::create_dir_all(target.parent().ok_or("missing parent")?)
+                .map_err(|e| e.to_string())?;
+            fs::write(&target, bytes).map_err(|e| e.to_string())?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(target, fs::Permissions::from_mode(*mode))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        Ok(())
     }
 
     pub fn apply(

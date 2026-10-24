@@ -722,15 +722,6 @@ pub fn file_sha256(workspace_root: &Path, relative_path: &str) -> Result<String,
     storage::file_sha256(workspace_root, relative_path)
 }
 
-pub fn write_lifecycle_state(
-    workspace_root: &Path,
-    relative_path: &str,
-    state: &LifecycleState,
-) -> Result<(), LifecycleError> {
-    state.validate()?;
-    storage::write_json_file(workspace_root, relative_path, state)
-}
-
 pub fn load_lifecycle_state(
     workspace_root: &Path,
     relative_path: &str,
@@ -738,15 +729,6 @@ pub fn load_lifecycle_state(
     let state: LifecycleState = storage::load_json_file(workspace_root, relative_path)?;
     state.validate_in_workspace(workspace_root)?;
     Ok(state)
-}
-
-pub fn write_publication_ready_packet(
-    workspace_root: &Path,
-    relative_path: &str,
-    packet: &PublicationReadyPacket,
-) -> Result<(), LifecycleError> {
-    packet.validate()?;
-    storage::write_json_file(workspace_root, relative_path, packet)
 }
 
 pub fn load_publication_ready_packet(
@@ -757,3 +739,5 @@ pub fn load_publication_ready_packet(
     packet.validate_in_workspace(workspace_root)?;
     Ok(packet)
 }
+
+pub use storage::{write_lifecycle_state, write_publication_ready_packet};

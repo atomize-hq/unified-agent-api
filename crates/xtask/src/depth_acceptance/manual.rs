@@ -19,7 +19,7 @@ use std::{
     path::Path,
 };
 
-trait Host {
+pub(super) trait Host {
     fn bindings(
         &self,
         root: &Path,
@@ -193,7 +193,7 @@ fn integration_tip(root: &Path) -> Result<String, String> {
         .map(|s| s.trim().to_owned())
         .map_err(|e| e.to_string())
 }
-fn admitted(
+pub(super) fn admitted(
     root: &Path,
     view: &View,
     record: &DepthRecord,

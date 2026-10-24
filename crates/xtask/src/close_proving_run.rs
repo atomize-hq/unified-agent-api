@@ -92,6 +92,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if true {
+        xtask::depth_routes::refuse_workspace(workspace_root, "close_proving_run")
+            .map_err(Error::Validation)?;
+    }
     let approval_path = normalize_repo_relative_path(workspace_root, &args.approval, "--approval")?;
     let closeout_path = normalize_repo_relative_path(workspace_root, &args.closeout, "--closeout")?;
     let onboarding_pack_prefix = onboarding_pack_prefix_from_closeout_path(&closeout_path)?;

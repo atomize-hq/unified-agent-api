@@ -3,6 +3,7 @@ use super::*;
 #[cfg(unix)]
 #[tokio::test]
 async fn cloud_list_parses_json_and_maps_args() {
+    let _guard = env_guard_async().await;
     let dir = tempfile::tempdir().unwrap();
     let script_path = write_fake_codex(
         dir.path(),
@@ -41,6 +42,7 @@ JSON
 #[cfg(unix)]
 #[tokio::test]
 async fn cloud_exec_maps_args_and_rejects_empty_env_id() {
+    let _guard = env_guard_async().await;
     let dir = tempfile::tempdir().unwrap();
     let script_path = write_fake_codex(
         dir.path(),

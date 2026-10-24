@@ -1028,7 +1028,7 @@ an acceptance effect.
 | MA3 | `refresh-agent --write` | A maintainer. No workflow runs it | Maintenance | Support publication, runtime-support projection, capability publication (`xtask/agent_maintenance/refresh.rs:137-228`) | Packet branch, then IN1 |
 | MA4 | `execute-agent-maintenance --write` | A maintainer or contributor | Maintenance | Every depth-gated output in its frozen write envelope (`xtask/agent_maintenance/contract_policy.rs:363-386`): `reports/<version>/`, where the depth record lives; the version file; support publication; the runtime-support projection; `crates/agent_api/**`, which carries capability advertising; and the maintenance root, which holds the request and the stand-down markers. D4 checks reporting-only effects across retained tuples and all agents before delivery, refusing closeout/acceptance effects and request/marker changes (`xtask/agent_maintenance/execute/{guarded,candidate}.rs`, `xtask/depth_acceptance/relay.rs`). Execution uses independent candidate files/Git metadata; the candidate is not an OS sandbox | Packet branch, then IN1 |
 | MA5 | `close-agent-maintenance`, `prepare-agent-closeout` | A maintainer. No workflow calls either | Maintenance | Maintenance closeout; lifecycle record (`maintenance_closeout_written`, cleared drift) (`xtask/agent_maintenance/closeout/write.rs:41-115`, `xtask/agent_maintenance/prepare_closeout.rs:272-290`) | Packet branch, then IN1 |
-| MA6 | Promotion | `wf/parity-promote.yml:274-344`, dispatched by a maintainer | Maintenance | Root and per-target pointers and `current.json` (shell, `:285-308`); version metadata with `--status validated`; stand-down marker removal (shell, `:324-326`); support publication; runtime-support projection | Promotion PR against `staging` (`:367-376`), then IN1 |
+| MA6 | Promotion | `wf/parity-promote.yml` invokes `xtask manifest-promote`, dispatched by a maintainer | Maintenance | One checked proposal for root/per-target pointers, current union, validated metadata, marker retirement, record entry and complete support/runtime/capability publication (D6 bounded implementation below) | Promotion PR against `staging` (`:367-376`), then IN1 |
 | ON1 | `onboard-agent --write` | A maintainer | Onboarding | Scaffolds the manifest root with a `current.json` and placeholder directories (`xtask/onboard_agent/preview.rs:282-320`); creates the lifecycle record at `enrolled` (`xtask/onboard_agent.rs:346`) | Branch, then IN1 |
 | ON2 | `runtime-follow-on`, `repair-runtime-evidence` | A maintainer | Onboarding | Lifecycle record, stages before `published` only (`xtask/runtime_follow_on/lifecycle.rs:133,176`; `xtask/repair_runtime_evidence.rs:380`) | Branch, then IN1 |
 | ON3 | `prepare-publication` | A maintainer | Onboarding | Lifecycle record to `publication_ready`, with the publication packet it will report (`xtask/prepare_publication.rs:431`) | Branch, then IN1 |
@@ -1551,3 +1551,47 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
 - The repository's existing content identities are SHA-256 digests of a file's bytes, such as
   `request_sha256`, of a rendered text, such as `prompt_sha256`, or of a typed value's
   serialization, such as a proving-run closeout's `release_watch_sha256`.
+
+### D6 bounded promotion implementation
+
+`xtask manifest-promote --agent <agent> --version <version> --validation-commit <sha>
+--passed-target <target>...` plans a maintenance promotion without writing the caller workspace;
+`--write` applies its opaque proposal. The owning command MUST bind validation to the same clean
+HEAD and locally fetched `origin/staging` commit at planning and apply. Workflow validation jobs
+and the promotion checkout MUST use the plan's pinned commit. A moved integration tip requires
+new validation; acquired union membership alone MUST NOT supply passed targets.
+
+The proposal includes version metadata, root/per-target pointers, `current.json`, support JSON,
+Markdown and runtime projection, capability publication, any matching promotion entries and the
+promoted version's marker retirement. It renders into a disposable observed-input view and runs
+canonical manifest validation before caller delivery. Unvalidated targets' pointers are preserved;
+if their existing pointers contradict the proposed metadata, the candidate MUST refuse. It keeps
+the lifecycle's existing version-order policy, including proposing an earlier retained version.
+
+For every actual depth acceptance destination, including another agent affected by aggregate
+publication, the private owning admission core MUST require maintenance lifecycle authority, a
+closeout entry for the current record statement, independently current P/O/E and bound evidence,
+and current debt. It reuses manual closeout's due-obligation and unresolved-work refusal. It MUST
+preserve historical entries and append the promotion's own current-digest entry in the same batch.
+A replaced working request/closeout does not replace the durable entry's authority (Annex A.5).
+A marker present on the integration tip MUST match that generation and be retired in the same
+proposal. Timestamp-bound markers remain usable after working-file replacement; a hash-only marker
+requires exact closeout bytes that establish its request digest, otherwise promotion refuses.
+
+Unsupported onboarding, neutral generators, fix/retention/legacy/backfill routes and exported lower
+writers conservatively refuse writes when a declaration or retained depth record is present in
+scope, including proposed declarations/records and authority above a caller-supplied nested root.
+Every scratch output MUST be jailed before any write, even in read-only planning. Their read-only
+modes remain available. The public generic mutation writer supplies no
+lifecycle authority; checked owning routes use a crate-private delivery core after their own
+admission. This prevents a cached raw mutation list or a caller-supplied publication/refresh bundle
+from bypassing an owning route. Existing expected-before rollback handles marker deletion alongside
+writes, preserving an observed concurrent replacement and keeping recovery backups on conflict.
+Observation and repair are best effort, not a filesystem lock or crash-atomic multi-file commit.
+
+These are bounded command and workflow guards. Normal production registry loading still refuses
+depth enrollment, and the production evidence boundary still cannot qualify a complete promise.
+Private fixed-producer tests prove admission composition, not authenticated production adequacy.
+D7's exact-result IN1 admission, route inventory re-establishment and the full isolated maintenance
+chain remain required before separately authorized production enrollment. D6 does not install host
+settings, merge its own PR or create a background automation.

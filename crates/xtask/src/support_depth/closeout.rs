@@ -10,6 +10,20 @@ pub(crate) fn current_closeout_bindings(
     root: &Path,
     record: &DepthRecord,
 ) -> Result<(PolicyPart, ObligationsPart), String> {
+    current_bindings(root, record, true)
+}
+
+pub(crate) fn current_promotion_bindings(
+    root: &Path,
+    record: &DepthRecord,
+) -> Result<(PolicyPart, ObligationsPart), String> {
+    current_bindings(root, record, false)
+}
+fn current_bindings(
+    root: &Path,
+    record: &DepthRecord,
+    require_request: bool,
+) -> Result<(PolicyPart, ObligationsPart), String> {
     let mut view = GitInputs::new(root)?;
     let agent = &record.policy.selection.agent_id;
     let version = &record.policy.selection.enrollment.version;
@@ -37,7 +51,11 @@ pub(crate) fn current_closeout_bindings(
     )?
     .ok_or("closeout lost depth enrollment")?;
     check_current_policy(&record.policy, &policy)?;
-    let request = view.required(&maintenance_request_path(agent))?;
+    let request = if require_request {
+        view.required(&maintenance_request_path(agent))?
+    } else {
+        b"".to_vec()
+    };
     let request: serde_json::Value =
         toml_edit::de::from_str(text(&request)?).map_err(|e| e.to_string())?;
     let string = |key: &str| {
@@ -45,22 +63,27 @@ pub(crate) fn current_closeout_bindings(
             .as_str()
             .ok_or_else(|| format!("missing closeout request {key}"))
     };
-    let event = Event::Maintenance {
-        request_commit: string("request_commit")?.into(),
-        request_recorded_at: string("request_recorded_at")?.into(),
-        trigger_kind: string("trigger_kind")?.into(),
-        opened_from: string("opened_from")?.into(),
+    let event = if require_request {
+        Event::Maintenance {
+            request_commit: string("request_commit")?.into(),
+            request_recorded_at: string("request_recorded_at")?.into(),
+            trigger_kind: string("trigger_kind")?.into(),
+            opened_from: string("opened_from")?.into(),
+        }
+    } else {
+        record.event.clone()
     };
-    if event != record.event
-        || request["agent_id"] != *agent
-        || request["detected_release"]["target_version"] != *version
-        || request["support_depth"]["policy_identity"] != policy.identity
-        || request["support_depth"]["obligations_identity"]
-            != record
-                .obligations
-                .as_ref()
-                .ok_or("closeout requires O")?
-                .identity
+    if require_request
+        && (event != record.event
+            || request["agent_id"] != *agent
+            || request["detected_release"]["target_version"] != *version
+            || request["support_depth"]["policy_identity"] != policy.identity
+            || request["support_depth"]["obligations_identity"]
+                != record
+                    .obligations
+                    .as_ref()
+                    .ok_or("closeout requires O")?
+                    .identity)
     {
         return Err("closeout request is not the exact current generation/P/O".into());
     }

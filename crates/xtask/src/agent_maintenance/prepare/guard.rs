@@ -1,5 +1,6 @@
 //! Preparation-local binding, not write authority or a cross-route lock.
 use super::*;
+use crate::workspace_mutation::apply_admitted_mutations as apply_mutations;
 use crate::{agent_registry::REGISTRY_RELATIVE_PATH, runtime_advertising::source::Source};
 use std::{collections::BTreeMap, fs, process::Command};
 

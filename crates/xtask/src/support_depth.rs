@@ -7,7 +7,7 @@
 
 mod acquisition;
 mod closeout;
-pub(crate) use closeout::current_closeout_bindings;
+pub(crate) use closeout::{current_closeout_bindings, current_promotion_bindings};
 pub mod debt;
 mod freeze;
 use crate::git_inputs;

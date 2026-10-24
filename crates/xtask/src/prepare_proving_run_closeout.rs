@@ -103,6 +103,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if !args.check {
+        xtask::depth_routes::refuse_workspace(workspace_root, "prepare_proving_run_closeout")
+            .map_err(Error::Validation)?;
+    }
     let context = build_context(workspace_root, &args)?;
 
     if args.check {

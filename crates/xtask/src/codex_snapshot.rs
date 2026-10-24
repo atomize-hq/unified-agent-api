@@ -80,6 +80,12 @@ pub enum Error {
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
+    if args.out_file.is_none() {
+        if let Some(root) = &args.out_dir {
+            xtask::depth_routes::refuse_destination(root, "legacy snapshot")
+                .map_err(Error::RulesUnsupported)?;
+        }
+    }
     let codex_binary = fs::canonicalize(&args.codex_binary)
         .map_err(|_| Error::InvalidCodexBinary(args.codex_binary.clone()))?;
     if !codex_binary.is_file() {

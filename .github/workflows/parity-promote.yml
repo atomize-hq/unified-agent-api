@@ -9,7 +9,8 @@ name: Parity promote
 # Per-agent behavior — validation commands, per-target runners, download URLs, archive shape — is
 # read from `cli_manifests/<agent>/RULES.json` through `xtask manifest-acquisition-plan`. The
 # validation matrix is intersected with the committed union's `inputs[]`, so only targets that
-# actually produced a snapshot are validated and promoted.
+# actually produced a snapshot are validated. The owning Rust command admits the proposal
+# using the targets whose validation jobs all passed against the same pinned revision.
 #
 # Migration note: a version acquired before this lane existed has lockfile rows keyed on the old
 # per-agent asset names, which this workflow cannot match. Re-run `parity-acquire.yml` for such a
@@ -68,6 +69,7 @@ jobs:
       validation_matrix: ${{ steps.matrix.outputs.validation_matrix }}
       manifest_root: ${{ steps.matrix.outputs.manifest_root }}
       required_target: ${{ steps.matrix.outputs.required_target }}
+      validation_commit: ${{ steps.matrix.outputs.validation_commit }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -99,17 +101,6 @@ jobs:
           test -f "$UNION"
           test -f "${ROOT}/artifacts.lock.json"
 
-          # `union.promotion_policy.allow_promote_when_incomplete` is committed policy, so honor it
-          # rather than assuming either answer. codex and claude_code deliberately allow a
-          # linux-first promotion; an agent that has not declared a stance does not get one.
-          COMPLETE="$(jq -r '.complete' "$UNION")"
-          ALLOW_INCOMPLETE="$(jq -r '.allow_promote_when_incomplete' _ci_tmp/acquisition-plan.json)"
-          if [ "$COMPLETE" != "true" ] && [ "$ALLOW_INCOMPLETE" != "true" ]; then
-            echo "::error title=Incomplete union::${UNION} has complete=false and ${ROOT}/RULES.json does not set union.promotion_policy.allow_promote_when_incomplete. Re-run parity-acquire until the union is complete." >&2
-            exit 1
-          fi
-          echo "union complete=${COMPLETE}; manifest allows incomplete promotion=${ALLOW_INCOMPLETE}"
-
           # Only promote targets the committed union actually contains: promoting a pointer for a
           # target that never produced a snapshot would publish a support claim with no evidence.
           jq -c \
@@ -123,6 +114,7 @@ jobs:
             _ci_tmp/validation-matrix.json > /dev/null
 
           {
+            echo "validation_commit=$(git rev-parse HEAD)"
             echo "validation_matrix=$(cat _ci_tmp/validation-matrix.json)"
             echo "manifest_root=${ROOT}"
             echo "required_target=${REQUIRED_TARGET}"
@@ -153,7 +145,7 @@ jobs:
         run: git config --global core.longpaths true
       - uses: actions/checkout@v5
         with:
-          ref: staging
+          ref: ${{ needs.plan.outputs.validation_commit }}
           # This job runs the pinned upstream binary and this agent's declared validation
           # commands. A persisted credential would sit in .git/config, readable by that binary,
           # until post-job cleanup. The job never talks to this repository's remote.
@@ -264,76 +256,40 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - name: Require the promotion delivery token
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+        run: |
+          test -n "$AUTOMATION_TOKEN" || { echo "::error::Promotion PR delivery requires AUTOMATION_TOKEN"; exit 1; }
+
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: staging
+          ref: ${{ needs.plan.outputs.validation_commit }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Advance pointers and version metadata
+      - name: Apply the guarded promotion proposal
         shell: bash
         env:
           AGENT_ID: ${{ inputs.agent_id }}
           VERSION: ${{ inputs.version }}
-          ROOT: ${{ needs.plan.outputs.manifest_root }}
-          REQUIRED_TARGET: ${{ needs.plan.outputs.required_target }}
+          VALIDATION_COMMIT: ${{ needs.plan.outputs.validation_commit }}
+          VALIDATION_MATRIX: ${{ needs.plan.outputs.validation_matrix }}
         run: |
           set -euo pipefail
-          UNION="${ROOT}/snapshots/${VERSION}/union.json"
-
-          printf '%s\n' "$VERSION" > "${ROOT}/latest_validated.txt"
-          printf '%s\n' "$VERSION" > "${ROOT}/pointers/latest_validated/${REQUIRED_TARGET}.txt"
-          cp "$UNION" "${ROOT}/current.json"
-
+          git fetch origin staging
           VALIDATION_ARGS=()
           while IFS= read -r target; do
             [ -n "$target" ] || continue
             VALIDATION_ARGS+=(--passed-target "$target")
-          done < <(jq -r '.inputs[].target_triple' "$UNION" | tr -d '\r')
-
-          cargo run -p xtask -- manifest-version-metadata \
-            --root "$ROOT" \
-            --version "$VERSION" \
-            --status validated \
-            "${VALIDATION_ARGS[@]}"
-
-          while IFS= read -r target; do
-            [ -n "$target" ] || continue
-            printf '%s\n' "$VERSION" > "${ROOT}/pointers/latest_validated/${target}.txt"
-          done < <(jq -r '.validation.passed_targets[]?' "${ROOT}/versions/${VERSION}.json" | tr -d '\r')
-
-          while IFS= read -r target; do
-            [ -n "$target" ] || continue
-            printf '%s\n' "$VERSION" > "${ROOT}/pointers/latest_supported/${target}.txt"
-          done < <(jq -r '.coverage.supported_targets[]?' "${ROOT}/versions/${VERSION}.json" | tr -d '\r')
-
-          # Retire this version's stand-down marker, if a maintainer froze the packet.
-          #
-          # This is the only place a marker is removed, and it is here rather than in the nightly
-          # for four reasons. One commit: a failed cleanup leaves an extra marker, and a failed
-          # promotion never leaves a missing one. A maintainer merge: automation proposes the
-          # unfreeze, it does not perform it. Exactly one version named: a second frozen generation
-          # for the same agent is untouched. And correct timing: the repository only reads
-          # `status: validated` once this PR lands, which is the moment the packet is finished.
-          #
-          # Tying cleanup to a *new version* instead was rejected. Upstream cadence says nothing
-          # about whether the previous packet completed — codex ships near-daily and a closeout
-          # spans days — so a newer version's first run would delete the marker of the packet being
-          # worked on, which is the supersession hazard the guard exists to prevent.
-          MARKER="docs/agents/lifecycle/${AGENT_ID}-maintenance/governance/automation-stand-down/${VERSION}.toml"
-          if [ -f "$MARKER" ]; then
-            rm -f "$MARKER"
-            echo "Retired the stand-down marker for ${AGENT_ID} ${VERSION}: ${MARKER}"
-          else
-            echo "No stand-down marker to retire for ${AGENT_ID} ${VERSION}."
-          fi
-
-      - name: Refresh support publication
-        shell: bash
-        run: |
-          set -euo pipefail
-          cargo run -p xtask -- support-matrix
+          done < <(jq -r '.include[].target_triple' <<<"$VALIDATION_MATRIX" | tr -d '\r')
+          cargo run -p xtask -- manifest-promote \
+            --agent "$AGENT_ID" --version "$VERSION" \
+            --validation-commit "$VALIDATION_COMMIT" \
+            "${VALIDATION_ARGS[@]}" --write
 
       - name: Validate the promoted artifacts (hard gate)
         shell: bash
@@ -367,7 +323,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          token: ${{ secrets.AUTOMATION_TOKEN }}
           base: staging
           commit-message: "chore(${{ inputs.agent_id }}): promote ${{ inputs.version }}"
           title: "chore(${{ inputs.agent_id }}): promote ${{ inputs.version }}"

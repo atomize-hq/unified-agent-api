@@ -28,6 +28,8 @@ pub struct Args {
 pub enum RetainError {
     #[error("--root is required (no manifest root default is available for this subcommand)")]
     MissingRoot,
+    #[error("{0}")]
+    Depth(String),
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
     #[error("failed to parse JSON: {0}")]
@@ -70,6 +72,10 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
         .or_else(|| default_root.map(PathBuf::from))
         .ok_or(RetainError::MissingRoot)?;
     let root = fs::canonicalize(&requested_root).unwrap_or(requested_root);
+    if args.apply {
+        xtask::depth_routes::refuse_manifest(&root, "manifest-retain")
+            .map_err(RetainError::Depth)?;
+    }
     let rules_path = args
         .rules
         .clone()

@@ -102,6 +102,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if args.write {
+        xtask::depth_routes::refuse_workspace(workspace_root, "repair_runtime_evidence")
+            .map_err(Error::Validation)?;
+    }
     let context = build_context(workspace_root, &args)?;
     let run_id = repair_run_id(&context.approval.descriptor.agent_id);
     write_header(writer, &context, &run_id, args.write)?;
