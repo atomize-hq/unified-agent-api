@@ -121,11 +121,11 @@ fn an_unchanged_onboarding_statement_needs_no_surviving_approval() {
     rec["event"] = json!({ "lifecycle_path": "onboarding", "approval_commit": COMMIT, "approval_recorded_at": RECORDED_AT });
     rec["policy"]["selection"]["enrollment"]["lifecycle_path"] = json!("onboarding");
     seal(&mut rec);
+    rec["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": "a".repeat(64) }]);
     write_record(&root, &rec);
     git(temp.path(), &["add", "."]);
     git(temp.path(), &["commit", "-qm", "onboarding record"]);
     let tip = git(temp.path(), &["rev-parse", "HEAD"]);
-    rec["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": "a".repeat(64) }]);
     write_record(&root, &rec);
     let (status, report) = compare(&root, &tip);
     assert_eq!(status, 0, "{report}");

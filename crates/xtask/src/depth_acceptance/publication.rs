@@ -3,7 +3,7 @@ use crate::support_matrix::{self, SupportMatrixArtifact};
 use std::{collections::BTreeSet, path::Path};
 
 type Qualification = (String, String, String, String);
-fn qualifications(view: &View) -> Result<BTreeSet<Qualification>, String> {
+pub(super) fn qualifications(view: &View) -> Result<BTreeSet<Qualification>, String> {
     let path = support_matrix::JSON_OUTPUT_PATH;
     let artifact: SupportMatrixArtifact =
         serde_json::from_value(view.json(path)?).map_err(|e| e.to_string())?;

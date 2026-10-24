@@ -422,3 +422,5 @@ fn concurrent_output_edit_between_plan_and_apply_is_preserved() {
 mod regressions;
 
 mod promotions;
+
+mod integration;

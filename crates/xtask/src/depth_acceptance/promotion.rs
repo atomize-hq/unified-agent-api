@@ -14,7 +14,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
-struct Production;
+pub(super) struct Production;
 impl manual::Host for Production {
     fn bindings(
         &self,
@@ -84,79 +84,15 @@ pub(super) fn plan_with(
                 .records
                 .get(&version)
                 .ok_or("promotion has no destination depth record")?;
-            if record.policy.selection.enrollment.lifecycle_path != LifecyclePath::Maintenance
-                || !record.policy.path_enabled
-            {
-                return Err("promotion has no maintenance lifecycle-path authority".into());
-            }
-            let digest = record.stated_sha256()?;
-            let closeout = record
-                .acceptance_entries
-                .iter()
-                .find_map(|e| match e {
-                    AcceptanceEntry::MaintenanceCloseout {
-                        closeout,
-                        record_sha256,
-                    } if *record_sha256 == digest => Some(closeout),
-                    _ => None,
-                })
-                .ok_or("promotion requires a current retained maintenance closeout entry")?;
-            let expected = format!(
-                "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
-                entry.agent_id
-            );
-            if closeout.path != expected {
-                return Err("promotion closeout entry has wrong agent/path".into());
-            }
-            manual::admitted(root, &new, record, host)?;
-            let marker = crate::agent_maintenance::stand_down::marker_relative_path(
-                &format!("docs/agents/lifecycle/{}-maintenance", entry.agent_id),
-                &version,
-            );
-            if let Some(raw) = Source::tip(root, &tip)?.optional(&marker)? {
-                let Event::Maintenance {
-                    request_recorded_at,
-                    ..
-                } = &record.event
-                else {
-                    return Err("promotion is not a maintenance generation".into());
-                };
-                // Timestamp markers survive working-file replacement. A hash-only marker still
-                // requires its exact retained closeout bytes; an unrelated newer closeout cannot bind it.
-                let request_hash = match new.source.optional(&closeout.path)? {
-                    Some(raw) if artifacts::digest(&raw) == closeout.sha256 => {
-                        text(&super::input::json(&raw)?, "request_sha256")?.to_owned()
-                    }
-                    _ => String::new(),
-                };
-                crate::agent_maintenance::stand_down::require_generation_marker(
-                    &entry.agent_id,
-                    &version,
-                    &raw,
-                    request_recorded_at,
-                    &request_hash,
-                )?;
-                if new.source.optional(&marker)?.is_some() {
-                    return Err(
-                        "promotion must retire its integration marker in the same proposal".into(),
-                    );
-                }
-            }
-            let mut targets = BTreeSet::new();
-            for effect in comparison.effects.iter().filter(|e| e.version == version) {
-                if let Some(t) = &effect.target {
-                    targets.insert(t.clone());
-                }
-            }
-            let selected = crate::support_matrix::depth::covered_targets(record);
-            if targets.is_empty() {
-                targets.extend(selected.into_iter().map(str::to_owned));
-            }
+            let own = acceptance(
+                root,
+                &new,
+                record,
+                &Source::tip(root, &tip)?,
+                &comparison.effects,
+                host,
+            )?;
             let mut accepted = record.clone();
-            let own = AcceptanceEntry::Promotion {
-                targets: targets.into_iter().collect(),
-                record_sha256: digest,
-            };
             if !accepted.acceptance_entries.contains(&own) {
                 accepted.acceptance_entries.push(own);
             }
@@ -176,6 +112,88 @@ pub(super) fn plan_with(
     }
     Ok(outputs)
 }
+/// Same predicate and target attribution for local promotion and exact-result integration.
+pub(super) fn acceptance(
+    root: &Path,
+    view: &View,
+    record: &DepthRecord,
+    tip: &Source,
+    effects: &[super::Effect],
+    host: &impl manual::Host,
+) -> Result<AcceptanceEntry, String> {
+    let version = record.policy.selection.enrollment.version.clone();
+    if record.policy.selection.enrollment.lifecycle_path != LifecyclePath::Maintenance
+        || !record.policy.path_enabled
+    {
+        return Err("promotion has no maintenance lifecycle-path authority".into());
+    }
+    let digest = record.stated_sha256()?;
+    let closeout = record
+        .acceptance_entries
+        .iter()
+        .find_map(|e| match e {
+            AcceptanceEntry::MaintenanceCloseout {
+                closeout,
+                record_sha256,
+            } if *record_sha256 == digest => Some(closeout),
+            _ => None,
+        })
+        .ok_or("promotion requires a current retained maintenance closeout entry")?;
+    let expected = format!(
+        "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
+        view.entry.agent_id
+    );
+    if closeout.path != expected {
+        return Err("promotion closeout entry has wrong agent/path".into());
+    }
+    manual::admitted(root, view, record, host)?;
+    let marker = crate::agent_maintenance::stand_down::marker_relative_path(
+        &format!("docs/agents/lifecycle/{}-maintenance", view.entry.agent_id),
+        &version,
+    );
+    if let Some(raw) = tip.optional(&marker)? {
+        let Event::Maintenance {
+            request_recorded_at,
+            ..
+        } = &record.event
+        else {
+            return Err("promotion is not a maintenance generation".into());
+        };
+        // Timestamp markers survive working-file replacement. A hash-only marker still
+        // requires its exact retained closeout bytes; an unrelated newer closeout cannot bind it.
+        let request_hash = match view.source.optional(&closeout.path)? {
+            Some(raw) if artifacts::digest(&raw) == closeout.sha256 => {
+                text(&super::input::json(&raw)?, "request_sha256")?.to_owned()
+            }
+            _ => String::new(),
+        };
+        crate::agent_maintenance::stand_down::require_generation_marker(
+            &view.entry.agent_id,
+            &version,
+            &raw,
+            request_recorded_at,
+            &request_hash,
+        )?;
+        if view.source.optional(&marker)?.is_some() {
+            return Err("promotion must retire its integration marker in the same proposal".into());
+        }
+    }
+    let mut targets = BTreeSet::new();
+    for effect in effects.iter().filter(|e| e.version == version) {
+        if let Some(t) = &effect.target {
+            targets.insert(t.clone());
+        }
+    }
+    let selected = crate::support_matrix::depth::covered_targets(record);
+    if targets.is_empty() {
+        targets.extend(selected.into_iter().map(str::to_owned));
+    }
+    Ok(AcceptanceEntry::Promotion {
+        targets: targets.into_iter().collect(),
+        record_sha256: digest,
+    })
+}
+
 fn integration_tip(root: &Path) -> Result<String, String> {
     let output = crate::git_inputs::command(root)
         .args(["rev-parse", "--verify", "origin/staging^{commit}"])

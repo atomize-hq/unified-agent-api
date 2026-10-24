@@ -1,6 +1,7 @@
 //! Check 9: semantic acceptance detection and current record-wide entry matching.
 mod artifacts;
 mod input;
+mod integration;
 mod manifest;
 mod manual;
 mod promotion;
@@ -174,4 +175,10 @@ pub(crate) fn plan_promotion(
     written: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, Vec<u8>>, String> {
     promotion::plan(workspace, before, after, written)
+}
+
+/// Re-establish full admission against the supplied integration parent for every registered agent.
+/// This read-only check is not a reusable receipt or a substitute for the queue's conditional update.
+pub fn check_integration(workspace: &Path, revision: &str) -> Result<(), String> {
+    integration::check(workspace, revision)
 }

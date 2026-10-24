@@ -62,7 +62,11 @@ fn opt_in_runtime_advertising_and_default_feature_additions_need_current_entries
         write_record(&root, &rec);
         assert!(requirements(temp.path(), &tip).is_empty());
         let (status, diagnostic) = compare_as_published(&root, &tip, "manifest-validate", &[]);
-        assert_eq!(status, 0, "{diagnostic}");
+        assert_eq!(status, 2, "{diagnostic}");
+        assert!(
+            diagnostic.contains("DEPTH_ADMISSION_REFUSED"),
+            "{diagnostic}"
+        );
     }
 }
 #[test]

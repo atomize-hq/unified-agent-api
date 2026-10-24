@@ -27,7 +27,7 @@ pub(super) trait Host {
     ) -> Result<(PolicyPart, ObligationsPart), String>;
     fn evidence(&self, root: &Path, record: &DepthRecord) -> Result<EvidenceVerdicts, String>;
 }
-struct Production;
+pub(super) struct Production;
 impl Host for Production {
     fn bindings(
         &self,
@@ -116,50 +116,9 @@ fn plan_with(
                 .records
                 .get(&version)
                 .ok_or("selected closeout destination has no depth record")?;
-            if record.policy.selection.enrollment.lifecycle_path != LifecyclePath::Maintenance
-                || !record.policy.path_enabled
-            {
-                return Err("manual maintenance closeout has no lifecycle-path authority".into());
-            }
-            let closeout = new.json(&closeout_path)?;
-            let request_digest = input::text(&closeout, "request_sha256")?;
-            if closeout["preflight_passed"] != true {
-                return Err("depth closeout requires passed preflight".into());
-            }
-            crate::agent_maintenance::closeout::require_commit_binding(
-                root,
-                input::text(&closeout, "commit")?,
-            )
-            .map_err(|e| e.to_string())?;
-            let Event::Maintenance {
-                request_recorded_at,
-                ..
-            } = &record.event
-            else {
-                return Err("not a maintenance generation".into());
-            };
             let tip = integration.get_or_insert(integration_tip(root)?).clone();
-            let marker_path = stand_down::marker_relative_path(
-                &format!("docs/agents/lifecycle/{}-maintenance", entry.agent_id),
-                &version,
-            );
-            let marker = Source::tip(root, &tip)?.read(&marker_path)?;
-            stand_down::require_generation_marker(
-                &entry.agent_id,
-                &version,
-                &marker,
-                request_recorded_at,
-                request_digest,
-            )?;
-            admitted(root, &new, record, host)?;
+            let acceptance = acceptance(root, &new, record, &Source::tip(root, &tip)?, host)?;
             let mut accepted = record.clone();
-            let acceptance = AcceptanceEntry::MaintenanceCloseout {
-                closeout: crate::depth_record::FileRef {
-                    path: closeout_path.clone(),
-                    sha256: artifacts::digest(&new.source.read(&closeout_path)?),
-                },
-                record_sha256: record.stated_sha256()?,
-            };
             if !accepted.acceptance_entries.contains(&acceptance) {
                 accepted.acceptance_entries.push(acceptance);
             }
@@ -181,6 +140,72 @@ fn plan_with(
     }
     Ok(outputs)
 }
+/// Shared closeout predicate for the owning writer and final integration admission.
+pub(super) fn acceptance(
+    root: &Path,
+    view: &View,
+    record: &DepthRecord,
+    tip: &Source,
+    host: &impl Host,
+) -> Result<AcceptanceEntry, String> {
+    let version = &record.policy.selection.enrollment.version;
+    let closeout_path = format!(
+        "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
+        view.entry.agent_id
+    );
+    if artifacts::maintenance_owner(view)?.as_ref() != Some(version) {
+        return Err("closeout has no exact candidate generation".into());
+    }
+    if record.policy.selection.enrollment.lifecycle_path != LifecyclePath::Maintenance
+        || !record.policy.path_enabled
+    {
+        return Err("manual maintenance closeout has no lifecycle-path authority".into());
+    }
+    let closeout = view.json(&closeout_path)?;
+    let request_digest = input::text(&closeout, "request_sha256")?;
+    let request_path = crate::agent_lifecycle::maintenance_request_path(&view.entry.agent_id);
+    if input::text(&closeout, "request_ref")? != request_path
+        || artifacts::digest(&view.source.read(&request_path)?) != request_digest
+    {
+        return Err("closeout request must be the exact current generation binding".into());
+    }
+    if closeout["preflight_passed"] != true {
+        return Err("depth closeout requires passed preflight".into());
+    }
+    crate::agent_maintenance::closeout::require_commit_binding(
+        root,
+        input::text(&closeout, "commit")?,
+    )
+    .map_err(|e| e.to_string())?;
+    let Event::Maintenance {
+        request_recorded_at,
+        ..
+    } = &record.event
+    else {
+        return Err("not a maintenance generation".into());
+    };
+    let marker_path = stand_down::marker_relative_path(
+        &format!("docs/agents/lifecycle/{}-maintenance", view.entry.agent_id),
+        version,
+    );
+    let marker = tip.read(&marker_path)?;
+    stand_down::require_generation_marker(
+        &view.entry.agent_id,
+        version,
+        &marker,
+        request_recorded_at,
+        request_digest,
+    )?;
+    admitted(root, view, record, host)?;
+    Ok(AcceptanceEntry::MaintenanceCloseout {
+        closeout: crate::depth_record::FileRef {
+            path: closeout_path.clone(),
+            sha256: artifacts::digest(&view.source.read(&closeout_path)?),
+        },
+        record_sha256: record.stated_sha256()?,
+    })
+}
+
 fn integration_tip(root: &Path) -> Result<String, String> {
     let out = crate::git_inputs::command(root)
         .args(["rev-parse", "--verify", "origin/staging^{commit}"])
