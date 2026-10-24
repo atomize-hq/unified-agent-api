@@ -35,7 +35,12 @@ impl Proposal {
         })
     }
 
-    pub fn plan(
+    /// Read-only validation supplies no independently applicable mutations or admission receipt.
+    pub fn check(&self, root: &Path, files: &[(PathBuf, Vec<u8>)]) -> Result<(), String> {
+        self.plan(root, files.to_vec()).map(drop)
+    }
+
+    pub(crate) fn plan(
         &self,
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,

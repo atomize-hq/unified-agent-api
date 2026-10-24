@@ -323,12 +323,14 @@ fn lower_planner_revalidates_bytes_and_derives_paths_instead_of_trusting_constru
     linked.maintenance_pack_root = "docs/agents/lifecycle/codex-maintenance".into();
     linked.request.agent_id = "codex".into();
     let plans = crate::closeout::plan_closeout_mutations(&root, &linked).unwrap();
-    assert!(plans.iter().all(|p| p
-        .relative_path()
-        .starts_with("docs/agents/lifecycle/opencode-maintenance")));
+    assert!(plans
+        .paths()
+        .all(|p| p.starts_with("docs/agents/lifecycle/opencode-maintenance")));
     let prior = fs::read(root.join(&closeout)).unwrap();
     linked.closeout.recorded_at = "invalid".into();
-    let error = crate::closeout::plan_closeout_mutations(&root, &linked).unwrap_err();
+    let error = crate::closeout::plan_closeout_mutations(&root, &linked)
+        .err()
+        .expect("must refuse");
     assert!(error.to_string().contains("recorded_at"), "{error}");
     assert_eq!(fs::read(root.join(closeout)).unwrap(), prior);
 }
@@ -390,4 +392,52 @@ fn lower_writer_refuses_unresolved_retained_depth_ownership_and_preserves_output
     for (path, previous) in paths.into_iter().zip(before) {
         assert_eq!(fs::read(root.join(path)).unwrap(), previous);
     }
+}
+
+#[test]
+fn delayed_closeout_plan_refuses_retained_depth_appearing_before_apply() {
+    let (root, request, closeout) = lower_writer_fixture("d5-delayed-ordinary-plan");
+    write_text(
+        &root.join(".github/workflows/agent-maintenance-open-pr.yml"),
+        "name: Packet worker\n",
+    );
+    write_text(
+        &root.join(&request),
+        &automated_maintenance_request_toml(
+            "opencode",
+            "docs/integrations/opencode/governance/seam-2-closeout.md",
+        ),
+    );
+    write_text(
+        &root.join(&closeout),
+        &valid_closeout_json(&root.join(&request), &request),
+    );
+    let previous = fs::read(root.join(&closeout)).unwrap();
+    let mut linked = load_linked_closeout(&root, &request, &closeout).unwrap();
+    linked.closeout.recorded_at = "2026-10-23T14:00:00Z".into();
+    let plan = crate::closeout::plan_closeout_mutations(&root, &linked).unwrap();
+
+    let mut record: serde_json::Value = serde_json::from_str(
+        &include_str!("../fixtures/depth-ci/record.json").replace("codex", "opencode"),
+    )
+    .unwrap();
+    record["policy"]["selection"]["enrollment"]["version"] = json!("1.14.47");
+    record["event"] = json!({"lifecycle_path":"maintenance", "request_commit":"abcdef1", "request_recorded_at":"2026-05-05T15:00:00Z", "trigger_kind":"upstream_release_detected", "opened_from":".github/workflows/agent-maintenance-open-pr.yml"});
+    record["policy"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["policy"]).unwrap());
+    record["obligations"]["policy_identity"] = record["policy"]["identity"].clone();
+    record["obligations"]["identity"] =
+        json!(crate::depth_record::part_identity(&record["obligations"]).unwrap());
+    crate::depth_record::DepthRecord::parse(&record.to_string(), "opencode", "1.14.47").unwrap();
+    let record_path = "cli_manifests/opencode/reports/1.14.47/depth-record.json";
+    let record_bytes = serde_json::to_vec_pretty(&record).unwrap();
+    fs::write(root.join(record_path), &record_bytes).unwrap();
+    write_closeout_outputs(&root, &request, &closeout)
+        .expect_err("fresh writer refuses retained depth without its policy/bindings");
+    let error = plan
+        .apply(&root)
+        .expect_err("a saved plan must not bypass fresh depth admission");
+    assert!(error.to_string().contains("inputs changed"), "{error}");
+    assert_eq!(fs::read(root.join(closeout)).unwrap(), previous);
+    assert_eq!(fs::read(root.join(record_path)).unwrap(), record_bytes);
 }

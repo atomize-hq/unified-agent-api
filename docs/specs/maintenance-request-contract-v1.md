@@ -906,7 +906,10 @@ unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down m
 Both maintenance closeout writers validate the prospective bytes through the same canonical-path,
 request-linkage, live drift and support-audit validator before delivery. The file-addressed entry
 uses that validator too; no validation rule is relaxed. The exported lower closeout planner and
-writer use the same guard rather than inheriting admission from their usual CLI caller.
+writer use the same guard rather than inheriting admission from their usual CLI caller. The
+exported planner returns an opaque plan that retains its invocation snapshot. Its owning `apply`
+rechecks inputs and admission; it exposes no raw mutation list that can be saved and applied after
+the dependencies change.
 
 One invocation-local proposal observes validation inputs and prior output bytes/modes before
 planning. It includes tracked producer dependencies, the relevant untracked governance/acquisition

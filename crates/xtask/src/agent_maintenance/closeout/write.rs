@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::workspace_mutation::{PlannedMutation, WorkspacePathJail};
+use crate::workspace_mutation::{ApplySummary, WorkspacePathJail};
 use crate::{
     agent_lifecycle::{self, load_lifecycle_state, EvidenceId, SideState},
     agent_registry::AgentRegistry,
@@ -14,16 +14,35 @@ use super::{
     CloseoutWriteSummary, LinkedMaintenanceCloseout, MaintenanceCloseoutError,
 };
 
+/// A prospective closeout owns its invocation snapshot. It exposes no independently applicable
+/// mutation list; every caller must use the owning apply, which rechecks inputs and admission.
+pub struct CloseoutPlan {
+    proposal: super::super::closeout_proposal::Proposal,
+    files: Vec<(std::path::PathBuf, Vec<u8>)>,
+}
+impl CloseoutPlan {
+    /// Rendered artifact/doc paths; admission may additionally extend the depth record.
+    pub fn paths(&self) -> impl Iterator<Item = &Path> {
+        self.files.iter().map(|(path, _)| path.as_path())
+    }
+    pub fn apply(self, workspace_root: &Path) -> Result<ApplySummary, MaintenanceCloseoutError> {
+        self.proposal
+            .apply(workspace_root, self.files)
+            .map_err(MaintenanceCloseoutError::Validation)
+    }
+}
+
 pub fn plan_closeout_mutations(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
-) -> Result<Vec<PlannedMutation>, MaintenanceCloseoutError> {
+) -> Result<CloseoutPlan, MaintenanceCloseoutError> {
     let proposal = super::super::closeout_proposal::Proposal::capture(workspace_root)
         .map_err(MaintenanceCloseoutError::Validation)?;
     let files = closeout_files(workspace_root, linked)?;
     proposal
-        .plan(workspace_root, files)
-        .map_err(MaintenanceCloseoutError::Validation)
+        .check(workspace_root, &files)
+        .map_err(MaintenanceCloseoutError::Validation)?;
+    Ok(CloseoutPlan { proposal, files })
 }
 
 fn closeout_files(
@@ -67,9 +86,7 @@ pub fn write_closeout_outputs(
     if let Some(file) = plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)? {
         files.push(file);
     }
-    let apply = proposal
-        .apply(workspace_root, files)
-        .map_err(MaintenanceCloseoutError::Validation)?;
+    let apply = CloseoutPlan { proposal, files }.apply(workspace_root)?;
     Ok(CloseoutWriteSummary {
         agent_id: linked.request.agent_id.clone(),
         maintenance_pack_prefix: linked.maintenance_pack_prefix.clone(),
