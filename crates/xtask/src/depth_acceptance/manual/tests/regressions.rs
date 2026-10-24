@@ -154,7 +154,7 @@ fn durable_old_closeout_is_attributed_when_new_ordinary_request_replaces_its_bin
         1,
         "ordinary replacement must preserve the retained record/entries"
     );
-    crate::workspace_mutation::apply_mutations(f.root.path(), &plans).unwrap();
+    crate::workspace_mutation::apply_admitted_mutations(f.root.path(), &plans).unwrap();
     assert_eq!(
         fs::read(f.root.path().join(RECORD)).unwrap(),
         serde_json::to_vec_pretty(&f.record).unwrap()
@@ -219,7 +219,7 @@ fn existing_artifact_mode_and_bytes_survive_refusal_and_success_preserves_mode()
     );
     f.producer.proved = true;
     let plans = f.plan().unwrap();
-    crate::workspace_mutation::apply_mutations(f.root.path(), &plans).unwrap();
+    crate::workspace_mutation::apply_admitted_mutations(f.root.path(), &plans).unwrap();
     assert_eq!(fs::read(f.root.path().join(CLOSEOUT)).unwrap(), f.closeout);
     assert_eq!(
         fs::metadata(f.root.path().join(CLOSEOUT))

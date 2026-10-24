@@ -20,9 +20,7 @@ use thiserror::Error;
 use crate::{
     agent_lifecycle::maintenance_request_path,
     agent_registry::{AgentRegistry, AgentRegistryEntry},
-    workspace_mutation::{
-        apply_mutations, ApplySummary, WorkspaceMutationError, WorkspacePathJail,
-    },
+    workspace_mutation::{ApplySummary, WorkspaceMutationError, WorkspacePathJail},
 };
 
 use super::{

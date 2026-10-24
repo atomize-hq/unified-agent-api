@@ -300,6 +300,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if !args.dry_run {
+        xtask::depth_routes::refuse_workspace(workspace_root, "onboard_agent")
+            .map_err(Error::Validation)?;
+    }
     let jail = WorkspacePathJail::new(workspace_root)?;
     let dry_run_mode = args.dry_run;
     let registry_path = jail.resolve(Path::new(REGISTRY_RELATIVE_PATH))?;

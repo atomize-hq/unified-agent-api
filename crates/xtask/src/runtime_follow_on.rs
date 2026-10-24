@@ -158,6 +158,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if args.write {
+        xtask::depth_routes::refuse_workspace(workspace_root, "runtime_follow_on")
+            .map_err(Error::Validation)?;
+    }
     validate_args(&args, workspace_root)?;
     let context = build_context(workspace_root, &args)?;
     write_header(writer, &context, args.write)?;

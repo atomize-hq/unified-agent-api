@@ -12,8 +12,8 @@ pub use xtask::manifest_report;
 mod manifest_retain;
 pub use xtask::manifest_snapshot_schema;
 pub use xtask::manifest_union;
-mod manifest_validate;
-mod manifest_version_metadata;
+pub use xtask::manifest_validate;
+pub use xtask::manifest_version_metadata;
 mod opencode_snapshot;
 mod version_bump;
 mod wrapper_coverage_shared;
@@ -60,6 +60,8 @@ struct Cli {
 enum Command {
     /// Collect an isolated CI witness into target/depth-ci; grants no admission.
     DepthCiCollect,
+    /// Plan or apply a coherent, guarded promotion candidate.
+    ManifestPromote(xtask::manifest_promotion::Args),
     /// Read-only isolated CI proof; never writes packet or production records.
     DepthCiProve,
     /// Generate or check the restricted runtime capability model.
@@ -174,6 +176,13 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
+        Command::ManifestPromote(args) => match xtask::manifest_promotion::run(args) {
+            Ok(()) => 0,
+            Err(error) => {
+                eprintln!("{error}");
+                1
+            }
+        },
         Command::DepthCiProve => match std::env::current_dir()
             .map_err(|e| e.to_string())
             .and_then(|root| xtask::depth_evidence::prove_isolated_ci(&root))

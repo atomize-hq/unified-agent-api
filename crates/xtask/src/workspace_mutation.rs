@@ -9,6 +9,7 @@ pub struct PlannedMutation {
     relative_path: PathBuf,
     expected_before: Option<Vec<u8>>,
     desired_after: Vec<u8>,
+    remove: bool,
     expected_mode: Option<u32>,
 }
 
@@ -53,12 +54,16 @@ struct PreparedMutation<'a> {
 
 #[derive(Debug)]
 enum AppliedMutation {
-    CreatedFile {
+    Removed {
+        path: PathBuf,
+        backup_path: PathBuf,
+    },
+    Created {
         path: PathBuf,
         written: Vec<u8>,
         permissions: fs::Permissions,
     },
-    ReplacedFile {
+    Replaced {
         path: PathBuf,
         backup_path: PathBuf,
         written: Vec<u8>,
@@ -75,11 +80,19 @@ impl fmt::Display for WorkspaceMutationError {
 }
 
 impl PlannedMutation {
+    /// Owning proposals may retire a regular file in the same checked batch as their writes.
+    pub(crate) fn remove(relative_path: impl Into<PathBuf>, expected_before: Vec<u8>) -> Self {
+        let mut mutation = Self::replace(relative_path, expected_before, Vec::new());
+        mutation.remove = true;
+        mutation
+    }
+
     pub fn create(relative_path: impl Into<PathBuf>, desired_after: Vec<u8>) -> Self {
         Self {
             relative_path: relative_path.into(),
             expected_before: None,
             desired_after,
+            remove: false,
             expected_mode: None,
         }
     }
@@ -93,6 +106,7 @@ impl PlannedMutation {
             relative_path: relative_path.into(),
             expected_before: Some(expected_before),
             desired_after,
+            remove: false,
             expected_mode: None,
         }
     }
@@ -262,6 +276,16 @@ impl WorkspacePathJail {
 }
 
 pub fn apply_mutations(
+    workspace_root: &Path,
+    mutations: &[PlannedMutation],
+) -> Result<ApplySummary, WorkspaceMutationError> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "neutral mutation writer")
+        .map_err(WorkspaceMutationError::Validation)?;
+    apply_admitted_mutations(workspace_root, mutations)
+}
+
+/// Only owning routes which independently admit their whole proposal may use this boundary.
+pub(crate) fn apply_admitted_mutations(
     workspace_root: &Path,
     mutations: &[PlannedMutation],
 ) -> Result<ApplySummary, WorkspaceMutationError> {
@@ -483,7 +507,7 @@ fn classify_mutation<'a>(
                         absolute_path.display()
                     ))
                 })?;
-                if current == mutation.desired_after {
+                if !mutation.remove && current == mutation.desired_after {
                     MutationState::Identical
                 } else if mutation
                     .expected_before
@@ -497,7 +521,9 @@ fn classify_mutation<'a>(
             }
         }
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            if mutation.expected_before.is_none() {
+            if mutation.remove {
+                MutationState::Identical
+            } else if mutation.expected_before.is_none() {
                 MutationState::Absent
             } else {
                 MutationState::Divergent
@@ -524,6 +550,14 @@ fn apply_one(
     temp_path: &Path,
     backup_path: &Path,
 ) -> Result<AppliedMutation, WorkspaceMutationError> {
+    if mutation.remove {
+        fs::rename(absolute_path, backup_path)
+            .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?;
+        return Ok(AppliedMutation::Removed {
+            path: absolute_path.to_owned(),
+            backup_path: backup_path.to_owned(),
+        });
+    }
     if mutation.expected_before.is_some() {
         let permissions = fs::symlink_metadata(absolute_path)
             .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?
@@ -557,7 +591,7 @@ fn apply_one(
                 absolute_path.display()
             )));
         }
-        Ok(AppliedMutation::ReplacedFile {
+        Ok(AppliedMutation::Replaced {
             path: absolute_path.to_path_buf(),
             backup_path: backup_path.to_path_buf(),
             written: mutation.desired_after.clone(),
@@ -574,7 +608,7 @@ fn apply_one(
                 absolute_path.display()
             ))
         })?;
-        Ok(AppliedMutation::CreatedFile {
+        Ok(AppliedMutation::Created {
             path: absolute_path.to_path_buf(),
             written: mutation.desired_after.clone(),
             permissions,
@@ -590,13 +624,32 @@ fn rollback(
     let mut errors = Vec::new();
     for mutation in applied.iter().rev() {
         let attempt = (|| -> Result<(), WorkspaceMutationError> {
+            if let AppliedMutation::Removed { path, backup_path } = mutation {
+                jail.resolve(
+                    path.strip_prefix(&jail.canonical_root)
+                        .map_err(|e| WorkspaceMutationError::Validation(e.to_string()))?,
+                )?;
+                match fs::symlink_metadata(path) {
+                    Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                    _ => {
+                        return Err(WorkspaceMutationError::Validation(format!(
+                        "rollback conflict at {}; preserving intervening change and recovery files",
+                        path.display()
+                    )))
+                    }
+                }
+                fs::rename(backup_path, path)
+                    .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?;
+                return Ok(());
+            }
             let (path, written, permissions) = match mutation {
-                AppliedMutation::CreatedFile {
+                AppliedMutation::Removed { .. } => unreachable!(),
+                AppliedMutation::Created {
                     path,
                     written,
                     permissions,
                 }
-                | AppliedMutation::ReplacedFile {
+                | AppliedMutation::Replaced {
                     path,
                     written,
                     permissions,
@@ -619,7 +672,8 @@ fn rollback(
                 )));
             }
             match mutation {
-                AppliedMutation::CreatedFile { path, .. } => match fs::remove_file(path) {
+                AppliedMutation::Removed { .. } => unreachable!(),
+                AppliedMutation::Created { path, .. } => match fs::remove_file(path) {
                     Ok(()) => {}
                     Err(err) if err.kind() == io::ErrorKind::NotFound => {}
                     Err(err) => {
@@ -629,7 +683,7 @@ fn rollback(
                         )));
                     }
                 },
-                AppliedMutation::ReplacedFile {
+                AppliedMutation::Replaced {
                     path, backup_path, ..
                 } => {
                     match fs::remove_file(path) {

@@ -212,3 +212,49 @@ fn mode_precondition_preserves_a_chmod_seen_before_apply() {
     assert_eq!(fs::read(&path).unwrap(), b"before");
     assert_eq!(file_mode(&fs::metadata(&path).unwrap()), 0o600);
 }
+
+#[test]
+fn deletion_is_checked_and_restored_when_a_later_write_fails() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("marker"), "frozen").unwrap();
+    let plans = vec![
+        PlannedMutation::remove("marker", b"frozen".to_vec()),
+        PlannedMutation::create("later", b"new".to_vec()),
+    ];
+    let result = apply_with_hook(root.path(), &plans, |n| {
+        if n == 1 {
+            return Err(WorkspaceMutationError::Validation(
+                "injected failure".into(),
+            ));
+        }
+        Ok(())
+    });
+    assert!(result.is_err());
+    assert_eq!(fs::read(root.path().join("marker")).unwrap(), b"frozen");
+    assert!(!root.path().join("later").exists());
+}
+
+#[test]
+fn deletion_preserves_a_concurrent_replacement_and_its_recovery_backup() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("marker"), "frozen").unwrap();
+    let plans = vec![
+        PlannedMutation::remove("marker", b"frozen".to_vec()),
+        PlannedMutation::create("later", vec![]),
+    ];
+    let result = apply_with_hook(root.path(), &plans, |n| {
+        if n == 1 {
+            fs::write(root.path().join("marker"), "other writer").unwrap();
+            return Err(WorkspaceMutationError::Validation("stop".into()));
+        }
+        Ok(())
+    });
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("rollback conflict"));
+    assert_eq!(
+        fs::read(root.path().join("marker")).unwrap(),
+        b"other writer"
+    );
+}

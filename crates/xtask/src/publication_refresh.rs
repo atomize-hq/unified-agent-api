@@ -189,6 +189,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if args.write {
+        xtask::depth_routes::refuse_workspace(workspace_root, "publication_refresh")
+            .map_err(Error::Validation)?;
+    }
     let context = build_context(workspace_root, &args)?;
     let planned_outputs = validate_publication_contract(workspace_root, &context)?;
     write_header(writer, &context, args.write)?;

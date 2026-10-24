@@ -3,6 +3,8 @@ use std::fs;
 use super::{pointers, FatalError, PointerRead, PointerValue, ValidateCtx};
 
 pub(super) fn apply_fix_mode(ctx: &ValidateCtx) -> Result<(), FatalError> {
+    xtask::depth_routes::refuse_manifest(&ctx.root, "manifest-validate fix")
+        .map_err(FatalError::Rules)?;
     // 1) Create missing pointer files under pointers/ for every expected target.
     for target in &ctx.expected_targets {
         for dir in ["pointers/latest_supported", "pointers/latest_validated"] {

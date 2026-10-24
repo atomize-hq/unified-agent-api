@@ -60,6 +60,10 @@ fn prepare(root: &std::path::Path) -> Result<String, String> {
 
 pub fn run(args: Args) -> Result<(), Error> {
     let root = workspace_root().map_err(Error::Operational)?;
+    if !args.check {
+        xtask::depth_routes::refuse_workspace(&root, "runtime-advertising-model")
+            .map_err(Error::Invalid)?;
+    }
     let source = prepare(&root).map_err(Error::Invalid)?;
     if args.check {
         revision::Revision::workspace(&root).map_err(Error::Invalid)?;

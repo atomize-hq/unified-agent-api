@@ -101,6 +101,10 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if args.write {
+        xtask::depth_routes::refuse_workspace(workspace_root, "prepare_publication")
+            .map_err(Error::Validation)?;
+    }
     let context = build_context(workspace_root, &args)?;
     write_header(writer, &context, args.write)?;
 

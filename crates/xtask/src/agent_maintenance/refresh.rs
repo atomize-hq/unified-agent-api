@@ -213,6 +213,8 @@ pub fn apply_refresh_plan(
     workspace_root: &Path,
     plan: &RefreshPlan,
 ) -> Result<ApplySummary, Error> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "refresh apply")
+        .map_err(Error::Validation)?;
     let jail = WorkspacePathJail::new(workspace_root)?;
     let mutations = plan
         .files

@@ -60,6 +60,8 @@ pub enum Status {
 pub enum VersionMetadataError {
     #[error("--root is required (no manifest root default is available for this subcommand)")]
     MissingRoot,
+    #[error("{0}")]
+    Depth(String),
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
     #[error("failed to parse JSON: {0}")]
@@ -198,6 +200,27 @@ pub fn run_with_default_root(
         .clone()
         .or_else(|| default_root.map(PathBuf::from))
         .ok_or(VersionMetadataError::MissingRoot)?;
+    xtask::depth_routes::refuse_manifest(&requested_root, "manifest-version-metadata")
+        .map_err(VersionMetadataError::Depth)?;
+    let (version_path, bytes) = plan(args, default_root)?;
+    fs::create_dir_all(
+        version_path
+            .parent()
+            .ok_or(VersionMetadataError::MissingRoot)?,
+    )?;
+    fs::write(version_path, bytes)?;
+    Ok(())
+}
+
+pub(crate) fn plan(
+    args: Args,
+    default_root: Option<&str>,
+) -> Result<(PathBuf, Vec<u8>), VersionMetadataError> {
+    let requested_root = args
+        .root
+        .clone()
+        .or_else(|| default_root.map(PathBuf::from))
+        .ok_or(VersionMetadataError::MissingRoot)?;
     let root = fs::canonicalize(&requested_root).unwrap_or(requested_root);
     let rules_path = args
         .rules
@@ -298,9 +321,10 @@ pub fn run_with_default_root(
         eligible_for_latest_validated: Some(matches!(args.status, Status::Validated)),
     });
 
-    fs::create_dir_all(root.join("versions"))?;
-    write_json_pretty(&version_path, &serde_json::to_string_pretty(&out)?)?;
-    Ok(())
+    Ok((
+        version_path,
+        format!("{}\n", serde_json::to_string_pretty(&out)?).into_bytes(),
+    ))
 }
 
 fn build_validation(
@@ -433,14 +457,6 @@ fn deterministic_rfc3339_now() -> String {
     OffsetDateTime::now_utc()
         .format(&Rfc3339)
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
-}
-
-fn write_json_pretty(path: &Path, json: &str) -> Result<(), io::Error> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, format!("{json}\n"))?;
-    Ok(())
 }
 
 impl std::fmt::Display for Status {

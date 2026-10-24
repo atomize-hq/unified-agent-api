@@ -3,6 +3,7 @@ mod artifacts;
 mod input;
 mod manifest;
 mod manual;
+mod promotion;
 mod publication;
 mod relay;
 mod runtime;
@@ -163,4 +164,14 @@ pub(crate) fn plan_manual_closeout(
     written: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, Vec<u8>>, String> {
     manual::plan(workspace, before, after, written)
+}
+
+/// Owning promotion adapter, never a reusable authority receipt.
+pub(crate) fn plan_promotion(
+    workspace: &Path,
+    before: Source,
+    after: Source,
+    written: &BTreeSet<String>,
+) -> Result<BTreeMap<String, Vec<u8>>, String> {
+    promotion::plan(workspace, before, after, written)
 }

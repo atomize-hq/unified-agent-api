@@ -191,7 +191,7 @@ fn positive_closeout_and_exact_entry_are_delivered_in_one_checked_batch() {
     f.producer.current = f.record.clone();
     let plans = f.plan().unwrap();
     assert_eq!(plans.len(), 2);
-    crate::workspace_mutation::apply_mutations(f.root.path(), &plans).unwrap();
+    crate::workspace_mutation::apply_admitted_mutations(f.root.path(), &plans).unwrap();
     assert_eq!(fs::read(f.root.path().join(CLOSEOUT)).unwrap(), f.closeout);
     let accepted = DepthRecord::parse(
         &fs::read_to_string(f.root.path().join(RECORD)).unwrap(),
@@ -410,7 +410,7 @@ fn concurrent_output_edit_between_plan_and_apply_is_preserved() {
     let plans = f.plan().unwrap();
     write(f.root.path(), CLOSEOUT, "concurrent closeout");
     let prior = fs::read(f.root.path().join(RECORD)).unwrap();
-    crate::workspace_mutation::apply_mutations(f.root.path(), &plans).unwrap_err();
+    crate::workspace_mutation::apply_admitted_mutations(f.root.path(), &plans).unwrap_err();
     assert_eq!(
         fs::read_to_string(f.root.path().join(CLOSEOUT)).unwrap(),
         "concurrent closeout"
@@ -420,3 +420,5 @@ fn concurrent_output_edit_between_plan_and_apply_is_preserved() {
 
 #[path = "tests/regressions.rs"]
 mod regressions;
+
+mod promotions;

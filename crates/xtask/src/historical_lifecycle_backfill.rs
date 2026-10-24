@@ -141,6 +141,8 @@ fn backfill_agent(
     registry: &AgentRegistry,
     agent_id: &str,
 ) -> Result<(), Error> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "historical-lifecycle-backfill")
+        .map_err(Error::Validation)?;
     let entry = registry.find(agent_id).ok_or_else(|| {
         Error::Validation(format!("agent `{agent_id}` is not present in the registry"))
     })?;

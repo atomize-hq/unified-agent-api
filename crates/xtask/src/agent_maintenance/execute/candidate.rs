@@ -5,7 +5,7 @@ use super::{
     types::Context,
     Error, INPUT_CONTRACT_FILE_NAME, PROMPT_FILE_NAME,
 };
-use crate::workspace_mutation::{apply_mutations, PlannedMutation};
+use crate::workspace_mutation::{apply_admitted_mutations as apply_mutations, PlannedMutation};
 use std::{
     fs,
     path::{Path, PathBuf},

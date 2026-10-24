@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+extern crate self as xtask;
+
 pub mod agent_lifecycle;
 pub mod agent_maintenance;
 pub mod agent_registry;
@@ -35,3 +37,9 @@ pub mod wrapper_scaffold;
 pub mod depth_acceptance;
 
 pub mod depth_ci;
+
+pub mod depth_routes;
+pub mod manifest_promotion;
+pub mod manifest_version_metadata;
+
+pub mod manifest_validate;

@@ -727,6 +727,8 @@ pub fn write_lifecycle_state(
     relative_path: &str,
     state: &LifecycleState,
 ) -> Result<(), LifecycleError> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "lifecycle writer")
+        .map_err(LifecycleError::Validation)?;
     state.validate()?;
     storage::write_json_file(workspace_root, relative_path, state)
 }

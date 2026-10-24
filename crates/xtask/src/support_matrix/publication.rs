@@ -131,6 +131,7 @@ pub fn write_publication_artifacts(
     workspace_root: &Path,
     bundle: &PublicationBundle,
 ) -> Result<(), String> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "support-matrix writer")?;
     let json_path = workspace_root.join(JSON_OUTPUT_PATH);
     let markdown_path = workspace_root.join(MARKDOWN_OUTPUT_PATH);
     let runtime_support_data_path = workspace_root.join(AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH);

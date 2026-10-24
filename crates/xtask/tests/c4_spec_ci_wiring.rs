@@ -268,10 +268,11 @@ fn c4_spec_reusable_promotion_validates_every_promoted_target_before_advancing_p
         "runs-on: ${{ matrix.runs_on }}",
         "needs: [plan, validate-target]",
         // Only targets present in the committed union may be validated and promoted.
-        "jq -r '.inputs[].target_triple'",
+        "jq -r '.include[].target_triple'",
         "VALIDATION_ARGS+=(--passed-target \"$target\")",
-        "--status validated",
-        "pointers/latest_validated/${REQUIRED_TARGET}.txt",
+        "manifest-promote",
+        "--validation-commit",
+        "ref: ${{ needs.plan.outputs.validation_commit }}",
         "manifest-validate --root",
         // Validation commands and env come from the descriptor, not from this file.
         "jq -r '.validation_commands[]'",
@@ -709,26 +710,19 @@ fn c4_spec_a_stand_down_marker_retires_with_its_own_promotion() {
     let promote = read_repo_file(".github/workflows/parity-promote.yml");
     let advance = section_between(
         &promote,
-        "- name: Advance pointers and version metadata",
-        "- name: Refresh support publication",
+        "- name: Apply the guarded promotion proposal",
+        "- name: Validate the promoted artifacts",
         "parity-promote.yml",
     );
     let commands = without_comments(advance);
-
-    assert!(
-        commands.contains("automation-stand-down/${VERSION}.toml"),
-        "the pointer-advance step must retire the marker for the version being promoted"
-    );
-    assert!(
-        commands.contains("rm -f"),
-        "retirement has to remove the marker, not merely name it"
-    );
-    // Same commit as the `reported -> validated` flip: a failed cleanup then leaves an extra
-    // marker, and a failed promotion never leaves a missing one.
-    assert!(
-        commands.contains("--status validated"),
-        "retirement must ride with the status flip, which is what makes it one commit"
-    );
+    assert!(commands.contains("manifest-promote") && commands.contains("--write"));
+    assert!(commands.contains("--validation-commit"));
+    for forbidden in ["rm -f", "cp ", "--status validated", "latest_validated.txt"] {
+        assert!(
+            !commands.contains(forbidden),
+            "promotion policy must stay in the owning command: {forbidden}"
+        );
+    }
 
     // The removal reaches the PR only because this step has no `add-paths` to exclude it.
     let open_pr = section_from(

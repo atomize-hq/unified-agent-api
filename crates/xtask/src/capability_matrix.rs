@@ -27,6 +27,9 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<(), String> {
+    if !args.check {
+        xtask::depth_routes::refuse_workspace(&resolve_workspace_root()?, "capability-matrix")?;
+    }
     let markdown = generate_markdown()?;
     if args.check {
         let checked_in = resolve_output_path(None)?;
