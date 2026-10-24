@@ -1602,7 +1602,10 @@ settings, merge its own PR or create a background automation.
 With `--tip`, `manifest-validate` MUST re-establish depth admission through the shared owning
 predicates for every registered agent, independently of the requested manifest root. It compares
 the supplied immutable parent with the candidate, preserves retained entries and selections, and
-checks every acceptance destination and every newly listed entry. A new entry MUST describe the
+checks current request correspondence and new/changed-statement freeze authority even for
+reporting-only changes in another registered root. Historical unchanged statements need no
+surviving working request or approval. It checks every acceptance destination and every newly
+listed entry. A new entry MUST describe the
 current record and match the independently admitted owning entry; copying an entry or selecting a
 workflow/CLI name supplies no authority. Unsupported onboarding acceptance remains refused.
 

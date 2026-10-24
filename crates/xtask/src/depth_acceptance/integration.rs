@@ -7,6 +7,8 @@ use crate::{
 };
 use std::{collections::BTreeSet, path::Path};
 
+mod generation;
+
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     check_with(root, revision, &manual::Production, &promotion::Production)
 }
@@ -51,6 +53,7 @@ pub(super) fn check_with(
             },
             agent,
         )?;
+        generation::check(root, &old, &new).map_err(|e| format!("{agent}: {e}"))?;
         if old.records.is_empty() && new.records.is_empty() {
             continue;
         }

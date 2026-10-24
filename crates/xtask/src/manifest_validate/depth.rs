@@ -7,41 +7,19 @@ pub(super) mod merge;
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use serde::Deserialize;
 use xtask::{
     agent_lifecycle::{self, EvidenceId},
     agent_maintenance::closeout,
     agent_registry::AgentRegistry,
-    depth_record::{self, DepthRecord, Event, RequestBinding, DEPTH_RECORD_FILE_NAME},
+    depth_record::{
+        self,
+        request::{RequestTable, StandingRequest},
+        DepthRecord, Event, RequestBinding, DEPTH_RECORD_FILE_NAME,
+    },
     proving_run_closeout,
 };
 
 use super::{rel_path, workspace_root_for, ValidateCtx, Violation};
-
-/// The standing request, read only for what checks 1 and 3 compare. The validating loader
-/// refuses a `[support_depth]` table while no depth enrollment can be declared, and refuses a
-/// first-freeze placeholder, so this reader fails only on a file that is not TOML.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct StandingRequest {
-    request_commit: String,
-    request_recorded_at: String,
-    trigger_kind: String,
-    opened_from: String,
-    detected_release: Option<DetectedRelease>,
-    support_depth: Option<RequestTable>,
-}
-
-#[derive(Deserialize)]
-struct DetectedRelease {
-    target_version: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct RequestTable {
-    policy_identity: Option<String>,
-    obligations_identity: Option<String>,
-}
 
 pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Violation>) {
     // Canonical, as the workspace root is, so the root's path can be named relative to it.

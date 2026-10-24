@@ -6,6 +6,16 @@ fn baseline() -> (Fixture, String) {
     f.save();
     let _ = fs::remove_file(f.root.path().join(CLOSEOUT));
     f.producer.current = f.record.clone();
+    let request = format!(
+        "{}\n[support_depth]\npolicy_identity = \"{}\"\nobligations_identity = \"{}\"\n",
+        fs::read_to_string(f.root.path().join(REQUEST)).unwrap(),
+        f.record.policy.identity,
+        f.record.obligations.as_ref().unwrap().identity
+    );
+    write(f.root.path(), REQUEST, &request);
+    let mut closeout: Value = serde_json::from_slice(&f.closeout).unwrap();
+    closeout["request_sha256"] = json!(artifacts::digest(&request));
+    f.closeout = serde_json::to_vec(&closeout).unwrap();
     git(f.root.path(), &["add", "."]);
     git(f.root.path(), &["commit", "-qm", "integration baseline"]);
     let tip = git(f.root.path(), &["rev-parse", "HEAD"]);
@@ -379,4 +389,81 @@ fn repository_adapter_refuses_unadopted_retained_roots() {
     )
     .unwrap_err();
     assert!(error.contains("does not adopt"), "{error}");
+}
+
+#[test]
+fn reporting_only_changes_in_another_root_require_their_own_generation() {
+    for has_request in [true, false] {
+        let (f, _) = baseline();
+        let path = "cli_manifests/claude_code/reports/1.2.3/depth-record.json";
+        let request = crate::agent_lifecycle::maintenance_request_path("claude_code");
+        let mut other = serde_json::to_value(&f.record).unwrap();
+        other["policy"]["selection"]["agent_id"] = json!("claude_code");
+        other["policy"]["selection"]["enrollment"]["modes"][0]["command_path"] =
+            json!("claude_code exec");
+        canonical(&mut other, "");
+        other["policy"]["identity"] = json!(part_identity(&other["policy"]).unwrap());
+        other["obligations"]["policy_identity"] = other["policy"]["identity"].clone();
+        other["obligations"]["identity"] = json!(part_identity(&other["obligations"]).unwrap());
+        other["execution"]["policy_identity"] = other["policy"]["identity"].clone();
+        other["execution"]["obligations_identity"] = other["obligations"]["identity"].clone();
+        other["execution"]["identity"] = json!(part_identity(&other["execution"]).unwrap());
+        write(f.root.path(), path, other.to_string());
+        if has_request {
+            let raw = format!("request_commit = \"abc\"\nrequest_recorded_at = \"{STAMP}\"\ntrigger_kind = \"upstream_release_detected\"\nopened_from = \"docs/basis.md\"\n[detected_release]\ntarget_version = \"1.2.3\"\n[support_depth]\npolicy_identity = {}\nobligations_identity = {}\n", other["policy"]["identity"], other["obligations"]["identity"]);
+            write(f.root.path(), &request, raw);
+        } else {
+            let _ = fs::remove_file(f.root.path().join(&request));
+        }
+        git(f.root.path(), &["add", "."]);
+        git(f.root.path(), &["commit", "-qm", "unqualified other root"]);
+        let tip = git(f.root.path(), &["rev-parse", "HEAD"]);
+        other["event"]["opened_from"] = json!("docs/hand-edited.md");
+        write(f.root.path(), path, other.to_string());
+        // Keep all generated publication truthful: no acceptance effect or qualification.
+        let bundle = crate::support_matrix::generate_publication_artifacts(f.root.path()).unwrap();
+        for (path, raw) in [
+            (crate::support_matrix::JSON_OUTPUT_PATH, bundle.json),
+            (crate::support_matrix::MARKDOWN_OUTPUT_PATH, bundle.markdown),
+            (
+                crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+                bundle.runtime_support_data,
+            ),
+        ] {
+            write(f.root.path(), path, raw);
+        }
+        git(f.root.path(), &["add", "."]);
+        let error = crate::depth_acceptance::integration::check_with(
+            f.root.path(),
+            &tip,
+            &f.producer,
+            &f.producer,
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("claude_code")
+                && (error.contains("request") || error.contains("freeze")),
+            "{error}"
+        );
+        if has_request {
+            // A genuine new frozen Event is still an allowed reporting-only change.
+            let raw = fs::read_to_string(f.root.path().join(&request)).unwrap();
+            write(
+                f.root.path(),
+                &request,
+                raw.replace("docs/basis.md", "docs/hand-edited.md"),
+            );
+        } else {
+            // An unchanged historical record needs no surviving working request.
+            other["event"]["opened_from"] = json!("docs/basis.md");
+            write(f.root.path(), path, other.to_string());
+        }
+        crate::depth_acceptance::integration::check_with(
+            f.root.path(),
+            &tip,
+            &f.producer,
+            &f.producer,
+        )
+        .unwrap();
+    }
 }
