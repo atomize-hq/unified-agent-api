@@ -1,5 +1,6 @@
 pub mod audit_status;
 pub mod closeout;
+pub mod closeout_proposal;
 pub mod contract_policy;
 pub mod docs;
 pub mod drift;

@@ -37,6 +37,7 @@ pub use self::types::{
     MaintenanceControlPlaneAction, MaintenanceDriftCategory, MaintenanceFinding,
     MaintenanceRequest, MaintenanceTriggerKind, RuntimeFollowupRequired,
 };
+pub(crate) use self::validate::load_linked_closeout_bytes;
 pub use self::validate::{check_closeout_form, load_linked_closeout, load_request_artifact};
 #[allow(unused_imports)]
 pub(crate) use self::validate::{validate_live_drift_report, validate_live_drift_truth};
@@ -140,7 +141,14 @@ fn run_git(
     workspace_root: &Path,
     args: &[&str],
 ) -> Result<std::process::Output, MaintenanceCloseoutError> {
-    std::process::Command::new("git")
+    let mut command = std::process::Command::new("git");
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(key);
+        }
+    }
+    command
+        .arg("--no-replace-objects")
         .current_dir(workspace_root)
         .args(args)
         .output()

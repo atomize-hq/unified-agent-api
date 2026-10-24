@@ -23,21 +23,11 @@
 //! - **A request with no detected release refuses.** T5's derivation is version-scoped and there is
 //!   no version to scope it to.
 //!
-//! # Why it writes before it validates
+//! # Validate before delivery
 //!
-//! `load_linked_closeout` is the only public entry into the validator and it is path-addressed:
-//! `maintenance_pack_prefix_from_closeout_path` requires exactly six components ending in the
-//! literal `maintenance-closeout.json`, so a candidate written under a temporary name or into a
-//! temporary directory is refused on its path before its bytes are read. Validating a candidate
-//! elsewhere is therefore impossible without widening the validator, which spec §4 forbids — it is
-//! the fixed authority T6 must satisfy unmodified.
-//!
-//! So the canonical path is written first and validated second, and a refusal restores the previous
-//! bytes. Where no closeout existed there is nothing to restore, and the error names the file left
-//! behind rather than deleting it: a maintainer who can see the rejected artifact can read why it
-//! was rejected, and silent removal of a file this command just created is how a generator loses a
-//! maintainer's trust. The guarantee that survives is the one that matters — the bytes validated
-//! are the bytes on disk, never a second representation that happens to agree.
+//! The shared validator accepts prospective bytes at the canonical closeout path. Both linkage
+//! and live truth checks run before a single expected-before proposal writes any owned output.
+//! Refusal leaves no new artifact and preserves a prior artifact and its permissions.
 //!
 //! # Why it does not build its own serializer
 //!
@@ -114,6 +104,11 @@ pub fn run_in_workspace_with_fetcher<W: Write, F>(
 where
     F: FnMut(&str) -> Result<String, MaintenanceCloseoutError>,
 {
+    let proposal = args
+        .write
+        .then(|| super::closeout_proposal::Proposal::capture(workspace_root))
+        .transpose()
+        .map_err(MaintenanceCloseoutError::Validation)?;
     let prepared = build_closeout(workspace_root, &args, fetch)?;
     let bytes = serialize_closeout_json(&prepared.closeout)?;
 
@@ -121,7 +116,13 @@ where
     if !args.write {
         return Ok(());
     }
-    write_and_verify(workspace_root, &args.request, &prepared, bytes)?;
+    write_and_verify(
+        workspace_root,
+        &args.request,
+        &prepared,
+        bytes,
+        proposal.expect("write proposal captured"),
+    )?;
     writeln!(
         writer,
         "OK: wrote and validated {}",
@@ -267,68 +268,27 @@ fn carry_dispositions(
     Ok(carried)
 }
 
-/// Write the canonical path, validate it through the validator's real input path, and restore the
-/// previous bytes if it refuses.
+/// Validate the exact prospective bytes, then deliver one checked proposal.
 fn write_and_verify(
     workspace_root: &Path,
     request_path: &Path,
     prepared: &PreparedCloseout,
     bytes: Vec<u8>,
+    proposal: super::closeout_proposal::Proposal,
 ) -> Result<(), MaintenanceCloseoutError> {
-    let resolved = workspace_root.join(&prepared.closeout_path);
-    let previous = std::fs::read(&resolved).ok();
-    if let Some(parent) = resolved.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| {
-            MaintenanceCloseoutError::Internal(format!("create {}: {err}", parent.display()))
-        })?;
-    }
-    std::fs::write(&resolved, &bytes).map_err(|err| {
-        MaintenanceCloseoutError::Internal(format!(
-            "write {}: {err}",
-            prepared.closeout_path.display()
-        ))
-    })?;
-
-    match super::closeout::load_linked_closeout(
+    super::closeout::load_linked_closeout_bytes(
         workspace_root,
         request_path,
         &prepared.closeout_path,
-    ) {
-        Ok(_) => Ok(()),
-        Err(err) => Err(restore_and_report(
-            &resolved,
-            &prepared.closeout_path,
-            previous,
-            err,
-        )),
-    }
-}
-
-fn restore_and_report(
-    resolved: &Path,
-    closeout_path: &Path,
-    previous: Option<Vec<u8>>,
-    err: MaintenanceCloseoutError,
-) -> MaintenanceCloseoutError {
-    match previous {
-        Some(bytes) => match std::fs::write(resolved, bytes) {
-            Ok(()) => MaintenanceCloseoutError::Validation(format!(
-                "the generated closeout did not validate, so {} is unchanged: {err}",
-                closeout_path.display()
-            )),
-            Err(restore_err) => MaintenanceCloseoutError::Internal(format!(
-                "the generated closeout did not validate ({err}), and restoring {} failed too: \
-                 {restore_err}. That file now holds the rejected artifact.",
-                closeout_path.display()
-            )),
-        },
-        None => MaintenanceCloseoutError::Validation(format!(
-            "the generated closeout did not validate: {err}. No closeout existed before this run, \
-             so {} now holds the rejected artifact — it is left in place deliberately, so the \
-             refusal can be read against it. Remove it once the cause is fixed.",
-            closeout_path.display()
-        )),
-    }
+        &bytes,
+    )?;
+    proposal
+        .apply(
+            workspace_root,
+            vec![(prepared.closeout_path.clone(), bytes)],
+        )
+        .map_err(MaintenanceCloseoutError::Validation)?;
+    Ok(())
 }
 
 fn write_preview<W: Write>(

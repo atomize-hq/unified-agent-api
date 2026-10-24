@@ -426,6 +426,29 @@ fn validate_entry(
     Ok(marker)
 }
 
+/// Closeout authority is stricter than automation's version-level stand-down predicate.
+/// When both bindings are present the timestamp names the generation; a hash-only legacy marker
+/// names the exact request bytes. This does not change automation's protective mismatch behavior.
+pub(crate) fn require_generation_marker(
+    agent: &str,
+    version: &str,
+    text: &str,
+    recorded_at: &str,
+    request_sha256: &str,
+) -> Result<(), String> {
+    let directory = format!("docs/agents/lifecycle/{agent}-maintenance/{STAND_DOWN_RELATIVE_DIR}");
+    let marker = validate_entry(agent, &directory, &format!("{version}.toml"), text)
+        .map_err(|e| e.to_string())?;
+    let matches = match marker.request_recorded_at {
+        Some(stamp) => stamp == recorded_at,
+        None => marker.request_sha256.as_deref() == Some(request_sha256),
+    };
+    if !matches {
+        return Err("integration stand-down marker names another generation".into());
+    }
+    Ok(())
+}
+
 /// Mirror of the `^[0-9]+\.[0-9]+\.[0-9]+$` the packet workflow enforces on every version it acts
 /// on. Deliberately stricter than `semver::Version::parse`, which accepts prereleases and build
 /// metadata that can never be a packet generation here.

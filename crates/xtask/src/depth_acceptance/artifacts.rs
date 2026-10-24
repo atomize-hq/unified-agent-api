@@ -345,3 +345,11 @@ pub(super) fn detect(
     }
     Ok(())
 }
+
+/// Attribution is through the actual candidate artifact, including durable retained ownership.
+pub(super) fn maintenance_owner(view: &View) -> Result<Option<String>, String> {
+    artifact(view, &maintenance(view), Kind::Maintenance)?
+        .map(|a| owner(view, &a))
+        .transpose()
+        .map(Option::flatten)
+}

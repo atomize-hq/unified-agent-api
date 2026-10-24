@@ -901,6 +901,45 @@ The closeout artifact gains no field. It already binds the request it closes by 
 (`request_sha256`), and through the request the two identities. Closeout's other checks are
 unchanged, and [Packet freeze](#packet-freeze) rule 3 says what the stand-down marker has to name.
 
+### Manual closeout implementation (D5)
+
+Both maintenance closeout writers validate the prospective bytes through the same canonical-path,
+request-linkage, live drift and support-audit validator before delivery. The file-addressed entry
+uses that validator too; no validation rule is relaxed. The exported lower closeout planner and
+writer use the same guard rather than inheriting admission from their usual CLI caller.
+
+One invocation-local proposal observes validation inputs and prior output bytes/modes before
+planning. It includes tracked producer dependencies, the relevant untracked governance/acquisition
+and implementation scopes, and Git HEAD/index state. The owning guard derives touched retained
+destinations from actual candidate artifacts and lifecycle values, including durable ownership after
+a standing request is replaced. A successful depth closeout appends the exact closeout path/hash and
+current record digest to the existing acceptance-entry sequence in the same checked write batch.
+An identical entry is retained once; an unrelated current entry cannot substitute for it.
+
+The depth guard pins the locally fetched `origin/staging` tip, reads the exact generation marker
+from that commit, and refuses if the ref moves during admission. A timestamp marker names the
+record's generation; a hash-only marker must match the exact request identity. Candidate-only
+markers confer no authority. Ordinary version-level automation stand-down behavior is unchanged.
+
+The current binding reader rederives P and O from coherent stage-0 inputs, preserves P's original
+debt baseline, and reconciles the complete current inventory separately through the D3 planner.
+Current E must satisfy every independently resolved obligation on every selected target, including
+mapped capability obligations. A stated `verified` label, raw digest or prior entry cannot replace
+evaluated evidence. Permitted `not_applicable` results keep their existing policy restrictions.
+Unresolved classification, due name-level semantic work, or debt corroboration refuses explicitly.
+
+The existing acquisition intake conservatively leaves owned units classification-required, and
+no production-origin evidence or semantic debt/work producer is installed by D5. Positive isolated
+writer tests use a private fixed producer for current bindings and opaque evidence verdicts; they
+prove guard/batch composition, not production adequacy or the complete maintenance chain. Normal
+registry/request loading continues refusing production depth declarations.
+
+Before applying, the proposal rechecks its observed inputs and supplies expected-before bytes and
+modes to the existing mutation helper. Observed concurrent changes are preserved and refusal leaves
+no new closeout or acceptance entry. Shared best-effort restoration remains responsible for a failed
+batch; it is not filesystem isolation or serialization across routes. Final integration admission,
+remaining lifecycle writers and production enablement are separate work.
+
 ### Present behavior
 
 The read-only planner and private reporting-only preparation core above are implemented.
@@ -924,9 +963,9 @@ No production request carries a depth enrollment today. In particular:
   on invocation-start file observations. It checks writable surfaces and reporting-only effects
   before delivery, finalizes failed execution paths, and retains rejected candidate outputs for
   recovery. The dry-run digest remains prepared-packet validation, not restoration authority.
-- `prepare-agent-closeout` writes the closeout artifact, then validates it through the
-  validator's own input path, and leaves a rejected artifact in place when no closeout existed
-  before.
+- D5 validates closeout bytes before delivering a checked proposal. A refused new artifact is
+  absent; a prior artifact and its permissions are preserved. Both maintenance writers and the
+  lower closeout boundaries use the owning depth guard described above.
 - The stand-down check runs for every automated packet, whether or not depth is involved.
   `maintenance-stand-down-check` reads the marker directory from the working tree, or from a git
   ref when it is given one. The open-PR workflow asks it, against a freshly fetched integration
@@ -942,12 +981,11 @@ No production request carries a depth enrollment today. In particular:
   lifecycle spec names the actor as a coding agent handed the packet pull request. A marker's
   `declared_by` field is optional, the marker that `HANDOFF.md` renders omits it, and nothing
   checks it.
-- No command decides on the generation a marker names. `maintenance-stand-down-check` reports
-  whether the marker's `request_recorded_at` or `request_sha256` matches the request in the tree
-  and gives the same answer either way. `prepare-agent-closeout` does not read the marker.
-  `prepare-agent-maintenance` does not read it either: only the workflows ask before they call it,
-  so a maintainer who runs it under a packet freeze, other than as a re-freeze, opens a new
-  generation.
+- `maintenance-stand-down-check` still reports a binding mismatch protectively rather than
+  returning automation authority. D5's manual depth guard separately requires the exact generation
+  marker. `prepare-agent-maintenance` does not read that marker: only the workflows ask before
+  they call it, so a maintainer who runs it under a packet freeze, other than as a re-freeze,
+  opens a new generation. Remaining route/integration enforcement is separate work.
 - The [lifecycle spec](unified-agent-api/acquisition-maintenance-lifecycle-spec.md) has a packet
   closed on its own branch before it is merged, and promoted after the merge. In that order the
   depth record would first reach the integration branch with the closeout already written. Nothing

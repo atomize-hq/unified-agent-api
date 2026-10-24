@@ -6,6 +6,8 @@
 //! or acceptance. Production registry loading deliberately continues to refuse depth declarations.
 
 mod acquisition;
+mod closeout;
+pub(crate) use closeout::current_closeout_bindings;
 pub mod debt;
 mod freeze;
 use crate::git_inputs;
@@ -47,6 +49,7 @@ pub fn resolve_policy(
         rules,
         prior_record,
         debt_inventory,
+        None,
     )
     .map_err(|error| format!("support depth agent={agent} version={version}: {error}"))
 }
@@ -58,6 +61,7 @@ fn resolve(
     rules: &str,
     prior_record: Option<&str>,
     debt_inventory: &str,
+    baseline: Option<&[crate::agent_maintenance::support_audit::DebtInventoryRow]>,
 ) -> Result<Option<PolicyPart>, String> {
     let parsed = semver::Version::parse(version).map_err(|e| e.to_string())?;
     if !parsed.pre.is_empty() || !parsed.build.is_empty() || parsed.to_string() != version {
@@ -153,6 +157,9 @@ fn resolve(
     }
     let mut rows = parse_debt_inventory(debt_inventory, Path::new(NON_TUI_SUPPORT_DEBT_PATH))?;
     rows.retain(|row| row.agent_id == agent);
+    if let Some(baseline) = baseline {
+        rows = baseline.to_vec();
+    }
     let mut ids = BTreeSet::new();
     for row_id in debt_rows("policy.debt_baseline", &rows, agent)? {
         if !ids.insert(row_id) {

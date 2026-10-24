@@ -2,6 +2,7 @@
 mod artifacts;
 mod input;
 mod manifest;
+mod manual;
 mod publication;
 mod relay;
 mod runtime;
@@ -152,4 +153,14 @@ pub(crate) fn check_captured_relay(
     workspace: &Path,
 ) -> Result<(), String> {
     relay::check(before, after, workspace)
+}
+
+/// Owning manual-closeout adapter; returned bytes are a proposal, not integration authority.
+pub(crate) fn plan_manual_closeout(
+    workspace: &Path,
+    before: Source,
+    after: Source,
+    written: &BTreeSet<String>,
+) -> Result<BTreeMap<String, Vec<u8>>, String> {
+    manual::plan(workspace, before, after, written)
 }
