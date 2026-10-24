@@ -297,3 +297,25 @@ fn preview_jails_malformed_committed_target_before_any_scratch_write() {
     assert_eq!(fs::read(canary).unwrap(), b"preserve caller bytes");
     assert!(git(root.path(), &["status", "--porcelain"]).is_empty());
 }
+
+#[test]
+fn nested_standalone_manifest_root_cannot_hide_retained_reports() {
+    let root = tempfile::tempdir().unwrap();
+    write(
+        root.path(),
+        "reports/1.2.3/depth-record.json",
+        "retained standalone record",
+    );
+    write(root.path(), "pointers/latest_validated/target.txt", "old\n");
+    let nested = root.path().join("pointers/latest_validated");
+    let result = apply_mutations(
+        &nested,
+        &[PlannedMutation::replace(
+            "target.txt",
+            b"old\n".to_vec(),
+            b"1.2.3\n".to_vec(),
+        )],
+    );
+    assert!(result.is_err());
+    assert_eq!(fs::read(nested.join("target.txt")).unwrap(), b"old\n");
+}
