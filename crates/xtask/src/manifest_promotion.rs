@@ -103,6 +103,8 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
     let observation = Proposal::capture(root)?;
     let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
     observation.materialize(scratch.path())?;
+    let scratch_jail = crate::workspace_mutation::WorkspacePathJail::new(scratch.path())
+        .map_err(|e| e.to_string())?;
     let registry = AgentRegistry::load(scratch.path()).map_err(|e| e.to_string())?;
     let entry = registry
         .find(&args.agent)
@@ -124,6 +126,12 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
         .as_str()
         .ok_or("missing required target")?;
     let passed: BTreeSet<_> = args.passed_targets.iter().cloned().collect();
+    if passed
+        .iter()
+        .any(|t| t.is_empty() || t.contains(['/', '\\']) || t == "." || t == "..")
+    {
+        return Err("promotion target must be one literal path component".into());
+    }
     if passed.len() != args.passed_targets.len() || !passed.contains(required) {
         return Err("promotion requires unique passed targets including required target".into());
     }
@@ -204,7 +212,9 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
         files.insert(marker, None);
     }
     for (p, b) in &files {
-        let full = scratch.path().join(p);
+        let full = scratch_jail
+            .resolve(Path::new(p))
+            .map_err(|e| e.to_string())?;
         if let Some(b) = b {
             fs::create_dir_all(full.parent().ok_or("invalid output parent")?)
                 .map_err(|e| e.to_string())?;
@@ -232,7 +242,9 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
     // before any caller bytes are changed. Scratch is a rendering view, never delivery.
     for (path, bytes) in &files {
         if let Some(bytes) = bytes {
-            let full = scratch.path().join(path);
+            let full = scratch_jail
+                .resolve(Path::new(path))
+                .map_err(|e| e.to_string())?;
             fs::create_dir_all(full.parent().ok_or("invalid output parent")?)
                 .map_err(|e| e.to_string())?;
             fs::write(full, bytes).map_err(|e| e.to_string())?;

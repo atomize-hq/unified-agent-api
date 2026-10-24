@@ -730,6 +730,13 @@ pub fn write_lifecycle_state(
     xtask::depth_routes::refuse_workspace(workspace_root, "lifecycle writer")
         .map_err(LifecycleError::Validation)?;
     state.validate()?;
+    xtask::depth_routes::refuse_output(
+        workspace_root,
+        Path::new(relative_path),
+        &serde_json::to_vec(state).map_err(|e| LifecycleError::Internal(e.to_string()))?,
+        "lifecycle writer",
+    )
+    .map_err(LifecycleError::Validation)?;
     storage::write_json_file(workspace_root, relative_path, state)
 }
 
@@ -747,7 +754,16 @@ pub fn write_publication_ready_packet(
     relative_path: &str,
     packet: &PublicationReadyPacket,
 ) -> Result<(), LifecycleError> {
+    xtask::depth_routes::refuse_workspace(workspace_root, "publication packet writer")
+        .map_err(LifecycleError::Validation)?;
     packet.validate()?;
+    xtask::depth_routes::refuse_output(
+        workspace_root,
+        Path::new(relative_path),
+        &serde_json::to_vec(packet).map_err(|e| LifecycleError::Internal(e.to_string()))?,
+        "publication packet writer",
+    )
+    .map_err(LifecycleError::Validation)?;
     storage::write_json_file(workspace_root, relative_path, packet)
 }
 

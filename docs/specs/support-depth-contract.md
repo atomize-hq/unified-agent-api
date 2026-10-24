@@ -1580,7 +1580,9 @@ requires exact closeout bytes that establish its request digest, otherwise promo
 
 Unsupported onboarding, neutral generators, fix/retention/legacy/backfill routes and exported lower
 writers conservatively refuse writes when a declaration or retained depth record is present in
-scope. Their read-only modes remain available. The public generic mutation writer supplies no
+scope, including proposed declarations/records and authority above a caller-supplied nested root.
+Every scratch output MUST be jailed before any write, even in read-only planning. Their read-only
+modes remain available. The public generic mutation writer supplies no
 lifecycle authority; checked owning routes use a crate-private delivery core after their own
 admission. This prevents a cached raw mutation list or a caller-supplied publication/refresh bundle
 from bypassing an owning route. Existing expected-before rollback handles marker deletion alongside

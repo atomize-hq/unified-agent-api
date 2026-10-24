@@ -161,3 +161,139 @@ fn unknown_unacquired_or_duplicate_passed_targets_refuse_without_outputs() {
         assert!(git(root.path(), &["status", "--porcelain"]).is_empty());
     }
 }
+
+#[test]
+fn nested_root_cannot_hide_retained_depth_from_public_delivery() {
+    let root = tempfile::tempdir().unwrap();
+    let record = "cli_manifests/codex/reports/1.2.3/depth-record.json";
+    write(root.path(), record, "retained");
+    let nested = root.path().join("cli_manifests/codex");
+    let result = apply_mutations(
+        &nested,
+        &[PlannedMutation::create(
+            "latest_validated.txt",
+            b"1.2.3\n".to_vec(),
+        )],
+    );
+    assert!(result.is_err());
+    assert!(!nested.join("latest_validated.txt").exists());
+}
+#[test]
+fn neutral_batch_cannot_introduce_a_record_or_declaration_before_accepting_outputs() {
+    let root = tempfile::tempdir().unwrap();
+    let plans = [
+        PlannedMutation::create(
+            "cli_manifests/codex/latest_validated.txt",
+            b"1.2.3\n".to_vec(),
+        ),
+        PlannedMutation::create(
+            "cli_manifests/codex/reports/1.2.3/depth-record.json",
+            b"new record".to_vec(),
+        ),
+    ];
+    assert!(apply_mutations(root.path(), &plans).is_err());
+    assert!(!root.path().join("cli_manifests").exists());
+    let mut raw =
+        fs::read_to_string(repo().join(xtask::agent_registry::REGISTRY_RELATIVE_PATH)).unwrap();
+    let second = raw.match_indices("[[agents]]").nth(1).unwrap().0;
+    raw.insert_str(
+        second,
+        "[agents.support_depth]\nenabled_paths = [\"maintenance\"]\n\n",
+    );
+    xtask::agent_registry::AgentRegistry::parse_unenforced(&raw).unwrap();
+    assert!(apply_mutations(
+        root.path(),
+        &[PlannedMutation::create(
+            xtask::agent_registry::REGISTRY_RELATIVE_PATH,
+            raw.into_bytes()
+        )]
+    )
+    .is_err());
+    assert!(!root.path().join("crates").exists());
+}
+#[test]
+fn publication_packet_lower_writer_cannot_overwrite_a_retained_record() {
+    let root = tempfile::tempdir().unwrap();
+    let record = "cli_manifests/codex/reports/1.2.3/depth-record.json";
+    write(root.path(), record, "retained");
+    let packet: xtask::agent_lifecycle::PublicationReadyPacket =
+        serde_json::from_slice(
+            &fs::read(repo().join(
+                "docs/agents/lifecycle/codex-cli-onboarding/governance/publication-ready.json",
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+    packet.validate().unwrap();
+    assert!(
+        xtask::agent_lifecycle::write_publication_ready_packet(root.path(), record, &packet)
+            .is_err()
+    );
+    assert_eq!(fs::read(root.path().join(record)).unwrap(), b"retained");
+    fs::remove_file(root.path().join(record)).unwrap();
+    assert!(
+        xtask::agent_lifecycle::write_publication_ready_packet(root.path(), record, &packet)
+            .is_err()
+    );
+    assert!(!root.path().join(record).exists());
+}
+#[test]
+fn preview_jails_malformed_committed_target_before_any_scratch_write() {
+    let (root, mut args) = fixture();
+    let target = "../../../../../uaa-d6-canary";
+    let rules_path = "cli_manifests/codex/RULES.json";
+    let union_path = format!("cli_manifests/codex/snapshots/{}/union.json", args.version);
+    for (path, pointer) in [
+        (rules_path.to_owned(), "/union/expected_targets"),
+        (union_path.clone(), "/inputs"),
+    ] {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.path().join(&path)).unwrap()).unwrap();
+        let extra = if pointer == "/inputs" {
+            serde_json::json!({"target_triple":target})
+        } else {
+            serde_json::json!(target)
+        };
+        value
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_array_mut()
+            .unwrap()
+            .push(extra);
+        write(root.path(), &path, value.to_string());
+    }
+    git(root.path(), &["add", "."]);
+    git(
+        root.path(),
+        &["commit", "-qm", "malformed committed target"],
+    );
+    git(
+        root.path(),
+        &["update-ref", "refs/remotes/origin/staging", "HEAD"],
+    );
+    args.validation_commit = git(root.path(), &["rev-parse", "HEAD"]);
+    let scratch = tempfile::tempdir().unwrap();
+    let canary = scratch.path().join("uaa-d6-canary.txt");
+    fs::write(&canary, "preserve caller bytes").unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .current_dir(root.path())
+        .env("TMPDIR", scratch.path())
+        .args([
+            "manifest-promote",
+            "--agent",
+            &args.agent,
+            "--version",
+            &args.version,
+            "--validation-commit",
+            &args.validation_commit,
+            "--passed-target",
+            &args.passed_targets[0],
+            "--passed-target",
+            target,
+        ])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert_eq!(fs::read(canary).unwrap(), b"preserve caller bytes");
+    assert!(git(root.path(), &["status", "--porcelain"]).is_empty());
+}

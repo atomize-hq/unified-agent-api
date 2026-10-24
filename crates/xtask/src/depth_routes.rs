@@ -7,42 +7,75 @@ use crate::{
 use std::path::Path;
 
 pub fn refuse_workspace(root: &Path, route: &str) -> Result<(), String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    refuse_here(&root, route)?;
+    // Public writers accept a directory, not proof that it is the repository root. Locate every
+    // enclosing authority anchor rather than trusting a caller-supplied nested scope.
+    for parent in root.ancestors().skip(1) {
+        if parent.join(REGISTRY_RELATIVE_PATH).exists() || parent.join("cli_manifests").is_dir() {
+            refuse_here(parent, route)?;
+        }
+    }
+    Ok(())
+}
+fn refuse_here(root: &Path, route: &str) -> Result<(), String> {
     let source = Source::workspace(root)?;
     if let Some(raw) = source.optional(REGISTRY_RELATIVE_PATH)? {
-        let registry = AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?;
-        if registry.agents.iter().any(|a| a.support_depth.is_some()) {
+        refuse_registry(&raw, route)?;
+    }
+    for prefix in ["cli_manifests", "reports"] {
+        if source
+            .paths(prefix)?
+            .iter()
+            .any(|p| p.ends_with("/depth-record.json"))
+        {
             return Err(format!(
-                "{route}: unsupported depth write (declared enrollment)"
+                "{route}: unsupported depth write (retained record)"
             ));
         }
     }
-    if source
-        .paths("cli_manifests")?
-        .iter()
-        .any(|p| p.ends_with("/depth-record.json"))
-    {
+    Ok(())
+}
+fn refuse_registry(raw: &str, route: &str) -> Result<(), String> {
+    let registry = AgentRegistry::parse_unenforced(raw).map_err(|e| e.to_string())?;
+    if registry.agents.iter().any(|a| a.support_depth.is_some()) {
         return Err(format!(
-            "{route}: unsupported depth write (retained record)"
+            "{route}: unsupported depth write (declared enrollment)"
         ));
     }
     Ok(())
 }
-
 pub fn refuse_manifest(root: &Path, route: &str) -> Result<(), String> {
-    let source = Source::workspace(root)?;
-    if source
-        .paths("reports")?
-        .iter()
-        .any(|p| p.ends_with("/depth-record.json"))
+    refuse_workspace(root, route)
+}
+
+/// Also inspect destinations and candidate authority before a neutral writer creates any file.
+pub fn refuse_output(
+    root: &Path,
+    relative: &Path,
+    bytes: &[u8],
+    route: &str,
+) -> Result<(), String> {
+    let full = crate::workspace_mutation::WorkspacePathJail::new(root)
+        .map_err(|e| e.to_string())?
+        .resolve(relative)
+        .map_err(|e| e.to_string())?;
+    if full.file_name().is_some_and(|n| n == "depth-record.json")
+        && full
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::file_name)
+            .is_some_and(|n| n == "reports")
     {
         return Err(format!(
-            "{route}: unsupported depth write (retained record)"
+            "{route}: unsupported depth write (proposed depth record)"
         ));
     }
-    for parent in root.canonicalize().map_err(|e| e.to_string())?.ancestors() {
-        if parent.join(REGISTRY_RELATIVE_PATH).exists() || parent.join("cli_manifests").is_dir() {
-            return refuse_workspace(parent, route);
-        }
+    if full.ends_with(REGISTRY_RELATIVE_PATH) {
+        refuse_registry(
+            std::str::from_utf8(bytes).map_err(|e| e.to_string())?,
+            route,
+        )?;
     }
     Ok(())
 }
