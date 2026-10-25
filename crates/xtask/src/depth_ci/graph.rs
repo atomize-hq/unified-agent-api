@@ -11,7 +11,19 @@ pub(super) fn normalize(id: &str) -> String {
         .strip_prefix("path+file:")
         .and_then(|s| s.split_once('#'))
     {
-        format!("workspace:crates/wrapper_events#{package}")
+        format!(
+            "workspace:crates/{}#{package}",
+            match package.split('@').next().unwrap() {
+                "unified-agent-api" => "agent_api",
+                "unified-agent-api-codex" => "codex",
+                "unified-agent-api-wrapper-events" => "wrapper_events",
+                "unified-agent-api-claude-code" => "claude_code",
+                "unified-agent-api-aider" => "aider",
+                "unified-agent-api-gemini-cli" => "gemini_cli",
+                "unified-agent-api-opencode" => "opencode",
+                other => other,
+            }
+        )
     } else {
         id.into()
     }
@@ -22,6 +34,7 @@ pub(super) fn resolve(
     view: &mut GitInputs,
     metadata: &Value,
     compiled: &BTreeSet<String>,
+    profile: profile::Profile,
 ) -> Result<DependencyGraph, String> {
     let packages = metadata["packages"]
         .as_array()
@@ -31,7 +44,7 @@ pub(super) fn resolve(
         .ok_or("missing Cargo resolved graph")?;
     let root_package = packages
         .iter()
-        .find(|p| p["name"] == "unified-agent-api-wrapper-events")
+        .find(|p| p["name"] == profile.package())
         .ok_or("missing affected crate")?;
     let root_id = root_package["id"]
         .as_str()
@@ -45,17 +58,9 @@ pub(super) fn resolve(
         .iter()
         .map(|n| Ok((n["id"].as_str().ok_or("invalid node id")?, n)))
         .collect::<Result<_, String>>()?;
-    let seen = expected(metadata)?;
+    let seen = expected(metadata, profile)?;
     if &seen != compiled {
         return Err("resolved/compiled dependency populations disagree".into());
-    }
-    if node_by_id[&root_id.as_str()]["features"]
-        .as_array()
-        .ok_or("missing root features")?
-        .iter()
-        .any(|f| f != "default")
-    {
-        return Err("unsupported root features".into());
     }
     let lock_raw = view.required("Cargo.lock")?;
     let lock: Value =
@@ -158,25 +163,34 @@ pub(super) fn resolve(
                 .collect(),
         });
     }
-    for path in ["Cargo.toml", "Cargo.lock", CONTRACT, FIXTURE] {
+    for path in [
+        "Cargo.toml",
+        "Cargo.lock",
+        profile.contract(),
+        profile.fixture(),
+    ] {
         view.required(path)?;
         result.inputs.push(view.reference(path)?);
     }
-    result
-        .scopes
-        .push("crates/xtask/tests/fixtures/depth-ci".into());
-    for path in view.files_under("crates/xtask/tests/fixtures/depth-ci")? {
+    result.scopes.push(profile.directory().into());
+    for path in view.files_under(profile.directory())? {
         result.inputs.push(view.reference(&path)?);
+    }
+    if profile == profile::Profile::Core {
+        let record = profile.record(
+            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
+        )?;
+        for input in record.obligations.unwrap().acquired_inputs {
+            result.inputs.push(view.reference(&input.path)?);
+        }
     }
     result.inputs.sort();
     result.inputs.dedup();
     result.scopes.sort();
     result.scopes.dedup();
     result.packages.sort_by(|a, b| a.id.cmp(&b.id));
-    let profile: Value = serde_json::from_slice(
-        &view.required("crates/xtask/tests/fixtures/depth-ci/build-profile.json")?,
-    )
-    .map_err(|e| e.to_string())?;
+    let profile: Value = serde_json::from_slice(&view.required(&profile.build_profile())?)
+        .map_err(|e| e.to_string())?;
     if profile["schema_version"] != 1
         || serde_json::to_value(&result.packages).map_err(|e| e.to_string())? != profile["packages"]
     {
@@ -186,7 +200,10 @@ pub(super) fn resolve(
 }
 
 /// Resolve the complete selected closure before running any registry build script or proc macro.
-pub(super) fn expected(metadata: &Value) -> Result<BTreeSet<String>, String> {
+pub(super) fn expected(
+    metadata: &Value,
+    profile: profile::Profile,
+) -> Result<BTreeSet<String>, String> {
     let packages = metadata["packages"]
         .as_array()
         .ok_or("missing Cargo packages")?;
@@ -195,7 +212,7 @@ pub(super) fn expected(metadata: &Value) -> Result<BTreeSet<String>, String> {
         .ok_or("missing Cargo graph")?;
     let root_id = packages
         .iter()
-        .find(|p| p["name"] == "unified-agent-api-wrapper-events")
+        .find(|p| p["name"] == profile.package())
         .and_then(|p| p["id"].as_str())
         .ok_or("missing affected root")?
         .to_owned();

@@ -10,12 +10,12 @@ mod results;
 pub(crate) use results::production_results;
 #[cfg(test)]
 pub(crate) use results::test_results;
-pub use results::EvidenceVerdicts;
+pub use results::{evaluate_isolated_record, EvidenceVerdicts};
 pub mod payload;
 mod validate;
 mod verdict;
-pub use verdict::prove_isolated_ci;
 pub use verdict::{evaluate_workspace, Evaluation, Verdict};
+pub use verdict::{prove_isolated_ci, prove_isolated_core};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

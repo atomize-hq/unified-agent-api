@@ -10,9 +10,10 @@ pub(super) fn witness(
     approved_helper: &str,
     run: &Value,
     attempt: u64,
+    profile: crate::depth_ci::profile::Profile,
 ) -> Result<Witness, String> {
     let id = run["id"].as_u64().ok_or("missing run id")?;
-    let name = format!("depth-channel-v1-{id}-{attempt}");
+    let name = format!("{}-{id}-{attempt}", profile.artifact());
     let artifacts = list(
         api,
         &format!("actions/runs/{id}/artifacts"),
@@ -57,15 +58,21 @@ pub(super) fn witness(
         return Err("nonterminal/wrong-attempt producer job".into());
     }
     let steps = job["steps"].as_array().ok_or("missing job steps")?;
-    for name in [
-        "Collect isolated depth witness",
-        "Upload isolated depth witness",
-        "Bind isolated depth artifact",
-    ] {
+    let label = if profile == crate::depth_ci::profile::Profile::Channel {
+        "isolated depth"
+    } else {
+        "isolated CORE depth"
+    };
+    let names = [
+        format!("Collect {label} witness"),
+        format!("Upload {label} witness"),
+        format!("Bind {label} artifact"),
+    ];
+    for name in &names {
         if steps
             .iter()
             .filter(|s| {
-                s["name"] == name && s["conclusion"] == "success" && s["status"] == "completed"
+                s["name"] == *name && s["conclusion"] == "success" && s["status"] == "completed"
             })
             .count()
             != 1
@@ -73,10 +80,7 @@ pub(super) fn witness(
             return Err("producer collection/upload/binding step did not complete".into());
         }
     }
-    let binding_step = steps
-        .iter()
-        .find(|s| s["name"] == "Bind isolated depth artifact")
-        .unwrap();
+    let binding_step = steps.iter().find(|s| s["name"] == names[2]).unwrap();
     let started = required_string(binding_step, "started_at")?;
     let completed = required_string(binding_step, "completed_at")?;
     let job_id = job["id"].as_u64().ok_or("missing producer job id")?;
@@ -94,13 +98,17 @@ pub(super) fn witness(
         let Some(body) = body.strip_prefix("DEPTH_ARTIFACT_BINDING=") else {
             continue;
         };
+        let binding = serde_json::from_str::<Value>(body).map_err(|_| "invalid binding log")?;
+        if binding["name"] != name {
+            continue;
+        }
         let second = timestamp.get(..19).ok_or("invalid binding log time")?;
         if second < started.get(..19).ok_or("invalid binding step start")?
             || second > completed.get(..19).ok_or("invalid binding step end")?
         {
             return Err("artifact binding was not emitted by binding step".into());
         }
-        bindings.push(serde_json::from_str::<Value>(body).map_err(|_| "invalid binding log")?);
+        bindings.push(binding);
     }
     if bindings.len() != 1
         || bindings[0]["id"] != artifact_id

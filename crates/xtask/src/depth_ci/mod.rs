@@ -11,6 +11,7 @@ use std::{path::Path, process::Command};
 
 mod collector;
 mod graph;
+pub(crate) mod profile;
 pub const REPOSITORY: &str = "atomize-hq/unified-agent-api";
 pub const FIXTURE: &str = "crates/xtask/tests/fixtures/depth-ci/record.json";
 pub const CONTRACT: &str = "crates/xtask/tests/fixtures/depth-ci/contract.md";
@@ -65,4 +66,8 @@ pub(crate) fn output(command: &mut Command) -> Result<Vec<u8>, String> {
         return Err("isolated producer command failed; inspect local/CI command logs".into());
     }
     Ok(out.stdout)
+}
+
+pub fn collect_core(workspace: &Path) -> Result<(), String> {
+    collector::collect_profile(workspace, profile::Profile::Core)
 }

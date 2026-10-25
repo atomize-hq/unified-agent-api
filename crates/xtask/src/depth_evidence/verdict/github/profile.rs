@@ -1,6 +1,6 @@
 use super::{transport::*, *};
+use crate::depth_ci::profile::Profile;
 use crate::{
-    agent_registry::support_depth::ObligationId,
     depth_ci::{self, Witness},
     runtime_advertising::source::Source,
 };
@@ -14,32 +14,49 @@ pub(super) const OPTIONAL: [&str; 4] = [
 ];
 pub(super) const WORKFLOW: &str = ".github/workflows/ci.yml";
 pub(super) const EXECUTOR: &str = "github-actions:rust-tests/isolated-channel-v1";
-pub(super) const TRUST: &str = "github-actions-channel-v1";
 pub(super) const REVIEW: &str = "maintainer-mapping-v1";
 
-pub(super) fn original(source: &Source) -> Result<DepthRecord, String> {
-    let record = depth_ci::record(&source.read(depth_ci::FIXTURE)?)?;
+pub(super) fn original_for(source: &Source, p: Profile) -> Result<DepthRecord, String> {
+    let record = p.record(&source.read(p.fixture())?)?;
     if record.execution.is_some() || !record.acceptance_entries.is_empty() {
         return Err("fixture is not frozen P/O".into());
+    }
+    for input in &record
+        .obligations
+        .as_ref()
+        .ok_or("missing frozen obligations")?
+        .acquired_inputs
+    {
+        if depth_ci::reference(
+            &input.path,
+            &source
+                .optional_bytes(&input.path)?
+                .ok_or("missing acquired profile input")?,
+        ) != *input
+        {
+            return Err("acquired profile provenance differs from frozen O".into());
+        }
     }
     Ok(record)
 }
 pub(super) fn scope(record: &DepthRecord) -> Scope {
+    scope_for(
+        record,
+        Profile::Channel,
+        Profile::Channel.obligations(record).remove(0),
+    )
+}
+pub(super) fn scope_for(record: &DepthRecord, p: Profile, obligation: ObligationRef) -> Scope {
     Scope {
         agent_id: "codex".into(),
-        version: "0.0.0".into(),
+        version: p.version().into(),
         event: record.event.clone(),
         enrollment_origin: EnrollmentOrigin::Isolated,
-        obligation: ObligationRef {
-            operation: "controlled_channel".into(),
-            id: Some(ObligationId::V1),
-            capability: None,
-            target: depth_ci::TARGET.into(),
-        },
+        obligation,
         policy_identity: record.policy.identity.clone(),
         obligations_identity: record.obligations.as_ref().unwrap().identity.clone(),
         rules_revision: record.policy.rules_revision.clone(),
-        trust_revision: TRUST.into(),
+        trust_revision: p.trust().into(),
         review_revision: REVIEW.into(),
     }
 }
@@ -96,6 +113,7 @@ pub(super) fn validate_witness(
     run: &Value,
     attempt: u64,
     anchor: &str,
+    p: Profile,
 ) -> Result<DepthRecord, String> {
     if w.schema_version != 1
         || w.run_id != run["id"].as_u64().ok_or("missing host run")?
@@ -131,14 +149,16 @@ pub(super) fn validate_witness(
         return Err("workflow/build source mismatch".into());
     }
     approved(root, &w.build.source_commit, &w.workflow_commit, anchor)?;
-    let original = original(&built)?;
+    let original = original_for(&built, p)?;
     let names = w
         .cases
         .requested
         .iter()
         .map(|c| c.name.as_str())
         .collect::<Vec<_>>();
-    if names != depth_ci::CASES
+    let raw = built.optional(&format!("{}/cases.json", p.directory()))?;
+    let expected = p.case_names(raw.as_deref())?;
+    if names != expected
         || w.cases.requested.is_empty()
         || w.cases
             .requested
@@ -148,16 +168,14 @@ pub(super) fn validate_witness(
         return Err("wrong exact test executable/case population".into());
     }
     w.graph.closure()?;
-    let profile: Value = serde_json::from_str(
-        &built.read("crates/xtask/tests/fixtures/depth-ci/build-profile.json")?,
-    )
-    .map_err(|e| e.to_string())?;
+    let profile: Value =
+        serde_json::from_str(&built.read(&p.build_profile())?).map_err(|e| e.to_string())?;
     if serde_json::to_value(&w.graph.packages).map_err(|e| e.to_string())? != profile["packages"]
         || w.graph.inputs != w.build.covered_inputs
         || w.build.host_target != depth_ci::TARGET
         || w.environment.target != depth_ci::TARGET
-        || !w.build.features.is_empty()
-        || !w.environment.features.is_empty()
+        || w.build.features != p.features()
+        || w.environment.features != p.features()
     {
         return Err("witness build graph/environment disagrees with reviewed profile".into());
     }
@@ -195,4 +213,70 @@ pub(super) fn mapping(w: &Witness, reviewer: &str) -> Result<AdequacyMapping, St
             .ok_or("missing assertion/production graph input")
     };
     Ok(AdequacyMapping{obligation:scope(&DepthRecord::parse(include_str!("../../../../tests/fixtures/depth-ci/record.json"),"codex","0.0.0")?).obligation,reviewer_identity:reviewer.into(),executor_identity:EXECUTOR.into(),assertions:w.cases.requested.iter().map(|case| Ok(AssertionBinding{case:case.clone(),assertion:input(depth_ci::ASSERTION)?,production_inputs:vec![input(depth_ci::PRODUCTION)?],counterfactual:"If the production validator accepts a forbidden value, rejects an allowed value or changes an accepted value, the corresponding bound grammar assertion fails. Redundant implementation guards need not independently fail.".into()})).collect::<Result<_,String>>()?})
+}
+
+pub(super) fn mapping_for(
+    root: &Path,
+    w: &Witness,
+    reviewer: &str,
+    p: Profile,
+    obligation: &ObligationRef,
+) -> Result<AdequacyMapping, String> {
+    if p == Profile::Channel {
+        return mapping(w, reviewer);
+    }
+    let built = source(root, &w.build.source_commit)?;
+    let specs: std::collections::BTreeMap<String, Vec<crate::depth_ci::profile::CaseSpec>> =
+        serde_json::from_str(&built.read(&format!("{}/cases.json", p.directory()))?)
+            .map_err(|e| e.to_string())?;
+    let key = obligation
+        .id
+        .map(|id| {
+            serde_json::to_value(id)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .unwrap_or_else(|| "M".into());
+    let input = |path: &str| {
+        w.graph
+            .inputs
+            .iter()
+            .find(|f| f.path == path)
+            .cloned()
+            .ok_or_else(|| format!("missing mapped input {path}"))
+    };
+    let assertions = specs
+        .get(&key)
+        .ok_or("missing due obligation mapping")?
+        .iter()
+        .map(|spec| {
+            Ok(AssertionBinding {
+                case: w
+                    .cases
+                    .requested
+                    .iter()
+                    .find(|c| c.name == spec.name)
+                    .cloned()
+                    .ok_or("mapped case absent from collected population")?,
+                assertion: input(&spec.assertion)?,
+                production_inputs: spec
+                    .production_inputs
+                    .iter()
+                    .map(|s| input(s))
+                    .collect::<Result<_, String>>()?,
+                counterfactual: spec.counterfactual.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if assertions.is_empty() {
+        return Err("empty obligation mapping".into());
+    }
+    Ok(AdequacyMapping {
+        obligation: obligation.clone(),
+        reviewer_identity: reviewer.into(),
+        executor_identity: p.executor().into(),
+        assertions,
+    })
 }

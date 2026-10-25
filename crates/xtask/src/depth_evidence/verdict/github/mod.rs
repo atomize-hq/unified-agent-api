@@ -1,5 +1,6 @@
 //! The only installed host profile: canonical GitHub CI, isolated source-contract proof.
 use super::*;
+use crate::depth_ci::profile::Profile;
 use crate::{
     depth_ci::{self, Witness},
     depth_record::Event,
@@ -18,17 +19,21 @@ pub(super) struct AuthenticatedRun {
 }
 #[derive(Debug)]
 pub(super) struct Resolved {
+    pub profile: Profile,
     pub original: DepthRecord,
     pub definition: String,
     pub runs: Vec<AuthenticatedRun>,
 }
 
+#[cfg(test)]
 fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
+    resolve_profile(api, root, Profile::Channel)
+}
+fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, String> {
     let mut view = GitInputs::new(root)?;
-    let original = depth_ci::record(
-        std::str::from_utf8(&view.required(depth_ci::FIXTURE)?).map_err(|e| e.to_string())?,
-    )?;
-    let definition = depth_ci::reference("", &view.required(depth_ci::CONTRACT)?).sha256;
+    let original =
+        p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;
+    let definition = depth_ci::reference("", &view.required(p.contract())?).sha256;
     let anchor_value = api.json(&endpoint("git/ref/heads/staging"))?;
     let anchor = sha(required_string(&anchor_value["object"], "sha")?)?;
     let anchor_source = source(root, anchor)?;
@@ -101,10 +106,10 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
         let head = source(root, sha(required_string(run, "head_sha")?)?)?;
         // Applicability precedes looking for artifacts or outcomes. Missing witnesses cannot
         // erase an otherwise applicable attempt. Other generations are genuinely out of scope.
-        let Some(raw) = head.optional(depth_ci::FIXTURE)? else {
+        let Some(raw) = head.optional(p.fixture())? else {
             continue;
         };
-        let candidate = depth_ci::record(&raw)?;
+        let candidate = p.record(&raw)?;
         if candidate.event != original.event
             || candidate.policy != original.policy
             || candidate.obligations != original.obligations
@@ -136,50 +141,59 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
             {
                 return Err("missing/unstable/nonterminal applicable attempt".into());
             }
-            let w = artifact::witness(api, &decoder, &attempt_run, attempt)?;
+            let w = artifact::witness(api, &decoder, &attempt_run, attempt, p)?;
             let built_original =
-                profile::validate_witness(root, &w, &attempt_run, attempt, anchor)?;
+                profile::validate_witness(root, &w, &attempt_run, attempt, anchor, p)?;
             if built_original != original {
                 return Err(
                     "actual checkout disagrees with independently applicable generation".into(),
                 );
             }
-            let Some((mapping, adoption)) = adoption::resolve(api, root, pr, &w)? else {
-                return Err(format!("missing exact authenticated adequacy adoption on PR #{pr}; proposal: ```depth-adequacy-v1\n{}\n```",serde_json::to_string_pretty(&adoption::proposal(&w,"REPLACE_WITH_REVIEWER_INVOCATION")?).map_err(|e|e.to_string())?));
-            };
-            let built = source(root, &w.build.source_commit)?;
-            let receipt = EvidenceReceipt {
-                schema_version: 1,
-                scope: profile::scope(&built_original),
-                producer: Producer {
-                    kind: ProducerKind::GithubActions,
-                    repository: depth_ci::REPOSITORY.into(),
-                    workflow_path: profile::WORKFLOW.into(),
-                    workflow_commit: w.workflow_commit.clone(),
-                    collector: depth_ci::reference(
-                        depth_ci::COLLECTOR,
-                        built.read(depth_ci::COLLECTOR)?.as_bytes(),
-                    ),
-                    run_id: id,
-                    run_attempt: attempt,
-                    job: "rust-tests".into(),
-                    artifact_name: format!("depth-channel-v1-{id}-{attempt}"),
-                },
-                build: w.build.clone(),
-                provenance: w.provenance.clone(),
-                cases: w.cases.clone(),
-                adequacy: Adequacy {
-                    mapping,
-                    endorsement: adoption.endorsement,
-                },
-            };
-            let receipt = EvidenceReceipt::parse(
-                &serde_json::to_string(&receipt).map_err(|e| e.to_string())?,
-            )?;
-            runs.push(AuthenticatedRun {
-                receipt,
-                witness: w,
-            });
+            let adoptions = adoption::resolve(api, root, pr, &w, p)?;
+            if adoptions.is_empty() {
+                return Err(format!("missing exact authenticated adequacy adoption on PR #{pr}; proposal: ```depth-adequacy-v1\n{}\n```",serde_json::to_string_pretty(&adoption::proposal_for(root,&w,"REPLACE_WITH_REVIEWER_INVOCATION",p)?).map_err(|e|e.to_string())?));
+            }
+            for (mapping, adoption) in adoptions {
+                let scope = profile::scope_for(&built_original, p, mapping.obligation.clone());
+                let mapped: std::collections::BTreeSet<_> =
+                    mapping.assertions.iter().map(|a| a.case.clone()).collect();
+                let mut cases = w.cases.clone();
+                cases.requested.retain(|c| mapped.contains(c));
+                cases.executed.retain(|c| mapped.contains(&c.case));
+                let built = source(root, &w.build.source_commit)?;
+                let receipt = EvidenceReceipt {
+                    schema_version: 1,
+                    scope,
+                    producer: Producer {
+                        kind: ProducerKind::GithubActions,
+                        repository: depth_ci::REPOSITORY.into(),
+                        workflow_path: profile::WORKFLOW.into(),
+                        workflow_commit: w.workflow_commit.clone(),
+                        collector: depth_ci::reference(
+                            depth_ci::COLLECTOR,
+                            built.read(depth_ci::COLLECTOR)?.as_bytes(),
+                        ),
+                        run_id: id,
+                        run_attempt: attempt,
+                        job: "rust-tests".into(),
+                        artifact_name: format!("{}-{id}-{attempt}", p.artifact()),
+                    },
+                    build: w.build.clone(),
+                    provenance: w.provenance.clone(),
+                    cases,
+                    adequacy: Adequacy {
+                        mapping,
+                        endorsement: adoption.endorsement,
+                    },
+                };
+                let receipt = EvidenceReceipt::parse(
+                    &serde_json::to_string(&receipt).map_err(|e| e.to_string())?,
+                )?;
+                runs.push(AuthenticatedRun {
+                    receipt,
+                    witness: w.clone(),
+                });
+            }
         }
     }
     if runs.is_empty() {
@@ -193,6 +207,7 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
     }
     view.verify()?;
     Ok(Resolved {
+        profile: p,
         original,
         definition,
         runs,
@@ -200,17 +215,49 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
 }
 
 fn receipt_ref(r: &EvidenceReceipt) -> Result<FileRef, String> {
+    let p = if r.scope.version == "0.0.0" {
+        Profile::Channel
+    } else {
+        Profile::Core
+    };
+    let suffix = if p == Profile::Channel {
+        String::new()
+    } else {
+        format!(
+            "/{}",
+            r.scope
+                .obligation
+                .id
+                .map(|id| serde_json::to_value(id)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_owned())
+                .unwrap_or_else(|| "M".into())
+        )
+    };
     Ok(depth_ci::reference(
         format!(
-            "cli_manifests/codex/reports/0.0.0/evidence/channel-v1/{}-{}/receipt.json",
-            r.producer.run_id, r.producer.run_attempt
+            "{}/{}-{}{}/receipt.json",
+            p.evidence(),
+            r.producer.run_id,
+            r.producer.run_attempt,
+            suffix
         ),
         &serde_json::to_vec(r).map_err(|e| e.to_string())?,
     ))
 }
 impl Resolved {
     fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
-        if profile::scope(&self.original) != current.current
+        if profile::scope_for(
+            &self.original,
+            self.profile,
+            current.current.obligation.clone(),
+        ) != current.current
+            || !self
+                .profile
+                .obligations(&self.original)
+                .contains(&current.current.obligation)
             || self.definition != current.definition_sha256
             || current.record.event != self.original.event
             || current.record.policy != self.original.policy
@@ -218,21 +265,32 @@ impl Resolved {
         {
             return Ok(None);
         }
-        let first = &self.runs[0].witness;
-        if self.runs.iter().any(|r| {
+        let applicable: Vec<_> = self
+            .runs
+            .iter()
+            .filter(|r| r.receipt.scope.obligation == current.current.obligation)
+            .collect();
+        let Some(first) = applicable.first() else {
+            return Ok(None);
+        };
+        let first = &first.witness;
+        if applicable.iter().any(|r| {
             r.witness.environment != first.environment
                 || r.witness.build.toolchain != first.build.toolchain
         }) {
             return Ok(None);
         }
         Ok(Some(Population {
-            current: profile::scope(&self.original),
+            current: profile::scope_for(
+                &self.original,
+                self.profile,
+                current.current.obligation.clone(),
+            ),
             definition_sha256: self.definition.clone(),
             environment: first.environment.clone(),
             toolchain: first.build.toolchain.clone(),
-            runs: self
-                .runs
-                .iter()
+            runs: applicable
+                .into_iter()
                 .map(|r| {
                     Ok(Run {
                         evidence: receipt_ref(&r.receipt)?,
@@ -263,12 +321,16 @@ impl Host for Adapter<'_> {
     fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
         if current.current.enrollment_origin != EnrollmentOrigin::Isolated
             || current.current.agent_id != "codex"
-            || current.current.version != "0.0.0"
         {
             return Ok(None);
         }
+        let p = match current.current.version.as_str() {
+            "0.0.0" => Profile::Channel,
+            "0.156.1" => Profile::Core,
+            _ => return Ok(None),
+        };
         // Read failures are absence of authenticated authority, never successful evidence.
-        match resolve(&Github, self.root) {
+        match resolve_profile(&Github, self.root, p) {
             Ok(resolved) => resolved.population(current),
             Err(_) => Ok(None),
         }
@@ -278,10 +340,17 @@ impl Host for Adapter<'_> {
 /// Read-only live proof in a disposable checkout. It materializes no authoritative repository
 /// records, modifies no packet/host policy, and cannot enroll a production version.
 pub fn prove(root: &Path) -> Result<String, String> {
-    prove_with(root, &Github)
+    prove_profile(root, &Github, Profile::Channel)
 }
+#[cfg(test)]
 fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
-    let resolved = resolve(api, root)?;
+    prove_profile(root, api, Profile::Channel)
+}
+pub fn prove_core(root: &Path) -> Result<String, String> {
+    prove_profile(root, &Github, Profile::Core)
+}
+fn prove_profile(root: &Path, api: &impl Api, p: Profile) -> Result<String, String> {
+    let resolved = resolve_profile(api, root, p)?;
     let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
     let commit = resolved.runs[0].witness.build.source_commit.clone();
     crate::depth_ci::output(
@@ -306,10 +375,12 @@ fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
     }
     let jail = crate::workspace_mutation::WorkspacePathJail::new(scratch.path())
         .map_err(|e| e.to_string())?;
-    let mut selected = None;
+    let mut selected = std::collections::BTreeMap::new();
     for run in &resolved.runs {
         let r = receipt_ref(&run.receipt)?;
-        selected.get_or_insert(r.clone());
+        selected
+            .entry(run.receipt.scope.obligation.clone())
+            .or_insert(r.clone());
         let mut files = profile::payloads(&run.witness)?;
         files.push((
             r,
@@ -332,47 +403,50 @@ fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
         std::process::Command::new("git")
             .arg("-C")
             .arg(scratch.path())
-            .args([
-                "add",
-                "--",
-                "cli_manifests/codex/reports/0.0.0/evidence/channel-v1",
-            ]),
+            .args(["add", "--", &p.evidence()]),
     )?;
-    let selected = selected.ok_or("no selected proof")?;
     let mut record = resolved.original.clone();
-    let scope = profile::scope(&record);
+    let scope = profile::scope_for(&record, p, p.obligations(&record).remove(0));
     let mut e = crate::depth_record::ExecutionPart {
         identity: String::new(),
         policy_identity: scope.policy_identity.clone(),
         obligations_identity: scope.obligations_identity.clone(),
-        results: vec![crate::depth_record::ObligationResult {
-            obligation: scope.obligation.clone(),
-            result: DepthResult::Verified,
-            rationale: None,
-            evidence: vec![selected.clone()],
-        }],
+        results: selected
+            .iter()
+            .map(
+                |(obligation, evidence)| crate::depth_record::ObligationResult {
+                    obligation: obligation.clone(),
+                    result: DepthResult::Verified,
+                    rationale: None,
+                    evidence: vec![evidence.clone()],
+                },
+            )
+            .collect(),
         reuse_bindings: vec![],
         debt_grants: vec![],
         debt_retired: vec![],
     };
+    // Annex B derived arrays sort by canonical serialized entries, not Rust enum order.
+    e.results
+        .sort_by_key(|r| serde_json::to_vec(&serde_json::to_value(r).unwrap()).unwrap());
     e.identity = crate::depth_record::part_identity(&e)?;
     record.execution = Some(e);
-    let first = &resolved.runs[0].witness;
-    let current = Evaluation {
-        current: scope.clone(),
-        definition_sha256: resolved.definition.clone(),
-        record: record.clone(),
-        environment: first.environment.clone(),
-        toolchain: first.build.toolchain.clone(),
+    let (results, decisions) = resolved.decisions(scratch.path(), &record)?;
+    let verdicts=selected.keys().map(|obligation|json!({"obligation":obligation,"result":results.result(&record,obligation)})).collect::<Vec<_>>();
+    let verdict = Verdict {
+        result: if verdicts.iter().all(|v| v["result"] == "verified") {
+            DepthResult::Verified
+        } else if verdicts.iter().any(|v| v["result"] == "failed") {
+            DepthResult::Failed
+        } else {
+            DepthResult::Unverified
+        },
+        reason: decisions
+            .values()
+            .map(|v| v.reason.as_str())
+            .collect::<Vec<_>>()
+            .join("; "),
     };
-    struct Snapshot(Resolved);
-    impl Host for Snapshot {
-        fn population(&self, c: &Evaluation) -> Result<Option<Population>, String> {
-            self.0.population(c)
-        }
-    }
-    let verdict = evaluate(scratch.path(), &selected, &current, &Snapshot(resolved))?;
-    let results = super::super::results::evaluated(&record, scope.obligation, verdict.result)?;
     let facts = crate::support_matrix::depth::derive_evaluated_depth_facts(
         Some(&record),
         true,
@@ -386,7 +460,7 @@ fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
     )?;
     let row = crate::support_matrix::SupportRow {
         agent: "codex".into(),
-        version: "0.0.0".into(),
+        version: p.version().into(),
         target: depth_ci::TARGET.into(),
         manifest_support: crate::support_matrix::ManifestSupportState::Unsupported,
         backend_support: crate::support_matrix::BackendSupportState::Partial,
@@ -398,8 +472,86 @@ fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
         depth: facts.clone(),
     };
     let publication = crate::support_matrix::render_publication_bundle(&[row], String::new())?;
-    serde_json::to_string_pretty(&json!({"origin":"isolated","result":verdict.result,"reason":verdict.reason,"publisher":facts,"publication_json":serde_json::from_str::<Value>(&publication.json).map_err(|e|e.to_string())?,"publication_markdown":publication.markdown,"production_enrollment":false})).map_err(|e|e.to_string())
+    serde_json::to_string_pretty(&json!({"origin":"isolated","obligations":verdicts,"result":verdict.result,"reason":verdict.reason,"publisher":facts,"publication_json":serde_json::from_str::<Value>(&publication.json).map_err(|e|e.to_string())?,"publication_markdown":publication.markdown,"production_enrollment":false})).map_err(|e|e.to_string())
 }
 
 #[cfg(test)]
 mod tests;
+
+impl Host for Resolved {
+    fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
+        self.population(current)
+    }
+}
+impl Resolved {
+    fn evaluate_record(
+        &self,
+        root: &Path,
+        record: &DepthRecord,
+    ) -> Result<super::super::EvidenceVerdicts, String> {
+        self.decisions(root, record).map(|(results, _)| results)
+    }
+    fn decisions(
+        &self,
+        root: &Path,
+        record: &DepthRecord,
+    ) -> Result<
+        (
+            super::super::EvidenceVerdicts,
+            std::collections::BTreeMap<ObligationRef, Verdict>,
+        ),
+        String,
+    > {
+        let first = self.runs.first().ok_or("empty authenticated population")?;
+        let mut results = std::collections::BTreeMap::new();
+        let mut decisions = std::collections::BTreeMap::new();
+        for obligation in self.profile.obligations(&self.original) {
+            let current = Evaluation {
+                current: profile::scope_for(&self.original, self.profile, obligation.clone()),
+                definition_sha256: self.definition.clone(),
+                record: record.clone(),
+                environment: first.witness.environment.clone(),
+                toolchain: first.witness.build.toolchain.clone(),
+            };
+            let row = record
+                .execution
+                .as_ref()
+                .and_then(|e| e.results.iter().find(|r| r.obligation == obligation));
+            let mut outcomes = vec![];
+            if let Some(row) = row {
+                for selected in &row.evidence {
+                    outcomes.push(evaluate(root, selected, &current, self)?);
+                }
+            }
+            let result =
+                if outcomes.is_empty() || outcomes.iter().any(|r| r.result != outcomes[0].result) {
+                    DepthResult::Unverified
+                } else {
+                    outcomes[0].result
+                };
+            let reason = if outcomes.is_empty() {
+                "missing selected evidence for due obligation".into()
+            } else if outcomes.iter().any(|r| r.result != outcomes[0].result) {
+                "contradictory selected evidence results".into()
+            } else {
+                outcomes[0].reason.clone()
+            };
+            decisions.insert(obligation.clone(), Verdict { result, reason });
+            results.insert(obligation, result);
+        }
+        Ok((
+            super::super::results::evaluated_many(record, results)?,
+            decisions,
+        ))
+    }
+}
+/// Read-only bridge for the fixed isolated CORE profile. Production consumers never call this.
+pub(in crate::depth_evidence) fn isolated_record_results(
+    root: &Path,
+    record: &DepthRecord,
+) -> Result<super::super::EvidenceVerdicts, String> {
+    match resolve_profile(&Github, root, Profile::Core) {
+        Ok(resolved) => resolved.evaluate_record(root, record),
+        Err(_) => Ok(super::super::EvidenceVerdicts::default()),
+    }
+}

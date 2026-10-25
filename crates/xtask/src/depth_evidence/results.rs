@@ -45,14 +45,44 @@ pub(crate) fn test_results(record: Option<&DepthRecord>) -> EvidenceVerdicts {
     }
 }
 
-/// Only the evaluator's private host path may seal a result. A public Verdict grants no authority.
-pub(super) fn evaluated(
+pub(super) fn evaluated_many(
     record: &DepthRecord,
-    obligation: ObligationRef,
-    result: DepthResult,
+    results: BTreeMap<ObligationRef, DepthResult>,
 ) -> Result<EvidenceVerdicts, String> {
     Ok(EvidenceVerdicts {
         record_sha256: Some(record.stated_sha256()?),
-        results: BTreeMap::from([(obligation, result)]),
+        results,
     })
+}
+/// Authenticate and evaluate only the compiled isolated Codex CORE profile; no production origin.
+pub fn evaluate_isolated_record(
+    workspace: &std::path::Path,
+    record: &DepthRecord,
+) -> Result<EvidenceVerdicts, String> {
+    super::verdict::isolated_record_results(workspace, record)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn opaque_results_do_not_survive_a_changed_record() {
+        let mut record = crate::depth_ci::profile::Profile::Core
+            .record(include_str!("../../tests/fixtures/depth-core/record.json"))
+            .unwrap();
+        let obligation = crate::depth_ci::profile::Profile::Core
+            .obligations(&record)
+            .remove(0);
+        let results = evaluated_many(
+            &record,
+            BTreeMap::from([(obligation.clone(), DepthResult::Verified)]),
+        )
+        .unwrap();
+        assert_eq!(results.result(&record, &obligation), DepthResult::Verified);
+        record.policy.path_enabled = false;
+        assert_eq!(
+            results.result(&record, &obligation),
+            DepthResult::Unverified
+        );
+    }
 }

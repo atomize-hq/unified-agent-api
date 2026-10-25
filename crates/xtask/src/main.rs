@@ -60,6 +60,10 @@ struct Cli {
 enum Command {
     /// Collect an isolated CI witness into target/depth-ci; grants no admission.
     DepthCiCollect,
+    /// Collect the fixed isolated Codex CORE profile, without enrollment or writes to reports.
+    DepthCoreCollect,
+    /// Read-only authenticated per-obligation CORE preview in a disposable checkout.
+    DepthCoreProve,
     /// Plan or apply a coherent, guarded promotion candidate.
     ManifestPromote(xtask::manifest_promotion::Args),
     /// Read-only isolated CI proof; never writes packet or production records.
@@ -183,6 +187,25 @@ fn main() {
                 1
             }
         },
+        Command::DepthCoreCollect => {
+            let root = std::env::current_dir().expect("workspace");
+            if let Err(e) = xtask::depth_ci::collect_core(&root) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        Command::DepthCoreProve => {
+            let result = std::env::current_dir()
+                .map_err(|e| e.to_string())
+                .and_then(|root| xtask::depth_evidence::prove_isolated_core(&root));
+            match result {
+                Ok(raw) => println!("{raw}"),
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(1);
+                }
+            }
+        }
         Command::DepthCiProve => match std::env::current_dir()
             .map_err(|e| e.to_string())
             .and_then(|root| xtask::depth_evidence::prove_isolated_ci(&root))

@@ -1,6 +1,7 @@
 # Phase E1: isolated maintenance-chain proof plan
 
-Status: proposed; policy decisions E1-P1 and E1-P2 await maintainer approval.
+Status: E1-P1 and E1-P2 approved by the maintainer on 2026-10-25.
+The first prerequisite is the evidence bridge; public-route wiring and the host run follow separately.
 Source baseline: staging `dd10558157583f1969b4ac0a412107ef617648e1` (PR #296).
 This plan accompanies the refreshed [Annex A inventory](../../specs/support-depth-contract.md#annex-a-route-inventory).
 The [support-depth contract](../../specs/support-depth-contract.md) remains normative. E1 changes
@@ -14,7 +15,10 @@ manual closeout → separate promotion → exact-result integration. Every rejec
 no unadmitted final acceptance effect. Existing unchanged historical records and truthful
 `unverified` reporting must continue to work.
 
-Current source does **not** support claiming that positive public chain yet:
+At the E1 source baseline, the following gaps prevented claiming that positive public chain.
+The evidence-bridge increment adds the isolated CORE consumer described in the
+[evidence contract](../../specs/support-depth-evidence-v1.md#isolated-codex-core-evidence-bridge);
+public routes and production evidence remain separate work:
 
 1. `AgentRegistry::parse` rejects declared depth enrollment; public preparation also refuses
    retained depth. Unsupported refresh/neutral/onboarding writers have their own refusals.
@@ -33,7 +37,7 @@ Consequently an isolated rehearsal using those seams may diagnose wiring, but is
 complete-chain/path-enablement proof. There is no reason to introduce a new rehearsal framework as
 an additional acceptance milestone. The missing bounded wiring/evidence work comes first.
 
-## Decisions requested
+## Approved decisions
 
 | Id | Recommendation | Reason and boundary |
 | --- | --- | --- |

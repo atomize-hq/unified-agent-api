@@ -436,3 +436,6 @@ mod tests;
 
 mod github;
 pub use github::prove as prove_isolated_ci;
+
+pub(super) use github::isolated_record_results;
+pub use github::prove_core as prove_isolated_core;
