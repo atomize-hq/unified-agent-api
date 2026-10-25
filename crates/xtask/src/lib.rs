@@ -12,6 +12,7 @@ pub mod capability_publication;
 pub mod depth_evidence;
 pub mod depth_record;
 mod git_inputs;
+pub mod isolated_maintenance;
 pub mod manifest_acquisition;
 pub mod manifest_report;
 pub mod manifest_snapshot_schema;
