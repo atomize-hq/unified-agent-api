@@ -193,13 +193,17 @@ fn main() {
                 eprintln!("{e}");
                 std::process::exit(1);
             }
+            0
         }
         Command::DepthCoreProve => {
             let result = std::env::current_dir()
                 .map_err(|e| e.to_string())
                 .and_then(|root| xtask::depth_evidence::prove_isolated_core(&root));
             match result {
-                Ok(raw) => println!("{raw}"),
+                Ok(raw) => {
+                    println!("{raw}");
+                    0
+                }
                 Err(e) => {
                     eprintln!("{e}");
                     std::process::exit(1);
