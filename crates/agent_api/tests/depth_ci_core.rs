@@ -1,5 +1,5 @@
 //! Reuse production adapter assertions; all subprocesses below are explicitly synthetic.
-#![cfg(all(feature = "codex", target_os = "linux"))]
+#![cfg(all(feature = "codex", target_os = "linux", target_arch = "x86_64"))]
 #[path = "c1_codex_stream_exec_adapter.rs"]
 mod adapter;
 #[path = "c3_explicit_cancellation.rs"]
@@ -130,6 +130,17 @@ async fn stdin_prompt_and_unknown_event_are_handled() {
         .iter()
         .position(|e| e.kind == AgentWrapperEventKind::TextOutput)
         .unwrap();
+    let unknown = seen
+        .iter()
+        .position(|e| {
+            matches!(
+                e.kind,
+                AgentWrapperEventKind::Unknown | AgentWrapperEventKind::Error
+            )
+        })
+        .expect("unknown event is reported");
+    assert!(unknown < text);
+    assert_eq!(seen.last().unwrap().kind, AgentWrapperEventKind::Status);
     assert!(seen[..text]
         .iter()
         .any(|e| e.kind == AgentWrapperEventKind::Status));

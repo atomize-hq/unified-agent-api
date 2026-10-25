@@ -181,7 +181,12 @@ pub(super) fn resolve(
             std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
         )?;
         for input in record.obligations.unwrap().acquired_inputs {
-            result.inputs.push(view.reference(&input.path)?);
+            view.required(&input.path)?;
+            let current = view.reference(&input.path)?;
+            if current != input {
+                return Err("acquired CORE provenance differs from frozen O".into());
+            }
+            result.inputs.push(current);
         }
     }
     result.inputs.sort();
