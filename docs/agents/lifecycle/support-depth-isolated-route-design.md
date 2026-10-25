@@ -195,7 +195,7 @@ authorization, read back isolation/rules and compare production identities befor
 1. **Binding plumbing, fail closed.** Private fixed isolated-context resolver, approved-source and
    repository observations, scoped loader and plan/scratch/apply lifecycle. Read-only probes and
    negative/public ordinary controls; no positive depth writer enabled yet.
-2. **Packet intake readiness.** Exact predicate/alias and selected-unit classification handling,
+2. **Packet intake readiness.** The proposed [intake design and exact classifications](support-depth-packet-intake-design.md) brings PI-P1–PI-P3 for separate maintainer decisions. Exact predicate/alias and selected-unit classification handling,
    real target/acquisition and P/O currentness. First present exact effect classifications and any
    necessary P representation changes for maintainer review; implement only approved policy.
    Resolve the IR-D1 feasibility checkpoint early; prove unresolved/classification/work refusals
