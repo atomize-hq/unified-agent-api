@@ -84,7 +84,6 @@ impl BuildEnv {
             )
             .env("CARGO_NET_OFFLINE", "true")
             .env("CARGO_INCREMENTAL", "0")
-            .env("CARGO_BUILD_JOBS","2")
             .env("SOURCE_DATE_EPOCH", "0")
             .env("LANG", "C")
             .env("LC_ALL", "C")
@@ -528,7 +527,6 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
             ),
             ("CARGO_NET_OFFLINE", "true"),
             ("CARGO_INCREMENTAL", "0"),
-            ("CARGO_BUILD_JOBS","2"),
             ("SOURCE_DATE_EPOCH", "0"),
             ("LANG", "C"),
             ("LC_ALL", "C"),
@@ -547,6 +545,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
             value: "2".into(),
         });
     }
+    Environment::parse(&serde_json::to_string(&environment).map_err(|e| e.to_string())?)?;
     view.required(COLLECTOR)?;
     let build = Build {
         source_commit: commit,
