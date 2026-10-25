@@ -136,6 +136,11 @@ fn merge_entries_are_append_only_and_do_not_require_surviving_working_files() {
     rec["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": "a".repeat(64) }]);
     let (temp, root, tip) = baseline(Some(&rec));
     fs::remove_file(temp.path().join(request_path())).unwrap();
+    assert_eq!(
+        compare(&root, &tip).0,
+        0,
+        "historical entries need no working request"
+    );
     let entry = json!({ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": "b".repeat(64) });
     rec["acceptance_entries"]
         .as_array_mut()
@@ -143,7 +148,8 @@ fn merge_entries_are_append_only_and_do_not_require_surviving_working_files() {
         .push(entry.clone());
     write_record(&root, &rec);
     let (status, report) = compare(&root, &tip);
-    assert_eq!(status, 0, "{report}");
+    assert_eq!(status, 2, "{report}");
+    assert!(report.contains("DEPTH_ADMISSION_REFUSED"), "{report}");
     for entries in [
         json!([]),
         json!([entry.clone()]),
@@ -203,7 +209,8 @@ fn merge_acceptance_pointer_requires_the_candidate_statement_entry() {
     rec["acceptance_entries"] = json!([{ "backs": "promotion", "targets": [REQUIRED_TARGET], "record_sha256": parsed.stated_sha256().unwrap() }]);
     write_record(&root, &rec);
     let (status, report) = compare(&root, &tip);
-    assert_eq!(status, 0, "{report}");
+    assert_eq!(status, 2, "{report}");
+    assert!(report.contains("DEPTH_ADMISSION_REFUSED"), "{report}");
 }
 
 #[test]

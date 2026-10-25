@@ -15,6 +15,9 @@ class IntegrationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        runtime = tempfile.TemporaryDirectory()
+        self.addCleanup(runtime.cleanup)
+        self.runtime = Path(runtime.name)
         self.git("init", "-q", "-b", "staging")
         self.git("config", "user.name", "Test")
         self.git("config", "user.email", "test@example.invalid")
@@ -121,6 +124,17 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(result["tip"], "")
         with self.assertRaises(ValueError):
             self.context({})  # Missing metadata is not a non-staging PR.
+
+    def test_dirty_tracked_or_untracked_candidate_is_not_exact_result(self):
+        for path in ("VERSION", "docs/uncommitted-proof.json"):
+            with self.subTest(path=path):
+                self.write(path, "uncommitted candidate input\n")
+                with self.assertRaisesRegex(ValueError, "exactly the committed candidate"):
+                    self.context()
+                if path == "VERSION":
+                    self.git("checkout", "--", path)
+                else:
+                    (self.root / path).unlink()
 
     def needs(self, candidate):
         result = {job: {"result": "success", "outputs": {}} for job in gate.JOBS}
@@ -260,12 +274,12 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(gate.version_change(self.root, "workflow_dispatch", {}, candidate), "0")
 
     def cli(self, mode, event=None, name="pull_request", needs=None):
-        event_file = self.root / "event.json"
+        event_file = self.runtime / "event.json"
         event_file.write_text(json.dumps(self.event if event is None else event))
         env = os.environ | {
             "GITHUB_EVENT_NAME": name, "GITHUB_EVENT_PATH": str(event_file),
-            "GITHUB_SHA": self.candidate, "GITHUB_OUTPUT": str(self.root / "outputs"),
-            "GITHUB_STEP_SUMMARY": str(self.root / "summary.md"),
+            "GITHUB_SHA": self.candidate, "GITHUB_OUTPUT": str(self.runtime / "outputs"),
+            "GITHUB_STEP_SUMMARY": str(self.runtime / "summary.md"),
             "GITHUB_REPOSITORY": "example/repo", "GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "2",
             "CI_NEEDS": json.dumps(needs),
         }
@@ -277,7 +291,7 @@ class IntegrationTests(unittest.TestCase):
         needs = self.needs(candidate)
         version = self.cli("version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        outputs = dict(line.split("=", 1) for line in (self.root / "outputs").read_text().splitlines())
+        outputs = dict(line.split("=", 1) for line in (self.runtime / "outputs").read_text().splitlines())
         self.assertEqual(outputs, {"candidate": self.candidate, "tip": self.base, "version_changed": "0"})
         result = self.cli("gate", needs=needs)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -288,7 +302,7 @@ class IntegrationTests(unittest.TestCase):
                          ("example/repo", "123", "2"))
         self.assertEqual(report["tree"], self.git("rev-parse", "HEAD^{tree}"))
         self.assertEqual(len(report["evaluator_sha256"]), 64)
-        self.assertIn('"verdict": "success"', (self.root / "summary.md").read_text())
+        self.assertIn('"verdict": "success"', (self.runtime / "summary.md").read_text())
         needs["preflight"]["result"] = "cancelled"
         result = self.cli("gate", needs=needs)
         self.assertNotEqual(result.returncode, 0)

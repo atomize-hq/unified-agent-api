@@ -1,5 +1,5 @@
-//! Two-tree record invariants and check 9 acceptance detection. Route admission remains later
-//! work; see docs/backlog.json. Both parsed revisions enforce check 11 through check 13.
+//! Two-tree record invariants and full check 9 admission against the supplied integration parent.
+//! Both parsed revisions enforce check 11 through check 13.
 
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -40,6 +40,10 @@ pub(in crate::manifest_validate) fn validate(
             return;
         }
     };
+    // Full mediation is repository-wide, including effects outside this requested root.
+    if let Err(error) = xtask::depth_acceptance::check_integration(&workspace, tip.commit()) {
+        emit(violations, "DEPTH_ADMISSION_REFUSED", root.clone(), error);
+    }
     let registry = AgentRegistry::load(&workspace).ok();
     let entry = registry
         .as_ref()
@@ -264,6 +268,14 @@ pub(in crate::manifest_validate) fn validate(
                 "cannot compute stated digest".into(),
             ),
         }
+    }
+    if git::Tip::new(&workspace, revision).map(|now| now.commit() == tip.commit()) != Ok(true) {
+        emit(
+            violations,
+            "DEPTH_TIP_MOVED",
+            root,
+            "integration parent changed during validation".into(),
+        );
     }
 }
 

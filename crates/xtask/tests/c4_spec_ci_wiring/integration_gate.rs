@@ -95,7 +95,7 @@ fn terminal_gate_covers_all_existing_jobs_without_duplicate_test_runs() {
 #[test]
 #[cfg(unix)]
 fn queue_validation_passes_the_supplied_base_to_every_manifest_root() {
-    use std::os::unix::fs::{symlink, PermissionsExt};
+    use std::os::unix::fs::PermissionsExt;
     use std::process::Command;
 
     let dir = tempfile::tempdir().unwrap();
@@ -122,6 +122,12 @@ fn queue_validation_passes_the_supplied_base_to_every_manifest_root() {
     };
     git(&source, &["init", "-q", "-b", "staging"]);
     fs::write(source.join("fixture"), "base").unwrap();
+    fs::create_dir(source.join("scripts")).unwrap();
+    fs::copy(
+        repo_root().join("scripts/check_staging_integration.py"),
+        source.join("scripts/check_staging_integration.py"),
+    )
+    .unwrap();
     git(&source, &["add", "."]);
     git(&source, &["commit", "-qm", "base"]);
     let base = git(&source, &["rev-parse", "HEAD"]);
@@ -138,7 +144,6 @@ fn queue_validation_passes_the_supplied_base_to_every_manifest_root() {
             candidate.to_str().unwrap(),
         ],
     );
-    symlink(repo_root().join("scripts"), candidate.join("scripts")).unwrap();
     let event = dir.path().join("event.json");
     let queue_event = serde_json::json!({
         "action": "checks_requested",

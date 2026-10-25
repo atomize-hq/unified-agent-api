@@ -1,6 +1,6 @@
 use super::*;
 const POINTER: &str = "cli_manifests/codex/pointers/latest_validated/x86_64-unknown-linux-gnu.txt";
-fn closed() -> Fixture {
+pub(super) fn closed() -> Fixture {
     let mut f = Fixture::new();
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let paths = std::process::Command::new("git")
@@ -30,7 +30,9 @@ fn closed() -> Fixture {
     f.producer.current = f.record.clone();
     f
 }
-fn promote(f: &Fixture) -> Result<Vec<crate::workspace_mutation::PlannedMutation>, String> {
+pub(super) fn promote(
+    f: &Fixture,
+) -> Result<Vec<crate::workspace_mutation::PlannedMutation>, String> {
     Proposal::capture(f.root.path())?.plan_changes(
         f.root.path(),
         vec![

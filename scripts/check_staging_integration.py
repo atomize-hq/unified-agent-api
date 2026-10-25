@@ -81,6 +81,9 @@ def context(root, event_name, event, expected_sha):
                 == commit(root, expected_sha), "checkout differs from the merge-group SHA")
         git(root, "merge-base", "--is-ancestor", base, candidate)
         result.update(integration=True, tip=base)
+    if result["integration"]:
+        require(not git(root, "status", "--porcelain=v1", "--untracked-files=all"),
+                "integration checkout must contain exactly the committed candidate")
     return result
 
 

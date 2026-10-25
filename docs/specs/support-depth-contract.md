@@ -1541,9 +1541,9 @@ Source references are to `staging` at `f61534be` and use the abbreviations of An
   validation compares event SHA with event.before. With `--tip`, check 9 also compares every
   acceptance-effect category through `xtask/depth_acceptance/`, using each revision's own immutable
   inputs and the checked runtime advertising model. It requires a candidate record-wide current
-  entry for every covered acceptance destination, except entry listing itself. This is structural
-  validation, not actor authorization or route admission. Route admission, strict staging
-  integration and the remaining proof/enablement work remain prerequisites (uaa-0073).
+  entry for every covered acceptance destination. The read-only comparison remains diagnostic;
+  D7 below adds full owning admission, including entry listing, to the validation path.
+  The remaining inventory, isolated chain proof and enablement work remain prerequisites (uaa-0073).
 - In the three roots that have them, `RULES.json` names the record's path as
   `storage.committed.reports.depth_record`, which is how a root states that it adopts this annex.
   `SCHEMA.json` defines no shape for a depth record: the typed reader rejects any member B.6 does
@@ -1595,3 +1595,43 @@ Private fixed-producer tests prove admission composition, not authenticated prod
 D7's exact-result IN1 admission, route inventory re-establishment and the full isolated maintenance
 chain remain required before separately authorized production enrollment. D6 does not install host
 settings, merge its own PR or create a background automation.
+
+
+### D7 final integration admission
+
+With `--tip`, `manifest-validate` MUST re-establish depth admission through the shared owning
+predicates for every registered agent, independently of the requested manifest root. It compares
+the supplied immutable parent with the candidate, preserves retained entries and selections, and
+checks current request correspondence and new/changed-statement freeze authority even for
+reporting-only changes in another registered root. Historical unchanged statements need no
+surviving working request or approval. It checks every acceptance destination and every newly
+listed entry. A new entry MUST describe the
+current record and match the independently admitted owning entry; copying an entry or selecting a
+workflow/CLI name supplies no authority. Unsupported onboarding acceptance remains refused.
+
+Maintenance closeout uses the same predicate as both local closeout writers: the actual candidate
+closeout, exact current request path/content binding, current P/O/E and independently evaluated
+obligations/debt, maintenance lifecycle authority and a generation-matching marker already present
+on the supplied integration parent. A candidate-only marker cannot authorize its own closeout.
+Promotion reuses the local promotion predicate and requires an admitted retained closeout from the
+parent or a newly admitted candidate closeout, plus its own current target entry and coherent
+marker retirement. Replaced working files do not erase already established retained authority.
+
+An unchanged qualified promise or depth-qualified capability MUST also re-establish current
+bindings and evidence. Dependency-only invalidation cannot leave an existing claim qualified merely
+because the record and its entries did not change. Reporting invalidated results as `unverified`
+remains permitted without a new acceptance entry, subject to the existing record/publication
+invariants. Aggregate publication must agree with the current derived facts.
+
+The existing CI adapter MUST refuse an integration checkout with uncommitted tracked changes or
+untracked candidate files. PR event parents and the merge-group candidate/base remain bound to
+exact commits; the existing terminal gate evaluates those same results, and the native merge queue
+supplies the tip-conditional ref update. Resolved HEAD/parent changes during admission refuse. A
+local read-only validation or cached verdict is not a reusable integration receipt. These changes
+add no CI job, host setting, global lock or alternate integration framework.
+
+Normal production registry loading continues to refuse depth enrollment. Private fixed-producer
+positives establish composition and agreement of the local and integration predicates, not an
+authenticated production promise or complete maintenance-chain conformance. Phase E must still
+re-establish the route inventory and prove that chain in isolation before separately authorized
+production enrollment. D7 does not activate production or merge its own implementation PR.
