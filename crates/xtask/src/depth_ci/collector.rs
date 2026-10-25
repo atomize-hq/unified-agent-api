@@ -14,6 +14,7 @@ use std::{
 };
 
 struct BuildEnv {
+    profile: profile::Profile,
     rustc: PathBuf,
     cargo: PathBuf,
     sysroot: PathBuf,
@@ -23,7 +24,7 @@ struct BuildEnv {
     root: PathBuf,
 }
 impl BuildEnv {
-    fn new(root: &Path) -> Result<Self, String> {
+    fn new(root: &Path, profile: profile::Profile) -> Result<Self, String> {
         let which = |binary: &str| -> Result<PathBuf, String> {
             let bytes =
                 output(Command::new("rustup").args(["which", "--toolchain", TOOLCHAIN, binary]))?;
@@ -49,6 +50,7 @@ impl BuildEnv {
         let raw = output(Command::new(&rustc).args(["--print", "sysroot"]))?;
         let sysroot = PathBuf::from(std::str::from_utf8(&raw).map_err(|e| e.to_string())?.trim());
         Ok(Self {
+            profile,
             rustc,
             cargo,
             sysroot,
@@ -86,6 +88,9 @@ impl BuildEnv {
             .env("LANG", "C")
             .env("LC_ALL", "C")
             .env("TZ", "UTC");
+        if self.profile == profile::Profile::Core {
+            c.env("CARGO_BUILD_JOBS", "2");
+        }
         c
     }
 }
@@ -202,7 +207,12 @@ fn toolchain(env: &BuildEnv, executable: &Path, scripts: &[Value]) -> Result<Str
     generated.sort_by_key(Value::to_string);
     serde_json::to_string(&json!({"rustc":version,"rustc_sha256":identity(&env.rustc)?,"cargo":required(env.command(&env.cargo).arg("-Vv"),65536)?,"cargo_sha256":identity(&env.cargo)?,"standard_library":standard,"native_tools":native,"runtime_libraries":linked,"build_scripts":generated})).map_err(|e|e.to_string())
 }
-fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String> {
+fn execute(
+    env: &BuildEnv,
+    executable: &Path,
+    names: &[String],
+    exact_population: bool,
+) -> Result<(Cases, String), String> {
     let listed = required(
         env.command(executable)
             .args(["--list", "--format", "terse"]),
@@ -212,14 +222,15 @@ fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String>
         .lines()
         .filter_map(|s| s.strip_suffix(": test"))
         .collect();
-    if listed != CASES.into_iter().collect() {
+    let expected: BTreeSet<_> = names.iter().map(String::as_str).collect();
+    if !expected.is_subset(&listed) || (exact_population && listed != expected) {
         return Err("unrecognized test executable population".into());
     }
     let digest = identity(executable)?;
-    let requested: Vec<_> = CASES
+    let requested: Vec<_> = names
         .iter()
         .map(|name| CaseIdentity {
-            name: (*name).into(),
+            name: name.clone(),
             executable_sha256: digest.clone(),
         })
         .collect();
@@ -241,15 +252,17 @@ fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String>
         )?;
         let outcome = if success
             && output.contains(&format!("test {} ... ok", case.name))
-            && output.contains(
-                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out",
-            ) {
+            && output.contains(&format!(
+                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; {} filtered out",
+                listed.len() - 1
+            )) {
             CaseOutcome::Passed
         } else if !success
             && output.contains(&format!("test {} ... FAILED", case.name))
-            && output.contains(
-                "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out",
-            )
+            && output.contains(&format!(
+                "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; {} filtered out",
+                listed.len() - 1
+            ))
         {
             CaseOutcome::Failed
         } else if output.contains("1 ignored;") {
@@ -278,11 +291,12 @@ fn execute(env: &BuildEnv, executable: &Path) -> Result<(Cases, String), String>
         raw,
     ))
 }
-fn witness(root: &Path) -> Result<Witness, String> {
+fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     let (run_id, run_attempt, workflow_commit) = host_header()?;
     let mut view = GitInputs::new(root)?;
-    let original =
-        record(std::str::from_utf8(&view.required(FIXTURE)?).map_err(|e| e.to_string())?)?;
+    let original = profile.record(
+        std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
+    )?;
     if original.execution.is_some() || !original.acceptance_entries.is_empty() {
         return Err("source fixture must contain only frozen P/O".into());
     }
@@ -297,15 +311,30 @@ fn witness(root: &Path) -> Result<Witness, String> {
     .trim()
     .to_owned();
     let source = Source::tip(root, &commit)?;
-    let absent = [
+    let mut absent = [
         ".cargo/config",
         ".cargo/config.toml",
         "rust-toolchain",
         "rust-toolchain.toml",
-        "crates/wrapper_events/build.rs",
     ]
     .map(str::to_owned)
     .to_vec();
+    if profile == profile::Profile::Channel {
+        absent.push("crates/wrapper_events/build.rs".into());
+    } else {
+        absent.extend(
+            [
+                "crates/agent_api/build.rs",
+                "crates/codex/build.rs",
+                "crates/wrapper_events/build.rs",
+                "crates/claude_code/build.rs",
+                "crates/aider/build.rs",
+                "crates/gemini_cli/build.rs",
+                "crates/opencode/build.rs",
+            ]
+            .map(str::to_owned),
+        );
+    }
     for path in &absent {
         if view.optional(path)?.is_some() || source.optional_bytes(path)?.is_some() {
             return Err("initial producer does not support additional build configuration".into());
@@ -319,43 +348,79 @@ fn witness(root: &Path) -> Result<Witness, String> {
             }
         }
     }
-    let env = BuildEnv::new(root)?;
-    let metadata: Value = serde_json::from_str(&required(
-        env.command(&env.cargo).args([
-            "metadata",
-            "--format-version",
-            "1",
-            "--locked",
-            "--offline",
-            "--no-default-features",
-            "--filter-platform",
-            TARGET,
-        ]),
+    let env = BuildEnv::new(root, profile)?;
+    let mut metadata: Value = serde_json::from_str(&required(
+        env.command(&env.cargo)
+            .args([
+                "metadata",
+                "--format-version",
+                "1",
+                "--locked",
+                "--offline",
+                "--no-default-features",
+                "--filter-platform",
+                TARGET,
+            ])
+            .args(if profile == profile::Profile::Core {
+                vec!["--all-features"]
+            } else {
+                vec![]
+            }),
         16777216,
     )?)
     .map_err(|e| e.to_string())?;
+    if profile == profile::Profile::Core {
+        let tree = required(
+            env.command(&env.cargo).args([
+                "tree",
+                "--locked",
+                "--offline",
+                "--no-default-features",
+                "--all-features",
+                "-p",
+                profile.package(),
+                "--target",
+                TARGET,
+                "--prefix",
+                "none",
+                "--format",
+                "{p}",
+                "--edges",
+                "normal,build,dev",
+            ]),
+            16777216,
+        )?;
+        metadata = super::graph::selected(metadata, &tree)?;
+    }
     // Check locked source contents/inventories before allowing their build-time code to run.
     super::graph::resolve(
         root,
         &mut view,
         &metadata,
-        &super::graph::expected(&metadata)?,
+        &super::graph::expected(&metadata, profile)?,
+        profile,
     )?;
     let built = required(
-        env.command(&env.cargo).args([
-            "test",
-            "--locked",
-            "--offline",
-            "-p",
-            "unified-agent-api-wrapper-events",
-            "--no-default-features",
-            "--target",
-            TARGET,
-            "--test",
-            "depth_ci_channel",
-            "--no-run",
-            "--message-format=json",
-        ]),
+        env.command(&env.cargo)
+            .args([
+                "test",
+                "--locked",
+                "--offline",
+                "-p",
+                profile.package(),
+                "--no-default-features",
+                "--target",
+                TARGET,
+                "--test",
+                profile.test(),
+                "--no-run",
+                "--message-format=json",
+            ])
+            .args(if profile == profile::Profile::Core {
+                vec!["--all-features"]
+            } else {
+                vec![]
+            }),
         16777216,
     )?;
     let mut compiled = BTreeSet::new();
@@ -379,7 +444,7 @@ fn witness(root: &Path) -> Result<Witness, String> {
                     .ok_or("missing built package identity")?
                     .to_owned(),
             );
-            if m["target"]["name"] == "depth_ci_channel" {
+            if m["target"]["name"] == profile.test() {
                 executable = Some(PathBuf::from(
                     m["executable"].as_str().ok_or("missing executable")?,
                 ));
@@ -390,18 +455,33 @@ fn witness(root: &Path) -> Result<Witness, String> {
         }
     }
     let executable = executable.ok_or("no selected test executable")?;
-    let profile: Value = serde_json::from_slice(
-        &view.required("crates/xtask/tests/fixtures/depth-ci/build-profile.json")?,
-    )
-    .map_err(|e| e.to_string())?;
+    let build_profile: Value = serde_json::from_slice(&view.required(&profile.build_profile())?)
+        .map_err(|e| e.to_string())?;
     let mut script_ids: Vec<_> = scripts.iter().map(|s| s["package_id"].clone()).collect();
     script_ids.sort_by_key(Value::to_string);
-    if serde_json::to_value(&features).map_err(|e| e.to_string())? != profile["features"]
-        || json!(script_ids) != profile["build_scripts"]
+    if serde_json::to_value(&features).map_err(|e| e.to_string())? != build_profile["features"]
+        || json!(script_ids) != build_profile["build_scripts"]
     {
+        let actual = serde_json::to_value(&features).map_err(|e| e.to_string())?;
+        let expected = build_profile["features"]
+            .as_object()
+            .ok_or("missing reviewed features")?;
+        for (id, wanted) in expected {
+            if actual[id] != *wanted {
+                eprintln!(
+                    "profile feature mismatch {id}: wanted {wanted}, observed {}",
+                    actual[id]
+                );
+            }
+        }
+        eprintln!(
+            "profile scripts wanted {}, observed {}",
+            build_profile["build_scripts"],
+            json!(script_ids)
+        );
         return Err("compiled features/build scripts are outside the reviewed profile".into());
     }
-    let graph = super::graph::resolve(root, &mut view, &metadata, &compiled)?;
+    let graph = super::graph::resolve(root, &mut view, &metadata, &compiled, profile)?;
     for file in &graph.inputs {
         if source.optional_bytes(&file.path)?.as_deref()
             != Some(view.required(&file.path)?.as_slice())
@@ -411,14 +491,26 @@ fn witness(root: &Path) -> Result<Witness, String> {
         }
     }
     let report = toolchain(&env, &executable, &scripts)?;
-    let (mut cases, raw) = execute(&env, &executable)?;
-    let prefix =
-        format!("cli_manifests/codex/reports/0.0.0/evidence/channel-v1/{run_id}-{run_attempt}");
+    let core_cases = view.optional(&format!("{}/cases.json", profile.directory()))?;
+    let names = profile.case_names(
+        core_cases
+            .as_deref()
+            .map(|b| std::str::from_utf8(b))
+            .transpose()
+            .map_err(|e| e.to_string())?,
+    )?;
+    let (mut cases, raw) = execute(
+        &env,
+        &executable,
+        &names,
+        profile == profile::Profile::Channel,
+    )?;
+    let prefix = format!("{}/{run_id}-{run_attempt}", profile.evidence());
     cases.raw_output = reference(format!("{prefix}/raw.txt"), raw.as_bytes());
-    let environment = Environment {
+    let mut environment = Environment {
         schema_version: 1,
         target: TARGET.into(),
-        features: vec![],
+        features: profile.features(),
         variables: [
             (
                 "CARGO_CONFIG_POLICY",
@@ -447,6 +539,13 @@ fn witness(root: &Path) -> Result<Witness, String> {
         })
         .collect(),
     };
+    if profile == profile::Profile::Core {
+        environment.variables.push(Variable {
+            name: "CARGO_BUILD_JOBS".into(),
+            value: "2".into(),
+        });
+    }
+    Environment::parse(&serde_json::to_string(&environment).map_err(|e| e.to_string())?)?;
     view.required(COLLECTOR)?;
     let build = Build {
         source_commit: commit,
@@ -454,12 +553,13 @@ fn witness(root: &Path) -> Result<Witness, String> {
         host_target: TARGET.into(),
         toolchain: reference(
             format!(
-                "cli_manifests/codex/reports/0.0.0/evidence/channel-v1/toolchains/{}.json",
+                "{}/toolchains/{}.json",
+                profile.evidence(),
                 reference("", report.as_bytes()).sha256
             ),
             report.as_bytes(),
         ),
-        features: vec![],
+        features: profile.features(),
         environment: reference(
             format!("{prefix}/environment.json"),
             serde_json::to_string(&environment).unwrap().as_bytes(),
@@ -480,11 +580,29 @@ fn witness(root: &Path) -> Result<Witness, String> {
         build,
         graph,
         environment,
-        provenance: vec![Provenance {
-            kind: ProvenanceKind::Source,
-            origin: "isolated channel-validation source contract 0.0.0; not a CLI release".into(),
-            file: original.obligations.unwrap().acquired_inputs[0].clone(),
-        }],
+        provenance: if profile == profile::Profile::Channel {
+            vec![Provenance {
+                kind: ProvenanceKind::Source,
+                origin: "isolated channel-validation source contract 0.0.0; not a CLI release"
+                    .into(),
+                file: original.obligations.unwrap().acquired_inputs[0].clone(),
+            }]
+        } else {
+            original
+                .obligations
+                .unwrap()
+                .acquired_inputs
+                .into_iter()
+                .map(|file| Provenance {
+                    kind: ProvenanceKind::Fixture,
+                    origin: format!(
+                        "isolated {} fixture provenance; not live upstream execution",
+                        profile.version()
+                    ),
+                    file,
+                })
+                .collect()
+        },
         cases,
         toolchain_report: report,
         raw_output: raw,
@@ -492,7 +610,10 @@ fn witness(root: &Path) -> Result<Witness, String> {
 }
 pub(super) fn collect(workspace: &Path) -> Result<(), String> {
     let root = fs::canonicalize(workspace).map_err(|e| e.to_string())?;
-    let result = witness(&root);
+    collect_profile(&root, profile::Profile::Channel)
+}
+pub(super) fn collect_profile(root: &Path, profile: profile::Profile) -> Result<(), String> {
+    let result = witness(root, profile);
     let value = match &result {
         Ok(w) => serde_json::to_value(w).map_err(|e| e.to_string())?,
         Err(reason) => json!({"schema_version":1,"unavailable":reason}),
@@ -501,7 +622,11 @@ pub(super) fn collect(workspace: &Path) -> Result<(), String> {
     if bytes.len() > 1048576 {
         return Err("witness bounds exceeded".into());
     }
-    let destination = root.join("target/depth-ci");
+    let destination = root.join(if profile == profile::Profile::Channel {
+        "target/depth-ci"
+    } else {
+        "target/depth-core"
+    });
     fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
     fs::write(destination.join("witness.json"), bytes).map_err(|e| e.to_string())?;
     if let Err(reason) = result {

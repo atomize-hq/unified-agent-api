@@ -11,7 +11,19 @@ pub(super) fn normalize(id: &str) -> String {
         .strip_prefix("path+file:")
         .and_then(|s| s.split_once('#'))
     {
-        format!("workspace:crates/wrapper_events#{package}")
+        format!(
+            "workspace:crates/{}#{package}",
+            match package.split('@').next().unwrap() {
+                "unified-agent-api" => "agent_api",
+                "unified-agent-api-codex" => "codex",
+                "unified-agent-api-wrapper-events" => "wrapper_events",
+                "unified-agent-api-claude-code" => "claude_code",
+                "unified-agent-api-aider" => "aider",
+                "unified-agent-api-gemini-cli" => "gemini_cli",
+                "unified-agent-api-opencode" => "opencode",
+                other => other,
+            }
+        )
     } else {
         id.into()
     }
@@ -22,6 +34,7 @@ pub(super) fn resolve(
     view: &mut GitInputs,
     metadata: &Value,
     compiled: &BTreeSet<String>,
+    profile: profile::Profile,
 ) -> Result<DependencyGraph, String> {
     let packages = metadata["packages"]
         .as_array()
@@ -31,7 +44,7 @@ pub(super) fn resolve(
         .ok_or("missing Cargo resolved graph")?;
     let root_package = packages
         .iter()
-        .find(|p| p["name"] == "unified-agent-api-wrapper-events")
+        .find(|p| p["name"] == profile.package())
         .ok_or("missing affected crate")?;
     let root_id = root_package["id"]
         .as_str()
@@ -45,17 +58,9 @@ pub(super) fn resolve(
         .iter()
         .map(|n| Ok((n["id"].as_str().ok_or("invalid node id")?, n)))
         .collect::<Result<_, String>>()?;
-    let seen = expected(metadata)?;
+    let seen = expected(metadata, profile)?;
     if &seen != compiled {
         return Err("resolved/compiled dependency populations disagree".into());
-    }
-    if node_by_id[&root_id.as_str()]["features"]
-        .as_array()
-        .ok_or("missing root features")?
-        .iter()
-        .any(|f| f != "default")
-    {
-        return Err("unsupported root features".into());
     }
     let lock_raw = view.required("Cargo.lock")?;
     let lock: Value =
@@ -158,25 +163,45 @@ pub(super) fn resolve(
                 .collect(),
         });
     }
-    for path in ["Cargo.toml", "Cargo.lock", CONTRACT, FIXTURE] {
+    for path in [
+        "Cargo.toml",
+        "Cargo.lock",
+        profile.contract(),
+        profile.fixture(),
+    ] {
         view.required(path)?;
         result.inputs.push(view.reference(path)?);
     }
-    result
-        .scopes
-        .push("crates/xtask/tests/fixtures/depth-ci".into());
-    for path in view.files_under("crates/xtask/tests/fixtures/depth-ci")? {
+    result.scopes.push(profile.directory().into());
+    for path in view.files_under(profile.directory())? {
         result.inputs.push(view.reference(&path)?);
+    }
+    if profile == profile::Profile::Core {
+        let record = profile.record(
+            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
+        )?;
+        for input in record.obligations.unwrap().acquired_inputs {
+            view.required(&input.path)?;
+            let current = view.reference(&input.path)?;
+            if current != input {
+                return Err("acquired CORE provenance differs from frozen O".into());
+            }
+            result.inputs.push(current);
+        }
+    }
+    if let Some(scope) = profile.requirements() {
+        result.scopes.push(scope.into());
+        for path in view.files_under(scope)? {
+            result.inputs.push(view.reference(&path)?);
+        }
     }
     result.inputs.sort();
     result.inputs.dedup();
     result.scopes.sort();
     result.scopes.dedup();
     result.packages.sort_by(|a, b| a.id.cmp(&b.id));
-    let profile: Value = serde_json::from_slice(
-        &view.required("crates/xtask/tests/fixtures/depth-ci/build-profile.json")?,
-    )
-    .map_err(|e| e.to_string())?;
+    let profile: Value = serde_json::from_slice(&view.required(&profile.build_profile())?)
+        .map_err(|e| e.to_string())?;
     if profile["schema_version"] != 1
         || serde_json::to_value(&result.packages).map_err(|e| e.to_string())? != profile["packages"]
     {
@@ -186,7 +211,10 @@ pub(super) fn resolve(
 }
 
 /// Resolve the complete selected closure before running any registry build script or proc macro.
-pub(super) fn expected(metadata: &Value) -> Result<BTreeSet<String>, String> {
+pub(super) fn expected(
+    metadata: &Value,
+    profile: profile::Profile,
+) -> Result<BTreeSet<String>, String> {
     let packages = metadata["packages"]
         .as_array()
         .ok_or("missing Cargo packages")?;
@@ -195,7 +223,7 @@ pub(super) fn expected(metadata: &Value) -> Result<BTreeSet<String>, String> {
         .ok_or("missing Cargo graph")?;
     let root_id = packages
         .iter()
-        .find(|p| p["name"] == "unified-agent-api-wrapper-events")
+        .find(|p| p["name"] == profile.package())
         .and_then(|p| p["id"].as_str())
         .ok_or("missing affected root")?
         .to_owned();
@@ -217,4 +245,71 @@ pub(super) fn expected(metadata: &Value) -> Result<BTreeSet<String>, String> {
         }
     }
     Ok(seen)
+}
+
+/// Cargo metadata unifies features across unrelated workspace members. The selected package's
+/// independently resolved Cargo tree supplies its actual population before build-time code runs.
+pub(super) fn selected(mut metadata: Value, tree: &str) -> Result<Value, String> {
+    let packages = metadata["packages"]
+        .as_array()
+        .ok_or("missing Cargo packages")?;
+    let mut selected = BTreeSet::new();
+    for line in tree
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('['))
+    {
+        let mut words = line.split_whitespace();
+        let name = words.next().ok_or("missing selected package")?;
+        let version = words
+            .next()
+            .and_then(|v| v.strip_prefix('v'))
+            .ok_or("missing selected package version")?;
+        let matches: Vec<_> = packages
+            .iter()
+            .filter(|p| p["name"] == name && p["version"] == version)
+            .collect();
+        if matches.len() != 1 {
+            return Err("ambiguous selected package source".into());
+        }
+        selected.insert(
+            matches[0]["id"]
+                .as_str()
+                .ok_or("missing selected package id")?
+                .to_owned(),
+        );
+    }
+    if selected.is_empty() {
+        return Err("empty selected Cargo population".into());
+    }
+    metadata["packages"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|p| p["id"].as_str().is_some_and(|id| selected.contains(id)));
+    let nodes = metadata["resolve"]["nodes"]
+        .as_array_mut()
+        .ok_or("missing Cargo nodes")?;
+    nodes.retain(|n| n["id"].as_str().is_some_and(|id| selected.contains(id)));
+    for node in nodes {
+        node["dependencies"]
+            .as_array_mut()
+            .ok_or("missing dependencies")?
+            .retain(|id| id.as_str().is_some_and(|id| selected.contains(id)));
+    }
+    Ok(metadata)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn selected_tree_excludes_unrelated_workspace_feature_dependencies() {
+        let metadata = serde_json::json!({"packages":[{"id":"root","name":"root","version":"1.0.0"},{"id":"dep","name":"dep","version":"1.0.0"},{"id":"other","name":"other","version":"1.0.0"}],"resolve":{"nodes":[{"id":"root","dependencies":["dep","other"]},{"id":"dep","dependencies":[]},{"id":"other","dependencies":[]}]}});
+        let narrowed = selected(metadata.clone(), "root v1.0.0 (/source)\ndep v1.0.0\n").unwrap();
+        assert_eq!(narrowed["packages"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            narrowed["resolve"]["nodes"][0]["dependencies"],
+            serde_json::json!(["dep"])
+        );
+        assert!(selected(metadata, "root v1.0.0\nunknown v1.0.0").is_err());
+    }
 }

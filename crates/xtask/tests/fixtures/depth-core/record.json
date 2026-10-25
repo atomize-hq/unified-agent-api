@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "event": {
+    "lifecycle_path": "maintenance",
+    "request_commit": "9e1cfd8bce93639dc87e42acaa6e37c1453c9d00",
+    "request_recorded_at": "2026-10-25T03:22:54+00:00",
+    "trigger_kind": "isolated_codex_core",
+    "opened_from": ".github/workflows/ci.yml"
+  },
+  "policy": {
+    "identity": "f0c34d2440afdede12eddfe64f2c4d06db3ec8f5e42a7415689914b86f33ce50",
+    "selection": {
+      "agent_id": "codex",
+      "enrollment": {
+        "lifecycle_path": "maintenance",
+        "version": "0.156.1",
+        "targets": [
+          "x86_64-unknown-linux-gnu"
+        ],
+        "modes": [
+          {
+            "selector": "run",
+            "command_path": "codex exec",
+            "mode": "headless",
+            "predicates": [
+              {
+                "flag": "--json",
+                "value": "true"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "run",
+            "serves": [
+              "run"
+            ],
+            "templates": [
+              "CORE"
+            ],
+            "shared_mapping": "mapped",
+            "forwarding": false,
+            "not_applicable_permitted": [],
+            "promise": {
+              "r1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "v1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "g1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "e1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "a1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "x1": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "x2": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "x3": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim.",
+              "x4": "Fixture-based isolated adapter promise; see depth-core/contract.md; no live upstream execution claim."
+            }
+          }
+        ],
+        "capabilities": [
+          {
+            "id": "agent_api.run",
+            "operations": [
+              "run"
+            ]
+          }
+        ]
+      }
+    },
+    "rules_revision": "1",
+    "base": [
+      "A1",
+      "E1",
+      "G1",
+      "R1",
+      "V1",
+      "X1",
+      "X2",
+      "X3",
+      "X4"
+    ],
+    "templates": [
+      {
+        "template": "CORE",
+        "obligations": [
+          "LC2",
+          "OUT3"
+        ]
+      }
+    ],
+    "path_enabled": true,
+    "debt_baseline": []
+  },
+  "obligations": {
+    "identity": "5ee7a009d656a9d065ccc9998c5d1212a985c9693c6ead7c3fc29fb3bd9d8530",
+    "policy_identity": "f0c34d2440afdede12eddfe64f2c4d06db3ec8f5e42a7415689914b86f33ce50",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ],
+    "acquired_inputs": [
+      {
+        "path": "cli_manifests/codex/snapshots/0.156.1/x86_64-unknown-linux-musl.json",
+        "sha256": "dfaac28c036883b523bf156e17e79bcdb76ca39259a06b4f0da35a2d063f894b"
+      },
+      {
+        "path": "cli_manifests/codex/versions/0.156.1.json",
+        "sha256": "bfa72408d7b5e9272faf1c1de30bbc2ed3137ce21c3246f17e07d56502616468"
+      },
+      {
+        "path": "crates/xtask/tests/fixtures/depth-core/contract.md",
+        "sha256": "b71810765ed549f22276722e389d4a1ef1b284085413d58eeb95b9be528ceb6b"
+      }
+    ],
+    "operations": [
+      {
+        "id": "run",
+        "surfaces": [],
+        "obligations": [
+          "A1",
+          "E1",
+          "G1",
+          "LC2",
+          "OUT3",
+          "R1",
+          "V1",
+          "X1",
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    ],
+    "classification_required": [],
+    "acceptance_work": []
+  },
+  "execution": null,
+  "acceptance_entries": []
+}

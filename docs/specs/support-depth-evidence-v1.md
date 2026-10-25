@@ -336,3 +336,61 @@ producer/workflow closure as well as the separately checked actual checkout. A w
 synthetic merge cannot approve an unreviewed executed workflow. Artifact decoding executes only
 the helper read from the immutable independently approved staging anchor, never executable bytes
 from a discovered candidate head.
+
+## Isolated Codex CORE evidence bridge
+
+The approved E1-P1/P2 evidence increment installs a second compiled isolated profile alongside
+channel V1. It pins Codex0.156.1, one headless `run`/CORE selector, the `agent_api.run` mapping and
+Linux `x86_64-unknown-linux-gnu` wrapper execution. The frozen source contract, P/O, case mapping
+and resolved build profile live under `crates/xtask/tests/fixtures/depth-core/`. Its upstream Linux
+musl snapshot and executable digest are provenance, distinct from the GNU wrapper build target.
+Adapter subprocesses are synthetic; passing fixtures do not assert a live upstream model run.
+The precise version applicability and substantive adequacy still require independent review and
+exact authorized maintainer adoption; unsupported claims remain unverified.
+
+`depth-core-collect` reuses the existing collector, closed build environment, pinned Rust and
+locked registry verification. The fixed workspace all-features build is recorded explicitly;
+only Codex run is claimed. It executes the union of the reviewed cases, binding the executable,
+complete build/input/mode/configuration closure and exact requested/executed outcomes. CORE binds
+all committed `docs/specs/**` requirements, including the canonical run protocol and capability
+contracts, as one fixed complete scope. That scope must match built, independently reviewed and
+current inputs; changed bytes, modes or requirement inventory invalidate the evidence. Channel V1
+keeps its existing input boundary. Its witness
+is uploaded as `depth-codex-core-v1-<run_id>-<attempt>` by the existing `rust-tests` job, with separate
+successful collection/upload/binding steps and exact authenticated artifact correspondence. No
+new job, required status check or service is added. Unavailable collection stays unavailable.
+
+The existing canonical-repository/protected-staging trust anchor, exhaustive applicable run and
+attempt discovery, immutable artifact checks, independent mapping adoption and currentness rules
+apply unchanged. A profile is selected only from the two compiled definitions, never a receipt,
+remote URL, environment override or user-supplied trust flag. CORE's trust revision is
+`github-actions-codex-core-v1`; its executor is
+`github-actions:rust-tests/isolated-codex-core-v1`. `maintainer-mapping-v1` remains the adoption
+revision and the same exact `depth-adequacy-v1` body format applies. Each of the eleven id
+obligations and mapped M obligation has its own content-bound mapping. Partial adoption cannot
+qualify the full profile. Implementation integration and independent adoption remain prerequisites
+for any live verified result; the candidate cannot endorse itself.
+
+One aggregate witness yields a separately authenticated receipt and complete population for every
+due obligation. Each receipt's cases are exactly that obligation's mapped subset; its raw log is
+the complete union execution. Failing unrelated cases cannot hide a counterexample for their own
+obligation, and a favorable E-selected receipt cannot omit another applicable attempt. Receipt
+paths under `reports/0.156.1/evidence/core-v1/<run>-<attempt>/<obligation>/` distinguish R/V/G/E/A/X,
+OUT3, LC2 and M. Malformed form is an error; missing, skipped, unadopted, stale, unavailable or
+contradictory evidence remains unverified, and qualifying counterexamples fail.
+
+The read-only `evaluate_isolated_record` bridge authenticates the fixed CORE profile and evaluates
+every due obligation. Its opaque result set binds the exact record state; changed Event/P/O/E or
+entries invalidate that set. A separate private seal includes the complete typed record, including
+schema version and entry order; the acceptance digest still deliberately excludes entries.
+E labels, public Verdict objects, caller callbacks and receipt JSON
+cannot construct verified results. `depth-core-prove` materializes host receipts/payloads only in
+a disposable checkout, calls that evaluation path and the existing publisher, and prints per-
+obligation decisions. These are isolated reporting facts, never acceptance or write authority.
+
+Official production consumers still require production-origin proof; `production_results` remains
+unverified. This increment neither enables public maintenance writers nor changes registry,
+production enrollment, trust to a disposable host, acceptance entries or pointers. The next
+increment must independently bind the supported isolated public paths and IN1 before a complete
+maintenance-chain proof can be claimed. Unit host fixtures establish predicate composition;
+they are not live authenticated evidence or a maintainer endorsement.

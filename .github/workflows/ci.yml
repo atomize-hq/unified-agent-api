@@ -214,6 +214,38 @@ jobs:
           print("DEPTH_ARTIFACT_BINDING=" + json.dumps(binding, separators=(",", ":")))
           PY
 
+      - name: Collect isolated CORE depth witness
+        if: ${{ always() }}
+        env:
+          DEPTH_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: cargo run -p xtask -- depth-core-collect
+      - name: Upload isolated CORE depth witness
+        if: ${{ always() }}
+        id: depth-core-upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: depth-codex-core-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/depth-core/witness.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Bind isolated CORE depth artifact
+        if: ${{ always() && steps.depth-core-upload.outcome == 'success' }}
+        env:
+          DEPTH_ARTIFACT_ID: ${{ steps.depth-core-upload.outputs.artifact-id }}
+          DEPTH_ARTIFACT_DIGEST: ${{ steps.depth-core-upload.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          binding = {
+              "id": int(os.environ["DEPTH_ARTIFACT_ID"]),
+              "digest": os.environ["DEPTH_ARTIFACT_DIGEST"],
+              "name": f'depth-codex-core-v1-{os.environ["GITHUB_RUN_ID"]}-{os.environ["GITHUB_RUN_ATTEMPT"]}',
+          }
+          print("DEPTH_ARTIFACT_BINDING=" + json.dumps(binding, separators=(",", ":")))
+          PY
+
   agent-api-all-features:
     name: Agent API tests (all features)
     runs-on: ubuntu-latest

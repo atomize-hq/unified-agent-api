@@ -1,0 +1,336 @@
+{
+  "R1": [
+    {
+      "name": "policy::codex_backend_defaults_to_non_interactive_and_workspace_write_sandbox",
+      "assertion": "crates/agent_api/tests/c1_codex_exec_policy.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong default argv or absent production Status event fails."
+    },
+    {
+      "name": "policy::sandbox_mode_extension_overrides_codex_sandbox",
+      "assertion": "crates/agent_api/tests/c1_codex_exec_policy.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong explicit sandbox precedence fails subprocess argv assertions."
+    }
+  ],
+  "V1": [
+    {
+      "name": "adapter::empty_prompt_is_rejected_before_spawning",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "An accepted empty prompt fails the InvalidRequest assertion."
+    },
+    {
+      "name": "adapter::extension_types_are_validated",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong typed extension acceptance fails InvalidRequest."
+    },
+    {
+      "name": "adapter::unknown_extension_key_is_rejected_fail_closed",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Unknown extension acceptance fails UnsupportedCapability."
+    },
+    {
+      "name": "empty_prompt_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for an empty prompt writes the marker before any fixture validation and fails the no-marker assertion; accepting the prompt fails InvalidRequest."
+    },
+    {
+      "name": "invalid_extension_type_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for a wrong extension type writes the marker and fails the no-marker assertion; accepting the extension fails InvalidRequest."
+    },
+    {
+      "name": "unknown_extension_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for an unknown extension writes the marker and fails the no-marker assertion; accepting it fails UnsupportedCapability."
+    },
+    {
+      "name": "valid_request_observes_spawn_marker",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "A valid production run must complete and write the marker, so a broken marker or uninvoked executable cannot make rejection observations vacuous."
+    }
+  ],
+  "G1": [
+    {
+      "name": "pinned_upstream_grammar_and_applicability",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Changed selected upstream version/binary provenance or missing observed exec/json flag fails."
+    },
+    {
+      "name": "policy::codex_exec_with_model_emits_model_before_add_dirs",
+      "assertion": "crates/agent_api/tests/c1_codex_exec_policy.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "A changed model/open value or argv ordering fails child assertions."
+    }
+  ],
+  "E1": [
+    {
+      "name": "adapter::nonzero_exit_is_redacted_and_completion_is_ok_with_nonzero_status",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong completion status or leaked raw output fails."
+    },
+    {
+      "name": "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "A missing error, secret leak or stopped stream fails."
+    },
+    {
+      "name": "spawn_and_timeout_are_distinct",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Missing binary and timed-out live child must produce distinct redacted failure outcomes."
+    },
+    {
+      "name": "cancel::explicit_cancel_terminates_blocking_backend_and_completion_is_cancelled",
+      "assertion": "crates/agent_api/tests/c3_explicit_cancellation.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Failure to terminate/reap/cancel without leaking stderr fails."
+    }
+  ],
+  "A1": [
+    {
+      "name": "pinned_upstream_grammar_and_applicability",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong fixture version, binary target or digest fails, with GNU wrapper versus musl upstream recorded distinctly."
+    }
+  ],
+  "X1": [
+    {
+      "name": "credential_sentinel_is_not_projected",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Synthetic credential reaching projected output/completion fails; environment handoff is checked by the child."
+    }
+  ],
+  "X2": [
+    {
+      "name": "credential_sentinel_is_not_projected",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong child cwd/env or unexpected parent state mutation fails."
+    },
+    {
+      "name": "adapter::env_tests::request_env_override_wins_over_codex_home_injection_and_parent_codex_home_is_unchanged",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter/env_tests.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong CODEX_HOME/request precedence or parent mutation fails."
+    }
+  ],
+  "X3": [
+    {
+      "name": "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Raw malformed-line sentinel leak fails."
+    },
+    {
+      "name": "projected_text_is_bounded",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Oversized projected text or diagnostics fails byte-cap assertions."
+    }
+  ],
+  "X4": [
+    {
+      "name": "policy::codex_backend_defaults_to_non_interactive_and_workspace_write_sandbox",
+      "assertion": "crates/agent_api/tests/c1_codex_exec_policy.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Missing never-approval argv fails."
+    },
+    {
+      "name": "stdin_prompt_and_unknown_event_are_handled",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Wrong stdin prompt, extra answers, unknown-event termination or missing final result fails."
+    }
+  ],
+  "OUT3": [
+    {
+      "name": "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Malformed events must surface redacted errors and allow subsequent events."
+    },
+    {
+      "name": "stdin_prompt_and_unknown_event_are_handled",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Known/unknown ordering, session identity or terminal result mismatch fails."
+    }
+  ],
+  "LC2": [
+    {
+      "name": "parity::events_are_observable_before_process_exit",
+      "assertion": "crates/agent_api/tests/c2_codex_stream_exec_parity.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Completion resolving before the explicitly released child, or no earlier event, fails."
+    },
+    {
+      "name": "cancel::explicit_cancel_terminates_blocking_backend_and_completion_is_cancelled",
+      "assertion": "crates/agent_api/tests/c3_explicit_cancellation.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Failure to terminate/reap/cancel without leaking stderr fails."
+    },
+    {
+      "name": "cancel::dropping_events_does_not_deadlock_completion",
+      "assertion": "crates/agent_api/tests/c3_explicit_cancellation.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "A dropped stream leaving completion pending fails."
+    },
+    {
+      "name": "adapter::dropping_events_unblocks_buffered_model_runtime_rejection_completion",
+      "assertion": "crates/agent_api/tests/c1_codex_stream_exec_adapter.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Backpressure/drop allowing premature or stuck completion or lost runtime error fails."
+    },
+    {
+      "name": "spawn_and_timeout_are_distinct",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Missing binary and timed-out live child must produce distinct redacted failure outcomes."
+    }
+  ],
+  "M": [
+    {
+      "name": "policy::codex_backend_defaults_to_non_interactive_and_workspace_write_sandbox",
+      "assertion": "crates/agent_api/tests/c1_codex_exec_policy.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "The actual AgentWrapperBackend run operation failing to spawn/map/produce a Status event fails."
+    }
+  ]
+}
