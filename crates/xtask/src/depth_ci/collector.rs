@@ -14,6 +14,7 @@ use std::{
 };
 
 struct BuildEnv {
+    profile: profile::Profile,
     rustc: PathBuf,
     cargo: PathBuf,
     sysroot: PathBuf,
@@ -23,7 +24,7 @@ struct BuildEnv {
     root: PathBuf,
 }
 impl BuildEnv {
-    fn new(root: &Path) -> Result<Self, String> {
+    fn new(root: &Path, profile: profile::Profile) -> Result<Self, String> {
         let which = |binary: &str| -> Result<PathBuf, String> {
             let bytes =
                 output(Command::new("rustup").args(["which", "--toolchain", TOOLCHAIN, binary]))?;
@@ -49,6 +50,7 @@ impl BuildEnv {
         let raw = output(Command::new(&rustc).args(["--print", "sysroot"]))?;
         let sysroot = PathBuf::from(std::str::from_utf8(&raw).map_err(|e| e.to_string())?.trim());
         Ok(Self {
+            profile,
             rustc,
             cargo,
             sysroot,
@@ -87,6 +89,9 @@ impl BuildEnv {
             .env("LANG", "C")
             .env("LC_ALL", "C")
             .env("TZ", "UTC");
+        if self.profile == profile::Profile::Core {
+            c.env("CARGO_BUILD_JOBS", "2");
+        }
         c
     }
 }
@@ -344,7 +349,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
             }
         }
     }
-    let env = BuildEnv::new(root)?;
+    let env = BuildEnv::new(root, profile)?;
     let mut metadata: Value = serde_json::from_str(&required(
         env.command(&env.cargo)
             .args([
@@ -503,7 +508,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     )?;
     let prefix = format!("{}/{run_id}-{run_attempt}", profile.evidence());
     cases.raw_output = reference(format!("{prefix}/raw.txt"), raw.as_bytes());
-    let environment = Environment {
+    let mut environment = Environment {
         schema_version: 1,
         target: TARGET.into(),
         features: profile.features(),
@@ -536,6 +541,12 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         })
         .collect(),
     };
+    if profile == profile::Profile::Core {
+        environment.variables.push(Variable {
+            name: "CARGO_BUILD_JOBS".into(),
+            value: "2".into(),
+        });
+    }
     view.required(COLLECTOR)?;
     let build = Build {
         source_commit: commit,
@@ -570,20 +581,29 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         build,
         graph,
         environment,
-        provenance: original
-            .obligations
-            .unwrap()
-            .acquired_inputs
-            .into_iter()
-            .map(|file| Provenance {
-                kind: ProvenanceKind::Fixture,
-                origin: format!(
-                    "isolated {} fixture provenance; not live upstream execution",
-                    profile.version()
-                ),
-                file,
-            })
-            .collect(),
+        provenance: if profile == profile::Profile::Channel {
+            vec![Provenance {
+                kind: ProvenanceKind::Source,
+                origin: "isolated channel-validation source contract 0.0.0; not a CLI release"
+                    .into(),
+                file: original.obligations.unwrap().acquired_inputs[0].clone(),
+            }]
+        } else {
+            original
+                .obligations
+                .unwrap()
+                .acquired_inputs
+                .into_iter()
+                .map(|file| Provenance {
+                    kind: ProvenanceKind::Fixture,
+                    origin: format!(
+                        "isolated {} fixture provenance; not live upstream execution",
+                        profile.version()
+                    ),
+                    file,
+                })
+                .collect()
+        },
         cases,
         toolchain_report: report,
         raw_output: raw,
