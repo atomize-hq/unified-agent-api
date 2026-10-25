@@ -127,6 +127,12 @@ impl Fixture {
                 files.insert(spec.assertion.clone());
                 files.extend(spec.production_inputs.clone());
             }
+            files.extend(
+                crate::runtime_advertising::source::Source::tip(&repo, "HEAD")
+                    .unwrap()
+                    .committed_files(p.requirements().unwrap())
+                    .unwrap(),
+            );
             for path_name in files {
                 inputs.push(write(
                     path,
@@ -177,6 +183,7 @@ impl Fixture {
             inputs: inputs.clone(),
             scopes: std::iter::once(p.directory().to_owned())
                 .chain(local_dirs.iter().map(|d| (*d).to_owned()))
+                .chain(p.requirements().map(str::to_owned))
                 .collect(),
         };
         let environment = Environment {
@@ -597,7 +604,14 @@ fn root_cargo_and_toolchain_configuration_is_inside_producer_approval() {
         git(f.root.path(), &["add", "."]);
         git(f.root.path(), &["commit", "-qm", "config"]);
         let candidate = git(f.root.path(), &["rev-parse", "HEAD"]);
-        assert!(profile::approved(f.root.path(), &candidate, &candidate, &f.commit).is_err());
+        assert!(profile::approved(
+            f.root.path(),
+            &candidate,
+            &candidate,
+            &f.commit,
+            Profile::Channel
+        )
+        .is_err());
         assert!(resolve(&f.api, f.root.path()).is_err());
     }
 }
@@ -682,3 +696,6 @@ fn core_requires_every_exact_mapping_adoption() {
         .unwrap_err()
         .contains("missing exact authenticated adequacy adoption"));
 }
+
+#[path = "tests/core_repairs.rs"]
+mod core_repairs;

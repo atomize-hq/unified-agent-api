@@ -189,6 +189,12 @@ pub(super) fn resolve(
             result.inputs.push(current);
         }
     }
+    if let Some(scope) = profile.requirements() {
+        result.scopes.push(scope.into());
+        for path in view.files_under(scope)? {
+            result.inputs.push(view.reference(&path)?);
+        }
+    }
     result.inputs.sort();
     result.inputs.dedup();
     result.scopes.sort();

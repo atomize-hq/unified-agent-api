@@ -51,6 +51,46 @@
         "crates/agent_api/src/backends/codex/backend.rs"
       ],
       "counterfactual": "Unknown extension acceptance fails UnsupportedCapability."
+    },
+    {
+      "name": "empty_prompt_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for an empty prompt writes the marker before any fixture validation and fails the no-marker assertion; accepting the prompt fails InvalidRequest."
+    },
+    {
+      "name": "invalid_extension_type_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for a wrong extension type writes the marker and fails the no-marker assertion; accepting the extension fails InvalidRequest."
+    },
+    {
+      "name": "unknown_extension_rejection_does_not_spawn",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Starting the configured executable for an unknown extension writes the marker and fails the no-marker assertion; accepting it fails UnsupportedCapability."
+    },
+    {
+      "name": "valid_request_observes_spawn_marker",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "A valid production run must complete and write the marker, so a broken marker or uninvoked executable cannot make rejection observations vacuous."
     }
   ],
   "G1": [
@@ -105,6 +145,16 @@
         "crates/agent_api/src/backends/codex/backend.rs"
       ],
       "counterfactual": "Missing binary and timed-out live child must produce distinct redacted failure outcomes."
+    },
+    {
+      "name": "cancel::explicit_cancel_terminates_blocking_backend_and_completion_is_cancelled",
+      "assertion": "crates/agent_api/tests/c3_explicit_cancellation.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Failure to terminate/reap/cancel without leaking stderr fails."
     }
   ],
   "A1": [
@@ -259,6 +309,16 @@
         "crates/agent_api/src/backends/codex/backend.rs"
       ],
       "counterfactual": "Backpressure/drop allowing premature or stuck completion or lost runtime error fails."
+    },
+    {
+      "name": "spawn_and_timeout_are_distinct",
+      "assertion": "crates/agent_api/tests/depth_ci_core.rs",
+      "production_inputs": [
+        "crates/agent_api/src/backends/codex/exec.rs",
+        "crates/agent_api/src/backends/codex/harness.rs",
+        "crates/agent_api/src/backends/codex/backend.rs"
+      ],
+      "counterfactual": "Missing binary and timed-out live child must produce distinct redacted failure outcomes."
     }
   ],
   "M": [

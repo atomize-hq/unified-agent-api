@@ -23,6 +23,12 @@ impl Profile {
             Self::Core => "crates/xtask/tests/fixtures/depth-core",
         }
     }
+    pub(crate) fn requirements(self) -> Option<&'static str> {
+        match self {
+            Self::Channel => None,
+            Self::Core => Some("docs/specs"),
+        }
+    }
     pub(crate) fn build_profile(self) -> String {
         format!("{}/build-profile.json", self.directory())
     }

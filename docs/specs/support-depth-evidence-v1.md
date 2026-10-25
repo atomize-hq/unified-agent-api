@@ -351,7 +351,11 @@ exact authorized maintainer adoption; unsupported claims remain unverified.
 `depth-core-collect` reuses the existing collector, closed build environment, pinned Rust and
 locked registry verification. The fixed workspace all-features build is recorded explicitly;
 only Codex run is claimed. It executes the union of the reviewed cases, binding the executable,
-complete build/input/mode/configuration closure and exact requested/executed outcomes. Its witness
+complete build/input/mode/configuration closure and exact requested/executed outcomes. CORE binds
+all committed `docs/specs/**` requirements, including the canonical run protocol and capability
+contracts, as one fixed complete scope. That scope must match built, independently reviewed and
+current inputs; changed bytes, modes or requirement inventory invalidate the evidence. Channel V1
+keeps its existing input boundary. Its witness
 is uploaded as `depth-codex-core-v1-<run_id>-<attempt>` by the existing `rust-tests` job, with separate
 successful collection/upload/binding steps and exact authenticated artifact correspondence. No
 new job, required status check or service is added. Unavailable collection stays unavailable.
@@ -377,7 +381,9 @@ contradictory evidence remains unverified, and qualifying counterexamples fail.
 
 The read-only `evaluate_isolated_record` bridge authenticates the fixed CORE profile and evaluates
 every due obligation. Its opaque result set binds the exact record state; changed Event/P/O/E or
-entries invalidate that set. E labels, public Verdict objects, caller callbacks and receipt JSON
+entries invalidate that set. A separate private seal includes the complete typed record, including
+schema version and entry order; the acceptance digest still deliberately excludes entries.
+E labels, public Verdict objects, caller callbacks and receipt JSON
 cannot construct verified results. `depth-core-prove` materializes host receipts/payloads only in
 a disposable checkout, calls that evaluation path and the existing publisher, and prints per-
 obligation decisions. These are isolated reporting facts, never acceptance or write authority.

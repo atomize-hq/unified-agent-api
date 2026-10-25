@@ -67,6 +67,7 @@ pub(super) fn approved(
     built: &str,
     workflow: &str,
     anchor: &str,
+    p: Profile,
 ) -> Result<(), String> {
     for commit in [built, workflow, anchor] {
         let source = source(root, commit)?;
@@ -84,7 +85,10 @@ pub(super) fn approved(
         "Cargo.lock",
         WORKFLOW,
         depth_ci::ARCHIVE,
-    ] {
+    ]
+    .into_iter()
+    .chain(p.requirements())
+    {
         let oid = |commit: &str| -> Result<Vec<u8>, String> {
             crate::depth_ci::output(
                 Command::new("git")
@@ -148,7 +152,7 @@ pub(super) fn validate_witness(
     if w.workflow_commit != w.build.source_commit || w.build.source_tree != built.tree()? {
         return Err("workflow/build source mismatch".into());
     }
-    approved(root, &w.build.source_commit, &w.workflow_commit, anchor)?;
+    approved(root, &w.build.source_commit, &w.workflow_commit, anchor, p)?;
     let original = original_for(&built, p)?;
     let names = w
         .cases
@@ -168,6 +172,20 @@ pub(super) fn validate_witness(
         return Err("wrong exact test executable/case population".into());
     }
     w.graph.closure()?;
+    if let Some(scope) = p.requirements() {
+        let prefix = format!("{scope}/");
+        let claimed: std::collections::BTreeSet<_> = w
+            .graph
+            .inputs
+            .iter()
+            .filter(|f| f.path.starts_with(&prefix))
+            .map(|f| f.path.clone())
+            .collect();
+        let expected = built.committed_files(scope)?.into_iter().collect();
+        if !w.graph.scopes.iter().any(|s| s == scope) || claimed != expected {
+            return Err("CORE witness lacks complete canonical requirement scope".into());
+        }
+    }
     let profile: Value =
         serde_json::from_str(&built.read(&p.build_profile())?).map_err(|e| e.to_string())?;
     if serde_json::to_value(&w.graph.packages).map_err(|e| e.to_string())? != profile["packages"]

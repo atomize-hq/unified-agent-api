@@ -211,3 +211,124 @@ fn fixture_binary(name: &str) -> PathBuf {
         .unwrap()
         .join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
 }
+
+fn marker_backend(marker: &std::path::Path) -> CodexBackend {
+    CodexBackend::new(CodexBackendConfig {
+        binary: Some(fixture_binary("fake_codex_depth_core")),
+        env: [(
+            "DEPTH_CORE_SPAWN_MARKER".into(),
+            marker.to_str().unwrap().into(),
+        )]
+        .into_iter()
+        .collect(),
+        ..Default::default()
+    })
+}
+
+#[tokio::test]
+async fn valid_request_observes_spawn_marker() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("spawned");
+    let handle = marker_backend(&marker)
+        .run(AgentWrapperRunRequest {
+            prompt: "depth-core-prompt".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut events = handle.events;
+    let drain = async {
+        while std::future::poll_fn(|cx| events.as_mut().poll_next(cx))
+            .await
+            .is_some()
+        {}
+    };
+    let (_, completion) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(drain, handle.completion)
+    })
+    .await
+    .unwrap();
+    assert!(completion.unwrap().status.success());
+    assert_eq!(std::fs::read(&marker).unwrap(), b"spawned");
+}
+
+#[tokio::test]
+async fn empty_prompt_rejection_does_not_spawn() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("spawned");
+    let err = marker_backend(&marker)
+        .run(AgentWrapperRunRequest {
+            prompt: "   ".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        agent_api::AgentWrapperError::InvalidRequest { .. }
+    ));
+    // Allow a wrongly started child to run its first instruction before observing absence.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        !marker.exists(),
+        "empty-prompt rejection started the executable"
+    );
+}
+
+#[tokio::test]
+async fn invalid_extension_type_rejection_does_not_spawn() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("spawned");
+    let err = marker_backend(&marker)
+        .run(AgentWrapperRunRequest {
+            prompt: "depth-core-prompt".into(),
+            extensions: [(
+                "agent_api.exec.non_interactive".into(),
+                serde_json::json!("true"),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        agent_api::AgentWrapperError::InvalidRequest { .. }
+    ));
+    // Allow a wrongly started child to run its first instruction before observing absence.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        !marker.exists(),
+        "typed-extension rejection started the executable"
+    );
+}
+
+#[tokio::test]
+async fn unknown_extension_rejection_does_not_spawn() {
+    let dir = tempfile::tempdir().unwrap();
+    let marker = dir.path().join("spawned");
+    let err = marker_backend(&marker)
+        .run(AgentWrapperRunRequest {
+            prompt: "depth-core-prompt".into(),
+            extensions: [(
+                "backend.codex.exec.unknown_key".into(),
+                serde_json::json!(true),
+            )]
+            .into_iter()
+            .collect(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        agent_api::AgentWrapperError::UnsupportedCapability { .. }
+    ));
+    // Allow a wrongly started child to run its first instruction before observing absence.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(
+        !marker.exists(),
+        "unknown-extension rejection started the executable"
+    );
+}

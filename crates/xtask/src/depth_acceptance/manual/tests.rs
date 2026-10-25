@@ -99,9 +99,14 @@ impl Host for Producer {
             self.current.obligations.clone().unwrap(),
         ))
     }
-    fn evidence(&self, _: &Path, _: &DepthRecord) -> Result<EvidenceVerdicts, String> {
-        Ok(if self.proved {
-            crate::depth_evidence::test_results(Some(&self.current))
+    fn evidence(&self, _: &Path, record: &DepthRecord) -> Result<EvidenceVerdicts, String> {
+        // Re-evaluate the independently fixed substantive state for this exact query. Entries
+        // do not establish evidence; owning admission checks them separately. A prior opaque
+        // set remains unusable after entry changes, so every query constructs a fresh set.
+        let mut evaluated = self.current.clone();
+        evaluated.acceptance_entries = record.acceptance_entries.clone();
+        Ok(if self.proved && evaluated == *record {
+            crate::depth_evidence::test_results(Some(&evaluated))
         } else {
             EvidenceVerdicts::default()
         })
@@ -424,3 +429,34 @@ mod regressions;
 mod promotions;
 
 mod integration;
+
+#[test]
+fn private_producer_freshly_seals_entries_but_keeps_substantive_state_fixed() {
+    let f = Fixture::new();
+    let obligation = f.record.execution.as_ref().unwrap().results[0]
+        .obligation
+        .clone();
+    let old = f.producer.evidence(f.root.path(), &f.record).unwrap();
+    let mut with_entry = f.record.clone();
+    with_entry
+        .acceptance_entries
+        .push(AcceptanceEntry::Promotion {
+            targets: vec![LINUX.into()],
+            record_sha256: f.record.stated_sha256().unwrap(),
+        });
+    assert_eq!(
+        old.result(&with_entry, &obligation),
+        DepthResult::Unverified
+    );
+    let fresh = f.producer.evidence(f.root.path(), &with_entry).unwrap();
+    assert_eq!(
+        fresh.result(&with_entry, &obligation),
+        DepthResult::Verified
+    );
+    with_entry.execution.as_mut().unwrap().identity = "f".repeat(64);
+    let changed = f.producer.evidence(f.root.path(), &with_entry).unwrap();
+    assert_eq!(
+        changed.result(&with_entry, &obligation),
+        DepthResult::Unverified
+    );
+}

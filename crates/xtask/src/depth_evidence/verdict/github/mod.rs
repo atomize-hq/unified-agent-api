@@ -39,7 +39,11 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
     let anchor_source = source(root, anchor)?;
     // Include all compiled producer code and its dependencies, not only the named collector.
     let mut paths = view.files_under("crates")?;
-    let anchor_paths = anchor_source.committed_files("crates")?;
+    let mut anchor_paths = anchor_source.committed_files("crates")?;
+    if let Some(scope) = p.requirements() {
+        paths.extend(view.files_under(scope)?);
+        anchor_paths.extend(anchor_source.committed_files(scope)?);
+    }
     if paths != anchor_paths {
         return Err("current producer inventory differs from approved staging".into());
     }
@@ -124,7 +128,7 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
         }
         // Approve the API-derived execution head before trusting any witness source claims.
         let head_sha = sha(required_string(run, "head_sha")?)?;
-        profile::approved(root, head_sha, head_sha, anchor)?;
+        profile::approved(root, head_sha, head_sha, anchor, p)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
         let count = run["run_attempt"]
             .as_u64()

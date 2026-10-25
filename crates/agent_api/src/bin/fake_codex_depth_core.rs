@@ -1,6 +1,10 @@
 //! Synthetic adapter fixture, never an upstream Codex executable.
 use std::io::{self, Read, Write};
 fn main() -> io::Result<()> {
+    // Observe every invocation before argv/stdin validation or any other fixture behavior.
+    if let Some(marker) = std::env::var_os("DEPTH_CORE_SPAWN_MARKER") {
+        std::fs::write(marker, b"spawned")?;
+    }
     let args: Vec<_> = std::env::args().collect();
     assert!(args.iter().any(|a| a == "exec"));
     assert!(args.iter().any(|a| a == "--json"));

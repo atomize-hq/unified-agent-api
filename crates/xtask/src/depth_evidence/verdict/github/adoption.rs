@@ -69,7 +69,11 @@ pub(super) fn resolve(
                 w.graph.inputs.iter().map(|f| f.path.as_str()).collect()
             };
             let same_inputs=input_paths.iter().all(|path| matches!((reviewed.optional_bytes(path),built.optional_bytes(path),reviewed.executable(path),built.executable(path)),(Ok(Some(a)),Ok(Some(b)),Ok(am),Ok(bm)) if a==b && am==bm));
-            if !same_inputs {
+            let same_requirement_population = match p.requirements() {
+                Some(scope) => reviewed.committed_files(scope)? == built.committed_files(scope)?,
+                None => true,
+            };
+            if !same_inputs || !same_requirement_population {
                 continue;
             }
             let author = required_string(&value["user"], "login")?;
