@@ -58,6 +58,8 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 #[allow(clippy::enum_variant_names)]
 enum Command {
+    /// Read-only fixed-profile isolated maintenance binding probe; grants no admission.
+    IsolatedMaintenanceBindingCheck,
     /// Collect an isolated CI witness into target/depth-ci; grants no admission.
     DepthCiCollect,
     /// Collect the fixed isolated Codex CORE profile, without enrollment or writes to reports.
@@ -180,6 +182,18 @@ fn main() {
     let cli = Cli::parse();
 
     let exit_code = match cli.command {
+        Command::IsolatedMaintenanceBindingCheck => {
+            match std::env::current_dir()
+                .map_err(|e| e.to_string())
+                .and_then(|root| xtask::isolated_maintenance::check(&root))
+            {
+                Ok(()) => 0,
+                Err(error) => {
+                    eprintln!("{error}");
+                    1
+                }
+            }
+        }
         Command::ManifestPromote(args) => match xtask::manifest_promotion::run(args) {
             Ok(()) => 0,
             Err(error) => {

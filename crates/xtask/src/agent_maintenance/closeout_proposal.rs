@@ -30,11 +30,71 @@ struct Snapshot {
 
 pub struct Proposal {
     before: Snapshot,
+    isolated: Option<crate::isolated_maintenance::Context>,
 }
 impl Proposal {
     pub fn capture(root: &Path) -> Result<Self, String> {
         Ok(Self {
             before: capture(root)?,
+            isolated: None,
+        })
+    }
+
+    pub(crate) fn capture_isolated(
+        root: &Path,
+        context: crate::isolated_maintenance::Context,
+    ) -> Result<Self, String> {
+        context.recheck(root)?;
+        let proposal = Self {
+            before: capture(root)?,
+            isolated: Some(context),
+        };
+        proposal.verify_current(root)?;
+        Ok(proposal)
+    }
+
+    fn recheck_binding(&self, root: &Path) -> Result<(), String> {
+        if let Some(context) = &self.isolated {
+            context.recheck(root)?;
+        }
+        Ok(())
+    }
+
+    fn verify_current(&self, root: &Path) -> Result<(), String> {
+        self.recheck_binding(root)?;
+        if capture(root)? != self.before {
+            return Err(
+                "closeout inputs changed during validation; preserving concurrent edits".into(),
+            );
+        }
+        Ok(())
+    }
+
+    /// A scratch view borrows the original caller's context; copying its files supplies no authority.
+    #[allow(dead_code)]
+    pub(crate) fn isolated_view(
+        &self,
+        root: &Path,
+        destination: &Path,
+    ) -> Result<IsolatedView<'_>, String> {
+        if self.isolated.is_none() {
+            return Err("proposal has no isolated caller binding".into());
+        }
+        self.verify_current(root)?;
+        let destination_identity = crate::isolated_maintenance::FileIdentity::read(destination)?;
+        if fs::read_dir(destination)
+            .map_err(|e| e.to_string())?
+            .next()
+            .is_some()
+        {
+            return Err("isolated proposal view requires an empty scratch directory".into());
+        }
+        self.materialize(destination)?;
+        Ok(IsolatedView {
+            proposal: self,
+            caller: root.canonicalize().map_err(|e| e.to_string())?,
+            destination: destination.canonicalize().map_err(|e| e.to_string())?,
+            destination_identity,
         })
     }
 
@@ -80,6 +140,7 @@ impl Proposal {
             &BTreeSet<String>,
         ) -> Result<BTreeMap<String, Vec<u8>>, String>,
     ) -> Result<Vec<PlannedMutation>, String> {
+        self.recheck_binding(root)?;
         let mut proposed = BTreeMap::new();
         let mut after = self.before.files.clone();
         for (path, bytes) in files {
@@ -121,11 +182,7 @@ impl Proposal {
                 return Err("acceptance entry overwrites another proposed output".into());
             }
         }
-        if capture(root)? != self.before {
-            return Err(
-                "closeout inputs changed during validation; preserving concurrent edits".into(),
-            );
-        }
+        self.verify_current(root)?;
         proposed
             .into_iter()
             .map(|(path, bytes)| {
@@ -165,8 +222,46 @@ impl Proposal {
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,
     ) -> Result<ApplySummary, String> {
-        let mutations = self.plan(root, files)?;
+        self.apply_with(root, files, crate::depth_acceptance::plan_manual_closeout)
+    }
+
+    pub(crate) fn apply_with(
+        &self,
+        root: &Path,
+        files: Vec<(PathBuf, Vec<u8>)>,
+        admit: impl FnOnce(
+            &Path,
+            Source,
+            Source,
+            &BTreeSet<String>,
+        ) -> Result<BTreeMap<String, Vec<u8>>, String>,
+    ) -> Result<ApplySummary, String> {
+        let mutations = self.plan_with(root, files, admit)?;
+        if self.isolated.is_some() {
+            self.verify_current(root)?;
+        }
         apply_mutations(root, &mutations).map_err(|e| e.to_string())
+    }
+}
+/// Read-only view with borrowed, non-serializable original-caller freshness, never write authority.
+#[allow(dead_code)]
+pub(crate) struct IsolatedView<'a> {
+    proposal: &'a Proposal,
+    caller: PathBuf,
+    destination: PathBuf,
+    destination_identity: crate::isolated_maintenance::FileIdentity,
+}
+#[allow(dead_code)]
+impl IsolatedView<'_> {
+    pub(crate) fn source(&self) -> Result<Source, String> {
+        self.proposal.verify_current(&self.caller)?;
+        if crate::isolated_maintenance::FileIdentity::read(&self.destination)?
+            != self.destination_identity
+            || crate::isolated_maintenance::entry_exists(&self.destination.join(".git"))?
+        {
+            return Err("isolated scratch cannot acquire Git authority".into());
+        }
+        source(&self.destination, &self.proposal.before.files)
     }
 }
 fn source(root: &Path, files: &Files) -> Result<Source, String> {
