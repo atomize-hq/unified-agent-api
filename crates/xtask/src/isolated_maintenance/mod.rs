@@ -160,6 +160,16 @@ impl Workspace {
                 _ => {}
             }
         }
+        // IB-DEF-1: a real top-level directory can still delegate objects or references
+        // through symlinked fanout, pack, namespace or leaf entries. Revisit descendants on
+        // every Workspace read, including both freshness observations in Context::recheck.
+        let mut remaining = 100_000;
+        for namespace in [".git/objects", ".git/refs"] {
+            let path = root.join(namespace);
+            if entry_exists(&path)? {
+                inspect_git_namespace(&path, 0, &mut remaining)?;
+            }
+        }
         for (option, expected) in [
             ("--show-toplevel", root.to_owned()),
             ("--absolute-git-dir", root.join(".git")),
@@ -205,6 +215,26 @@ impl Workspace {
             index: git(root, &["ls-files", "--stage", "-z"])?,
         })
     }
+}
+/// Bounded observation of the two Git storage namespaces, without following symlinks.
+fn inspect_git_namespace(path: &Path, depth: usize, remaining: &mut usize) -> Result<(), String> {
+    if depth > 64 || *remaining == 0 {
+        return Err("isolated Git metadata inventory exceeds bound".into());
+    }
+    *remaining -= 1;
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if metadata.file_type().is_symlink() {
+        return Err("shared symlinked isolated Git metadata descendant".into());
+    }
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            inspect_git_namespace(&entry.path(), depth + 1, remaining)?;
+        }
+    } else if !metadata.is_file() {
+        return Err("unsupported isolated Git metadata descendant".into());
+    }
+    Ok(())
 }
 fn source(
     root: &Path,

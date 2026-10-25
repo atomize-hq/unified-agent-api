@@ -4,6 +4,8 @@ use serde_json::json;
 use std::{collections::BTreeMap, fs};
 
 mod fixture;
+#[cfg(unix)]
+mod git_metadata;
 use fixture::{declaration, git, write, Fake, Fixture};
 
 #[test]
