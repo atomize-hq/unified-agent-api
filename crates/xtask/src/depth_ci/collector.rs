@@ -435,6 +435,23 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     if serde_json::to_value(&features).map_err(|e| e.to_string())? != build_profile["features"]
         || json!(script_ids) != build_profile["build_scripts"]
     {
+        let actual = serde_json::to_value(&features).map_err(|e| e.to_string())?;
+        let expected = build_profile["features"]
+            .as_object()
+            .ok_or("missing reviewed features")?;
+        for (id, wanted) in expected {
+            if actual[id] != *wanted {
+                eprintln!(
+                    "profile feature mismatch {id}: wanted {wanted}, observed {}",
+                    actual[id]
+                );
+            }
+        }
+        eprintln!(
+            "profile scripts wanted {}, observed {}",
+            build_profile["build_scripts"],
+            json!(script_ids)
+        );
         return Err("compiled features/build scripts are outside the reviewed profile".into());
     }
     let graph = super::graph::resolve(root, &mut view, &metadata, &compiled, profile)?;
