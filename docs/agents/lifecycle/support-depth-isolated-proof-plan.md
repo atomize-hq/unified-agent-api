@@ -65,10 +65,11 @@ and later separate per-agent production authorization. This plan does not amend 
    authority in the production repository. No general-purpose enrollment bypass or second policy
    inventory. Include the final integration checker, not just local commands. Specify and review
    this narrow binding before implementation; E1 does not invent an already usable switch.
-   The proposed [binding design](support-depth-isolated-route-design.md) records the exact-host
+   The approved [binding design](support-depth-isolated-route-design.md) records the exact-host
    boundary, real-packet intake/evidence prerequisites and source increment order. Its IR-P1/IR-P2/
-   IR-P3 recommendations remain pending, including isolated producer-job terminality with unchanged
-   pre-MERGE workflow gates; it enables no path and grants no normative exception.
+   IR-P3 recommendations were approved on 2026-10-25, including isolated producer-job terminality
+   with unchanged pre-MERGE workflow gates. Implementation and host proof remain separate; approval
+   alone enables no path.
 3. **Run and retain the chain below.** Use the resulting reviewed source unchanged for each step
    and for actual protected-host PR/queue evaluation. If a prerequisite cannot meet the scope or
    a route remains unsupported, record the exact unmet claim and stop dependent acceptance proof.

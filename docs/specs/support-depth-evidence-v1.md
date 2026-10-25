@@ -394,3 +394,39 @@ production enrollment, trust to a disposable host, acceptance entries or pointer
 increment must independently bind the supported isolated public paths and IN1 before a complete
 maintenance-chain proof can be claimed. Unit host fixtures establish predicate composition;
 they are not live authenticated evidence or a maintainer endorsement.
+
+## Isolated maintenance binding foundation
+
+The maintainer approved IR-P1, IR-P2 and IR-P3 in the
+[isolated route design](../agents/lifecycle/support-depth-isolated-route-design.md) on 2026-10-25.
+Implementation is staged. The initial binding foundation MUST leave the live isolated profile
+uninstalled until the exact repository identity, original installation baseline and credential
+references have their separate authorization and the profile is installed through reviewed source.
+An absent profile MUST refuse before host reads; a CLI flag, environment value, remote, registry
+declaration, receipt or serialized diagnostic MUST NOT install or authorize one.
+
+Binding uses one private, non-deserializable context. It independently checks the fixed repository
+id, owner id, expected name, protected staging tip, approved source closure, installation baseline
+and actual workspace/Git ownership. It binds only Codex0.156.1 maintenance `run`/CORE and
+`agent_api.run` on the acquired `x86_64-unknown-linux-musl` tuple. The GNU Rust wrapper build host
+is distinct evidence metadata. Registry declarations remain necessary and every registered retained
+root is mediated; unsupported or extra selections MUST refuse. Neither this context nor its
+read-only diagnostic is an acceptance verdict or proof of OS isolation.
+The isolated registry is separately checked governing data, with coherent bytes, exact scope and
+freshness retained. The approved isolated declaration must already exist on the isolated protected
+baseline; resolving a context does not install or edit it. Source approval MUST NOT require enabling
+the canonical production registry to admit the isolated declaration, nor treat arbitrary
+governing-data edits as approved code.
+
+Planning, a derived invocation-local proposal view and apply MUST retain the caller's binding and
+check freshness against independently observed host/source/tip and coherent local inputs. A copied
+scratch tree MUST NOT resolve its own authority. Reuse existing expected-before delivery checks;
+do not convert a prior check or serialized context into a reusable write permission. Ordinary
+registry loading and unsupported public writer refusals remain until their own reviewed wiring.
+
+IR-P3 applies only to the future packet-bound isolated producer: authenticated terminal producer-job
+evidence may be evaluated while its enclosing workflow runs, with all applicable attempts,
+unfavorable witnesses and missing/unfinished-producer refusals retained. Consumers must follow the
+producer without producer self-admission. The complete CI result policy and terminal gate still
+govern MERGE. Existing channel/CORE fixture profiles retain whole-workflow completion; this
+foundation does not implement packet evidence, change their behavior or enable production results.

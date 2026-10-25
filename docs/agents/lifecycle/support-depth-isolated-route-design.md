@@ -1,11 +1,12 @@
 # Isolated public maintenance routes: binding design
 
-Status: proposed; IR-P1, IR-P2 and IR-P3 below need maintainer decisions.
+Status: IR-P1, IR-P2 and IR-P3 approved by the maintainer on 2026-10-25.
+Implementation is incremental; approval does not provision a host or enable production.
 Source baseline: staging `930e85317f07f0c5161f9ffd7dbf8023ba15c143` (PR #297).
 This is step 2 of the approved [isolated proof plan](support-depth-isolated-proof-plan.md).
 The [depth contract](../../specs/support-depth-contract.md), [registry contract](../../specs/agent-registry-contract.md#support-depth)
 and [evidence contract](../../specs/support-depth-evidence-v1.md) remain normative.
-This document enables no route, changes no registry/host setting and creates no background job.
+This approval enables no route by itself, changes no registry/host setting and creates no background job.
 
 ## Outcome and scope
 
@@ -21,13 +22,13 @@ PR #297 landed the read-only bridge, not that public chain. Its two fixed fixtur
 existing behavior. Public production loading still refuses depth and `production_results` still
 returns empty verdicts. Ordinary non-depth commands keep their current behavior.
 
-## Decisions to approve
+## Approved decisions
 
 | Id | Recommendation | Reason / boundary |
 | --- | --- | --- |
 | IR-P1 — isolated authority | Bind exactly one disposable repository by fixed GitHub repository id, owner id, expected full name and protected staging, with a separately approved implementation baseline. Add one private isolated context alongside existing production behavior. Resolve it from authenticated host observations, never record/receipt/remote spelling/environment claims | Real public entrypoints need an isolated authority boundary. Names alone, a worktree or an arbitrary `--allow-depth` switch do not supply it. Exact repository provisioning and credential references are authorized separately before host writes; no production path is enabled |
 | IR-P2 — target meaning | Enroll the packet on the actual upstream/promotion tuple `x86_64-unknown-linux-musl`; keep `x86_64-unknown-linux-gnu` as the Rust wrapper build/execution host in evidence | Codex RULES and the pinned0.156.1 artifact use musl; the public resolver requires a real selected shard. The existing CORE fixture's GNU enrollment cannot be copied into a real packet. This clarifies the approved single-Linux scope; it does not relabel a snapshot, claim GNU upstream acquisition or grant cross-target receipt reuse. The new packet gets fresh P/O, trust binding, mappings and adoption |
-| IR-P3 — isolated packet producer terminality | For this new isolated-packet trust profile only, admit authenticated evidence after the existing `rust-tests` producer job is terminal and its collection/upload/binding steps and immutable artifacts are authenticated, even while the enclosing workflow runs | Repairs IR-ADV-01 (original P2): same-run IN1 cannot wait for completion of the workflow containing its own checks. Keep every applicable attempt and the full pre-MERGE workflow gate. Existing channel/CORE fixture profiles retain whole-workflow completion. This is a proposed policy change requiring maintainer approval and reviewed contract/profile changes before use, not an approved exception to today's normative evidence contract |
+| IR-P3 — isolated packet producer terminality | For this new isolated-packet trust profile only, admit authenticated evidence after the existing `rust-tests` producer job is terminal and its collection/upload/binding steps and immutable artifacts are authenticated, even while the enclosing workflow runs | Repairs IR-ADV-01 (original P2): same-run IN1 cannot wait for completion of the workflow containing its own checks. Keep every applicable attempt and the full pre-MERGE workflow gate. Existing channel/CORE fixture profiles retain whole-workflow completion. This profile-specific policy is approved; reviewed contract/profile implementation is required before use. Existing profiles are unchanged |
 
 The following are existing requirements, not requests for new exemptions: maintainer classification
 and explicit P re-freeze, exact generation stand-down on the integration parent, separate closeout
@@ -58,6 +59,12 @@ positive-chain work, establish legitimate approved-baseline/ordinary revalidatio
 the actual carried work. If it remains nonempty, stop that dependent work and bring the exact
 semantic corroborator needed for review. Do not erase/relabel required work, assume an empty list
 or treat a baseline reset, private fixture or historical closure alone as public depth-positive proof.
+
+The binding-foundation read-only probe on baseline930e8531 found the current ordinary audit
+`satisfied`, its closeout bound to the exact old request, and an ordinary revalidation plan with
+zero required uplifts and no depth binding. No plan was applied. This makes an ordinary bootstrap
+plausible; protected delivery, ordinary closure and the later actual depth P/O still need proof.
+Direct depth enrollment against the old request continues to carry its 56 rows.
 
 ## One private context, reused owning checks
 
@@ -125,7 +132,7 @@ adoption may cover the twelve independently reviewed mappings; candidate source 
 review does not supply adequacy. New target/source/assertion/P/O/trust differences must be evaluated
 under existing mapping-reuse rules; old fixture adoption is not automatically transferred.
 
-Under proposed IR-P3, workflow `in_progress` alone does not make an otherwise complete producer
+Under approved IR-P3 for the new packet profile, workflow `in_progress` alone does not make an otherwise complete producer
 unverified. Independently authenticate API run/attempt/head, approved workflow and checkout source,
 exact terminal producer job/steps, timestamped binding logs and immutable artifact identity/digest.
 Require a complete stable applicable run/attempt/job/artifact population; recheck identities and membership
@@ -196,7 +203,7 @@ authorization, read back isolation/rules and compare production identities befor
 3. **Packet-bound authenticated producer.** Reuse CORE collection/evaluation for the real frozen
    generation and isolated host scope. Prove all twelve obligations with positive/negative host
    fixtures, currentness, IR-P3 terminality/discovery and opaque entry-state behavior. Live adoption
-   is separate host work; unapproved IR-P3 remains a blocker to same-run positive integration.
+   is separate host work; IR-P3 implementation remains a prerequisite for same-run positive integration.
 4. **Connect public routes and IN1.** Thread the admitted context and hosts through the supported
    builders/apply/lower paths and final validator. Reporting may land earlier where its exact
    effects are guarded; acceptance remains refused until every owning/final predicate is wired.
