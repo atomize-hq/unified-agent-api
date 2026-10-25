@@ -345,7 +345,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         }
     }
     let env = BuildEnv::new(root)?;
-    let metadata: Value = serde_json::from_str(&required(
+    let mut metadata: Value = serde_json::from_str(&required(
         env.command(&env.cargo)
             .args([
                 "metadata",
@@ -365,6 +365,29 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         16777216,
     )?)
     .map_err(|e| e.to_string())?;
+    if profile == profile::Profile::Core {
+        let tree = required(
+            env.command(&env.cargo).args([
+                "tree",
+                "--locked",
+                "--offline",
+                "--no-default-features",
+                "--all-features",
+                "-p",
+                profile.package(),
+                "--target",
+                TARGET,
+                "--prefix",
+                "none",
+                "--format",
+                "{p}",
+                "--edges",
+                "normal,build,dev",
+            ]),
+            16777216,
+        )?;
+        metadata = super::graph::selected(metadata, &tree)?;
+    }
     // Check locked source contents/inventories before allowing their build-time code to run.
     super::graph::resolve(
         root,

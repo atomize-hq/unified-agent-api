@@ -240,3 +240,54 @@ pub(super) fn expected(
     }
     Ok(seen)
 }
+
+/// Cargo metadata unifies features across unrelated workspace members. The selected package's
+/// independently resolved Cargo tree supplies its actual population before build-time code runs.
+pub(super) fn selected(mut metadata: Value, tree: &str) -> Result<Value, String> {
+    let packages = metadata["packages"]
+        .as_array()
+        .ok_or("missing Cargo packages")?;
+    let mut selected = BTreeSet::new();
+    for line in tree
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('['))
+    {
+        let mut words = line.split_whitespace();
+        let name = words.next().ok_or("missing selected package")?;
+        let version = words
+            .next()
+            .and_then(|v| v.strip_prefix('v'))
+            .ok_or("missing selected package version")?;
+        let matches: Vec<_> = packages
+            .iter()
+            .filter(|p| p["name"] == name && p["version"] == version)
+            .collect();
+        if matches.len() != 1 {
+            return Err("ambiguous selected package source".into());
+        }
+        selected.insert(
+            matches[0]["id"]
+                .as_str()
+                .ok_or("missing selected package id")?
+                .to_owned(),
+        );
+    }
+    if selected.is_empty() {
+        return Err("empty selected Cargo population".into());
+    }
+    metadata["packages"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|p| p["id"].as_str().is_some_and(|id| selected.contains(id)));
+    let nodes = metadata["resolve"]["nodes"]
+        .as_array_mut()
+        .ok_or("missing Cargo nodes")?;
+    nodes.retain(|n| n["id"].as_str().is_some_and(|id| selected.contains(id)));
+    for node in nodes {
+        node["dependencies"]
+            .as_array_mut()
+            .ok_or("missing dependencies")?
+            .retain(|id| id.as_str().is_some_and(|id| selected.contains(id)));
+    }
+    Ok(metadata)
+}
