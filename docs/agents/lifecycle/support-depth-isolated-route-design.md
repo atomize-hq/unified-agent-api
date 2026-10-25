@@ -1,6 +1,6 @@
 # Isolated public maintenance routes: binding design
 
-Status: proposed; IR-P1 and IR-P2 below need maintainer decisions.
+Status: proposed; IR-P1, IR-P2 and IR-P3 below need maintainer decisions.
 Source baseline: staging `930e85317f07f0c5161f9ffd7dbf8023ba15c143` (PR #297).
 This is step 2 of the approved [isolated proof plan](support-depth-isolated-proof-plan.md).
 The [depth contract](../../specs/support-depth-contract.md), [registry contract](../../specs/agent-registry-contract.md#support-depth)
@@ -27,6 +27,7 @@ returns empty verdicts. Ordinary non-depth commands keep their current behavior.
 | --- | --- | --- |
 | IR-P1 — isolated authority | Bind exactly one disposable repository by fixed GitHub repository id, owner id, expected full name and protected staging, with a separately approved implementation baseline. Add one private isolated context alongside existing production behavior. Resolve it from authenticated host observations, never record/receipt/remote spelling/environment claims | Real public entrypoints need an isolated authority boundary. Names alone, a worktree or an arbitrary `--allow-depth` switch do not supply it. Exact repository provisioning and credential references are authorized separately before host writes; no production path is enabled |
 | IR-P2 — target meaning | Enroll the packet on the actual upstream/promotion tuple `x86_64-unknown-linux-musl`; keep `x86_64-unknown-linux-gnu` as the Rust wrapper build/execution host in evidence | Codex RULES and the pinned0.156.1 artifact use musl; the public resolver requires a real selected shard. The existing CORE fixture's GNU enrollment cannot be copied into a real packet. This clarifies the approved single-Linux scope; it does not relabel a snapshot, claim GNU upstream acquisition or grant cross-target receipt reuse. The new packet gets fresh P/O, trust binding, mappings and adoption |
+| IR-P3 — isolated packet producer terminality | For this new isolated-packet trust profile only, admit authenticated evidence after the existing `rust-tests` producer job is terminal and its collection/upload/binding steps and immutable artifacts are authenticated, even while the enclosing workflow runs | Repairs IR-ADV-01 (original P2): same-run IN1 cannot wait for completion of the workflow containing its own checks. Keep every applicable attempt and the full pre-MERGE workflow gate. Existing channel/CORE fixture profiles retain whole-workflow completion. This is a proposed policy change requiring maintainer approval and reviewed contract/profile changes before use, not an approved exception to today's normative evidence contract |
 
 The following are existing requirements, not requests for new exemptions: maintainer classification
 and explicit P re-freeze, exact generation stand-down on the integration parent, separate closeout
@@ -49,6 +50,14 @@ stop that dependent increment and bring the exact representation change for revi
 does not approve unnamed classifications, a new template or a schema change in advance. Every
 observed/claimed unit still counts, including unsupported and passthrough units. If classification
 requires more than CORE, report the actual policy choice and evidence work; do not reduce obligations.
+
+IR-D1 (original P3) is an early implementation feasibility checkpoint: the standing Codex0.156.1
+request contains 56 required uplift rows, and `support_depth/freeze.rs` carries same-version work
+across Events. A fresh audit or Event alone cannot prove empty `acceptance_work`. Before dependent
+positive-chain work, establish legitimate approved-baseline/ordinary revalidation history and audit
+the actual carried work. If it remains nonempty, stop that dependent work and bring the exact
+semantic corroborator needed for review. Do not erase/relabel required work, assume an empty list
+or treat a baseline reset, private fixture or historical closure alone as public depth-positive proof.
 
 ## One private context, reused owning checks
 
@@ -83,8 +92,9 @@ requires a new plan; it is never silently resealed or retried against a differen
 At IN1, resolve the context afresh from the independently authenticated repository and exact
 queue candidate/base, before requested-root narrowing. A local context or earlier check grants
 no final permission. Reuse the current all-root comparison, generation, qualification and owning
-closeout/promotion checks; retain App15368 status bindings and the terminal gate. No new CI job,
-required check, queue substitute, persistent lease, approval ledger or transaction engine is needed.
+closeout/promotion checks; retain App15368 status bindings and the terminal gate. Reuse the existing
+job graph; this design mandates no new CI job, required check, queue substitute, persistent lease,
+approval ledger or transaction engine. The ordering work below remains to be reviewed and proved.
 
 The trusted validator/controller comes from independently approved protected source, not an
 executor-modified candidate. Bootstrap the isolated protected baseline before the first depth
@@ -114,6 +124,27 @@ attempt counts even if failed, unfinished or missing evidence. One exact authent
 adoption may cover the twelve independently reviewed mappings; candidate source or generic code
 review does not supply adequacy. New target/source/assertion/P/O/trust differences must be evaluated
 under existing mapping-reuse rules; old fixture adoption is not automatically transferred.
+
+Under proposed IR-P3, workflow `in_progress` alone does not make an otherwise complete producer
+unverified. Independently authenticate API run/attempt/head, approved workflow and checkout source,
+exact terminal producer job/steps, timestamped binding logs and immutable artifact identity/digest.
+Require a complete stable applicable run/attempt/job/artifact population; recheck identities and membership
+without demanding that unrelated workflow progress stop. Missing, queued, running or aborted
+producers remain unverified; missing/unavailable logs, incomplete artifacts or failed collection/
+upload/binding never verify. Terminal failed-case witnesses and contradictions remain in evaluation,
+including faithful witnesses from a job that failed elsewhere. Do not exclude the current run,
+filter to the latest green attempt or invent an adoption fallback. All twelve mappings still need
+independent adoption. Before MERGE, the whole workflow must finish through its existing 17-job
+result policy (including candidate-justified skips), direct required checks and terminal gate.
+
+Implementation must trace every evidence invocation, including public checks, support publication,
+`make preflight`/support-matrix and all-root IN1. Schedule actual consumers after the terminal
+producer and bound artifacts; the producer must neither invoke nor depend on its own packet
+admission. Review minimal explicit `needs` edges in the existing workflow, preserving failure
+observation rather than silently skipping consumers after a failed producer. A job condition alone
+does not create conditional `needs`. Review actual scope and latency: serializing consumers behind
+`rust-tests` can delay ordinary CI too. Do not claim no latency impact or add a new framework to
+hide the dependency; prove the resulting invocation graph has no admission cycle.
 
 Reporting may publish actual opaque isolated verdicts only inside the authenticated isolated
 context. Canonical production consumers keep production-origin requirements and their current
@@ -160,14 +191,17 @@ authorization, read back isolation/rules and compare production identities befor
 2. **Packet intake readiness.** Exact predicate/alias and selected-unit classification handling,
    real target/acquisition and P/O currentness. First present exact effect classifications and any
    necessary P representation changes for maintainer review; implement only approved policy.
-   Prove unresolved/classification/work refusals and truthful P-only behavior.
+   Resolve the IR-D1 feasibility checkpoint early; prove unresolved/classification/work refusals
+   and truthful P-only behavior.
 3. **Packet-bound authenticated producer.** Reuse CORE collection/evaluation for the real frozen
    generation and isolated host scope. Prove all twelve obligations with positive/negative host
-   fixtures, currentness and opaque entry-state behavior. Live adoption is separate host work.
+   fixtures, currentness, IR-P3 terminality/discovery and opaque entry-state behavior. Live adoption
+   is separate host work; unapproved IR-P3 remains a blocker to same-run positive integration.
 4. **Connect public routes and IN1.** Thread the admitted context and hosts through the supported
    builders/apply/lower paths and final validator. Reporting may land earlier where its exact
    effects are guarded; acceptance remains refused until every owning/final predicate is wired.
-   Prove real entrypoints and rollback/conflict preservation before claiming this increment complete.
+   Prove real entrypoints, producer/consumer ordering and rollback/conflict preservation before
+   claiming this increment complete.
 
 These are causal source increments, not new governance gates. Split a diff only when its actual
 size/authority boundary needs it. Every source PR uses the existing required gates and both
@@ -193,6 +227,14 @@ matrix. Add focused controls for wrong repository id/owner/name, copied canonica
 source/baseline/tip drift, forged/deserialized/scratch context, extra retained scopes, predicate
 ambiguity, target relabeling, classification additions and nonempty carried work. Capture exact
 before/after state on failed delivery and preserve externally changed state.
+
+For IR-ADV-01, prove same-run MA5/MA6→IN1 can verify after the current producer is terminal while
+its workflow still runs, then pass the unchanged queue gate. Controls must keep unfinished/missing/
+aborted producers, unavailable logs, partial artifacts, failed cases, contradictory attempts and
+missing adoption unverified/refused as appropriate. A failed producer with a faithful witness must
+retain its counterexample. Test identity/population drift and producer self-admission; preserve
+existing channel/CORE whole-workflow refusals and exact candidate/base conditional queue admission.
+A positive evidence result never overrides a failed required check or terminal workflow gate.
 
 Completion of this design means a reviewed binding/route plan and explicit decisions, not that
 any currently refusing public path has become usable. All positive implementation and host proof
