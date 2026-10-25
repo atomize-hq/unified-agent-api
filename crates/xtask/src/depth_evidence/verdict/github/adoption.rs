@@ -32,6 +32,7 @@ pub(super) fn resolve(
     let original = original_for(&source(root, &w.build.source_commit)?, p)?;
     let obligations = p.obligations(&original);
     let mut adopted = vec![];
+    let mut mappings = std::collections::BTreeMap::new();
     for (kind, values) in [
         (EndorsementKind::IssueComment, comments),
         (EndorsementKind::PrReview, reviews),
@@ -94,8 +95,16 @@ pub(super) fn resolve(
                 {
                     continue;
                 }
-                for obligation in &obligations {
-                    let mapping = mapping_for(root, w, &entry.reviewer_identity, p, obligation)?;
+                if !mappings.contains_key(&entry.reviewer_identity) {
+                    let bound = obligations
+                        .iter()
+                        .map(|obligation| {
+                            mapping_for(root, w, &entry.reviewer_identity, p, obligation)
+                        })
+                        .collect::<Result<Vec<_>, String>>()?;
+                    mappings.insert(entry.reviewer_identity.clone(), bound);
+                }
+                for mapping in &mappings[&entry.reviewer_identity] {
                     if mapping.sha256()? != entry.mapping_sha256 {
                         continue;
                     }
@@ -110,7 +119,7 @@ pub(super) fn resolve(
                         mapping_sha256: entry.mapping_sha256.clone(),
                     };
                     adopted.push((
-                        mapping,
+                        mapping.clone(),
                         Adoption {
                             endorsement,
                             reviewer: entry.reviewer_identity.clone(),

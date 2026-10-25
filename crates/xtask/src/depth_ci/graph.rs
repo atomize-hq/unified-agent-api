@@ -291,3 +291,19 @@ pub(super) fn selected(mut metadata: Value, tree: &str) -> Result<Value, String>
     }
     Ok(metadata)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn selected_tree_excludes_unrelated_workspace_feature_dependencies() {
+        let metadata = serde_json::json!({"packages":[{"id":"root","name":"root","version":"1.0.0"},{"id":"dep","name":"dep","version":"1.0.0"},{"id":"other","name":"other","version":"1.0.0"}],"resolve":{"nodes":[{"id":"root","dependencies":["dep","other"]},{"id":"dep","dependencies":[]},{"id":"other","dependencies":[]}]}});
+        let narrowed = selected(metadata.clone(), "root v1.0.0 (/source)\ndep v1.0.0\n").unwrap();
+        assert_eq!(narrowed["packages"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            narrowed["resolve"]["nodes"][0]["dependencies"],
+            serde_json::json!(["dep"])
+        );
+        assert!(selected(metadata, "root v1.0.0\nunknown v1.0.0").is_err());
+    }
+}
