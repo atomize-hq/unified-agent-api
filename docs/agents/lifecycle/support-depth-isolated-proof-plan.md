@@ -113,8 +113,9 @@ and revisions as the proof runs, not fabricated runnable commands for today's re
 | 7 — final readback | Inspect actual queue commit/base/tree, post-push transition and all derived artifacts | Every record/entry/selection retained; exact owning authority and aggregate freshness; correct promoted pointers and marker retirement; production identities/settings unchanged |
 
 Branches/forks for negative cases start from the named checkpoint, so a rejection is compared with
-its own expected-before state. The main positive has no debt transition: use existing corroborated
-renewal/whole-row-retirement planner cases and a retained-debt negative fork to establish refusal.
+its own expected-before state. The main positive has no debt transition: reuse conditional
+renewal/whole-row-retirement planner tests, which retain unresolved corroboration requirements,
+and add a retained-debt negative fork to establish connected refusal.
 MA4's current refusal of retained debt inventory edits remains valid; a successful new debt writer
 is outside this proof unless separately designed. Debt cannot substitute for depth obligations.
 
