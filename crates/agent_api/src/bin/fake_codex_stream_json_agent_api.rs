@@ -1,7 +1,8 @@
 use std::{
     collections::BTreeMap,
     env, fs,
-    io::{self, Write},
+    io::{self, Read, Write},
+    net::TcpStream,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -114,6 +115,7 @@ fn main() -> io::Result<()> {
     //
     // Scenario is selected via `FAKE_CODEX_SCENARIO` (normative C2 values):
     // - live_two_events_long_delay
+    // - live_two_events_until_released
     // - emit_normalize_error_with_rawline_secret
     // - dump_env_then_exit
     //
@@ -173,7 +175,17 @@ fn main() -> io::Result<()> {
     }
 
     match scenario().as_str() {
-        "live_two_events_long_delay" => {
+        scenario @ ("live_two_events_long_delay" | "live_two_events_until_released") => {
+            let mut release = if scenario == "live_two_events_until_released" {
+                let address = env::var("CODEX_WRAPPER_TEST_RELEASE_ADDR")
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+                let stream = TcpStream::connect(address)?;
+                // A lost parent closes the socket; a stuck parent cannot leave an unbounded child.
+                stream.set_read_timeout(Some(Duration::from_secs(30)))?;
+                Some(stream)
+            } else {
+                None
+            };
             emit_jsonl(
                 &mut out,
                 r#"{"type":"thread.started","thread_id":"thread-1"}"#,
@@ -182,7 +194,11 @@ fn main() -> io::Result<()> {
                 &mut out,
                 r#"{"type":"turn.started","thread_id":"thread-1","turn_id":"turn-1"}"#,
             )?;
-            std::thread::sleep(Duration::from_millis(300));
+            if let Some(stream) = release.as_mut() {
+                stream.read_exact(&mut [0])?;
+            } else {
+                std::thread::sleep(Duration::from_millis(300));
+            }
         }
         "emit_normalize_error_with_rawline_secret" => {
             // 1) Parse error (invalid JSON) with secret in the raw line.

@@ -2,6 +2,8 @@
 
 use std::{
     collections::BTreeMap,
+    io::Write,
+    net::TcpListener,
     path::PathBuf,
     pin::Pin,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -68,12 +70,20 @@ fn unique_temp_path(stem: &str) -> PathBuf {
 
 #[tokio::test]
 async fn events_are_observable_before_process_exit() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind release listener");
+    listener.set_nonblocking(true).unwrap();
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some(fake_codex_binary()),
-        env: [(
-            "FAKE_CODEX_SCENARIO".to_string(),
-            "live_two_events_long_delay".to_string(),
-        )]
+        env: [
+            (
+                "FAKE_CODEX_SCENARIO".to_string(),
+                "live_two_events_until_released".to_string(),
+            ),
+            (
+                "CODEX_WRAPPER_TEST_RELEASE_ADDR".to_string(),
+                listener.local_addr().unwrap().to_string(),
+            ),
+        ]
         .into_iter()
         .collect(),
         ..Default::default()
@@ -104,6 +114,12 @@ async fn events_are_observable_before_process_exit() {
         "expected a live status event before process exit"
     );
 
+    // The fake connects before emitting: accept cannot depend on a scheduling window.
+    let (mut release, _) = listener.accept().expect("fake connected before its event");
+    drop(listener);
+    // Regress a slow consumer outlasting the old 300 ms exit timer. The fake now waits
+    // for our explicit release, so correctness no longer depends on either duration.
+    tokio::time::sleep(Duration::from_millis(400)).await;
     drop(events);
 
     assert!(
@@ -113,6 +129,8 @@ async fn events_are_observable_before_process_exit() {
         "expected completion to remain pending after observing the first event"
     );
 
+    release.write_all(b"R").expect("release fake process");
+    drop(release);
     let completion = tokio::time::timeout(COMPLETION_TIMEOUT, &mut completion)
         .await
         .expect("completion resolves")
