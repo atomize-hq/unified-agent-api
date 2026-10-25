@@ -912,278 +912,177 @@ remain separate work, and production depth remains disabled.
 
 ## Annex A: route inventory
 
-Source revision: `staging` at `f61534be`. The inventory is final for that revision and MUST be
-established again against the revision that carries enforcement, as
-[Route inventory](#route-inventory) requires. Branch protection is a repository setting and not
-part of that revision; it was read from the GitHub API on 2026-10-04. Paths are relative to the
-repository root; `xtask/` abbreviates `crates/xtask/src/` and `wf/` abbreviates
-`.github/workflows/`.
+Source revision: `staging` at `dd10558157583f1969b4ac0a412107ef617648e1`
+(PR #296, D7 plus the stream-parity synchronization repair). This inventory replaces the
+pre-enforcement snapshot at `f61534be` and its bounded updates. Paths below are repository-relative;
+`xtask/` abbreviates `crates/xtask/src/`, and `wf/` abbreviates `.github/workflows/`.
+It inventories present source behavior, not completion of the isolated maintenance-chain proof.
+The [phase E proof plan](../agents/lifecycle/support-depth-isolated-proof-plan.md) names the
+remaining evidence and proposed scope; its policy recommendations are not authorizations.
 
-MA2 and its relationship to IN1 below are updated for the acquisition destination guard against
-`staging` at `d03e6b6f` on 2026-10-21. This is a bounded update, not the full inventory
-re-establishment required before path enablement. Effective staging rules were also read again
-on that date: none were installed. No branch protection is installed by the destination guard.
+Host configuration was read without mutation on 2026-10-24 America/Indianapolis
+(`2026-10-25T03:04:34Z`): `scripts/check_staging_ruleset.py` reported `match`, ruleset
+`25609013`, desired SHA-256 `7dc816f61e8cd940def0922db09021b6a7da54b79266dc1e2cac757690de9d3d`.
+The active staging rules have no bypass actors or overlapping legacy protection, require a PR,
+MERGE-only native queue, strict status checks bound to GitHub Actions app `15368`, the terminal
+`Staging integration gate` and five direct checks. The terminal gate evaluates the existing
+17 jobs; legitimate skips are justified from candidate inputs. This is a time-bounded
+configuration observation, not a fresh credential-specific host-proof run. The versioned desired
+[ruleset](../agents/lifecycle/staging-integration-ruleset.json) and
+[runbook](../agents/lifecycle/staging-integration-enforcement.md) remain authoritative for comparison.
+PR #296's queue CI [40155444440](https://github.com/atomize-hq/unified-agent-api/actions/runs/40155444440)
+and post-merge depth validation
+[40156225694](https://github.com/atomize-hq/unified-agent-api/actions/runs/40156225694) passed.
 
-Committing acquisition MUST refuse delivery to `staging` or `main` before checkout or acquisition,
-regardless of depth enrollment. It accepts only a literal branch name or `refs/heads/<branch>`;
-both spellings MUST use the same canonical branch for checkout, packet re-freeze and push.
-The branch MUST already exist on the remote; a tag or commit MUST NOT substitute for it.
-Read-only acquisition retains its existing checkout-ref behavior and does not require the
-automation delivery token. Committing acquisition still requires that token. Missing or
-incoherent canonical outputs MUST fail before checkout, including before delivery credentials
-are provided to the union checkout. Preparation branches reach staging through a PR; acquisition
-does not create one or establish integration admission.
+Three distinctions apply throughout this inventory:
 
-CI candidate validation is updated against `staging` at `c27ac7a6` on 2026-10-21. This remains
-a bounded inventory update; it does not install GitHub protection or establish route authority.
-For a staging PR, CI MUST validate the checked two-parent merge against the event's base and
-head commits. For a staging merge group, CI MUST validate the checked group SHA and the supplied
-`base_sha`, fetch that base explicitly and establish its ancestry. All three manifest validators
-MUST use that exact base with `--tip`; missing or contradictory inputs MUST fail rather than
-select one-tree validation. Queue validation covers the whole supplied group and MUST NOT infer
-its membership or parent layout. Non-staging events retain one-tree manifest validation.
-
-The terminal `Staging integration gate` MUST evaluate all 17 existing CI job results, without
-rerunning them. Failure, cancellation, missing/unknown results and unexpected skips MUST fail.
-It permits a readiness skip only when VERSION is unchanged from the integration base to the
-candidate; a minimum-supported smoke skip only when valid candidate min/latest pointers match;
-and a Claude smoke skip only when the valid candidate latest pointer is `none`. Candidate inputs
-MUST be read independently and match the version/pointer job outputs. Both staging PR and group
-version/CHANGELOG comparisons use the same base-to-candidate range, including when the base and
-head independently contain an identical version bump. The existing main/release comparisons
-remain unchanged. Other events use the distinct `CI summary (non-staging)` context.
-
-The gate records the checked candidate/base/tree, event, run identity, dependency results and
-justified skips. A CheckRun's associated SHA is not evidence of the executed checkout's identity.
-These checks provide structural evidence for a candidate. Required checks, queue serialization,
-effective host enforcement, exact final-tip/result correspondence and production enablement
-still require the separately reviewed installation and host-proof work.
-
-The desired staging host policy is versioned in
-[`staging-integration-ruleset.json`](../agents/lifecycle/staging-integration-ruleset.json), with a
-[maintainer runbook](../agents/lifecycle/staging-integration-enforcement.md) and a read-only
-configuration comparison. A match MUST require complete policy readback, including bypass scope,
-inherited effective rules and legacy protection. Missing installation, policy differences and
-unavailable/unsupported readback MUST NOT be reported as a match. These artifacts do not install
-host settings or establish the required isolated-host proof, route authority or depth enablement.
-
-No route establishes full depth admission today. MA2 has behavioral destination-refusal tests;
-full route-admission conformance remains unproved. Every
-"Required" cell below is enforcement and test work under [Path enablement](#path-enablement)
-item 4. Until that work lands for a route, the route's required behavior is to refuse every
-depth-gated effect.
-
-The preparatory C1 request-binding increment adds the optional typed table and a private shared
-binding validator (`xtask/agent_maintenance/request/depth.rs`) plus internal rendering
-(`xtask/agent_maintenance/prepare/render.rs`). Isolated tests cover table presence/form and
-Event/P/O matching under both audit policies. Exported loaders retain the normal registry refusal;
-MA1 renders no production depth table or record, and no route gains write or acceptance authority.
-This changes request plumbing, not the output writers/serialization domains inventoried below.
-
-The preparatory C2 increment connects that plumbing to the shared freeze planner through the
-private `prepare/depth.rs` core. `prepare/guard.rs` binds the workspace, inputs/index membership
-and expected-before outputs and independently rebuilds the proposal at apply. Public builder and
-apply both retain the registry refusal and reject retained depth scope. Isolated fixtures cover all
-three adopted roots, stale/modified plans, preserved generations/work/entries, coherent publication
-and refusal of new acceptance effects even with old entries and across aggregate agents.
-
-Publication preview reuses `support_matrix`'s loaded-root derivation and renderers; the bounded
-proposed-bytes adapter reuses `depth_acceptance`'s existing check-9 detectors. C additionally
-refuses new execution/debt-dependent positive publication facts, including verified results whose
-promises remain unqualified, and refuses P-only replacements that cannot retain prior due targets.
-Input identities use raw bytes and bind directory-prefix index membership. No candidate files
-are written to obtain a preview. `workspace_mutation` rollback preserves observed external edits
-and reports conflicts; it remains best-effort repair, with races/crash limits. These changes prove
-bounded MA1 preparation behavior, not the complete route inventory, actor admission, integration
-serialization predicate or enablement. D/E proof remains due.
-
-The bounded C3 increment updates MA1/MA2 transport against the C2 staging baseline `68a4c0e7`.
-`manifest_acquisition/plan.rs` supplies exact generator-owned input/output lists;
-`prepare/report.rs` emits planned paths/hashes after successful guarded apply. Initial packet
-creation requires `AUTOMATION_TOKEN` and uses the computed preparation output set. In
-`wf/parity-acquire.yml`, `Stage exact acquisition inputs before freeze` precedes re-freeze;
-publication follows it and `Stage the complete checked delivery` precedes audit. The shared
-`scripts/maintenance_transport.py` stages literal files, rejects pre-existing/unmerged index work,
-checks bytes before commit, and copies the same checked set for the diagnostic bundle. All three
-publication outputs, including the runtime projection, are delivered together.
-
-Real-Git transport tests and executable workflow-shell fixtures cover unrelated staged/untracked
-work, extra report evidence, partial/symlinked inputs, stage-before-freeze ordering, failed
-preparation, token/stand-down refusal, missing runtime projection, changed checked bytes and a
-rejected push without retry. Shell fixtures stub the external freeze command; C2's isolated core
-suites separately prove freeze semantics. This is bounded transport conformance, not full Annex A
-re-establishment, actor admission or serialization proof. Exported production depth refusal remains.
+- **Public refusal:** `AgentRegistry::parse` rejects every declared `support_depth` table.
+  Additional retained-record guards prevent omission of the declaration from bypassing unsupported
+  writers. A refused route has no positive production-depth claim.
+- **Owning core:** preparation, relay, closeout and promotion have bounded private/admitted paths
+  with independent checks. Their positive fixed-producer fixtures prove composition, not a public
+  CLI path with authenticated adequate evidence.
+- **Final integration:** D7 re-establishes admission against the exact candidate and parent before
+  the native queue's conditional ref update. A local plan, caller name, matching digest or existing
+  entry is not an integration receipt. `production_results` currently returns no verified results;
+  the installed authenticated CI profile proves isolated V1 only. Thus no production promise or
+  full acceptance-chain success follows from the installed guards.
 
 ### A.1 Routes
 
-Each route is listed once, from its entrypoint forward. "Path" is the lifecycle path whose
-authority the route can hold. A neutral route holds none. When a path route calls it, that
-route's authority and depth admission cover the call. Run on its own, a neutral route MUST refuse
-an acceptance effect.
+Existing route IDs are preserved; NE8 and LW1 make the generated advertising writer and lower
+storage boundaries explicit. "Branch" means candidate preparation followed by IN1. A neutral
+route has no lifecycle acceptance authority. Source references name the entry and owning boundary;
+A.4 distinguishes existing tests from proof still required.
 
-| Id | Route | Entrypoint and callers | Path | Depth-gated outputs it can change | Reaches the integration branch by |
-| --- | --- | --- | --- | --- | --- |
-| MA1 | `prepare-agent-maintenance` | `wf/agent-maintenance-open-pr.yml` (`Prepare maintenance packet`, `Stage the computed packet delivery`, `Create PR`), dispatched nightly by `wf/agent-maintenance-release-watch.yml` or by a maintainer; a maintainer directly | Maintenance | The exact computed preparation outputs: request/packet and, in the private depth core, record plus complete publication (`xtask/agent_maintenance/prepare.rs`, `prepare/report.rs`). The open-PR workflow resets the packet branch to `staging` plus those computed outputs, which discards earlier MA2, MA3, MA4 and MA5 commits on it | Packet branch, then IN1 |
-| MA2 | Acquisition | `wf/parity-acquire.yml`, called from the open-PR workflow or dispatched; first step `Admit the acquisition destination` | Maintenance | Version metadata with `--status reported`, which overwrites any earlier status; support publication JSON and Markdown; the request's second freeze when the canonical branch is this version's packet branch (`Re-freeze the maintenance request against the acquired artifacts`). It delivers the runtime-support projection with both support publications through the exact checked delivery set | Preparation branch, then PR through IN1. Committing runs use canonical `HEAD:refs/heads/<branch>` and refuse `staging`/`main` before checkout; default `ref=staging` is read-only unless another destination is supplied. No rebase/retry on rejected delivery |
-| MA3 | `refresh-agent --write` | A maintainer. No workflow runs it | Maintenance | Support publication, runtime-support projection, capability publication (`xtask/agent_maintenance/refresh.rs:137-228`) | Packet branch, then IN1 |
-| MA4 | `execute-agent-maintenance --write` | A maintainer or contributor | Maintenance | Every depth-gated output in its frozen write envelope (`xtask/agent_maintenance/contract_policy.rs:363-386`): `reports/<version>/`, where the depth record lives; the version file; support publication; the runtime-support projection; `crates/agent_api/**`, which carries capability advertising; and the maintenance root, which holds the request and the stand-down markers. D4 checks reporting-only effects across retained tuples and all agents before delivery, refusing closeout/acceptance effects and request/marker changes (`xtask/agent_maintenance/execute/{guarded,candidate}.rs`, `xtask/depth_acceptance/relay.rs`). Execution uses independent candidate files/Git metadata; the candidate is not an OS sandbox | Packet branch, then IN1 |
-| MA5 | `close-agent-maintenance`, `prepare-agent-closeout` | A maintainer. No workflow calls either | Maintenance | Maintenance closeout; lifecycle record (`maintenance_closeout_written`, cleared drift) (`xtask/agent_maintenance/closeout/write.rs:41-115`, `xtask/agent_maintenance/prepare_closeout.rs:272-290`) | Packet branch, then IN1 |
-| MA6 | Promotion | `wf/parity-promote.yml` invokes `xtask manifest-promote`, dispatched by a maintainer | Maintenance | One checked proposal for root/per-target pointers, current union, validated metadata, marker retirement, record entry and complete support/runtime/capability publication (D6 bounded implementation below) | Promotion PR against `staging` (`:367-376`), then IN1 |
-| ON1 | `onboard-agent --write` | A maintainer | Onboarding | Scaffolds the manifest root with a `current.json` and placeholder directories (`xtask/onboard_agent/preview.rs:282-320`); creates the lifecycle record at `enrolled` (`xtask/onboard_agent.rs:346`) | Branch, then IN1 |
-| ON2 | `runtime-follow-on`, `repair-runtime-evidence` | A maintainer | Onboarding | Lifecycle record, stages before `published` only (`xtask/runtime_follow_on/lifecycle.rs:133,176`; `xtask/repair_runtime_evidence.rs:380`) | Branch, then IN1 |
-| ON3 | `prepare-publication` | A maintainer | Onboarding | Lifecycle record to `publication_ready`, with the publication packet it will report (`xtask/prepare_publication.rs:431`) | Branch, then IN1 |
-| ON4 | `refresh-publication` | A maintainer | Onboarding | Support publication, runtime-support projection, capability publication; lifecycle record to `published` (`xtask/publication_refresh.rs:187-280,433-472`) | Branch, then IN1 |
-| ON5 | `close-proving-run`, `prepare-proving-run-closeout` | A maintainer | Onboarding | Proving-run closeout (`xtask/close_proving_run.rs:121-123`, `xtask/prepare_proving_run_closeout.rs:132-147`); lifecycle record to `closed_baseline`, cleared drift (`xtask/close_proving_run.rs:410-478`) | Branch, then IN1 |
-| NE1 | `support-matrix` | MA2, MA4, MA6, a maintainer | Neutral | Support publication JSON and Markdown and the runtime-support projection, for every agent (`xtask/support_matrix/publication.rs:92`) | Its caller |
-| NE2 | `capability-matrix` | A maintainer | Neutral | Capability publication, for every agent (`xtask/capability_matrix.rs:29`) | Its caller |
-| NE3 | `manifest-version-metadata`, `codex-version-metadata` | MA2, MA4, MA6, a maintainer | Neutral | One version file; the status and the passed targets are caller-supplied arguments (`xtask/manifest_version_metadata.rs:184,302`) | Its caller |
-| NE4 | `manifest-validate` and `codex-validate` in fix mode | A maintainer. CI runs check mode only | Neutral | Creates missing per-target pointers as `none`; rewrites `current.json` from the union that `latest_validated.txt` names (`xtask/manifest_validate/fix_mode.rs:5-46`) | Its caller |
-| NE5 | `manifest-retain`, `codex-retain` | A maintainer. No workflow calls either | Neutral | Removes `reports/<version>/` for versions outside the keep set, the depth record with it (`xtask/manifest_retain.rs:97-126`) | Its caller |
-| NE6 | Snapshot commands in legacy output mode | A maintainer | Neutral | `current.json` when the output directory is a manifest root (`xtask/codex_snapshot/layout.rs:38` and its two siblings) | Its caller |
-| NE7 | `historical-lifecycle-backfill` | A maintainer | Neutral | For several agents already at `closed_baseline`: the publication packet, the proving-run closeout, and the lifecycle record's evidence and references (`xtask/historical_lifecycle_backfill.rs:153-215`) | Its caller |
-| IN1 | Ref update of the integration branch | A pull request merge, or another writer's direct push; MA2 refuses direct staging delivery | Whatever the change carries | Every depth-gated output | The ref update itself |
-| HE1 | Hand edit or unsupported tooling | Anyone with write access to a branch | None | Every depth-gated output | IN1 |
+| Id | Entrypoint / callers | Outputs and scope | Present depth behavior / owning source | Integration |
+| --- | --- | --- | --- | --- |
+| MA1 | `prepare-agent-maintenance`; open-PR workflow, maintainer; nightly release-watch dispatch | Request/packet; private core freezes P, then O where acquisition exists, record and coherent aggregate publication | Public builder/apply refuse declarations and retained depth; private `prepare/{depth,guard}.rs` preserves selection/entries/due work, refuses acceptance, binds/rebuilds before apply. `prepare.rs`, `prepare/report.rs`; exact workflow delivery via `scripts/maintenance_transport.py` | Branch |
+| MA2 | `parity-acquire.yml`, reusable or dispatch | Acquisition inputs, reported metadata, packet re-freeze, complete support JSON/Markdown/runtime projection; aggregate effects | Committing destination refuses `staging`/`main` before checkout; requires `AUTOMATION_TOKEN`; stages acquisition before re-freeze and exact delivery before audit; rejected push is not rebased/retried. Depth preparation and neutral writers still refuse public depth scope; shell transport is not depth authority | Preparation branch, PR then IN1 |
+| MA3 | `refresh-agent --write` | Packet docs and requested support/runtime/capability projections, aggregate scope | `refresh.rs::apply_refresh_plan` and neutral batch boundary refuse depth workspace; no admitted positive depth refresh path | Branch |
+| MA4 | `execute-agent-maintenance --write`; executor may invoke generators | Frozen write envelope: wrapper/adapter code, version reports/metadata, publication, request/marker directories and debt inventory | `execute/{guarded,candidate,delivery_index,tree}.rs` captures independent candidate/Git state, finalizes after all execution outcomes and delivers only checked reporting changes. `depth_acceptance/relay.rs` preserves Event/P/O/entries, refuses acceptance, request/marker edits, changed frozen inputs and uncorroborated debt edits. Candidate is not an OS sandbox | Branch |
+| MA5 | `close-agent-maintenance`, `prepare-agent-closeout`, exported lower closeout planner/writer | Closeout and docs; first command may update lifecycle evidence/drift; owning admission adds exact entry | `closeout/write.rs::CloseoutPlan`, `prepare_closeout.rs::write_and_verify` use `closeout_proposal::Proposal` at apply. Shared `depth_acceptance/manual.rs` requires current request path/bytes, exact generation marker on integration parent, current P/O/E, evaluated evidence and debt. Public loading/evidence still prevent production depth success | Branch |
+| MA6 | `manifest-promote`; `parity-promote.yml` | Root/per-target pointers, `current.json`, validated metadata, marker retirement, own entry and aggregate support/runtime/capability outputs | `manifest_promotion::{build_plan,PromotionPlan::apply}` checks clean exact validation revision and pinned integration tip, renders one proposal, re-admits at apply. `depth_acceptance/promotion.rs` requires maintenance authority, admitted retained closeout, current evidence/debt and its own target entry. Workflow no longer carries pointer/marker policy in shell | Promotion PR, IN1 |
+| ON1 | `onboard-agent --write` | Manifest scaffold/current and lifecycle state | `onboard_agent.rs` refuses depth workspace before writes; LW1 also guards lower delivery. No depth enrollment/acceptance path | Branch |
+| ON2 | `runtime-follow-on`, `repair-runtime-evidence` | Runtime implementation/evidence and pre-publication lifecycle; executor can affect indirect inputs | Both public write entries refuse depth workspace; lifecycle lower writer also refuses. No onboarding depth freeze/writer is installed | Branch |
+| ON3 | `prepare-publication` | Publication packet, lifecycle `publication_ready` | Entry and lower packet/lifecycle writers refuse depth workspace; no acceptance authority for maintenance scope | Branch |
+| ON4 | `refresh-publication` | Aggregate support/runtime/capability outputs; lifecycle `published` | `publication_refresh.rs` and neutral/lower writers refuse depth workspace before effects. No onboarding depth publication path | Branch |
+| ON5 | `close-proving-run`, `prepare-proving-run-closeout` | Proving closeout; lifecycle `closed_baseline`, evidence lists/drift | Both entries refuse depth workspace; lower lifecycle/batch writers also refuse. D7 rejects unsupported onboarding acceptance effects, including incorrectly attributed drift clearance | Branch |
+| NE1 | `support-matrix` write; maintenance/publication callers | Complete support bundle across agents | `support_matrix/publication.rs::write_publication_artifacts` refuses depth workspace. Pure generation/rendering is not delivery authority; owning proposals use renderers then admit aggregate effects | Caller / IN1 |
+| NE2 | `capability-matrix` write | Aggregate capability publication | `capability_matrix.rs` refuses depth workspace; added advertising is also detected at final integration, regardless of how code was edited | Caller / IN1 |
+| NE3 | `manifest-version-metadata`, historical alias `codex-version-metadata` | One version's status and target outcomes | `manifest_version_metadata.rs::run_with_default_root` refuses depth manifest; internal read-only planner is used by owning promotion. Caller `--status` is not authority | Caller / IN1 |
+| NE4 | Manifest validator fix modes and aliases | Pointer formatting/missing `none` pointers; `current.json` | `manifest_validate/fix_mode.rs` refuses depth manifest before writes. Check mode is read-only; `--tip` additionally invokes repository-wide IN1 admission | Caller / IN1 |
+| NE5 | Retention commands and aliases, write mode | Removes snapshot/report directories, potentially retained records | `manifest_retain.rs` refuses depth manifest before pruning. It has no authority to remove a depth record | Caller / IN1 |
+| NE6 | Codex/Claude/OpenCode snapshot legacy `--out-dir` | `current.json` when directory is a manifest root | All three snapshot entries use `depth_routes::refuse_destination` before legacy output; arbitrary unsupported edits still meet IN1. Versioned snapshot output is an acquisition input, not a depth acceptance output | Caller / IN1 |
+| NE7 | `historical-lifecycle-backfill` | Packet/proving-closeout/lifecycle for several agents | Entry refuses depth workspace; lower writers refuse as well. Historical status grants no authority over a retained depth generation | Caller / IN1 |
+| NE8 | `runtime-advertising-model` write | `crates/agent_api/src/runtime_advertising/data.rs`, indirect capability advertising | `runtime_advertising/mod.rs::run` refuses depth workspace on write; check mode is non-mutating. D7 compares actual runtime advertising on any candidate | Caller / IN1 |
+| LW1 | Public `workspace_mutation::apply_mutations`; lifecycle/packet storage helpers, every caller | Proposed outputs across all scopes, lifecycle and publication packets | `workspace_mutation/delivery.rs`, `agent_lifecycle/storage.rs` refuse declared/retained depth and proposed record/enrollment destinations. Crate-private `apply_admitted_mutations` is reachable from MA1/MA4/MA5/MA6 only after owning checks; it grants no authority by itself | Caller / IN1 |
+| IN1 | Integration ref update, including all branch writers | Every depth-gated output and dependency; every registered retained root | Required checks and native queue validate exact merge result/base; `manifest_validate/depth/merge.rs` calls `depth_acceptance/integration.rs` before requested-root narrowing. Shared generation/closeout/promotion/current-qualification checks; native tip-conditional MERGE ref update | `staging` itself |
+| HE1 | Hand edit, external tool, unsupported output-path use | Any output or invalidating dependency | No caller authority. Candidate is judged from its values by IN1; forbidden entries, lost records, stale qualification and wrong lifecycle effects refuse | IN1 |
 
-IN1 and HE1 can change every output and are not repeated in each row of A.2. Every other route
-changes a branch, and its writes reach the integration branch only through IN1. Under
-[Final depth admission](#final-depth-admission) those writes prepare a candidate and the gated
-sequence is IN1's integration step. MA2 only prepares a candidate and refuses direct integration
-delivery; this does not prevent another writer from reaching IN1 without the future host rules.
-
-The publication packet is not a depth-gated output. It is listed because the lifecycle record's
-`published` stage reports it.
+The request nesting environment flag is an ergonomic refusal, not a security boundary.
+MA4's host guard applies independently of what the executor invokes. Other branch-local tools
+and restorations prepare candidates; none may present an earlier check as final integration
+admission. Public depth refusal is intentionally broader than the minimal touched tuple.
 
 ### A.2 Outputs
 
-Each depth-gated output is listed with every route that can change it, from the output backward.
-An acceptance effect is admitted only under the lifecycle path that owns the tuple's depth
-enrollment. A route that holds another path's authority refuses it, as
-[Complete mediation](#complete-mediation) rule 4 requires. MA4 makes reporting effects only:
-[Debt operations](#debt-operations) says execution never closes or promotes its own work.
+The backward view below reconciles the forward routes. IN1 and HE1 reach every row.
+An executor can attempt out-of-envelope writes too; MA4 observes/refuses those attempts rather
+than gaining authority over additional outputs. LW1 is a
+lower delivery boundary for proposed batches/lifecycle files, not an extra lifecycle owner.
+Statements about owning positive behavior refer to the bounded cores, subject to A.1's refusal
+and evidence limits; they do not assert public production enablement.
 
-| Depth-gated output | Routes | Scope a route's change can reach | Present gate | Required |
-| --- | --- | --- | --- | --- |
-| Depth records | None writes one. MA4 can write its directory. NE5 removes it | One version of one agent | None | The record is written at the P freeze (MA1; ON2's dry run on the onboarding path). It is extended at O's freeze (MA1 where reports exist at open, otherwise MA2; ON2's dry run on the onboarding path), as E changes (MA4, ON2) and with an acceptance entry (MA5, MA6, ON4, ON5). MA4 MUST NOT list an acceptance entry. NE5 MUST leave a depth record in place |
-| Support publication rows and Markdown | NE1 through MA2, MA4 and MA6; MA3; ON4 | Aggregate: every agent's rows are regenerated, whichever agent triggered the route, including rows that change because a pointer moved | `make preflight` runs `support-matrix --check` on pull requests (`wf/ci.yml:190-201`, `Makefile:219`), which proves freshness against committed evidence and nothing about depth | Admission for every tuple whose row changes, not only the requesting agent's. Publishing a promise as qualified or a capability as depth-qualified is an acceptance effect; every other row change is a reporting effect |
-| Capability publication | NE2; MA3; ON4; MA4 and any merge of adapter code that changes advertising | Aggregate, every agent | `capability-matrix --check` and the audit in `make preflight` | As above. Added advertising is an acceptance effect. The capability matrix publishes no depth fact |
-| Version metadata | NE3 through MA2 (`reported`) and MA6 (`validated`); MA4 can pass it any status | One version file | The command's own gates (`xtask/manifest_version_metadata.rs:345-421`) and `manifest-validate` in CI. None concerns depth, and the status is whatever the caller passes | `validated`, `supported` and passed per-target outcomes are acceptance effects. `reported` and `snapshotted` are reporting effects. MA2 overwrites a `validated` status with `reported` today; whether it may is for the maintenance lifecycle rules, which this contract leaves unchanged |
-| `current.json` | MA6 (shell); NE4; NE6; ON1 at scaffold | One manifest root | `manifest-validate` in CI for three roots | A change to whether it lists a tuple's target is a reporting effect. NE4 and NE6 run on their own establish admission for it or refuse |
-| Pointers | MA6 (shell); NE4 (creates `none`, normalizes formatting) | One root, per target. A promotion moves the pointers off the version they named | `manifest-validate` checks pointer shape and consistency | Setting or advancing a pointer to a depth-enrolled version is an acceptance effect. Moving it off one, to a later or an earlier version, is a reporting effect for the version it leaves |
-| Embedded runtime-support projection | NE1 through MA2, MA4 and MA6; MA3; ON4. MA2 regenerates it and does not commit it | Aggregate, every agent and target | `support-matrix --check` | Setting or advancing it to a depth-enrolled version is an acceptance effect, admitted with the pointer change that causes it |
-| Stand-down markers | Removal by MA6 (shell) and within MA4's envelope. Declared and changed by whoever works the packet, in a change to the integration branch that the packet branch does not carry, as the maintenance request contract's packet freeze rule 5 states | One version of one agent | None beyond the merge of the promotion PR. `maintenance-stand-down-check` validates every marker it reads and reports, without deciding on it, whether a marker names the request in the tree (`xtask/agent_maintenance/stand_down.rs:227-233,443-481`) | Removal is an acceptance effect. A marker on the integration branch is a packet freeze. It commits nothing, and the closeout of a depth-enrolled generation requires one that names the generation, as the maintenance request contract's packet freeze states. The changes of an MA4 run MUST NOT add, change or remove one, as that contract's relay execution rule 3 states them |
-| Maintenance request | MA1; MA2 at the second freeze; MA4's envelope | One agent. The file is replaced when a later version's generation opens | The request contract's own validation | Reporting effect. Replacing it displaces the earlier version's tuples, which then resolve from their depth record. MA4 MUST NOT change it |
-| Maintenance closeout | MA5 | One agent, one file replaced across versions | `close-agent-maintenance`: the stand-down check and the commit binding (`xtask/agent_maintenance/closeout.rs:55-66`). `prepare-agent-closeout`: the commit binding only | Acceptance effect, with an acceptance entry listed in the same change. For a depth-enrolled generation, only under a packet freeze that names it |
-| Proving-run closeout | ON5; NE7 | One agent | The approval and lifecycle continuity checks in ON5 | Recording `closed` is an acceptance effect, with an entry in the same change. NE7 refuses for an agent that has a depth record |
-| Lifecycle record | ON1, ON2, ON3 (stages before `published`); ON4 (`published`); ON5 (`closed_baseline`, cleared drift); NE7 (evidence and references); MA5 (`maintenance_closeout_written`, cleared drift) | One agent. It names no version | Stage and evidence validation when the record is loaded (`xtask/agent_lifecycle.rs:354-487`) | `published`, `closed_baseline`, the two closeout evidence ids and a cleared drift state are acceptance effects, attributed through the packet or closeout they report. A cleared drift state reports the maintenance closeout. ON5 clears it and resets the evidence lists, which drops `maintenance_closeout_written` (`xtask/close_proving_run.rs:460-469`); where the maintenance closeout that stands belongs to a depth-enrolled generation, that acts on another path's tuple and ON5 refuses or leaves both in place. Earlier stages are not depth-gated |
-
-No onboarding route writes pointers or version status today: `runtime-follow-on` rejects a run that
-changed either (`xtask/runtime_follow_on/codex_exec.rs:159-163`,
-`xtask/runtime_follow_on.rs:455-482`), by a check after an unsandboxed run, as for MA4. A tuple
-whose depth enrollment the onboarding path owns therefore has no admitting route for either output,
-and MA6 refuses for it. The [onboarding charter](cli-agent-onboarding-charter.md#support-depth)
-adds none: those effects become available when the version's declaration is moved to the
-maintenance path and a maintenance generation of the version reaches promotion.
-
-### A.3 Serialization domains
-
-No cross-process lock exists. Every xtask route writes a working tree. Several write through
-`workspace_mutation::apply_mutations` (`xtask/workspace_mutation.rs:246`), which refuses when a
-file differs from the state the plan expected (`:269-274,415-457`) and rolls the files it already
-applied back in the same process on error (`:285-337,504-559`). It holds nothing between
-processes. Its compare-before-write is a per-writer compare-and-refuse for one working tree and
-is not serialization against another branch.
-
-| Domain | Members | Present serialization | Required |
-| --- | --- | --- | --- |
-| The integration branch | IN1, and through it every other route; MA2 now refuses direct integration delivery | None. `staging` has no branch protection and no ruleset: no required status check, no required pull request and no requirement that a branch be up to date. Only `main` is protected, and its one required check is the source-branch guard | The tip-conditional ref update that [Final depth admission](#final-depth-admission) requires, with depth admission established against the exact merge result, and repository validation of that result under [Complete mediation](#complete-mediation) rule 7. MA2 refuses instead of acting as that integration step |
-| One packet branch | MA1, MA2, MA3, MA4, MA5 for one agent and version | Partial. The open-PR workflow serializes its own runs per packet branch (`wf/agent-maintenance-open-pr.yml:69-71`), and acquisition has its own group (`wf/parity-acquire.yml:70-72`) and fails instead of rebasing when its push is rejected (`:897-920`). MA3, MA4 and MA5 are run by a maintainer with no serialization. The stand-down marker is what stops the workflow from resetting a branch a maintainer is working on (`wf/agent-maintenance-open-pr.yml:101-142,218-258`) | Sufficient for preparing a candidate. It is not depth admission |
-| Promotion of one version | MA6 | Workflow concurrency per agent and version (`wf/parity-promote.yml:50-52`) | Sufficient for preparing a candidate |
-| Aggregate publication | NE1, NE2, MA3, ON4 from different branches | None. Two branches that each regenerate the aggregate conflict textually at merge, or merge cleanly and leave an aggregate that matches neither tip's evidence | Covered by the integration branch domain: each merge result is re-checked against the tip it replaces |
-
-Restorations, each a depth-gated effect when it rewrites a depth-gated output:
-
-| Restoration | Output it rewrites | Source |
+| Output | Writers / indirect routes | Present check and remaining requirement |
 | --- | --- | --- |
-| `apply_mutations` rollback, reached from MA1, MA3, MA5, ON1, ON4 and ON5 | Whatever the plan had already written | `xtask/workspace_mutation.rs:285-337,504-559` |
-| `refresh-publication` restores its snapshots when its gate fails | Support and capability publication, the projection, the lifecycle record | `xtask/publication_refresh.rs:255-266,534-560` |
-| `prepare-publication` restores the lifecycle record | Lifecycle record | `xtask/prepare_publication.rs:437-444` |
-| `repair-runtime-evidence` restores the lifecycle record | Lifecycle record | `xtask/repair_runtime_evidence.rs:169-174,184-189` |
-| `prepare-agent-closeout` restores the earlier closeout when validation fails | Maintenance closeout | `xtask/agent_maintenance/prepare_closeout.rs:307-330` |
+| Depth records and entries | MA1 (P/O), MA2 via re-freeze, MA4 (reporting E), MA5/MA6 (own entry); LW1 and NE5 can otherwise target/remove them | Private freeze/relay/owning admission preserves prior records, entries, selection and due work; unsupported lower/pruning delivery refuses. IN1 checks new/changed generations, retained invariants and exact new entry authority for all roots. Public positive chain remains unproved |
+| Support publication JSON and Markdown | MA1 private bundle; MA2/MA4/MA6 via owning proposal/renderers; MA3, ON4, NE1, LW1 | Aggregate current derivation and actual-effect detection; neutral/public depth paths refuse. Existing qualification is re-evaluated even without record changes. Dependency invalidation may downgrade honestly to `unverified` |
+| Capability publication / advertising | MA3, ON4, NE2, NE8; MA4/MA6; any adapter/runtime code edit under HE1 | Neutral guards; real source/projection comparison and aggregate currentness at IN1. Added advertising needs its own admitted acceptance destination; generated freshness alone is insufficient |
+| Version metadata | MA2/MA4/MA6, NE3, LW1 | Neutral write refuses depth; owning promotion checks exact validated commit/targets. IN1 detects status and passed-target acceptance values, including hand edits |
+| `current.json` | MA6, NE4, NE6, ON1, LW1 | Guarded promotion or explicit unsupported refusal. Expected-target changes are checked independently of an unchanged pointer/projection |
+| Root and per-target pointers | MA6, NE4, LW1 | One admitted promotion proposal; fix mode refuses depth. Destination tuple receives acceptance; displaced tuple remains reporting and keeps its record/work |
+| Embedded runtime-support projection | MA1 private bundle; MA2/MA4/MA6; MA3, ON4, NE1, LW1 | Delivered with complete support bundle; aggregate derivation and IN1 check every touched tuple, not just the named agent |
+| Stand-down marker removal | MA6, MA4 envelope, LW1 | Guarded promotion retires its marker coherently; relay forbids marker changes. Parent marker is required for new closeout authority. Marker addition/change is not itself depth-gated, but cannot self-authorize a closeout on the candidate |
+| Maintenance request | MA1, MA2 re-freeze, MA4 envelope, LW1 | Shared Event/P/O binding and same-version/lifecycle freeze; private preparation preserves displaced records. Relay refuses request changes; IN1 validates reporting-only generation changes across roots |
+| Maintenance closeout | MA5; MA4 envelope/LW1 are potential unsupported writers | Both manual writers re-admit the exact proposal and add its entry in the same checked batch; relay refuses acceptance. Existing output/absence survives refusal; current production evidence cannot authorize a positive result |
+| Proving-run closeout | ON5, NE7, LW1 | Unsupported depth workspace refuses at entry/lower boundary; IN1 refuses unsupported onboarding acceptance. No maintenance authority is borrowed |
+| Lifecycle acceptance values | ON1–ON5, NE7, MA5, LW1; MA4 envelope can reach maintenance files | Public unsupported guards and value-derived attribution; MA5's owning batch may report its closeout in private proofs. Drift clearance requires candidate generation attribution even when the lifecycle file disappears |
 
-Each runs in one process on the working tree it started in. None checks that it still owns the
-files it restores, and `refresh-publication` holds its snapshot across a `make preflight` run. A
-maintainer's tree can be shared with another route, MA4's executor included. Required: a
-restoration follows [Final depth admission](#final-depth-admission), and one that would overwrite
-state the route no longer owns reports the conflict and stops.
+Input-only writers remain relevant without becoming new depth-gated outputs:
+`manifest-union`, `manifest-report`, versioned snapshots, wrapper-coverage generators, code/evidence
+edits and MA4 debt edits can invalidate O/E, due work or publication. Their normal output paths do
+not grant acceptance. Frozen acquisition changes require explicit re-freeze; retained qualification
+must be re-evaluated at IN1. Debt transition planning is read-only (`support_depth/debt.rs`);
+MA4 currently refuses debt inventory changes for retained depth rather than granting a renewal
+or retirement from executor assertions. Direct maintainer edits still meet IN1 and the current
+closeout/debt predicates. Reports and coverage files do not become authoritative depth evidence
+merely by being collected.
 
-### A.4 Reconciliation
+### A.3 Serialization domains and restoration
 
-The output view and the entrypoint view agree: every writer found from an output in A.2 is a
-route in A.1, and every route in A.1 other than IN1 and HE1 appears under each output it can
-change. Five writers were
-found from one direction only and are included above: the promotion workflow's shell copy of the
-union to `current.json`, fix mode's pointer creation, the snapshot commands' legacy mode, the
-executor's write envelope, and acquisition's former direct staging push (now refused).
+| Domain | Writers and restorations | Present ownership / limit |
+| --- | --- | --- |
+| Integration branch | IN1, through it all routes, aggregate regeneration and hand edits | Native queue validates exact candidate/base and conditionally updates the ref. Effective staging policy requires the queue and checks; D7 is the semantic backstop. Post-push `depth-tip.yml` detects the actual before/after transition, but cannot retroactively prevent a push |
+| Packet candidate | MA1/MA2 automation, maintainer MA3/MA5, MA4 executor/delivery | Workflow groups and fresh stand-down checks reduce collisions; they are not a cross-route lock. MA1 rebuilds bound proposal; MA4 runs against an independent candidate with Git/index/output observations; MA5 re-admits observed inputs. Expected-before delivery/rollback protects observed edits, not an atomic filesystem transaction |
+| Promotion candidate | MA6 and aggregate renderers | Exact HEAD/validation/integration revision, one proposal re-admitted at apply; source changes, marker/evidence/debt changes and moved integration tip refuse. Final authority still belongs to IN1 |
+| Aggregate publication | MA1/MA2/MA3/MA4/MA6, ON4, NE1/NE2/NE8, code editors | Candidate may touch other agents; all-root admission and aggregate derivation run again on the merge result. Branch-local textual conflict resolution is not evidence of admission |
 
-Entrypoints checked and found to produce no depth-gated effect in supported use:
-`manifest-union`, `manifest-report`, the wrapper-coverage generators, `manifest-acquisition-plan`,
-`maintenance-watch`, `maintenance-audit-status`, `maintenance-stand-down-check`,
-`check-agent-drift`, `scaffold-wrapper-crate`, `recommend-next-agent-research`,
-`capability-matrix-audit`, `agent-api-backend-type-leak-guard`, `version-bump`, and every
-`--check` or dry-run mode. Also checked: the Makefile and `scripts/`, which hold no writer of a
-depth-gated output; `wf/ci.yml`, the smoke workflows and the release-watch workflow, which write
-nothing to a branch; and the superseded-PR handling in the open-PR workflow, which closes pull
-requests only. Coverage reports and `wrapper_coverage.json` are not depth-gated outputs.
+`workspace_mutation` classifies expected-before files and restores only its observed owned writes;
+its rollback preserves intervening bytes/type/mode changes or reports a conflict. D4 rejects a
+failed executor candidate instead of copying unauthorized product changes back into the caller;
+diagnostics/recovery candidate remain attributable. D5 no longer writes a new closeout then
+restores an old artifact after validation: both manual paths use a prospective checked batch.
 
-The merge of `staging` into `main` and `wf/publish-crates.yml`, which publishes the embedded
-projection and capability advertising on a push to `main`, are outside this inventory: the
-integration branch is `staging`. The `main` ruleset exempts organization and repository
-administrators, so a push to `main` that did not pass `staging` is possible and is not governed
-by this contract.
+Unsupported onboarding publication/lifecycle restoration paths remain in
+`publication_refresh.rs`, `prepare_publication.rs` and `repair_runtime_evidence.rs`.
+They are reached only after the depth workspace refusal in supported use; no depth-safe
+serialization claim is made for those legacy restoration implementations. Removing their refusal
+would require fresh ownership/restoration proof. There is no cross-process lock or crash-atomic
+multi-file transaction. If a route performs a final gated sequence outside IN1, the existing
+[Final depth admission](#final-depth-admission) serialization requirement still applies; E1 changes
+none of those rules.
 
-Present behavior that the required behavior changes:
+### A.4 Reconciliation and conformance status
 
-1. **The integration step is ungated.** A direct push to `staging` reaches every depth-gated
-   output with no check at all, and a pull request can merge while its checks are failing or were
-   run against an older tip. Enabling any path requires a tip-conditional, check-enforced ref
-   update on the integration branch.
-2. **Acquisition's direct integration destination is now refused.** MA2 rejects committing runs
-   to `staging` and `main` before checkout, including fully qualified branch spellings. It still
-   regenerates aggregate publication on preparation branches; that preparation does not establish
-   depth admission. Other writers can still reach the unprotected integration step in item 1.
-3. **Pointers, `current.json` and stand-down markers are written by workflow shell.** No shared
-   command mediates them. [Complete mediation](#complete-mediation) requires every route to
-   establish depth admission before the effect, and [Publication](#publication) forbids workflow
-   YAML from carrying depth admission policy. The writes move behind a command that establishes
-   depth admission, or MA6 refuses for a depth-enrolled version.
-4. **The executor's envelope covers most depth-gated outputs.** MA4 runs unsandboxed, can call the
-   neutral generators, and is checked only after it has written.
-   [Debt operations](#debt-operations) says execution never closes or promotes its own work. The
-   [maintenance request contract](maintenance-request-contract-v1.md#relay-execution) requires the
-   relay to fail any run whose changes include an acceptance effect for a depth scope tuple, or a
-   depth-gated effect it cannot admit, whichever generation the run belongs to, and to restore what
-   the run changed. It treats a run whose changes add or change a stand-down marker for a
-   depth-enrolled version in the same way. For a depth-enrolled generation it also bars the run
-   from changing the request.
-5. **Aggregate generators rewrite every agent's rows.** MA2, MA3, MA4, MA6 and ON4 each
-   regenerate publication for all agents under one path's authority. Each must determine the
-   touched tuples from the values that change, as Complete mediation rule 1 requires.
-6. **`manifest-retain` deletes depth records.** It removes `reports/<version>/` wholesale.
-7. **Version status is a caller-supplied argument.** [Depth enrollment](#depth-enrollment) rule 7
-   excludes a caller-supplied argument as authority.
-8. **Manual closeout now validates before delivery (D5).** The maintenance writers and their
-   lower boundaries use a checked proposal and preserve a prior artifact, or absence, on refusal.
-   Their owning depth guard and same-batch entry behavior are described in the maintenance request
-   contract's [manual closeout implementation](maintenance-request-contract-v1.md#manual-closeout-implementation-d5).
-   Production depth loading still refuses; this is not full path enablement.
-9. **Two manifest roots have no validator spec.** `cli_manifests/aider` and
-   `cli_manifests/gemini_cli` hold none, and CI validates three roots. Neither may hold a depth
-   record until it has one that adopts Annex B.
-10. **D5 adds generation-specific manual closeout authority.** Its depth guard requires the marker
-    for the exact generation on the pinned integration tip. The automation stand-down predicate
-    still treats a version-level marker protectively when its generation binding differs.
-    Preparation and final integration retain their separate enforcement work; D5 does not enable
-    production depth or replace the independent integration check.
+The forward/backward scan included public dispatch in `xtask/main.rs`, write-side entrypoints,
+all callers of crate-private admitted delivery, public lower storage, `scripts/`, workflow shell,
+restorations and generated runtime advertising. NE8 and LW1 were previously implicit; promotion
+shell writes, unsafe legacy retention and the unprotected-staging description are replaced above
+by their current owning-command/refusal/host behavior.
+
+Existing source and conformance anchors (test names are searchable in the named files):
+
+| Routes / obligation | Existing evidence | What is still due |
+| --- | --- | --- |
+| MA1 P/O and transport, MA2 intake/delivery | `tests/agent_maintenance_prepare/depth_core.rs`: `private_preparation_plans_p_only_and_coherent_o_for_every_adopted_root`, stale-plan/refreeze/displacement cases; `tests/c4_spec_ci_wiring/{workflow_transport,acquisition_destination,acquisition_token,acquisition_refreeze}.rs`; `scripts/test_maintenance_transport.py` | Connected acquisition→freeze proof through actual supported isolated entrypoints, not shell stubs or a global parser bypass |
+| MA4 reporting/failure/restoration | `tests/agent_maintenance_execute/relay.rs`; `tests/c0_spec_validate/depth_records/acceptance/{relay,relay_boundary}.rs`; `depth_acceptance/relay.rs` | Connect executor-start capture to real evidence, audit and both final acceptance steps in the same isolated chain |
+| MA5 owning closeout | `depth_acceptance/manual/tests.rs` and `manual/tests/regressions.rs`: exact parent generation, missing due obligations, stale bindings, concurrent input/output and public lower-boundary refusals; ordinary `tests/agent_maintenance_closeout/` | Authenticated all-due positive closeout, both public manual entrypoints, preserving an older closeout on negative outcomes |
+| MA6 / LW1 | `depth_acceptance/manual/tests/promotions.rs`; `tests/depth_promotion.rs`: coherent ordinary promotion, stale plan, nested anchors, proposed depth record and lower packet/batch refusal | Genuine evidence-backed positive promotion after closeout/replaced working files and native queue delivery |
+| ON1–ON5, NE1–NE8, LW1 | Source guards in A.1; lower-route/nested/proposed-output cases in `tests/depth_promotion.rs`; ordinary entrypoint suites | A retained-depth refusal case at every actual unsupported public entrypoint/lower boundary, with no changed protected output; source inspection alone is not that execution proof |
+| Debt | `tests/support_depth_debt.rs`, `tests/support_depth/debt.rs`, audit reconciliation consumers | Corroborated renewal/whole-row retirement and refused widened/new debt in the connected chain; debt never waives depth |
+| Evidence | `tests/depth_evidence*.rs`, `tests/depth_ci_archive.rs`; authenticated isolated V1 profile in `depth_evidence/verdict/github/` | The installed isolated profile is fixed to canonical repository, `codex/0.0.0`, Linux `controlled_channel` V1. It cannot be pointed at a new repository or production generation by editing receipt fields. `depth_evidence/results.rs::production_results` returns empty verdicts. Real profile integration/all-due coverage remains work |
+| IN1 / HE1 | `depth_acceptance/manual/tests/integration.rs`: forged entries/request hash, other-root generation, unchanged qualification, moving parent, unsupported lifecycle and local/final agreement; `tests/c0_spec_validate/depth_records/merge*`; `tests/c4_spec_ci_wiring/{integration_gate,depth_merge}.rs`; `scripts/test_staging_{integration,ruleset}.py`; successful PR #296 queue/push checks | End-to-end depth-positive host run and forbidden-depth candidate refusal on an isolated protected integration branch. The ordinary production merge and earlier host refusal exercises do not prove that positive chain |
+| Rollback | `workspace_mutation/tests.rs`: intervening edit/symlink/mode/removal; relay delivery conflict tests | Connected failure checks must preserve concurrent caller state and fail without a final acceptance effect |
+
+Only `codex`, `claude_code` and `opencode` currently have Annex-B-adopting validator specs and
+the fixed per-root CI loop. `aider` and `gemini_cli` do not. D7's all-root admission is not a
+substitute for adding a root's canonical validator adoption and complete manifest validation
+before that root may hold a depth record. The isolated refusal matrix must include this boundary.
+
+No executable command for depth freeze/debt transition is implied by its pure planner API.
+`depth-ci-collect` writes only a non-authoritative `target/depth-ci` witness;
+`depth-ci-prove` is a read-only isolated preview. Diagnostic comparison/check modes do not grant
+write authority. Maintenance audit-status/watch/drift and their summary projections, acquisition
+plans, scaffold/research metadata and release docs are not depth-gated outputs in supported use.
+Caller-controlled paths do not create an exception to HE1/IN1. The `main` release/publish boundary
+remains outside this staging inventory and is not certified by this refresh.
+
+This is a source inventory plus existing evidence mapping, not a path-enablement certificate.
+The production refusal, empty production evidence bridge, missing connected positive/public-route
+proof and unsupported-route negative coverage above must be resolved or retained as explicit
+refusals before the relevant scope is enabled. No future profile may turn isolated `0.0.0`
+receipts, a test producer, an executor statement or a skipped obligation into production adequacy.
 
 ### A.5 Promotion after the working files were replaced
 
@@ -1231,7 +1130,7 @@ stated, and the serialization the digests in B.3 and B.5 are taken over. It is a
 revisions that [Path enablement](#path-enablement) item 1 requires.
 
 The validator specs of the `codex`, `claude_code` and `opencode` roots adopt this annex and state
-no check for a record. A manifest root MUST NOT hold a depth record until its validator spec
+the executable depth-record checks; `--tip` additionally establishes repository-wide admission. A manifest root MUST NOT hold a depth record until its validator spec
 states the checks that [Complete mediation](#complete-mediation) rule 7 requires.
 
 ### B.1 File and revision
