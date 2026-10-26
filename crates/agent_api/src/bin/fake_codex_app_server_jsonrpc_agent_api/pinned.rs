@@ -7,12 +7,22 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
     let mut out = io::stdout().lock();
     let mut page = 0;
     let mut approval = false;
+    #[cfg(unix)]
+    let mut exit_gate = None;
     for line in stdin.lock().lines() {
         let message: Value = serde_json::from_str(&line?)?;
         let method = message["method"].as_str().unwrap_or_default();
         let id = &message["id"];
         let params = &message["params"];
         maybe_log_request_method(method);
+        #[cfg(unix)]
+        if env::var("FAKE_CODEX_PAUSE_AT").ok().as_deref() == Some(method) {
+            let mut stream =
+                std::os::unix::net::UnixStream::connect(env::var("FAKE_CODEX_GATE").unwrap())?;
+            writeln!(stream, "stage {}", std::process::id())?;
+            exit_gate = Some(stream);
+            continue; // Keep reading stdin, deliberately leave this setup RPC unanswered.
+        }
         if method.is_empty() {
             assert!(approval, "unexpected response");
             assert_eq!(id, "approval-1");
@@ -156,6 +166,28 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
                     )?;
                     continue;
                 }
+                if scenario == "pinned_retry_secret" {
+                    notify(
+                        &mut out,
+                        "error",
+                        json!({"threadId":"forked-1","turnId":"turn-1","willRetry":true,"error":{"message":"CREDENTIAL-SECRET-RETRY","codexErrorInfo":null,"additionalDetails":"CREDENTIAL-SECRET-DETAIL"}}),
+                    )?;
+                }
+                if scenario.starts_with("pinned_terminal_") {
+                    let mut turn = json!({"status":"completed","items":[],"error":null});
+                    match scenario {
+                        "pinned_terminal_blank" => turn["id"] = json!(" "),
+                        "pinned_terminal_conflict" => turn["id"] = json!("other"),
+                        "pinned_terminal_absent" => {}
+                        _ => unreachable!(),
+                    }
+                    notify(
+                        &mut out,
+                        "turn/completed",
+                        json!({"threadId":"forked-1","turnId":"turn-1","turn":turn}),
+                    )?;
+                    continue;
+                }
                 if scenario == "pinned_block" {
                     continue;
                 }
@@ -212,6 +244,13 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
             _ => panic!("unsupported pinned method: {method}"),
         }
         out.flush()?;
+    }
+    #[cfg(unix)]
+    if let Some(mut stream) = exit_gate {
+        use std::io::Read;
+        writeln!(stream, "eof")?;
+        let mut release = [0];
+        stream.read_exact(&mut release)?;
     }
     if let Ok(path) = env::var("FAKE_CODEX_APP_SERVER_EXIT_MARKER") {
         std::fs::write(path, "reaped after EOF")?;

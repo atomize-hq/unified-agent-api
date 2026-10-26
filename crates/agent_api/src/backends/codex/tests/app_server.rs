@@ -55,7 +55,10 @@ fn app_server_error_maps_to_error_event_with_safe_message_and_no_data() {
     });
     let event = fork::map_app_server_notification("error", &params).expect("mapped");
     assert_eq!(event.kind, AgentWrapperEventKind::Error);
-    assert_eq!(event.message.as_deref(), Some("boom"));
+    assert_eq!(
+        event.message.as_deref(),
+        Some("codex app-server error (details redacted)")
+    );
     assert!(!event.message.as_deref().unwrap().contains(secret));
     assert_eq!(event.data, None);
 }

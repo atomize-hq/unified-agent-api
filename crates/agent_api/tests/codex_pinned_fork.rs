@@ -323,3 +323,35 @@ async fn pinned_wrapper_last_filter_covers_exec_sources() {
 async fn pinned_wrapper_server_approval_request_is_not_a_client_response() {
     wrapper_paths("pinned_fork_approval").await;
 }
+
+// DEF-03: retry semantics must survive without exposing backend diagnostics.
+#[tokio::test]
+async fn retrying_errors_do_not_leak_raw_diagnostics() {
+    let (events, completion) = exercise("pinned_retry_secret", false).await;
+    assert!(completion.unwrap().status.success());
+    assert!(!format!("{events:?}").contains("CREDENTIAL-SECRET"));
+    assert!(events
+        .iter()
+        .any(|event| event.kind == AgentWrapperEventKind::Status
+            && event.message.as_deref()
+                == Some("codex app-server retrying after error (details redacted)")));
+    assert!(!events
+        .iter()
+        .any(|event| event.kind == AgentWrapperEventKind::Error));
+    assert!(events
+        .iter()
+        .any(|event| event.text.as_deref() == Some("final output")));
+}
+
+// DEF-04 / AS-1: terminal identity belongs to turn.id, never an extra turnId field.
+#[tokio::test]
+async fn terminal_nested_identity_cannot_be_missing_blank_or_shadowed() {
+    for scenario in [
+        "pinned_terminal_absent",
+        "pinned_terminal_blank",
+        "pinned_terminal_conflict",
+    ] {
+        let (_, completion) = exercise(scenario, false).await;
+        assert!(completion.is_err(), "{scenario} supplied false success");
+    }
+}

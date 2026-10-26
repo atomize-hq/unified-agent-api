@@ -131,16 +131,16 @@ pub(in crate::backends::codex) fn map_app_server_notification(
             })
         }
         "error" => {
-            let message = params
-                .get("error")
-                .and_then(|err| err.get("message"))
-                .and_then(Value::as_str)
-                .or_else(|| params.get("message").and_then(Value::as_str))
-                .unwrap_or_default();
-            if message.trim().is_empty() {
-                return None;
+            // DEF-03: backend messages can contain credentials even when retrying.
+            if params.get("willRetry").and_then(Value::as_bool) == Some(true) {
+                Some(status_event(Some(
+                    "codex app-server retrying after error (details redacted)".into(),
+                )))
+            } else {
+                Some(error_event(
+                    "codex app-server error (details redacted)".into(),
+                ))
             }
-            Some(error_event(message.to_string()))
         }
         _ => None,
     }

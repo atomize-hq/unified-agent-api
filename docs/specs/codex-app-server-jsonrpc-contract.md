@@ -163,16 +163,20 @@ Prompt mapping (pinned):
 This is acceptance, not terminal completion. The adapter MUST validate a nonblank accepted turn id,
 a known status and an items array, and then consume notifications until a matching
 `turn/completed` for **both** the forked `threadId` and accepted `turn.id` is observed.
-Unrelated thread/turn messages MUST NOT supply output or complete this run. Unknown notifications
-and malformed nonterminal payloads MAY be ignored. Missing/malformed acceptance, disconnect/EOF
+Terminal correlation MUST use the nonblank nested `params.turn.id`; an extra top-level
+`turnId` MUST NOT replace it. Absent/blank nested ids or contradictory top-level/nested ids MUST
+fail safely. Unrelated thread/turn messages MUST NOT supply output or complete this run. Unknown
+notifications and malformed nonterminal payloads MAY be ignored. Missing/malformed acceptance, disconnect/EOF
 before completion, malformed terminal payloads, failed or interrupted turns MUST NOT become success.
 The successful terminal turn MUST have `status="completed"`, an items array and no non-null error.
 
 The adapter MUST forward all preceding selected output before stream finality and MUST wait for
 actual owned-process exit before resolving completion. A successful RPC response or synthetic exit
-status cannot substitute for either requirement. Acceptance is bounded by three seconds, and a
-configured nonzero run timeout covers acceptance and the subsequent turn, independently of polling
-completion. Process failure during shutdown MUST fail the run. A forked thread may already have
+status cannot substitute for either requirement. Acceptance is bounded by three seconds. One configured nonzero run deadline is captured
+before the public run handle returns and covers process launch, initialize, every list page,
+fork, acceptance and the subsequent turn, independently of polling completion. Zero or absent run
+timeout adds no whole-run deadline. Timeout starts termination; completion still awaits bounded
+owned-process cleanup. Process failure during shutdown MUST fail the run. A forked thread may already have
 been persisted when turn start or completion fails; this operation promises no rollback or retry.
 
 ## Interaction with `agent_api.exec.add_dirs.v1` (pinned current truth)
@@ -247,10 +251,12 @@ Notification methods (wire) that MUST be handled:
     `params.threadId` / `params.turnId`. Do not copy command, patch, result or other item payloads.
 - `turn/started` → `AgentWrapperEventKind::Status` (safe `message`, optional)
 - `turn/completed` → `AgentWrapperEventKind::Status` (safe `message`, optional)
-- `error` → `AgentWrapperEventKind::Error`
-  - `event.message` MUST be derived from `params.error.message` and bounded per
-    `event-envelope-schema-spec.md`.
-  - The backend MUST NOT include `additionalDetails` or other raw backend details in `data`.
+- `error` with `willRetry=true` → `AgentWrapperEventKind::Status`, using the fixed message
+  `"codex app-server retrying after error (details redacted)"`; the turn remains active.
+- Non-retrying `error` → terminal `AgentWrapperEventKind::Error` with safe backend failure text.
+  The standalone mapper uses `"codex app-server error (details redacted)"` for non-retrying forms.
+  - Neither form may copy `params.error.message`, `additionalDetails` or other raw diagnostics into
+    public message, text or data. Retry messages can contain credentials too.
 
 All other notification methods:
 - MAY be ignored or mapped to `AgentWrapperEventKind::Unknown` / `Status`,
@@ -291,9 +297,12 @@ commands, reasons and details MUST NOT appear in public events or errors.
 After acceptance, cancellation and timeout MUST send `turn/interrupt` with
 `{ "threadId": "<forked id>", "turnId": "<accepted id>" }`. This interrupts the actual turn;
 `$/cancelRequest` targets the already-acknowledged RPC and is not the pinned v2 turn cancellation
-mechanism. If cancellation occurs before a turn identity is available, the client MUST close and
-reap its owned app-server without inventing a turn id. Interruption is best effort, followed by
-bounded owned-process cleanup; it MUST NOT require another server response to finish cleanup.
+mechanism. If cancellation occurs before a turn identity is available, including during initialize,
+list or fork, the client MUST close and reap its owned app-server without inventing a turn id. Fork
+startup MUST return its typed backend stream/completion and install cancellation before awaiting
+any process operation. The owned lifecycle task must retain the process across cancelled RPCs,
+so cancellation cannot enter a generic startup drop path while a fork child exists. Interruption is
+best effort, followed by bounded owned-process cleanup; it MUST NOT require another server response to finish cleanup.
 
 Universal cancellation and completion/event-stream precedence remain owned by
 `docs/specs/unified-agent-api/run-protocol-spec.md`. Ordinary MCP cancellation retains its own
@@ -301,8 +310,8 @@ Universal cancellation and completion/event-stream precedence remain owned by
 
 ## Timeout enforcement (pinned)
 
-Codex fork flows (`agent_api.session.fork.v1`) MUST enforce the Unified Agent API timeout budget
-for the in-flight `turn/start` request.
+Codex fork flows (`agent_api.session.fork.v1`) MUST enforce one Unified Agent API timeout budget
+across initialize, thread selection, fork, turn acceptance and the active turn.
 
 Timeout input (pinned):
 - The effective timeout is defined by `docs/specs/unified-agent-api/contract.md`:

@@ -163,28 +163,44 @@ impl CodexAppServer {
         client: ClientInfo,
         capabilities: Value,
     ) -> Result<Self, McpError> {
+        let server = Self::spawn_uninitialized(config).await?;
+        if let Err(err) = server.initialize(client, capabilities).await {
+            let _ = server.shutdown_and_wait().await;
+            return Err(err);
+        }
+        Ok(server)
+    }
+
+    /// Launch an owned process without awaiting initialization. Call [`Self::initialize`]
+    /// before thread/turn methods. Separating these steps lets an owner cancel initialization
+    /// while retaining the process handle for shutdown and reaping.
+    pub async fn spawn_uninitialized(config: StdioServerConfig) -> Result<Self, McpError> {
+        Ok(Self {
+            transport: Arc::new(JsonRpcTransport::spawn_app(config).await?),
+        })
+    }
+
+    /// Initialize this process. On error or cancellation, the owner must still call
+    /// [`Self::shutdown_and_wait`] before treating the process lifecycle as complete.
+    pub async fn initialize(
+        &self,
+        client: ClientInfo,
+        capabilities: Value,
+    ) -> Result<(), McpError> {
         let capabilities = match capabilities {
             Value::Null => Value::Object(Default::default()),
             other => other,
         };
-        let transport = JsonRpcTransport::spawn_app(config).await?;
         let params = InitializeParams {
             client,
             protocol_version: "2024-11-05".to_string(),
             capabilities,
         };
-
-        if let Err(err) = transport
-            .initialize(params, transport.startup_timeout())
+        self.transport
+            .initialize(params, self.transport.startup_timeout())
             .await
-        {
-            let _ = transport.shutdown_app().await;
-            return Err(McpError::Handshake(err.to_string()));
-        }
-
-        Ok(Self {
-            transport: Arc::new(transport),
-        })
+            .map(|_| ())
+            .map_err(|err| McpError::Handshake(err.to_string()))
     }
 
     /// Start a new thread (or use a provided ID) via `thread/start`.

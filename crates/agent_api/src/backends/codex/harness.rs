@@ -65,6 +65,7 @@ impl super::super::termination::TerminationHandle for CodexTerminationHandle {
 pub(super) struct CodexHarnessAdapter {
     config: CodexBackendConfig,
     run_start_cwd: Option<PathBuf>,
+    started_at: tokio::time::Instant,
     termination: Option<Arc<super::super::termination::TerminationState<CodexTerminationHandle>>>,
     handle_state: Arc<Mutex<CodexHandleFacetState>>,
 }
@@ -114,6 +115,7 @@ pub(super) fn new_harness_adapter(
     CodexHarnessAdapter {
         config,
         run_start_cwd,
+        started_at: tokio::time::Instant::now(),
         termination,
         handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
     }
@@ -347,6 +349,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
     > {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
+        let started_at = self.started_at;
         let termination = self.termination.clone();
         let handle_state = Arc::clone(&self.handle_state);
         let super::CodexExecPolicy {
@@ -368,6 +371,7 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
             let spawned = match if let Some(selector) = fork {
                 super::fork::spawn_fork_v1_flow(super::fork::ForkFlowRequest {
                     selector,
+                    started_at,
                     prompt,
                     working_dir,
                     effective_timeout,
