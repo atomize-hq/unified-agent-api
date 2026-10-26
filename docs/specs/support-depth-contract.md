@@ -219,6 +219,13 @@ of every template its promise selects. An excluded mode's set is `EX1` alone.
 
 Classification rules:
 
+The read-only Codex pilot diagnostic uses the finite typed context and source-bound protocol
+acquisition defined by the [registry contract](agent-registry-contract.md#support-depth).
+Its output is a candidate P/O and explicit remaining requirements, never execution readiness,
+writer admission or qualification. Unknown effective runtime context remains unresolved even
+when the pinned schema and expected configuration are available. Actual per-unit assignments
+remain maintainer-owned P changes under rule6 below; no diagnostic source fact approves a row.
+
 1. A **classification selector** MUST name an exact command path and mode, with explicit flag and
    value predicates where they change effects. Aliases are resolved before matching.
 2. Classification selectors that overlap with different effects or requirements are an error.

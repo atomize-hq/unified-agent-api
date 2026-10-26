@@ -1,5 +1,11 @@
 # Complete Codex pilot policy proposal
 
+Current-route update: PR #300 landed native interactive initial/resume as well as fork.
+The flow/environment tables below describe the original baseline; use the
+[route-aware readiness implementation](support-depth-codex-pilot-readiness.md) for current
+dispatch, canonical environment preparation, protocol binding and the resulting53-tuple
+recommendation. The original49-tuple table is historical, not an installed verdict profile.
+
 Status: implementation direction approved, 2026-10-26. The maintainer approved CP-1,
 CP-2 and CP-3's resolved-row direction; CP-3 does **not** approve any U-* row or missing evidence.
 This approval authorizes the bounded fork/approval compatibility repairs and tests; it does not

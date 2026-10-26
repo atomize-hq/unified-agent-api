@@ -6,8 +6,8 @@ use super::{
 use crate::{
     agent_maintenance::support_audit::{surface_identity, ReportRowShape, SurfaceIdentity},
     depth_record::{
-        part_identity, AcceptanceWork, ObligationsPart, OperationObligations, OperationSurface,
-        PolicyPart,
+        part_identity, AcceptanceWork, FileRef, ObligationsPart, OperationObligations,
+        OperationSurface, PolicyPart,
     },
     manifest_report, manifest_union,
 };
@@ -31,6 +31,18 @@ pub(super) fn derive(
     carried: Vec<AcceptanceWork>,
     required: &BTreeSet<SurfaceIdentity>,
 ) -> Result<Option<Acquired>, String> {
+    derive_with_pilot(view, root, rules_bytes, policy, carried, required, None)
+}
+
+pub(super) fn derive_with_pilot(
+    view: &mut GitInputs,
+    root: &str,
+    rules_bytes: &[u8],
+    policy: &PolicyPart,
+    carried: Vec<AcceptanceWork>,
+    required: &BTreeSet<SurfaceIdentity>,
+    pilot: Option<&(Value, Vec<FileRef>)>,
+) -> Result<Option<Acquired>, String> {
     let selection = &policy.selection;
     let agent = &selection.agent_id;
     let version = &selection.enrollment.version;
@@ -43,6 +55,9 @@ pub(super) fn derive(
         .filter(|p| p.starts_with("coverage.") && p.ends_with(".json"))
         .collect();
     if snapshot_files.is_empty() && report_files.is_empty() {
+        if pilot.is_some() {
+            return Err("pilot requires complete CLI acquisition".into());
+        }
         if policy
             .selection
             .enrollment
@@ -103,16 +118,29 @@ pub(super) fn derive(
     for shard in shards.values() {
         acquisition_basis::supported_shard(shard)?;
     }
+    if let Some((facts, _)) = pilot {
+        if shards
+            .get(super::codex_pilot::TARGET)
+            .map(|s| &s["binary"]["sha256"])
+            != facts.get("binary_sha256")
+        {
+            return Err("pilot protocol acquisition belongs to another target binary".into());
+        }
+    }
     let selected_paths = selection
         .enrollment
         .modes
         .iter()
-        .map(|mode| {
-            mode.command_path
-                .split(' ')
-                .skip(1)
-                .map(str::to_owned)
-                .collect()
+        .flat_map(|mode| {
+            let paths = if pilot.is_some() {
+                super::codex_pilot::paths(mode)
+            } else {
+                vec![mode.command_path.as_str()]
+            };
+            paths
+                .into_iter()
+                .map(|path| path.split(' ').skip(1).map(str::to_owned).collect())
+                .collect::<Vec<_>>()
         })
         .collect();
     manifest_union::intake::validate(rules_bytes, version, &union, &shards, &selected_paths)?;
@@ -177,7 +205,11 @@ pub(super) fn derive(
             .as_ref()
             .unwrap_or(&selection.enrollment.targets)
         {
-            acquisition_modes::validate(agent, mode, &shards[target], &union)?;
+            if pilot.is_some() {
+                super::codex_pilot::validate_mode(mode, &shards[target], &union)?;
+            } else {
+                acquisition_modes::validate(agent, mode, &shards[target], &union)?;
+            }
         }
     }
     let facts = AcquisitionFacts {
@@ -221,7 +253,12 @@ pub(super) fn derive(
                 let global = rules.globals.effective_flags_model.enabled
                     && surface.surface_kind == "global_flags"
                     && surface.command_path == *agent;
-                if (surface.command_path == mode.command_path || global)
+                let selected_paths = if pilot.is_some() {
+                    super::codex_pilot::paths(mode)
+                } else {
+                    vec![mode.command_path.as_str()]
+                };
+                if (selected_paths.contains(&surface.command_path.as_str()) || global)
                     && available.iter().any(|t| targets.contains(t))
                 {
                     owned.insert(surface.clone());
@@ -231,8 +268,16 @@ pub(super) fn derive(
         let owned: Vec<SurfaceIdentity> = canonical_set(owned.into_iter().collect())?;
         // One exact mode/target is the finite first classified-policy scope. Other existing
         // declarations retain their old fully unresolved O without inventing a combined basis.
-        if selection.enrollment.targets.len() == 1 && selection.enrollment.modes.len() == 1 {
-            let basis = facts.basis(&operation.id, &selection.enrollment.targets[0], &owned)?;
+        if selection.enrollment.targets.len() == 1
+            && (selection.enrollment.modes.len() == 1 || pilot.is_some())
+        {
+            let mut basis = facts.basis(&operation.id, &selection.enrollment.targets[0], &owned)?;
+            if let Some((context, _)) = pilot {
+                basis.facts["pilot"] = context.clone();
+                basis.facts["modes"] = serde_json::to_value(&modes_for_basis(policy, operation))
+                    .map_err(|e| e.to_string())?;
+                basis.sha256 = part_identity(&basis.facts)?;
+            }
             if operation
                 .classification_basis
                 .as_ref()
@@ -268,6 +313,9 @@ pub(super) fn derive(
             surfaces: owned,
             obligations: canonical_set(operation.obligations().into_iter().collect())?,
         });
+    }
+    if let Some((_, references)) = pilot {
+        acquired.extend(references.iter().cloned());
     }
     let mut result = ObligationsPart {
         identity: String::new(),
@@ -376,4 +424,17 @@ struct Globals {
 #[derive(Deserialize)]
 struct Flags {
     enabled: bool,
+}
+
+fn modes_for_basis<'a>(
+    policy: &'a PolicyPart,
+    operation: &crate::agent_registry::support_depth::OperationDeclaration,
+) -> Vec<&'a crate::agent_registry::support_depth::ModeSelector> {
+    policy
+        .selection
+        .enrollment
+        .modes
+        .iter()
+        .filter(|m| operation.serves.contains(&m.selector))
+        .collect()
 }

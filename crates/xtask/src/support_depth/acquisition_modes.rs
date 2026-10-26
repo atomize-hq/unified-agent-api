@@ -15,8 +15,26 @@ pub(super) fn validate(
     if mode.predicates.len() != 1 || predicate.value.is_some() {
         return Err("only acquired --json presence is supported".into());
     }
-    let path: Vec<_> = mode.command_path.split(' ').skip(1).collect();
-    if mode.command_path.split(' ').next() != Some(agent) {
+    presence(
+        agent,
+        &mode.command_path,
+        "--json",
+        &predicate.flag,
+        shard,
+        union,
+    )
+}
+
+pub(super) fn presence(
+    agent: &str,
+    command_path: &str,
+    flag: &str,
+    spelling: &str,
+    shard: &Value,
+    union: &Value,
+) -> Result<(), String> {
+    let path: Vec<_> = command_path.split(' ').skip(1).collect();
+    if command_path.split(' ').next() != Some(agent) {
         return Err("foreign predicate command".into());
     }
     let command = |value: &Value| -> Result<Value, String> {
@@ -34,7 +52,7 @@ pub(super) fn validate(
         .as_array()
         .into_iter()
         .flatten()
-        .any(|conflict| conflict["unit"] == "flag" && conflict["key"] == "--json")
+        .any(|conflict| conflict["unit"] == "flag" && conflict["key"] == flag)
     {
         return Err("--json has an unresolved acquired alias/arity conflict".into());
     }
@@ -47,17 +65,14 @@ pub(super) fn validate(
     let originals = flags(&original)?;
     let matching: Vec<_> = originals
         .iter()
-        .filter(|f| {
-            f["long"].as_str() == Some(&predicate.flag)
-                || f["short"].as_str() == Some(&predicate.flag)
-        })
+        .filter(|f| f["long"].as_str() == Some(spelling) || f["short"].as_str() == Some(spelling))
         .collect();
-    if matching.len() != 1 || matching[0]["long"] != "--json" {
+    if matching.len() != 1 || matching[0]["long"] != flag {
         return Err("predicate is not the acquired canonical --json or an acquired alias".into());
     }
     let original = matching[0];
     let normalized = flags(&normalized)?;
-    let matching: Vec<_> = normalized.iter().filter(|f| f["key"] == "--json").collect();
+    let matching: Vec<_> = normalized.iter().filter(|f| f["key"] == flag).collect();
     if matching.len() != 1 {
         return Err("--json has no coherent normalized acquisition".into());
     }

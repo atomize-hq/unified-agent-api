@@ -48,7 +48,7 @@ pub fn plan_freeze_with_work(
     request: &FreezeRequest,
     required: &[(String, String, String)],
 ) -> Result<Option<FreezePlan>, String> {
-    plan(workspace, request, required).map_err(|e| {
+    plan(workspace, request, required, false).map_err(|e| {
         format!(
             "support depth freeze agent={} version={}: {e}",
             request.agent, request.version
@@ -56,10 +56,18 @@ pub fn plan_freeze_with_work(
     })
 }
 
+pub(super) fn plan_pilot(
+    workspace: &Path,
+    request: &FreezeRequest,
+) -> Result<Option<FreezePlan>, String> {
+    plan(workspace, request, &[], true)
+}
+
 fn plan(
     workspace: &Path,
     request: &FreezeRequest,
     fresh_required: &[(String, String, String)],
+    pilot: bool,
 ) -> Result<Option<FreezePlan>, String> {
     let version = semver::Version::parse(&request.version).map_err(|e| e.to_string())?;
     if !version.pre.is_empty()
@@ -97,6 +105,7 @@ fn plan(
         text(&inventory)?,
         ResolutionContext {
             intake: true,
+            pilot,
             ..ResolutionContext::default()
         },
     )?
@@ -169,13 +178,19 @@ fn plan(
         .map(|o| o.acceptance_work.clone())
         .unwrap_or_default();
     required.extend(carried_work.iter().map(|w| w.surface.clone()));
-    let acquired = acquisition::derive(
+    let pilot_facts = if pilot {
+        Some(super::codex_pilot::load(&mut view)?)
+    } else {
+        None
+    };
+    let acquired = acquisition::derive_with_pilot(
         &mut view,
         root,
         &rules,
         &policy,
         carried_work.clone(),
         &required,
+        pilot_facts.as_ref(),
     )?;
     let (obligations, classification_bases) = match acquired {
         Some(acquired) => (Some(acquired.obligations), acquired.classification_bases),

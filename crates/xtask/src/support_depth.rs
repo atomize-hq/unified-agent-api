@@ -8,6 +8,7 @@
 mod acquisition;
 mod acquisition_basis;
 mod acquisition_modes;
+pub mod codex_pilot;
 pub use acquisition_basis::ClassificationBasis;
 mod closeout;
 pub(crate) use closeout::{current_closeout_bindings, current_promotion_bindings};
@@ -61,6 +62,7 @@ pub fn resolve_policy(
 struct ResolutionContext<'a> {
     baseline: Option<&'a [crate::agent_maintenance::support_audit::DebtInventoryRow]>,
     intake: bool,
+    pilot: bool,
 }
 
 fn resolve(
@@ -72,7 +74,11 @@ fn resolve(
     debt_inventory: &str,
     context: ResolutionContext<'_>,
 ) -> Result<Option<PolicyPart>, String> {
-    let ResolutionContext { baseline, intake } = context;
+    let ResolutionContext {
+        baseline,
+        intake,
+        pilot,
+    } = context;
     let parsed = semver::Version::parse(version).map_err(|e| e.to_string())?;
     if !parsed.pre.is_empty() || !parsed.build.is_empty() || parsed.to_string() != version {
         return Err("version must be one exact MAJOR.MINOR.PATCH".into());
@@ -131,6 +137,9 @@ fn resolve(
             ));
         }
     }
+    if pilot {
+        codex_pilot::selection(agent, declaration)?;
+    }
     // Without canonical acquisition facts, a free mode label or a flag spelling cannot prove
     // disjointness. Refuse unsupported predicates/exclusions, and all overlapping command scopes.
     for (index, mode) in declaration.modes.iter().enumerate() {
@@ -143,6 +152,9 @@ fn resolve(
             ));
         }
         for other in &declaration.modes[..index] {
+            if pilot {
+                continue;
+            }
             if mode.command_path == other.command_path
                 && mode
                     .targets
@@ -164,10 +176,11 @@ fn resolve(
             }
         }
     }
-    if declaration
-        .operations
-        .iter()
-        .any(|o| o.classifications.is_some())
+    if !pilot
+        && declaration
+            .operations
+            .iter()
+            .any(|o| o.classifications.is_some())
         && (declaration.targets.len() != 1 || declaration.modes.len() != 1)
     {
         return Err("classified intake currently supports one exact mode and target only".into());
@@ -181,6 +194,7 @@ fn resolve(
             .iter()
             .any(|operation| operation.classifications.is_some());
     if intake
+        && !pilot
         && acquired_policy
         && declaration.operations.iter().any(|operation| {
             operation.shared_mapping

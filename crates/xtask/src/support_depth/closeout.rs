@@ -50,6 +50,7 @@ fn current_bindings(
         ResolutionContext {
             baseline: Some(&record.policy.debt_baseline),
             intake: true,
+            pilot: false,
         },
     )?
     .ok_or("closeout lost depth enrollment")?;
