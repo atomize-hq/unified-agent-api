@@ -97,6 +97,15 @@ Root search/no-daemon/UI controls can receive explicit no-headless-effect/denial
 within a reviewed whole invocation boundary. App-server has different root handling; never inherit
 exec conclusions by spelling.
 
+The bounded compatibility follow-up now preserves normal initial/resume Never intent with an
+explicit approval-policy config override, including the upstream AutoReview exception, while leaving
+reviewer choice intact. An isolated offline pinned-binary observation reproduced the original loss
+and the effective corrected policy; production adapter fixtures cover initial, resume-last and
+resume-id with default/explicit Never, absent policy and external bypass. The disposition of explicit
+non-Never exec/resume requests remains pending a separate maintainer decision; no silent policy
+substitution, automatic-review enablement or protocol rerouting is authorized by this repair.
+The [streaming contract](../../specs/codex-streaming-exec-contract.md) records the adapter translation.
+
 ## Exact proposed operation and mode declarations
 
 One enrollment: agent `codex`, version `0.156.1`, target **only**

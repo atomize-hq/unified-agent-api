@@ -167,3 +167,26 @@ For streaming entrypoints that expose a termination handle (e.g., `ExecStreamCon
   drained by the consumer.
 - This contract does not supersede the universal `agent_api` completion gating rules (DR-0012);
   `agent_api` is responsible for enforcing those semantics at the universal boundary.
+
+
+## Unified adapter approval intent on pinned Codex 0.156.1
+
+The unified adapter's initial and resume paths MUST preserve `never` whenever non-interactive is
+true (the default), or when `backend.codex.exec.approval_policy="never"` is explicitly selected.
+For normal execution, the adapter emits root `--ask-for-approval never` for compatibility and an
+explicit `--config 'approval_policy="never"'`. The config override is authoritative on pinned
+`0.156.1`: its exec dispatch drops the root approval flag, and its AutoReview configuration path can
+remove the normal headless Never default. The explicit config override MUST survive that path
+without changing the configured reviewer. The dangerous external-sandbox path uses its existing
+bypass flag and MUST NOT add conflicting approval config or safety flags.
+
+When non-interactive is false and approval is absent, the adapter MUST preserve absence and let
+upstream select its effective default. The historical typed `untrusted`, `on-failure` and
+`on-request` inputs still require a separately approved disposition for exec/resume: pinned exec
+cannot honor those requests through the current root flag. This compatibility increment does not
+silently substitute another policy, switch protocol flows or enable automatic review for them.
+Fork approval uses its separate [app-server contract](codex-app-server-jsonrpc-contract.md).
+
+These are adapter translation requirements, not support-depth qualification or a new promise for
+arbitrary generic wrapper configuration. Source-bound fixture policy tests and isolated offline
+binary startup observations do not establish successful model execution or independent adequacy.

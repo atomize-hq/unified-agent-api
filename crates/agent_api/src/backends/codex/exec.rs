@@ -200,8 +200,13 @@ pub(super) async fn spawn_exec_or_resume_flow(
         builder = builder.dangerously_bypass_approvals_and_sandbox(true);
     }
 
-    if non_interactive {
+    if non_interactive || approval_policy == Some(super::CodexApprovalPolicy::Never) {
         builder = builder.approval_policy(codex::ApprovalPolicy::Never);
+        if !external_sandbox {
+            // Pinned exec ignores root -a and AutoReview can remove its headless
+            // Never default. An explicit config override survives both paths.
+            builder = builder.config_override("approval_policy", "\"never\"");
+        }
     } else if let Some(value) = approval_policy.as_ref() {
         builder = builder.approval_policy(map_approval_policy(value));
     }
