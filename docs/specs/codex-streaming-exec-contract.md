@@ -182,8 +182,10 @@ bypass flag and MUST NOT add conflicting approval config or safety flags.
 
 When non-interactive is false and approval is absent, the adapter MUST preserve absence and let
 upstream select its effective default. The historical typed `untrusted`, `on-failure` and
-`on-request` inputs still require a separately approved disposition for exec/resume: pinned exec
-cannot honor those requests through the current root flag. This compatibility increment does not
+`on-request` inputs retain existing forwarding while the proposed
+[native approval bridge](../agents/lifecycle/support-depth-codex-approval-compatibility-design.md)
+is designed and reviewed: pinned exec cannot honor those requests through the current root flag.
+That proposal changes no current normative behavior. This compatibility increment does not
 silently substitute another policy, switch protocol flows or enable automatic review for them.
 Fork approval uses its separate [app-server contract](codex-app-server-jsonrpc-contract.md).
 
