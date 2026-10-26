@@ -121,6 +121,8 @@ fn selection(declaration: &DepthEnrollmentDeclaration) -> Result<(), String> {
     if operation.id != "run"
         || operation.serves != ["run-json"]
         || operation.templates != [ObligationTemplate::Core]
+        || operation.classification_basis.is_some()
+        || operation.classifications.is_some()
         || operation.shared_mapping != Some(SharedMapping::Mapped)
         || operation.forwarding != Some(false)
         || !operation.not_applicable_permitted.is_empty()

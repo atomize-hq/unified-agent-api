@@ -2,6 +2,10 @@
 
 Status: E1-P1 and E1-P2 approved by the maintainer on 2026-10-25.
 The first prerequisite is the evidence bridge; public-route wiring and the host run follow separately.
+The original E1-P1 one-CORE mapped-proof premise is retired by approved
+[PI-P1–PI-P3](support-depth-packet-intake-design.md): initial mutation effects and complete
+initial/resume/fork declarations need separate review before positive mapped proof. The GNU target
+premise was superseded by IR-P2's acquired musl target; existing CORE fixtures remain diagnostic.
 Source baseline: staging `dd10558157583f1969b4ac0a412107ef617648e1` (PR #296).
 This plan accompanies the refreshed [Annex A inventory](../../specs/support-depth-contract.md#annex-a-route-inventory).
 The [support-depth contract](../../specs/support-depth-contract.md) remains normative. E1 changes
@@ -41,7 +45,7 @@ an additional acceptance milestone. The missing bounded wiring/evidence work com
 
 | Id | Recommendation | Reason and boundary |
 | --- | --- | --- |
-| E1-P1 — proof scope | Use one Codex `run` / `CORE` promise through the actual adapter, one headless selector and `x86_64-unknown-linux-gnu`. Pin the exact existing upstream version/artifact evidence at implementation start; baseline `latest_validated` is `0.156.1`. Include its mapped capability where the resolved P claims it | Exercises the actual streaming maintenance path while containing producer/fixture work. Cover every resolved BASE, output/lifecycle and mapping/capability obligation; isolated channel V1 is not a substitute. Other agents/targets get preservation/refusal cases, not new qualification claims. No new debt or blanket `not_applicable` permissions to make the positive pass |
+| E1-P1 — original proof scope (superseded by IR-P2 and PI-P1–PI-P3) | Originally: use one Codex `run` / `CORE` promise through the actual adapter, one headless selector and `x86_64-unknown-linux-gnu`. Pin the exact existing upstream version/artifact evidence at implementation start; baseline `latest_validated` is `0.156.1`. Include its mapped capability where the resolved P claims it | Exercises the actual streaming maintenance path while containing producer/fixture work. Cover every resolved BASE, output/lifecycle and mapping/capability obligation; isolated channel V1 is not a substitute. Other agents/targets get preservation/refusal cases, not new qualification claims. No new debt or blanket `not_applicable` permissions to make the positive pass |
 | E1-P2 — proof threshold and next work | Require authenticated all-due evidence plus the real supported public entrypoints before declaring the full-chain proof complete. Authorize the two bounded prerequisite increments below, then the isolated run; keep production enrollment unchanged | Avoids counting more fabricated-verdict successes as readiness. The isolated profile must remain distinguishable from production; there is no generic `--allow-depth`, environment bypass, receipt-supplied host/repository or unconditional parser removal. Any public routing change must be independently reviewed and exercised in isolation before landing |
 
 Existing requirements need no new vote: separate closeout/promotion, exact generation marker on the

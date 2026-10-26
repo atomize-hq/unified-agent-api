@@ -147,6 +147,21 @@ impl DepthEnrollmentDeclaration {
         for operation in &self.operations {
             let op_at = format!("{at}.operations[id={}]", operation.id);
             operation.validate(&op_at)?;
+            for row in operation.classifications.iter().flatten() {
+                let global = row.surface.surface_kind == "global_flags"
+                    && row.surface.command_path == agent_id;
+                if row.surface.command_path.split(' ').next() != Some(agent_id)
+                    || (!global
+                        && !self.modes.iter().any(|mode| {
+                            operation.serves.contains(&mode.selector)
+                                && mode.command_path == row.surface.command_path
+                        }))
+                {
+                    return Err(invalid(format!(
+                        "{op_at}: foreign or unowned classification surface"
+                    )));
+                }
+            }
             if operations
                 .insert(operation.id.as_str(), operation)
                 .is_some()
@@ -310,6 +325,18 @@ pub struct OperationDeclaration {
     pub not_applicable_permitted: Vec<ObligationId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification_basis: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classifications: Option<Vec<SurfaceClassification>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SurfaceClassification {
+    pub surface: crate::agent_maintenance::support_audit::SurfaceIdentity,
+    pub templates: Vec<ObligationTemplate>,
+    pub rationale: String,
 }
 
 impl OperationDeclaration {
@@ -317,12 +344,20 @@ impl OperationDeclaration {
         self.templates.contains(&ObligationTemplate::Excluded)
     }
 
-    /// The obligation set the declaration gives this operation, `M` aside: `M` obligations are
-    /// the mapped capability's minimum semantics and carry no id of their own here.
+    /// Parent templates plus additive per-unit templates, in declaration order.
+    pub fn selected_templates(&self) -> impl Iterator<Item = &ObligationTemplate> {
+        self.templates.iter().chain(
+            self.classifications
+                .iter()
+                .flatten()
+                .flat_map(|row| &row.templates),
+        )
+    }
+
+    /// The declared obligation union, `M` aside: mappings supply capability minimum semantics.
     pub fn obligations(&self) -> BTreeSet<ObligationId> {
         let mut set: BTreeSet<_> = self
-            .templates
-            .iter()
+            .selected_templates()
             .flat_map(|template| template.obligations())
             .copied()
             .collect();
@@ -341,8 +376,46 @@ impl OperationDeclaration {
             )));
         }
 
+        if self.classification_basis.is_some() != self.classifications.is_some() {
+            return Err(invalid(format!(
+                "{at}: classification_basis and classifications must be paired"
+            )));
+        }
+        if let Some(basis) = &self.classification_basis {
+            if basis.len() != 64
+                || !basis
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            {
+                return Err(invalid(format!(
+                    "{at}.classification_basis must be 64 lowercase SHA-256 hexadecimal characters"
+                )));
+            }
+        }
+        let mut classified = BTreeSet::new();
+        for row in self.classifications.iter().flatten() {
+            let templates: BTreeSet<_> = row.templates.iter().collect();
+            if !classified.insert(&row.surface)
+                || templates.is_empty()
+                || templates.len() != row.templates.len()
+                || row.templates.contains(&ObligationTemplate::Excluded)
+            {
+                return Err(invalid(format!(
+                    "{at}: duplicate classification or invalid per-unit templates"
+                )));
+            }
+            if !matches!(
+                row.surface.surface_kind.as_str(),
+                "commands" | "subcommands" | "flags" | "global_flags" | "positional_args"
+            ) || row.surface.surface_id.trim().is_empty()
+            {
+                return Err(invalid(format!("{at}: invalid classification surface")));
+            }
+            validate_non_empty_scalar("classification rationale", &row.rationale)?;
+        }
         if self.is_excluded() {
-            if self.templates.len() != 1
+            if self.classifications.is_some()
+                || self.templates.len() != 1
                 || self.serves.len() != 1
                 || self.shared_mapping.is_some()
                 || self.forwarding.is_some()
@@ -376,7 +449,7 @@ impl OperationDeclaration {
             // The template table: forwarding to the upstream CLI never meets the whole promise of
             // these. `QUERY` is never for a parsed-record promise, and its `OUT2` is one.
             Some(true)
-                if self.templates.iter().any(|template| {
+                if self.selected_templates().any(|template| {
                     matches!(
                         template,
                         ObligationTemplate::Core

@@ -1,12 +1,15 @@
 # Isolated packet intake readiness design
 
-Status: proposed; PI-P1, PI-P2 and PI-P3 need maintainer decisions before implementation.
+Status: PI-P1, PI-P2 and PI-P3 approved by the maintainer on 2026-10-25.
+The first bounded read-only intake is implemented; complete PI-P3 declarations and positive proof
+remain separate work. No live profile or production enrollment is installed.
 Baseline: staging `43a42bbcbc51ce2d21e5144a091d2bde5bac760f` (PR #298), 2026-10-25.
 This is sequence2 of the approved [isolated route design](support-depth-isolated-route-design.md).
 The [depth contract](../../specs/support-depth-contract.md),
 [registry contract](../../specs/agent-registry-contract.md#support-depth) and
-[evidence contract](../../specs/support-depth-evidence-v1.md) remain normative. This proposal changes
-no executable schema, registry, snapshot, writer, workflow, host profile or production enrollment.
+[evidence contract](../../specs/support-depth-evidence-v1.md) remain normative. The bounded implementation adds paired optional per-unit policy to the existing
+registry/P schema, preserving old omission bytes. It changes no committed enrollment, snapshot,
+writer admission, workflow, host profile or production enrollment.
 
 ## Outcome and source facts
 
@@ -17,12 +20,12 @@ existing GitInputs/Source/Proposal ownership and freshness checks. The live prof
 
 The [exact classification appendix](support-depth-packet-intake-classifications.md) reconciles all
 54 selected identities and all14 acquired input files. Original per-target flags normalized out of
-the union remain included. There are30 explicit proposed assignments and24 unresolved identities;
+the union remain included. There are30 explicit approved assignments and24 unresolved identities;
 none are execution evidence. The population includes the wrapper-only `--full-auto` claim and the
 TUI-root `--no-alt-screen` observation. Name-level exclusions and unsupported/passthrough levels
 remove nothing from depth accounting.
 
-Present code cannot resolve this packet:
+The approved design's baseline could not resolve this packet:
 
 - `support_depth.rs::resolve` refuses every predicate before acquisition interpretation.
 - `acquisition::derive` already validates schema, complete shards/union, wrapper claims and reports,
@@ -34,6 +37,26 @@ Present code cannot resolve this packet:
 - `isolated_maintenance/scope.rs` admits only the proposed one-run/CORE scope, and no live profile
   is installed. A future ADMIN or multi-flow declaration requires a reviewed fixed-scope source
   change; schema support must not silently broaden this authority.
+
+The first implementation now derives the exact acquired presence predicate and semantic basis from
+one validated GitInputs view, freezes optional classification rows in P, adds their templates to
+P/O and retains all missing rows as unresolved. FreezePlan exposes the basis hash and facts for
+registry authoring. Classification-bearing policy is conservatively limited to one exact mode and
+target. Newly supported predicate/per-unit intake refuses mapped operation selections, including
+P-only, until complete flow policy is separately reviewed and implemented. The real-data test is
+an unmapped initial-surface diagnostic, not a declaration that relabels the actual adapter run.
+Legacy predicate-free/field-absent mapped fixtures retain their existing unqualified semantics. Currentness uses the same resolver/derive path
+for preparation, refreeze, closeout and retained promotion. The real-data regression proves54
+selected identities,30 approved rows,24 unresolved rows and retention of56 historical uplift rows.
+No E or acceptance is synthesized. The fixed isolated scope explicitly refuses the new policy
+fields until separately reviewed complete declarations authorize that scope.
+
+The real packet also exposed an unrelated-command alias blocker in the old intake: `app-server
+generate-ts` uses `-p` for `--prettier` while root uses it for `--profile`; plugin commands use `-m`
+for `--marketplace` while root uses it for `--model`. Local duplicate/name/alias validation still
+covers every command. Inherited-root alias coherence now applies to exact selected command paths;
+those unselected nested commands neither invalidate `codex exec` nor join its selected population.
+Selected JSON alias/arity conflicts, including normalized-union conflicts, still refuse.
 
 Two facts change the positive-proof plan. The public wrapper streaming path always supplies a
 last-message file, even when callers omit one. PI-P1 recommends explicit ADMIN mutation obligations
@@ -52,7 +75,7 @@ in the future proposal, not an installed false qualification.
 | PI-P2 — minimal P representation | Add only `classification_basis` and `classifications` to the existing operation entry, with the finite row format below, frozen in selection/P | Maintainer-owned registry remains the sole policy inventory. Changes to classified semantic facts invalidate the reviewed assignments and require an explicit P update/refreeze. Missing rows remain unresolved; there is no runtime approval file, free-text classifier or executor decision |
 | PI-P3 — truthful mapped scope | Retire the assumption that the first complete mapped proof has only one CORE operation and twelve obligations. Plan the actual initial/resume/fork flow set, add the effect-driven templates and corresponding evidence, and review its exact declarations before a positive packet freeze | Initial needs the PI-P1 mutation promise; resume needs SESSION; the adapter-owned app-server fork needs managed-protocol/session review. Do not relabel a mapped operation wrapper-only, omit supported flows, weaken the complete-mapping rule or reuse the old twelve-case adoption. Intake plumbing can proceed read-only; incomplete policy must refuse a real freeze, not appear as valid P-only policy |
 
-PI-P3 authorizes a direction only if approved, not unnamed additional enrollment rows or evidence
+Approved PI-P3 authorizes a direction only, not unnamed additional enrollment rows or evidence
 mappings. The follow-up must present the exact complete declarations and additional selected-unit
 classifications before enabling that scope. No new template, NA, override, debt authorization or
 capability advertisement is recommended. The previous CORE-only diagnostic fixtures keep their
@@ -60,7 +83,7 @@ existing finite scope, trust binding, targets and whole-workflow-completion beha
 
 ## Finite classification rows inside P
 
-The proposed optional operation members are:
+The implemented optional operation members are:
 
 - `classification_basis`: one SHA-256 of the finite semantic fact projection described below,
   hashed with the existing B.7/part_identity canonicalization. O still references all14 complete
@@ -78,9 +101,10 @@ classification_required. Do not encode partial value approval in the rationale s
 value-specific selection needs a separately reviewed representation, not a substring convention.
 
 The basis is not a second snapshot framework. Derive it from the one validated intake view as
-`{agent, version, target, binary, features, rules_sha256, schema_sha256, units}`. `binary` contains
+`{agent, version, target, binary, features?, known_omissions?, rules_sha256, schema_sha256, units}`. `binary` contains
 selected-shard semantic_version, target_triple and sha256. `features` retains the complete selected
-shard feature regime. RULES and schema use their complete content digests. `units` is the sorted
+shard feature regime. `known_omissions` retains its complete payload and absent/present distinction;
+unknown/unprojectable payloads and numeric semantic payloads unsupported by B.7 refuse. RULES and schema use their complete content digests. `units` is the sorted
 complete54-identity selected population, with each original selected-shard and normalized union
 row payload, provenance kind and applicable target sets, plus the owning wrapper claim payload
 and its scope/level where present. Include observed arity, aliases, usage/notes and every other
@@ -117,7 +141,7 @@ Acquisition fields do not describe every hidden alias/value/default: these uncer
 explicitly unresolved. Source-informed maintainer assignment is not independent adequacy or A1
 proof that a tag's source produced the recorded binary. Neither is inferred from coverage level.
 
-Proposed compatibility: both members are optional and absent on existing declarations; preserve
+Implemented compatibility: both members are optional and absent on existing declarations; preserve
 omission with optional fields rather than serializing new empty defaults into old records. Explicit
 lists, where present, are copied in declaration order under B.7. New readers must preserve existing
 v1 P/O identities and bytes where these fields are absent. Old strict readers fail closed on new
@@ -178,7 +202,7 @@ does not authorize weakening that guard. New classifications are also not semant
 
 ## Small implementation sequence and acceptance
 
-After decisions, first implement the optional P representation and one coherent read-only intake
+The first implemented sequence adds the optional P representation and one coherent read-only intake
 with exact --json/recorded alias handling and invalidation, keeping all unresolved rows visible.
 Do not claim that this alone produces a valid complete mapped packet. Review the PI-P3 declarations,
 remaining classifications and actual carried-work path before installing positive packet policy.

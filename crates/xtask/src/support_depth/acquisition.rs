@@ -1,4 +1,8 @@
-use super::{canonical_set, git_inputs::GitInputs};
+use super::{
+    acquisition_basis::{self, AcquisitionFacts, ClassificationBasis},
+    acquisition_modes, canonical_set,
+    git_inputs::GitInputs,
+};
 use crate::{
     agent_maintenance::support_audit::{surface_identity, ReportRowShape, SurfaceIdentity},
     depth_record::{
@@ -12,7 +16,12 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-type Surfaces = BTreeMap<SurfaceIdentity, BTreeSet<String>>;
+pub(super) type Surfaces = BTreeMap<SurfaceIdentity, BTreeSet<String>>;
+
+pub(super) struct Acquired {
+    pub obligations: ObligationsPart,
+    pub classification_bases: Vec<ClassificationBasis>,
+}
 
 pub(super) fn derive(
     view: &mut GitInputs,
@@ -21,7 +30,7 @@ pub(super) fn derive(
     policy: &PolicyPart,
     carried: Vec<AcceptanceWork>,
     required: &BTreeSet<SurfaceIdentity>,
-) -> Result<Option<ObligationsPart>, String> {
+) -> Result<Option<Acquired>, String> {
     let selection = &policy.selection;
     let agent = &selection.agent_id;
     let version = &selection.enrollment.version;
@@ -34,6 +43,18 @@ pub(super) fn derive(
         .filter(|p| p.starts_with("coverage.") && p.ends_with(".json"))
         .collect();
     if snapshot_files.is_empty() && report_files.is_empty() {
+        if policy
+            .selection
+            .enrollment
+            .modes
+            .iter()
+            .flat_map(|m| &m.predicates)
+            .any(|p| p.flag != "--json" || p.value.is_some())
+        {
+            return Err(
+                "without acquisition only canonical --json presence has structural meaning".into(),
+            );
+        }
         return Ok(None);
     }
     if !snapshot_files.iter().any(|f| f == "union.json") {
@@ -53,7 +74,10 @@ pub(super) fn derive(
         .with_draft(Draft::Draft202012)
         .compile(&schema)
         .map_err(|e| e.to_string())?;
-    acquired.push(view.reference(&schema_path)?);
+    let schema_ref = view.reference(&schema_path)?;
+    let rules_sha256 = acquired[0].sha256.clone();
+    let schema_sha256 = schema_ref.sha256.clone();
+    acquired.push(schema_ref);
     let mut read = |path: &str| -> Result<Value, String> {
         let bytes = view.required(path)?;
         let value: Value = serde_json::from_slice(&bytes).map_err(|e| format!("{path}: {e}"))?;
@@ -67,6 +91,7 @@ pub(super) fn derive(
         Ok(value)
     };
     let union = read(&format!("{snapshots}/union.json"))?;
+    acquisition_basis::supported_union(&union)?;
     let mut shards = BTreeMap::new();
     for file in snapshot_files.iter().filter(|f| f.as_str() != "union.json") {
         let target = file
@@ -75,7 +100,22 @@ pub(super) fn derive(
             .ok_or_else(|| format!("unexpected target snapshot: {file}"))?;
         shards.insert(target.to_owned(), read(&format!("{snapshots}/{file}"))?);
     }
-    manifest_union::intake::validate(rules_bytes, version, &union, &shards)?;
+    for shard in shards.values() {
+        acquisition_basis::supported_shard(shard)?;
+    }
+    let selected_paths = selection
+        .enrollment
+        .modes
+        .iter()
+        .map(|mode| {
+            mode.command_path
+                .split(' ')
+                .skip(1)
+                .map(str::to_owned)
+                .collect()
+        })
+        .collect();
+    manifest_union::intake::validate(rules_bytes, version, &union, &shards, &selected_paths)?;
     if selection
         .enrollment
         .targets
@@ -85,6 +125,7 @@ pub(super) fn derive(
         return Err("selected target has no acquired snapshot".into());
     }
     let wrapper = read(&format!("{root}/wrapper_coverage.json"))?;
+    acquisition_basis::supported_wrapper(&wrapper)?;
     let mut reports = BTreeMap::new();
     for file in &report_files {
         reports.insert(file.clone(), read(&format!("{reports_dir}/{file}"))?);
@@ -130,6 +171,26 @@ pub(super) fn derive(
             })
             .collect::<Result<Vec<_>, String>>()?,
     )?;
+    for mode in &selection.enrollment.modes {
+        for target in mode
+            .targets
+            .as_ref()
+            .unwrap_or(&selection.enrollment.targets)
+        {
+            acquisition_modes::validate(agent, mode, &shards[target], &union)?;
+        }
+    }
+    let facts = AcquisitionFacts {
+        agent,
+        version,
+        union: &union,
+        shards: &shards,
+        wrapper: &wrapper,
+        surfaces: &surfaces,
+        rules_sha256: &rules_sha256,
+        schema_sha256: &schema_sha256,
+    };
+    let mut classification_bases = Vec::new();
     let mut operations = Vec::new();
     let mut classification = Vec::new();
     for operation in &selection.enrollment.operations {
@@ -168,14 +229,39 @@ pub(super) fn derive(
             }
         }
         let owned: Vec<SurfaceIdentity> = canonical_set(owned.into_iter().collect())?;
-        // Existing acquisition has names, aliases and help syntax, not an independently reviewed
-        // effects boundary. Conservatively retain every unit as classification_required. Raw
-        // bytes bind value/default/help changes even where revision 1 has no structured field.
+        // One exact mode/target is the finite first classified-policy scope. Other existing
+        // declarations retain their old fully unresolved O without inventing a combined basis.
+        if selection.enrollment.targets.len() == 1 && selection.enrollment.modes.len() == 1 {
+            let basis = facts.basis(&operation.id, &selection.enrollment.targets[0], &owned)?;
+            if operation
+                .classification_basis
+                .as_ref()
+                .is_some_and(|expected| expected != &basis.sha256)
+            {
+                return Err(format!(
+                    "operation `{}` has a stale classification_basis",
+                    operation.id
+                ));
+            }
+            classification_bases.push(basis);
+        }
+        let rows = operation.classifications.as_deref().unwrap_or_default();
+        for row in rows {
+            if !owned.contains(&row.surface) {
+                return Err(format!(
+                    "operation `{}` classification is foreign or unowned: {}",
+                    operation.id,
+                    row.surface.describe()
+                ));
+            }
+        }
         for surface in &owned {
-            classification.push(OperationSurface {
-                operation: operation.id.clone(),
-                surface: surface.clone(),
-            });
+            if !rows.iter().any(|row| row.surface == *surface) {
+                classification.push(OperationSurface {
+                    operation: operation.id.clone(),
+                    surface: surface.clone(),
+                });
+            }
         }
         operations.push(OperationObligations {
             id: operation.id.clone(),
@@ -193,7 +279,10 @@ pub(super) fn derive(
         acceptance_work: work,
     };
     result.identity = part_identity(&result)?;
-    Ok(Some(result))
+    Ok(Some(Acquired {
+        obligations: result,
+        classification_bases,
+    }))
 }
 
 fn observe(

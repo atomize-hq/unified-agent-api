@@ -307,11 +307,47 @@ for the modes it serves: it assigns their obligation templates.
 | `id` | A name, unique in the declaration. |
 | `serves` | The `selector` of each mode the operation serves: at least one, without repeats, each declared in `modes`. A mode exclusion serves exactly one mode. |
 | `templates` | The obligation templates the promise selects, by the names the support-depth contract gives them: at least one, without repeats. An entry whose only template is `EXCLUDED` is a mode exclusion. `EXCLUDED` MUST NOT be listed with another template. |
+| `classification_basis` | Optional SHA-256, paired with `classifications`; both are absent on old declarations. The reviewed semantic acquisition basis defined below. A mode exclusion MUST NOT carry it. |
+| `classifications` | Optional ordered rows `{surface, templates, rationale}`, paired with `classification_basis`. `surface` is the existing SurfaceIdentity triple, unique within the operation and owned by a served exact command path or its effective global flags. Each row selects one or more existing templates without repeats or `EXCLUDED`, and states a nonblank rationale for the complete acquired value/default/effect regime. Foreign, unowned, duplicate or unsupported rows refuse. A mode exclusion MUST NOT carry it. |
 | `shared_mapping` | `wrapper_only`, `mapped` or `proposed_extension`. Required, except in a mode exclusion, which MUST NOT carry it. |
-| `forwarding` | `true` when the promise is met by forwarding the invocation to the upstream CLI, the question the support-depth contract's template table answers for each template, otherwise `false`. Required, except in a mode exclusion, which MUST NOT carry it. It MUST NOT be `true` when `templates` lists `CORE`, `SESSION`, `QUERY` or `MANAGED`: that table says forwarding is never the whole promise of the first two and never suffices for `MANAGED`, and every `QUERY` promise is a parsed-record promise, for which it never suffices. Whether it suffices under the conditions the table states for the other templates is the maintainer's decision. |
+| `forwarding` | `true` when the promise is met by forwarding the invocation to the upstream CLI, the question the support-depth contract's template table answers for each template, otherwise `false`. Required, except in a mode exclusion, which MUST NOT carry it. It MUST NOT be `true` when parent or per-unit `templates` lists `CORE`, `SESSION`, `QUERY` or `MANAGED`: that table says forwarding is never the whole promise of the first two and never suffices for `MANAGED`, and every `QUERY` promise is a parsed-record promise, for which it never suffices. Whether it suffices under the conditions the table states for the other templates is the maintainer's decision. |
 | `promise` | What the promise states for each BASE dimension, under the keys `r1`, `v1`, `g1`, `e1`, `a1`, `x1`, `x2`, `x3` and `x4`. Every key is required and none is empty. Required, except in a mode exclusion, which MUST NOT carry it. |
 | `rationale` | Why the mode is excluded. Required and not empty in a mode exclusion. Any other entry MUST NOT carry it. |
 | `not_applicable_permitted` | Optional. The ids of the obligations for which the promise permits a `not_applicable` result, without repeats. Each MUST be a BASE obligation or one that the entry's templates select. A mode exclusion MUST NOT carry it. |
+
+Per-unit policy is additive: operation obligations retain BASE and every parent template, and add
+all templates from the explicit rows; capability mappings still supply M. P's template table MUST
+include the complete union. A row cannot override a promise, remove retained work, excuse missing
+mapping completeness or approve a partial value regime through rationale text. An absent row
+remains `classification_required`; absence of both optional members preserves old v1 bytes and
+identities and supplies no per-unit classification authority. Present rows retain declaration order.
+
+The first classified intake supports one exact mode and target. Newly supported predicate or
+per-unit intake refuses mapped operation selections, including on true acquisition absence, until
+complete flow policy is separately implemented and reviewed. Legacy predicate-free/field-absent
+structural mapped fixtures retain their existing unqualified semantics; the policy-only resolver
+still supplies no claim of actual adapter mapping completeness. The basis is the existing Annex
+B.7/`part_identity` SHA-256 of `{agent, version, target, binary, features?, known_omissions?,
+rules_sha256, schema_sha256, units}`. `binary` retains selected-shard `semantic_version`,
+`target_triple` and `sha256`; features and known omissions retain their entire payload and exact
+absent/present distinction. Units retain the complete selected population in canonical set order,
+including original flags removed by union normalization and all wrapper claim levels. Each unit
+states its SurfaceIdentity, complete applicable target set, original selected-shard row payload,
+normalized union row payload and wrapper claim payloads with owning command scope/level, including
+explicit absent provenance. Unknown/unprojectable row fields or payloads incompatible with B.7's
+no-number canonicalization MUST refuse. Nothing is silently filtered to obtain a digest.
+
+RULES and SCHEMA bind their complete raw file digests. Every other supported row field, arity,
+alias, usage, note, conflict and claim scope/level is retained. Acquisition timestamps, producer
+wrapper-version labels and union input file bookkeeping are outside this projection; complete raw
+file references remain in O. Reports are validated recomputations. Local duplicate path/name/alias validation covers every
+acquired command; inherited-root alias coherence applies only to exact selected command paths.
+Unselected nested commands may legally own different local aliases and do not expand selection.
+Timestamp-only regeneration
+therefore keeps the basis stable while changed raw inputs still change O and invalidate E unless
+explicit reuse is admissible. Changed semantic facts require maintainer basis review and P refreeze;
+a stale basis refuses. Read-only freeze plans expose the basis hash and facts for registry authoring,
+without providing readiness, evidence or a second policy store.
 
 `capabilities` lists the capability mappings of the declaration. It is omitted when the
 declaration claims no capability.
@@ -462,8 +498,11 @@ library foundation; no production command calls it and the registry loader's ref
   template definitions, path enablement and every debt row in force for the agent. The baseline
   MUST NOT be filtered by operation, target, version or observed acquisition gaps. Derived sets
   use Annex B's canonical order and `part_identity` defines P's identity.
-- The first implementation refuses predicate selectors and mode exclusions pending their bounded
-  acquisition/classification intake. Overlapping command scopes on a common target also refuse;
+- The policy-only resolver refuses predicate selectors without acquisition. The coherent read-only
+  freeze/currentness intake supports only one exact `--json` presence predicate: no value, exact
+  zero arity, and canonical spelling or a coherently acquired long/short alias. Hidden/source-only
+  aliases, other predicates, arity/alias conflicts and parent-prefix command matching refuse.
+  Mode exclusions remain unsupported. Overlapping command scopes on a common target also refuse;
   different free-form mode labels do not establish disjoint invocations. A declaration's canonical
   command paths are retained as policy, not certified as upstream alias/effect facts. Mapping
   declarations are preserved without certifying completeness of the actual adapter's flows.
@@ -472,7 +511,7 @@ library foundation; no production command calls it and the registry loader's ref
   or evidence-reuse verdict. Later transition-aware consumers retain their contract obligations.
 
 These functions MUST NOT be treated as request freezes, execution readiness, qualification,
-validated grants, actor/path authority or depth admission. Predicate selectors, semantic effect/adequacy decisions, E, request/record writers, guarded
+validated grants, actor/path authority or depth admission. Semantic effect/adequacy decisions, E, request/record writers, guarded
 acceptance and enablement remain separate work. The read-only P/O planner is described in the
 [maintenance request contract](maintenance-request-contract-v1.md#preparatory-read-only-freeze-planning). A caller supplies
 one coherent candidate view; `prior_record = None` MUST mean absent, never unreadable. No bypass

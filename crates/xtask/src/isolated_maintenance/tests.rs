@@ -151,7 +151,7 @@ fn canonical_ordinary_registry_and_isolated_protected_declaration_are_distinct()
 }
 #[test]
 fn finite_selection_rejects_scope_expansion_even_when_protected() {
-    for edit in 0..10 {
+    for edit in 0..11 {
         let f = Fixture::new();
         f.registry(|doc| {
             let agent = doc["agents"]
@@ -174,7 +174,13 @@ fn finite_selection_rejects_scope_expansion_even_when_protected() {
                 }
                 7 => declaration["capabilities"][0]["id"] = toml_edit::value("agent_api.other"),
                 8 => declaration["operations"][0]["templates"][0] = toml_edit::value("SESSION"),
-                _ => declaration["modes"][0]["predicates"][0]["value"] = toml_edit::value("true"),
+                9 => declaration["modes"][0]["predicates"][0]["value"] = toml_edit::value("true"),
+                _ => {
+                    declaration["operations"][0]["classification_basis"] =
+                        toml_edit::value("a".repeat(64));
+                    declaration["operations"][0]["classifications"] =
+                        toml_edit::value(toml_edit::Array::new());
+                }
             }
         });
         f.commit();

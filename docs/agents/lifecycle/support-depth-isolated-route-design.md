@@ -12,8 +12,11 @@ This approval enables no route by itself, changes no registry/host setting and c
 
 Run the existing public maintenance commands against one independently authorized disposable
 repository, with real acquisition and request-bound P/O, authenticated per-obligation evidence,
-manual closeout, separate promotion and final protected integration. Keep one Codex0.156.1
-`run`/CORE headless promise, `agent_api.run`, BASE+OUT3+LC2+M and no new debt or blanket NA.
+manual closeout, separate promotion and final protected integration. The earlier one-Codex0.156.1 `run`/CORE, twelve-obligation mapped-proof premise is retired by
+approved [PI-P1–PI-P3](support-depth-packet-intake-design.md). The real packet needs mutation
+obligations and complete initial/resume/fork declarations before claiming `agent_api.run`; those
+exact declarations remain uninstalled. Existing CORE fixtures retain only their diagnostic scope.
+No new debt or blanket NA is authorized.
 Synthetic adapter subprocesses retain their explicit fixture provenance; this is not qualification
 of live upstream model output. Other agents, modes, targets and onboarding get preservation/refusal
 coverage. The existing Annex A remains the sole route inventory.
@@ -128,7 +131,8 @@ No cross-version or cross-target reuse is added.
 Keep exhaustive host run/attempt discovery, immutable artifacts/log bindings, actual workflow/build
 identity, dependency/environment currentness and per-obligation case subsets. Every applicable
 attempt counts even if failed, unfinished or missing evidence. One exact authenticated maintainer
-adoption may cover the twelve independently reviewed mappings; candidate source or generic code
+adoption may cover the independently reviewed mappings of the complete approved flow set;
+previous twelve-case fixture adoption does not establish that set. Candidate source or generic code
 review does not supply adequacy. New target/source/assertion/P/O/trust differences must be evaluated
 under existing mapping-reuse rules; old fixture adoption is not automatically transferred.
 
@@ -140,7 +144,7 @@ without demanding that unrelated workflow progress stop. Missing, queued, runnin
 producers remain unverified; missing/unavailable logs, incomplete artifacts or failed collection/
 upload/binding never verify. Terminal failed-case witnesses and contradictions remain in evaluation,
 including faithful witnesses from a job that failed elsewhere. Do not exclude the current run,
-filter to the latest green attempt or invent an adoption fallback. All twelve mappings still need
+filter to the latest green attempt or invent an adoption fallback. Every mapping in the complete approved flow set still needs
 independent adoption. Before MERGE, the whole workflow must finish through its existing 17-job
 result policy (including candidate-justified skips), direct required checks and terminal gate.
 
@@ -195,13 +199,13 @@ authorization, read back isolation/rules and compare production identities befor
 1. **Binding plumbing, fail closed.** Private fixed isolated-context resolver, approved-source and
    repository observations, scoped loader and plan/scratch/apply lifecycle. Read-only probes and
    negative/public ordinary controls; no positive depth writer enabled yet.
-2. **Packet intake readiness.** The proposed [intake design and exact classifications](support-depth-packet-intake-design.md) brings PI-P1–PI-P3 for separate maintainer decisions. Exact predicate/alias and selected-unit classification handling,
+2. **Packet intake readiness.** The approved [intake design and exact classifications](support-depth-packet-intake-design.md) settles PI-P1–PI-P3. Exact predicate/alias and selected-unit classification handling,
    real target/acquisition and P/O currentness. First present exact effect classifications and any
    necessary P representation changes for maintainer review; implement only approved policy.
    Resolve the IR-D1 feasibility checkpoint early; prove unresolved/classification/work refusals
    and truthful P-only behavior.
 3. **Packet-bound authenticated producer.** Reuse CORE collection/evaluation for the real frozen
-   generation and isolated host scope. Prove all twelve obligations with positive/negative host
+   generation and isolated host scope. Prove every obligation from the complete reviewed PI-P3 declarations with positive/negative host
    fixtures, currentness, IR-P3 terminality/discovery and opaque entry-state behavior. Live adoption
    is separate host work; IR-P3 implementation remains a prerequisite for same-run positive integration.
 4. **Connect public routes and IN1.** Thread the admitted context and hosts through the supported

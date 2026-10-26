@@ -1,9 +1,10 @@
 # Packet intake: exact proposed effect classifications
 
-Status: proposed for maintainer decision PI-P1; no policy is installed by this appendix.
+Status: PI-P1 approved by the maintainer on 2026-10-25; no policy is installed by this appendix.
+The read-only reconciliation regression exercises the30 approved assignments and retains24 unknowns.
 Baseline: staging `43a42bbcbc51ce2d21e5144a091d2bde5bac760f` (PR #298).
 Read with the [intake design](support-depth-packet-intake-design.md). The registry remains the
-sole executable classification inventory; this is its proposed review table, not a second loader.
+sole executable classification inventory; this is its approved review table, not a second loader.
 
 ## Population and meaning
 
@@ -16,7 +17,7 @@ wrapper-only claim. Reports are validated inputs, not another population. Nested
 and root PROMPT are not silently assigned to this exact-path operation; adapter-flow completeness
 is a separate unmet claim in PI-P3. Nothing here changes name-level exclusions or coverage levels.
 
-`CORE` below is an explicit proposed assignment, not inheritance based on a flag's spelling.
+`CORE` below is an explicit approved assignment, not inheritance based on a flag's spelling.
 BASE always applies. `CORE+ADMIN` explicitly adds OUT1, LC1 and FX1 for file/Git mutation.
 `CORE-denial` retains the unit and requires a version-bound denied/no-effect path; it does not
 qualify remote execution. `U-*` is an exact unresolved disposition: retain classification_required.
@@ -34,7 +35,7 @@ effective flag covered by its separately listed global claim.
 
 ## Every selected identity
 
-| # | surface_kind | command_path | surface_id | Recorded alias / arity | Wrapper claim | Proposed assignment | Exact reason |
+| # | surface_kind | command_path | surface_id | Recorded alias / arity | Wrapper claim | Approved assignment | Exact reason |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `commands` | `codex exec` | `exec` | — / command | explicit | **CORE** | New noninteractive exec operation, OUT3/LC2; no claim covering resume/fork/review subcommands. |
 | 2 | `flags` | `codex exec` | `--add-dir` | — / value DIR | unclaimed | **CORE** | Writable-directory scope: explicit BASE X2/X4 and validation; no separate administrative operation promised. |
@@ -120,7 +121,7 @@ Wrapper grounding: [override argv](../../../crates/codex/src/builder/cli_overrid
 flags before `exec`; [streaming](../../../crates/codex/src/exec/streaming.rs) always supplies JSON,
 skip-repository-check, color and a last-message output path, using a temporary path when none is
 provided. Thus mutation is not merely a hypothetical user-supplied output option. ADMIN is a
-proposed conservative promise addition requiring maintainer approval, not a claim that existing
+approved conservative promise addition requiring independent effect proof, not a claim that existing
 CORE evidence already proves it. `--output-schema` is input shaping; the wrapper does not thereby
 claim a QUERY parsed-record interface. Initial persistence/ephemeral behavior alone adds no
 session selector; actual resume/fork does require SESSION review.
