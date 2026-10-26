@@ -94,15 +94,16 @@ impl AppServerRequest {
     }
     /// Consume ownership and queue the complete validated native result unchanged.
     pub fn reply(mut self, result: Value) -> Result<(), McpError> {
-        if !interaction_validation::valid(&self.method, &result, true)
-            || result.to_string().len() > MAX_FRAME
-        {
+        if !interaction_validation::valid(&self.method, &result, true) {
             self.state.refuse(self.token);
             self.answered = true;
             return Err(McpError::Transport(
                 "invalid native interaction reply".into(),
             ));
         }
+        // The private native ID and JSON-RPC envelope count toward the wire limit.
+        // On failure Drop safely queues refusal while ownership is still active.
+        self.state.check_reply_frame(self.token, &result)?;
         self.answered = true;
         self.state.queue(self.token, Some(result))
     }
@@ -224,10 +225,26 @@ impl InteractionState {
             })
             .map_err(|_| McpError::ChannelClosed)
     }
+    fn response_frame(id: &Value, result: Option<&Value>) -> String {
+        match result {
+            Some(result) => json!({"jsonrpc":"2.0","id":id,"result":result}),
+            None => json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":"client interaction unsupported"}}),
+        }.to_string()
+    }
+    fn check_reply_frame(&self, token: u64, result: &Value) -> Result<(), McpError> {
+        let p = self.pending.lock().expect("interaction lock");
+        let r = p.requests.get(&token).ok_or(McpError::Cancelled)?;
+        if Self::response_frame(&r.id, Some(result)).len() > MAX_FRAME {
+            return Err(McpError::Transport(
+                "invalid native interaction reply".into(),
+            ));
+        }
+        Ok(())
+    }
     pub(super) fn render_reply(&self, token: u64, result: Option<Value>) -> Option<String> {
         let p = self.pending.lock().expect("interaction lock");
         let r = p.requests.get(&token)?;
-        Some(match result { Some(result)=>json!({"jsonrpc":"2.0","id":r.id,"result":result}), None=>json!({"jsonrpc":"2.0","id":r.id,"error":{"code":-32601,"message":"client interaction unsupported"}}) }.to_string())
+        Some(Self::response_frame(&r.id, result.as_ref()))
     }
     pub(super) fn reply_watch(&self, token: u64) -> Option<watch::Receiver<bool>> {
         self.pending

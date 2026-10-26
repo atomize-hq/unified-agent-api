@@ -489,3 +489,63 @@ for line in sys.stdin:
     );
     server.shutdown_and_wait().await.unwrap();
 }
+
+#[tokio::test]
+async fn outgoing_native_reply_bound_covers_complete_wire_frame_and_string_id() {
+    const LIMIT: usize = 1024 * 1024;
+    let id = "native-λ-".repeat(12);
+    for extra in [0, 1] {
+        let native = json!({"id":id,"method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"s","mode":"url","message":"login","url":"https://example.test","elicitationId":"e"}});
+        let body = format!(
+            r#"
+send({native})
+line=sys.stdin.buffer.readline()
+reply=json.loads(line)
+send({{'method':'wire/reply','params':{{'bytes':len(line)-1,'id':reply['id'],'action':reply.get('result',{{}}).get('action'),'error':reply.get('error',{{}}).get('code')}}}})
+for line in sys.stdin: pass
+"#
+        );
+        let (_dir, server, mut stream) = fixture(&body).await;
+        let AppServerMessage::Request(request) = next(&mut stream).await else {
+            panic!("request")
+        };
+        let mut result = json!({"action":"accept","content":{"padding":""}});
+        let base = json!({"jsonrpc":"2.0","id":id,"result":result})
+            .to_string()
+            .len();
+        result["content"]["padding"] = json!("x".repeat(LIMIT - base + extra));
+        assert!(
+            result.to_string().len() < LIMIT,
+            "both result bodies alone fit; the wire envelope determines acceptance"
+        );
+        assert_eq!(
+            json!({"jsonrpc":"2.0","id":id,"result":result})
+                .to_string()
+                .len(),
+            LIMIT + extra
+        );
+        let reply = request.reply(result);
+        if extra == 0 {
+            reply.expect("exactly 1MiB complete frame must be accepted");
+        } else {
+            assert!(
+                reply.is_err(),
+                "one byte above complete frame bound must be refused"
+            );
+        }
+        let AppServerMessage::Notification { params, .. } = next(&mut stream).await else {
+            panic!("wire response")
+        };
+        assert_eq!(params["id"], id);
+        if extra == 0 {
+            assert_eq!(params["bytes"], LIMIT);
+            assert_eq!(params["action"], "accept");
+            assert!(params["error"].is_null());
+        } else {
+            assert!(params["bytes"].as_u64().unwrap() < LIMIT as u64);
+            assert_eq!(params["error"], -32601);
+            assert!(params["action"].is_null());
+        }
+        server.shutdown_and_wait().await.unwrap();
+    }
+}
