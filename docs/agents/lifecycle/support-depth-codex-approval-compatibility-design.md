@@ -1,10 +1,10 @@
 # Native Codex approvals through UAA
 
-Status: proposed technical design, 2026-10-26. The maintainer selected native compatibility:
+Status: implementation approved, 2026-10-26. The maintainer selected native compatibility:
 UAA transports supported Codex configuration and interactions; consuming applications choose
 policy, decisions and presentation. This supersedes the proposed blanket refusal of explicit
-non-Never initial/resume policies. It does not approve runtime implementation or qualify a pilot.
-PR #300's existing compatibility repairs remain separate and its approval bridge is not implemented.
+non-Never initial/resume policies. The maintainer subsequently approved implementing this design
+in PR #300. Implementation and configuration checks do not qualify a pilot.
 
 ## Outcome and boundary
 
@@ -22,10 +22,10 @@ claiming every upstream feature. New protocol features remain explicit additions
 
 ## Facts driving the change
 
-Initial/resume currently use `codex exec`; fork uses `codex app-server`. The initial/resume root
+Before this correction, initial/resume used `codex exec`; fork used `codex app-server`. The initial/resume root
 approval flag is not a reliable effective-policy control. Ordinary headless exec selects Never;
 AutoReview configuration is a distinct exception. PR #300 explicitly preserves Never intent and
-leaves other policy requests unchanged. This proposal fixes the route for those other requests.
+left other policy requests unchanged. The bridge corrects the route for those requests.
 
 | Requested policy | Pinned CLI path | Pinned app-server path |
 | --- | --- | --- |
@@ -91,10 +91,10 @@ or drop requested directories. A route is not ready while that required correspo
 ## Small application integration surface
 
 Add a Codex-backend-local asynchronous handler through a builder on `CodexBackend`, leaving
-`CodexBackendConfig` and universal run request/handle structs source-compatible. Proposed shape:
+`CodexBackendConfig` and universal run request/handle structs source-compatible. Integration shape:
 
 ```rust
-// Sketch: names and concrete error types belong to the implementation contract.
+// Public types are specified in docs/specs/codex-interaction-contract.md.
 CodexBackend::new(config).with_interaction_handler(handler)
 // handler(request { method, params, item_context }) -> Future<Result<Reply, InteractionError>>
 // Reply = Result(native_json_result) | Unsupported
@@ -261,8 +261,22 @@ Required implementation cases for the accepted discovery causes (original labels
   new thread-start/resume/fork and turn-start shape with the same granular object, including explicit
   false controls; assert exact native RPC method/JSON correspondence and no policy substitution.
 
-These are acceptance obligations for implementation, not tests performed by this design repair.
-The exact add-dir mapping, successful native approval execution and pilot proof remain pending.
+These are implementation acceptance obligations. The canonical
+[interaction contract](../../specs/codex-interaction-contract.md) defines the implemented handler,
+routing and native configuration mapping. Offline native configuration observations and adapter
+fixtures cover settings and protocol behavior; successful native approval execution and pilot
+qualification still require their own evidence.
+
+The root mapping reads native `config/read` (without layers) and `configRequirements/read` before
+thread creation/resume. App-server startup receives the selected `sandbox_mode` config override,
+matching exec's explicit sandbox selection. With that selection the pinned native implementation
+uses legacy syntax and discards a persisted selected profile. Supply an explicit first-occurrence
+union of effective cwd and normalized requested add-dirs; append native-resolved legacy writable
+roots only when both `default_permissions` and `allowedPermissionProfiles` are absent/null.
+Supply this complete vector before start/resume, including when add-dirs is empty, so resume cannot
+restore stale roots. Native Codex still owns profile compilation, requirements and enforcement.
+These read-only configuration RPCs are additional pilot effects to classify before enrollment;
+they do not expand the existing approved registry inventory.
 
 Implementation uses Rust2021, existing Tokio/serde machinery, safe owned-process patterns and the
 existing 700 Rust-code-LOC limit, with no new dependency or generic harness rewrite. Run targeted
@@ -273,5 +287,5 @@ and each agent's manifest validation, `--tip origin/staging` validation and acqu
 No new required checks, automation, registry fields or production settings are introduced here.
 
 The two recommendations are the semantic routing above and this backend-local native handler.
-They implement the maintainer's selected direction. Review this concrete plan before changing the
-public/runtime behavior; approval of the direction is not a claim that the bridge is implemented.
+The maintainer approved both recommendations and implementation. Required implementation review
+and gates apply to the complete source candidate; this document alone is not runtime proof.

@@ -20,13 +20,34 @@ pub struct CodexBackendConfig {
 
 pub struct CodexBackend {
     config: CodexBackendConfig,
+    interaction_handler: Option<interaction::Handler>,
 }
 
 impl CodexBackend {
     pub fn new(config: CodexBackendConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            interaction_handler: None,
+        }
+    }
+    /// Register an application handler without changing routing or native policy.
+    /// Dropping its future cancels the application's pending interaction work.
+    pub fn with_interaction_handler<F, Fut>(mut self, handler: F) -> Self
+    where
+        F: Fn(CodexInteractionRequest) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<CodexInteractionReply, CodexInteractionError>>
+            + Send
+            + 'static,
+    {
+        self.interaction_handler =
+            Some(interaction::Handler(std::sync::Arc::new(move |request| {
+                Box::pin(handler(request))
+            })));
+        self
     }
 }
+
+pub use interaction::{CodexInteractionError, CodexInteractionReply, CodexInteractionRequest};
 
 const PINNED_APPROVAL_REQUIRED: &str = "approval required";
 const PINNED_ADD_DIRS_UNSUPPORTED_FOR_FORK: &str = "add_dirs unsupported for codex fork";
@@ -91,6 +112,7 @@ mod backend;
 mod exec;
 mod fork;
 mod harness;
+mod interaction;
 mod mapping;
 mod mcp_management;
 mod policy;

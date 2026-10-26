@@ -171,24 +171,55 @@ For streaming entrypoints that expose a termination handle (e.g., `ExecStreamCon
 
 ## Unified adapter approval intent on pinned Codex 0.156.1
 
-The unified adapter's initial and resume paths MUST preserve `never` whenever non-interactive is
-true (the default), or when `backend.codex.exec.approval_policy="never"` is explicitly selected.
-For normal execution, the adapter emits root `--ask-for-approval never` for compatibility and an
-explicit `--config 'approval_policy="never"'`. The config override is authoritative on pinned
-`0.156.1`: its exec dispatch drops the root approval flag, and its AutoReview configuration path can
-remove the normal headless Never default. The explicit config override MUST survive that path
-without changing the configured reviewer. The dangerous external-sandbox path uses its existing
-bypass flag and MUST NOT add conflicting approval config or safety flags.
+The unified adapter's initial and resume paths use exec when noninteractive is absent or true,
+and retain the existing external-sandbox bypass route. Ordinary exec emits root
+`--ask-for-approval never` and explicit `--config 'approval_policy="never"'`. The latter preserves
+Never even when native AutoReview configuration removes exec's headless default. The configured
+reviewer is unchanged. External bypass retains its existing validation, opt-in and warning and
+MUST NOT receive conflicting approval overrides.
 
-When non-interactive is false and approval is absent, the adapter MUST preserve absence and let
-upstream select its effective default. The historical typed `untrusted`, `on-failure` and
-`on-request` inputs retain existing forwarding while the proposed
-[native approval bridge](../agents/lifecycle/support-depth-codex-approval-compatibility-design.md)
-is designed and reviewed: pinned exec cannot honor those requests through the current root flag.
-That proposal changes no current normative behavior. This compatibility increment does not
-silently substitute another policy, switch protocol flows or enable automatic review for them.
-Fork approval uses its separate [app-server contract](codex-app-server-jsonrpc-contract.md).
+With `agent_api.exec.non_interactive=false`, initial/resume use one owned native app-server process:
+`thread/start` or `thread/resume`, followed by `turn/start`. Fork uses `thread/fork` followed by
+`turn/start`. No failed native operation falls back to exec, creates a new session on resume failure,
+or substitutes another approval policy. Handler registration alone does not change routing.
 
-These are adapter translation requirements, not support-depth qualification or a new promise for
-arbitrary generic wrapper configuration. Source-bound fixture policy tests and isolated offline
-binary startup observations do not establish successful model execution or independent adequacy.
+Explicit `never`, `on-request`, `untrusted` and the pinned granular object are forwarded unchanged
+at thread and turn start. Absent policy remains absent, preserving native defaults and reviewer
+selection through the existing home/configuration environment. Granular policy requires boolean
+`sandbox_approval`, `rules`, and `mcp_elicitations`; optional boolean `request_permissions` and
+`skill_approval` preserve native false defaults, including explicit false. Unknown/malformed fields
+are rejected. Noninteractive true still rejects any explicit policy other than Never. Historical
+`on-failure` remains accepted by validation but returns a truthful redacted native unsupported-policy
+error on this pinned runtime. It is never aliased to another policy.
+
+The native route preserves request-over-backend model precedence, wrapper GPT-5 reasoning defaults,
+working directory and environment/home precedence, deterministic last/id selection, session handles,
+actual completed assistant final text, event bounds and completion after cleanup. Explicit zero
+timeout disables the deadline. The one run deadline includes initialization, config reads, selection,
+thread/turn acceptance, callbacks and execution. Cancellation and process cleanup do not depend on
+consumer event polling. Fork's model/add-dir refusals remain unchanged.
+
+For initial/resume, the native process receives the selected `sandbox_mode` as a startup config
+override. `config/read` for the effective absolute cwd and `configRequirements/read` supply the
+native current configuration. The adapter supplies the complete `runtimeWorkspaceRoots` at thread
+start/resume, including when no additional directories were requested. Its ordered, first-occurrence
+deduplicated vector is `[cwd] + normalized requested add_dirs + legacy ambient writable_roots`,
+with the last term included only when both native `default_permissions` and requirements
+`allowedPermissionProfiles` are absent or null. These predicates mirror the pinned runtime's
+explicit legacy sandbox override and profile selection; native Codex still enforces permissions.
+Malformed configuration fails safely. Roots are not filesystem-canonicalized, dropped, or confused
+with an incremental `runtimeWorkspaceRoots` alias. Supplying the current complete vector also
+prevents resume from restoring an obsolete persisted root vector.
+
+See the [native interaction contract](codex-interaction-contract.md) for callback ownership,
+file-change context, structured responses, limits and refusal. Fork's wrapper transport is defined
+by the [app-server contract](codex-app-server-jsonrpc-contract.md).
+
+Migration: callers setting noninteractive false now receive app-server defaults instead of exec's
+implicit Never. Set an explicit supported native policy when that intent matters, and register an
+application handler if client interaction is expected. Existing default/unattended and external
+bypass callers retain their routes. No approval UI or policy evaluator is supplied by UAA.
+
+These adapter translation requirements do not qualify support depth. Source-bound fixtures and
+isolated offline configuration observations do not prove successful model execution, real native
+approval execution or independent adequacy.

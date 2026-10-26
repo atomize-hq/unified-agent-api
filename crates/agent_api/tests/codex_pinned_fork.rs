@@ -256,7 +256,7 @@ async fn pinned_fork_forwards_supported_policies_and_preserves_absence() {
         exercise_with_policy("pinned_policy", false, Some(Some("on-failure"))).await;
     assert_eq!(
         completion.unwrap_err().to_string(),
-        "backend error: codex app-server rpc error"
+        "backend error: codex native approval policy unsupported (details redacted)"
     );
     assert!(!format!("{events:?}").contains("SECRET"));
 }

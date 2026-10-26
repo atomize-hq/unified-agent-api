@@ -286,8 +286,11 @@ request method to lifecycle handling, including when the request arrives during 
 Legacy approval methods and `codex/event` approval notifications remain recognized for compatibility;
 they are not claims about the pinned v2 emission shape.
 
-An approval request MUST fail promptly with safe message `"approval required"`; no approval-response
-UI or approval capability is promised for either value of non-interactive. When a consumer-visible
+For legacy constructors or a UAA run without an installed interaction handler, an approval request
+MUST fail promptly with safe message `"approval required"`; no approval-response
+UI is supplied. The opt-in native client interaction API below and UAA's
+[interaction contract](codex-interaction-contract.md) define application-supplied decisions;
+noninteractive=true does not invoke that handler. When a consumer-visible
 stream exists, emit exactly one terminal Error with that message, close the stream and resolve
 completion with `Err(AgentWrapperError::Backend { message: "approval required" })`. Raw approval
 commands, reasons and details MUST NOT appear in public events or errors.
@@ -383,7 +386,8 @@ poll, including after time spent queued or waiting for pipe readiness. No user c
 the transport reader/writer or under their locks. Owners remain responsible for thread/turn/item
 association and for invalidating replies when their application scope ends.
 
-App-server stdout frames MUST be limited to 1 MiB before frame allocation grows beyond that bound;
+App-server stdout frames and complete outgoing native interaction replies (including the JSON-RPC
+envelope and native ID) MUST be limited to 1 MiB; stdout allocation MUST NOT grow beyond that bound;
 exactly 1 MiB of UTF-8 payload (excluding the terminating LF) is permitted. There MUST be at most
 16 outstanding native server requests. Ordered delivery uses bounded backpressure for notification
 bursts; it MUST NOT silently drop/truncate notifications. Retained transport request/notification

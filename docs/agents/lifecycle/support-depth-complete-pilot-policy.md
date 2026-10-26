@@ -76,7 +76,7 @@ they are effects inputs even without corresponding argv tokens.
 | Policy variant, in every flow unless stated | Accepted behavior / rejection |
 | --- | --- |
 | Noninteractive absent or true | Defaults true; approval must be absent or `never`; adapter selects never. Sandbox defaults `workspace-write`; explicit modes are `read-only`, `workspace-write`, `danger-full-access` |
-| Noninteractive false | Optional approval is exactly `untrusted`, `on-failure`, `on-request`, `never`; absent means upstream effective policy. No generic interactive picker or approval-response interface is promised; approval-required/error terminal handling needs proof |
+| Noninteractive false | Optional approval is `untrusted`, `on-failure`, `on-request`, `never` or the pinned granular object; absent means upstream effective policy. Initial/resume use app-server. The backend-local native handler transports application decisions; successful native approval execution still needs proof |
 | External sandbox absent or false | Normal path; extension is admitted only when backend opt-in advertises support |
 | External sandbox true | Requires backend opt-in, rejects explicitly noninteractive=false and every `backend.codex.exec.*` key; initial/resume emit bypass and omit conflicting safety argv, fork sends never/danger-full-access. Adapter emits the existing warning; this is not host sandbox authorization |
 | Model/add-dirs/env/timeout/cancel | Typed validation and supported/rejected combinations remain controlling; source-bound tests must cover them. Zero effective timeout means no timeout; cancellation and timeout remain distinct outcomes |
@@ -103,9 +103,16 @@ reviewer choice intact. An isolated offline pinned-binary observation reproduced
 and the effective corrected policy; production adapter fixtures cover initial, resume-last and
 resume-id with default/explicit Never, absent policy and external bypass. The disposition of explicit
 non-Never exec/resume requests is now governed by the maintainer-selected native compatibility
-direction and the proposed [approval bridge design](support-depth-codex-approval-compatibility-design.md).
-The bridge is not implemented by this repair; existing forwarding remains unchanged. No silent
-policy substitution or automatic-review enablement is authorized.
+direction and the approved [approval bridge design](support-depth-codex-approval-compatibility-design.md).
+The bridge adds a backend-local asynchronous native interaction handler and routes
+noninteractive=false initial/resume through app-server, preserving native reviewer configuration.
+It forwards policies unchanged and reports actual native rejection, including pinned on-failure.
+Native configuration reads preserve cwd/add-dir/ambient roots before start/resume. These additional
+RPC effects must be classified before enrollment; the existing30 approved/24 unknown/56 carried
+inventory is unchanged. No silent policy substitution or automatic-review enablement is authorized.
+The [interaction contract](../../specs/codex-interaction-contract.md) specifies the implementation;
+fixtures and offline configuration observations do not establish successful approval/model execution
+or qualification.
 The [streaming contract](../../specs/codex-streaming-exec-contract.md) records the adapter translation.
 
 ## Exact proposed operation and mode declarations

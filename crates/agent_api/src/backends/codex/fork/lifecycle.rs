@@ -16,7 +16,7 @@ pub(super) async fn run(
     req: ForkFlowRequest,
     cwd: PathBuf,
     mut cancel: mpsc::UnboundedReceiver<()>,
-    events: &mpsc::UnboundedSender<CodexBackendEvent>,
+    events: &mpsc::Sender<CodexBackendEvent>,
 ) -> Result<CodexBackendCompletion, CodexBackendError> {
     let timeout = req.effective_timeout.filter(|duration| !duration.is_zero());
     // Captured by the adapter before the public harness returns a handle. Time spent
@@ -52,14 +52,16 @@ pub(super) async fn run(
     };
     // The spawn future has no suspension after the child is created. Cancelling a
     // busy-executable retry has no child; otherwise we retain the returned owner.
-    let server = tokio::select! {
+    let (server, messages) = tokio::select! {
         biased;
         Some(()) = cancel.recv() => return Err(cancelled()),
         _ = &mut expired => return Err(timed_out()),
-        server = CodexAppServer::spawn_uninitialized(config) => server.map_err(CodexBackendError::AppServer)?,
+        server = CodexAppServer::spawn_uninitialized_with_interactions_and_config(config,[("sandbox_mode".into(),serde_json::Value::String(map_sandbox_mode(if req.external_sandbox { &CodexSandboxMode::DangerFullAccess } else { &req.sandbox_mode }).into()))].into_iter().collect()) => server.map_err(CodexBackendError::AppServer)?,
     };
     let mut thread_id = None;
     let mut active_turn = None;
+    let (scope_tx, scope_rx) = mpsc::unbounded_channel();
+    let mut output = super::broker::Output::new(events.clone());
     let outcome = {
         let execution = async {
             server
@@ -73,12 +75,15 @@ pub(super) async fn run(
                 .await
                 .map_err(CodexBackendError::AppServer)?;
             let source = match req.selector {
-                SessionSelectorV1::Id { id } => id,
-                SessionSelectorV1::Last => server
-                    .select_last_thread_id(cwd.clone())
-                    .await
-                    .map_err(CodexBackendError::AppServer)?
-                    .ok_or(CodexBackendError::ForkSelectionEmpty)?,
+                Some(SessionSelectorV1::Id { id }) => Some(id),
+                Some(SessionSelectorV1::Last) => Some(
+                    server
+                        .select_last_thread_id(cwd.clone())
+                        .await
+                        .map_err(CodexBackendError::AppServer)?
+                        .ok_or(CodexBackendError::ForkSelectionEmpty)?,
+                ),
+                None => None,
             };
             let (approval, sandbox) = if req.external_sandbox {
                 (
@@ -89,47 +94,151 @@ pub(super) async fn run(
                 (req.approval_policy, req.sandbox_mode)
             };
             let approval = effective_approval_policy(req.non_interactive, approval.as_ref());
-            let forked = server
-                .thread_fork(codex::mcp::ThreadForkParams {
-                    thread_id: source,
-                    cwd: Some(cwd.clone()),
-                    approval_policy: approval.clone(),
-                    sandbox: Some(map_sandbox_mode(&sandbox).into()),
-                    persist_extended_history: None,
-                })
+            let roots = if req.is_fork {
+                None
+            } else {
+                super::native_config::workspace_roots(&server, &cwd, &req.add_dirs).await?
+            };
+            let model = if req.is_fork {
+                None
+            } else {
+                req.model_id
+                    .or(req.config.model)
+                    .filter(|model| !model.trim().is_empty())
+            };
+            let settings = if model
+                .as_deref()
+                .is_some_and(|model| model.to_ascii_lowercase().starts_with("gpt-5"))
+            {
+                [
+                    ("model_reasoning_effort", "medium"),
+                    ("model_reasoning_summary", "auto"),
+                    ("model_verbosity", "low"),
+                ]
+                .into_iter()
+                .map(|(key, value)| (key.into(), serde_json::Value::String(value.into())))
+                .collect()
+            } else {
+                std::collections::BTreeMap::new()
+            };
+            let call = if req.is_fork {
+                server
+                    .thread_fork_v2(codex::mcp::ThreadForkParamsV2 {
+                        thread_id: source.expect("fork source"),
+                        cwd: Some(cwd.clone()),
+                        model: model.clone(),
+                        approval_policy: approval.clone(),
+                        sandbox: Some(map_sandbox_mode(&sandbox).into()),
+                        config: settings,
+                        persist_extended_history: None,
+                        runtime_workspace_roots: roots,
+                    })
+                    .await
+            } else if let Some(source) = source {
+                server
+                    .thread_resume_v2(codex::mcp::ThreadResumeParamsV2 {
+                        thread_id: source,
+                        cwd: Some(cwd.clone()),
+                        model: model.clone(),
+                        approval_policy: approval.clone(),
+                        sandbox: Some(map_sandbox_mode(&sandbox).into()),
+                        config: settings,
+                        persist_extended_history: None,
+                        runtime_workspace_roots: roots,
+                    })
+                    .await
+            } else {
+                server
+                    .thread_start_v2(codex::mcp::ThreadStartParamsV2 {
+                        cwd: Some(cwd.clone()),
+                        model: model.clone(),
+                        approval_policy: approval.clone(),
+                        sandbox: Some(map_sandbox_mode(&sandbox).into()),
+                        config: settings,
+                        persist_extended_history: None,
+                        runtime_workspace_roots: roots,
+                    })
+                    .await
+            }
+            .map_err(CodexBackendError::AppServer)?;
+            let response = reply(call)
                 .await
+                .map_err(|err| native_policy_error(err, &approval))
                 .map_err(|err| match err {
-                    McpError::Rpc { ref message, .. }
+                    CodexBackendError::AppServer(McpError::Rpc { ref message, .. })
                         if super::super::is_not_found_signal(message) =>
                     {
                         CodexBackendError::ForkSessionNotFound
                     }
-                    other => CodexBackendError::AppServer(other),
+                    other => other,
                 })?;
-            if forked.thread.id.trim().is_empty() {
-                return Err(CodexBackendError::AppServer(McpError::Server(
-                    "invalid forked thread identity".into(),
-                )));
-            }
-            install_thread_id(&req.handle_state, &forked.thread.id);
-            thread_id = Some(forked.thread.id.clone());
+            let selected = response
+                .get("thread")
+                .and_then(|thread| thread.get("id"))
+                .and_then(serde_json::Value::as_str)
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| {
+                    CodexBackendError::AppServer(McpError::Server("invalid thread identity".into()))
+                })?
+                .to_string();
+            install_thread_id(&req.handle_state, &selected);
+            thread_id = Some(selected.clone());
+            let _ = scope_tx.send(super::broker::Scope::Thread(selected.clone()));
             let call = server
-                .turn_start_v2(codex::mcp::TurnStartParamsV2 {
-                    thread_id: forked.thread.id.clone(),
+                .turn_start_v3(codex::mcp::TurnStartParamsV3 {
+                    thread_id: selected,
                     input: vec![codex::mcp::UserInputV2::text(req.prompt)],
-                    approval_policy: approval,
+                    approval_policy: approval.clone(),
                     cwd: Some(cwd),
+                    model,
+                    ..Default::default()
                 })
                 .await
                 .map_err(CodexBackendError::AppServer)?;
-            super::turn::run_turn(forked.thread.id, call, &mut active_turn, events).await
+            let accepted = reply(call)
+                .await
+                .map_err(|err| native_policy_error(err, &approval))?;
+            let turn = accepted.get("turn").ok_or_else(|| {
+                CodexBackendError::AppServer(McpError::Server("invalid turn lifecycle".into()))
+            })?;
+            let id = turn
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| {
+                    CodexBackendError::AppServer(McpError::Server("invalid turn lifecycle".into()))
+                })?
+                .to_string();
+            if turn
+                .get("items")
+                .and_then(serde_json::Value::as_array)
+                .is_none()
+                || !matches!(
+                    turn.get("status").and_then(serde_json::Value::as_str),
+                    Some("inProgress" | "completed" | "failed" | "interrupted")
+                )
+            {
+                return Err(CodexBackendError::AppServer(McpError::Server(
+                    "invalid turn lifecycle".into(),
+                )));
+            }
+            active_turn = Some(id.clone());
+            let _ = scope_tx.send(super::broker::Scope::Turn(id));
+            std::future::pending::<Result<Option<String>, CodexBackendError>>().await
         };
-        tokio::pin!(execution);
+        let handler = if req.non_interactive {
+            None
+        } else {
+            req.interaction_handler
+        };
+        let interactions = super::broker::run(messages, scope_rx, handler, &mut output);
+        tokio::pin!(execution, interactions);
         tokio::select! {
             biased;
-            Some(()) = cancel.recv() => Err(cancelled()),
-            _ = &mut expired => Err(timed_out()),
-            result = &mut execution => result,
+            Some(())=cancel.recv()=>Err(cancelled()),
+            _=&mut expired=>Err(timed_out()),
+            result=&mut execution=>result,
+            result=&mut interactions=>result,
         }
     };
     if outcome.is_err() {
@@ -143,7 +252,8 @@ pub(super) async fn run(
         .shutdown_and_wait()
         .await
         .map_err(CodexBackendError::AppServer);
-    outcome?;
+    output.flush().await;
+    let final_text = outcome?;
     let status = status?;
     if !status.success() {
         return Err(CodexBackendError::AppServer(McpError::Server(
@@ -152,8 +262,34 @@ pub(super) async fn run(
     }
     Ok(CodexBackendCompletion {
         status,
-        final_text: None,
+        final_text,
         backend_error_message: None,
         selection_failure_message: None,
     })
+}
+
+pub(super) async fn reply(
+    mut call: codex::mcp::AppCallHandle,
+) -> Result<serde_json::Value, CodexBackendError> {
+    tokio::time::timeout(Duration::from_secs(3), &mut call.response)
+        .await
+        .map_err(|_| CodexBackendError::AppServer(McpError::Timeout(Duration::from_secs(3))))?
+        .map_err(|_| CodexBackendError::AppServer(McpError::ChannelClosed))?
+        .map_err(CodexBackendError::AppServer)
+}
+
+fn native_policy_error(
+    error: CodexBackendError,
+    approval: &Option<serde_json::Value>,
+) -> CodexBackendError {
+    if approval.as_ref().and_then(serde_json::Value::as_str) == Some("on-failure") {
+        if let CodexBackendError::AppServer(McpError::Rpc { message, .. }) = &error {
+            if message.contains("unknown variant") {
+                return CodexBackendError::AppServer(McpError::Server(
+                    "native approval policy unsupported".into(),
+                ));
+            }
+        }
+    }
+    error
 }

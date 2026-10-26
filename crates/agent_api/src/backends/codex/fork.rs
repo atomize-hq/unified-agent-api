@@ -14,7 +14,6 @@ use super::{
     mapping::{error_event, status_event},
     CodexApprovalPolicy, CodexBackendCompletion, CodexBackendConfig, CodexBackendError,
     CodexBackendEvent, CodexHandleFacetState, CodexSandboxMode, CodexTerminationHandle,
-    PINNED_APPROVAL_REQUIRED,
 };
 
 use super::super::{
@@ -24,7 +23,11 @@ use super::super::{
 
 #[derive(Clone, Debug)]
 pub(super) struct ForkFlowRequest {
-    pub(super) selector: SessionSelectorV1,
+    pub(super) selector: Option<SessionSelectorV1>,
+    pub(super) is_fork: bool,
+    pub(super) model_id: Option<String>,
+    pub(super) add_dirs: Vec<PathBuf>,
+    pub(super) interaction_handler: Option<super::interaction::Handler>,
     pub(super) started_at: tokio::time::Instant,
     pub(super) prompt: String,
     pub(super) working_dir: Option<PathBuf>,
@@ -69,23 +72,20 @@ fn map_sandbox_mode(mode: &CodexSandboxMode) -> &'static str {
     }
 }
 
-fn map_approval_policy(policy: &CodexApprovalPolicy) -> &'static str {
-    match policy {
-        CodexApprovalPolicy::Untrusted => "untrusted",
-        CodexApprovalPolicy::OnFailure => "on-failure",
-        CodexApprovalPolicy::OnRequest => "on-request",
-        CodexApprovalPolicy::Never => "never",
-    }
-}
-
 fn effective_approval_policy(
     non_interactive: bool,
-    approval_policy: Option<&CodexApprovalPolicy>,
-) -> Option<String> {
+    policy: Option<&CodexApprovalPolicy>,
+) -> Option<Value> {
     if non_interactive {
-        return Some("never".to_string());
+        return Some(Value::String("never".into()));
     }
-    approval_policy.map(|policy| map_approval_policy(policy).to_string())
+    policy.map(|policy| match policy {
+        CodexApprovalPolicy::Untrusted => Value::String("untrusted".into()),
+        CodexApprovalPolicy::OnFailure => Value::String("on-failure".into()),
+        CodexApprovalPolicy::OnRequest => Value::String("on-request".into()),
+        CodexApprovalPolicy::Never => Value::String("never".into()),
+        CodexApprovalPolicy::Granular(value) => value.clone(),
+    })
 }
 
 fn resolve_fork_effective_cwd(
@@ -119,7 +119,9 @@ fn install_thread_id(handle_state: &Arc<std::sync::Mutex<CodexHandleFacetState>>
     }
 }
 
+mod broker;
 mod lifecycle;
+mod native_config;
 mod notifications;
 mod turn;
 pub(super) use notifications::{is_approval_request_notification, map_app_server_notification};
@@ -143,13 +145,16 @@ pub(super) async fn spawn_fork_v1_flow(
             AppServerTurnCancelHandle { cancel: cancel_tx },
         ));
     }
-    let (event_tx, event_rx) = mpsc::unbounded_channel::<CodexBackendEvent>();
+    let (event_tx, event_rx) =
+        mpsc::channel::<CodexBackendEvent>(crate::backend_harness::DEFAULT_EVENT_CHANNEL_CAPACITY);
     let (completion_tx, completion_rx) = oneshot::channel();
     tokio::spawn(async move {
         let result = lifecycle::run(req, effective_cwd, cancel_rx, &event_tx).await;
         if let Err(err) = &result {
             let message = super::harness::render_backend_error_message(err);
-            let _ = event_tx.send(CodexBackendEvent::TerminalError { message });
+            let _ = event_tx
+                .send(CodexBackendEvent::TerminalError { message })
+                .await;
         }
         let _ = completion_tx.send(result);
     });

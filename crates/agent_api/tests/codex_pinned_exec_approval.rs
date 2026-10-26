@@ -18,10 +18,37 @@ async fn never_intent_overrides_auto_review_config_for_initial_and_resume() {
         for mode in ["default", "never", "absent", "external"] {
             let backend = CodexBackend::new(CodexBackendConfig {
                 binary: Some(
-                    env!("CARGO_BIN_EXE_fake_codex_stream_exec_scenarios_agent_api").into(),
+                    if matches!(mode, "never" | "absent") {
+                        env!("CARGO_BIN_EXE_fake_codex_native_bridge")
+                    } else {
+                        env!("CARGO_BIN_EXE_fake_codex_stream_exec_scenarios_agent_api")
+                    }
+                    .into(),
                 ),
                 allow_external_sandbox_exec: true,
                 env: [
+                    (
+                        "NATIVE_POLICY".into(),
+                        if mode == "absent" {
+                            "null"
+                        } else {
+                            "\"never\""
+                        }
+                        .into(),
+                    ),
+                    (
+                        "NATIVE_SOURCE".into(),
+                        if selector
+                            .as_ref()
+                            .and_then(|value| value.get("id"))
+                            .is_some()
+                        {
+                            "thread-1"
+                        } else {
+                            "source"
+                        }
+                        .into(),
+                    ),
                     ("FAKE_CODEX_AUTOREVIEW_APPROVAL".into(), "on-request".into()),
                     (
                         "FAKE_CODEX_EXPECT_EFFECTIVE_APPROVAL".into(),
