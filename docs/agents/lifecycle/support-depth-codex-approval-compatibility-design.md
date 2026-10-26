@@ -150,6 +150,16 @@ calling the handler. A request preceding its context is a missing-context failur
 indefinitely or show a context-free prompt. Prove the pinned native ordering before enabling this
 route, alongside the production-path cases below.
 
+For the pinned healthy, continuously subscribed stdio path, source establishes that ordering:
+[`execute_verified_patch`](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/core/src/tools/handlers/apply_patch.rs#L582-L611)
+awaits emission of the complete verified file-change item before entering the approval orchestrator.
+The [thread listener](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/app-server/src/request_processors/thread_lifecycle.rs#L277-L355)
+awaits each event's translation before reading the next, and the
+[stdio writer](https://github.com/openai/codex/blob/b412ff32c417f855c2b2d1581b77058eed87c84b/codex-rs/app-server-transport/src/transport/stdio.rs#L136-L149)
+acknowledges each complete write before taking the next queued message. The item and approval
+retain the same thread/turn/call identity. This source inference excludes notification opt-out,
+reconnect/replay and delivery failure; missing context still refuses. It is not a live approval run.
+
 Give each prompt an immutable snapshot of that native item. Preserve array order, all JSON values
 and exact UTF-8 bytes of decoded path/diff strings and kind fields; JSON lexical whitespace/escape
 spelling is not an API promise. No diff normalization, truncation or synthesized changes. Keep the
