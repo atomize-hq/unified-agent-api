@@ -11,7 +11,9 @@ fn fixture_config(body: &str) -> (tempfile::TempDir, StdioServerConfig) {
         binary: path,
         code_home: None,
         current_dir: None,
-        env: vec![],
+        // Sibling binary-selection tests replace process PATH. Keep the fixture's
+        // interpreter lookup tied to the build invocation, not that mutable state.
+        env: vec![("PATH".into(), env!("PATH").into())],
         app_server_analytics_default_enabled: false,
         mirror_stdio: false,
         startup_timeout: Duration::from_secs(2),
@@ -548,4 +550,68 @@ for line in sys.stdin: pass
         }
         server.shutdown_and_wait().await.unwrap();
     }
+}
+
+#[tokio::test]
+async fn native_fixture_preserves_python_lookup_when_siblings_replace_ambient_path() {
+    const CHILD: &str = "UAA_NATIVE_ISOLATED_PATH";
+    if std::env::var_os(CHILD).is_some() {
+        let (_dir, server, mut stream) =
+            fixture("send({'method':'alive','params':{}})\nfor line in sys.stdin: pass\n").await;
+        let AppServerMessage::Notification { method, .. } = next(&mut stream).await else {
+            panic!("fixture startup notification")
+        };
+        assert_eq!(method, "alive");
+        server.shutdown_and_wait().await.unwrap();
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "mcp::tests_core::native_interactions::native_fixture_preserves_python_lookup_when_siblings_replace_ambient_path", "--nocapture"])
+        .env(CHILD, "1")
+        .env("PATH", "/no/python/on/ambient/path")
+        .output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[tokio::test]
+async fn queued_result_shared_lease_releases_after_the_complete_frame_is_written() {
+    let native = json!({"id":"leased","method":"mcpServer/elicitation/request","params":{"threadId":"t","serverName":"s","mode":"url","message":"q","url":"https://example.test","elicitationId":"e"}});
+    let body = format!(
+        r#"
+send({native})
+r=json.loads(sys.stdin.readline())
+assert len(r['result']['content']['opaque']) == 100000
+send({{'method':'written','params':{{}}}})
+for line in sys.stdin: pass
+"#
+    );
+    let (_dir, server, mut stream) = fixture(&body).await;
+    let AppServerMessage::Request(request) = next(&mut stream).await else {
+        panic!("request")
+    };
+    let result = json!({"action":"accept","content":{"opaque":"界".repeat(100_000)}});
+    let frame = json!({"jsonrpc":"2.0","id":"leased","result":result})
+        .to_string()
+        .len();
+    let retained = native.to_string().len() + frame;
+    let _held = stream.retain_json(16 * 1024 * 1024 - retained).unwrap();
+    request.reply(result).unwrap();
+    assert!(
+        stream.retain_json(1).is_err(),
+        "the queued frame fills the shared budget before writer polling"
+    );
+    let AppServerMessage::Notification { method, .. } = next(&mut stream).await else {
+        panic!("written notification")
+    };
+    assert_eq!(method, "written");
+    assert!(
+        stream.retain_json(retained).is_ok(),
+        "actual complete write releases response and request leases"
+    );
+    server.shutdown_and_wait().await.unwrap();
 }

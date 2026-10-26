@@ -4,8 +4,8 @@ use super::super::{
     CodexBackendError, CodexBackendEvent, PINNED_APPROVAL_REQUIRED,
 };
 use codex::mcp::{
-    AppNotification, AppServerMessage, AppServerMessageStream, AppServerRequest,
-    AppServerRetention, McpError,
+    AppNotification, AppServerMessage, AppServerMessageStream, AppServerReplyOwnership,
+    AppServerRequest, AppServerRetention, McpError,
 };
 use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt};
 use serde_json::Value;
@@ -116,12 +116,17 @@ impl Output {
         }
     }
 }
+struct PendingReply {
+    item_id: Option<String>,
+    owner: AppServerReplyOwnership,
+    callback_pending: bool,
+}
 struct Broker {
     thread: Option<String>,
     turn: Option<String>,
     queue: VecDeque<(AppServerMessage, Option<AppServerRetention>)>,
     contexts: BTreeMap<String, Context>,
-    pending: BTreeMap<usize, Option<String>>,
+    pending: BTreeMap<usize, PendingReply>,
     callbacks: FuturesUnordered<ReplyFuture>,
     serial: usize,
     final_text: Option<String>,
@@ -134,8 +139,12 @@ impl Broker {
     ) -> Result<(), CodexBackendError> {
         let retention = match &message {
             AppServerMessage::Request(_) => None,
-            AppServerMessage::Notification { params, .. } => {
-                Some(stream.retain_json(size(params)).map_err(|_| failure())?)
+            AppServerMessage::Notification { method, params } => {
+                let bytes = b"{\"method\":,\"params\":}"
+                    .len()
+                    .saturating_add(size(&Value::String(method.clone())))
+                    .saturating_add(size(params));
+                Some(stream.retain_json(bytes).map_err(|_| failure())?)
             }
         };
         let requests = self
@@ -235,7 +244,14 @@ impl Broker {
         let handler = handler.expect("checked handler").clone();
         self.serial += 1;
         let serial = self.serial;
-        self.pending.insert(serial, item_id);
+        self.pending.insert(
+            serial,
+            PendingReply {
+                item_id,
+                owner: request.reply_ownership(),
+                callback_pending: true,
+            },
+        );
         self.callbacks.push(Box::pin(async move {
             let _retention = retention;
             let mut request = request;
@@ -315,14 +331,18 @@ impl Broker {
             let item = params.get("item").ok_or_else(failure)?;
             let id = identity(item, "id").ok_or_else(failure)?.to_string();
             if method == "item/completed" {
-                // Completing a prompted file item invalidates every owned callback before replies.
-                if self.contexts.remove(&id).is_some()
-                    && self
-                        .pending
-                        .values()
-                        .any(|item| item.as_deref() == Some(id.as_str()))
-                {
-                    return Err(failure());
+                if self.contexts.remove(&id).is_some() {
+                    let mut callback_pending = false;
+                    for reply in self.pending.values() {
+                        if reply.item_id.as_deref() == Some(id.as_str()) && reply.owner.is_pending()
+                        {
+                            reply.owner.invalidate();
+                            callback_pending |= reply.callback_pending;
+                        }
+                    }
+                    if callback_pending {
+                        return Err(failure());
+                    }
                 }
                 if item.get("type").and_then(Value::as_str) == Some("agentMessage") {
                     if let Some(text) = item.get("text").and_then(Value::as_str) {
@@ -421,6 +441,9 @@ pub(super) async fn run(
         final_text: None,
     };
     loop {
+        // Callback completion is not response completion. Keep item revocation
+        // authority while queued or blocked before the first actual write.
+        state.pending.retain(|_, reply| reply.owner.is_pending());
         tokio::select! {
             biased;
             _=events.next(),if !events.queue.is_empty()=>{},
@@ -442,7 +465,7 @@ pub(super) async fn run(
                 } else {state.queue(message,&stream)?;}
             }
             Some((serial,result))=state.callbacks.next(),if !state.callbacks.is_empty()=>{
-                state.pending.remove(&serial);
+                if let Some(reply) = state.pending.get_mut(&serial) { reply.callback_pending = false; }
                 if let Some((request,result))=result {
                     if !request.is_active() {continue;}
                     match result {
@@ -484,3 +507,8 @@ mod tests {
         assert_eq!(message, "0");
     }
 }
+
+#[cfg(test)]
+#[cfg(unix)]
+#[path = "broker_retention_tests.rs"]
+mod retention_tests;

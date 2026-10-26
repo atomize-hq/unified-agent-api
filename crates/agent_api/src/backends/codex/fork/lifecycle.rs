@@ -33,22 +33,38 @@ pub(super) async fn run(
     let timed_out = || CodexBackendError::Timeout {
         timeout: timeout.unwrap_or_default(),
     };
-    let config = StdioServerConfig {
-        binary: req
-            .config
-            .binary
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("codex")),
-        code_home: req.config.codex_home.clone(),
-        current_dir: Some(cwd.clone()),
-        env: req
-            .env
-            .iter()
-            .map(|(k, v)| (OsString::from(k), OsString::from(v)))
+    let startup = async {
+        let mut config = StdioServerConfig::for_codex_command(
+            req.config.binary.clone(),
+            req.config.codex_home.clone(),
+        )
+        .map_err(|_| {
+            CodexBackendError::AppServer(McpError::Server("native setup failed".into()))
+        })?;
+        config.current_dir = Some(cwd.clone());
+        config.env.extend(
+            req.env
+                .iter()
+                .map(|(k, v)| (OsString::from(k), OsString::from(v))),
+        );
+        CodexAppServer::spawn_uninitialized_with_interactions_and_config(
+            config,
+            [(
+                "sandbox_mode".into(),
+                serde_json::Value::String(
+                    map_sandbox_mode(if req.external_sandbox {
+                        &CodexSandboxMode::DangerFullAccess
+                    } else {
+                        &req.sandbox_mode
+                    })
+                    .into(),
+                ),
+            )]
+            .into_iter()
             .collect(),
-        app_server_analytics_default_enabled: false,
-        mirror_stdio: false,
-        startup_timeout: Duration::from_secs(3),
+        )
+        .await
+        .map_err(CodexBackendError::AppServer)
     };
     // The spawn future has no suspension after the child is created. Cancelling a
     // busy-executable retry has no child; otherwise we retain the returned owner.
@@ -56,7 +72,7 @@ pub(super) async fn run(
         biased;
         Some(()) = cancel.recv() => return Err(cancelled()),
         _ = &mut expired => return Err(timed_out()),
-        server = CodexAppServer::spawn_uninitialized_with_interactions_and_config(config,[("sandbox_mode".into(),serde_json::Value::String(map_sandbox_mode(if req.external_sandbox { &CodexSandboxMode::DangerFullAccess } else { &req.sandbox_mode }).into()))].into_iter().collect()) => server.map_err(CodexBackendError::AppServer)?,
+        server = startup => server?,
     };
     let mut thread_id = None;
     let mut active_turn = None;

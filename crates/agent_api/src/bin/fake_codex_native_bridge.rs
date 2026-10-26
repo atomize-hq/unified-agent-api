@@ -2,7 +2,7 @@
 use serde_json::{json, Value};
 use std::{
     env,
-    io::{self, BufRead, Write},
+    io::{self, BufRead, Read, Write},
 };
 fn emit(out: &mut impl Write, value: Value) {
     writeln!(out, "{value}").unwrap();
@@ -46,8 +46,11 @@ fn main() {
     let mut out = io::stdout().lock();
     let mut turn_ack = None;
     let mut responses = 0;
-    for line in io::stdin().lock().lines() {
-        let msg: Value = serde_json::from_str(&line.unwrap()).unwrap();
+    let mut input = io::stdin().lock();
+    let mut line = String::new();
+    while input.read_line(&mut line).unwrap() != 0 {
+        let msg: Value = serde_json::from_str(&line).unwrap();
+        line.clear();
         let method = msg["method"].as_str().unwrap_or("");
         let id = &msg["id"];
         let params = &msg["params"];
@@ -94,6 +97,10 @@ fn main() {
                 }
                 if let Ok(expected) = env::var("NATIVE_EXPECT_HOME") {
                     assert_eq!(env::var("CODEX_HOME").unwrap(), expected);
+                    assert!(
+                        std::path::Path::new(&expected).is_dir(),
+                        "native requires an existing configured home"
+                    );
                 }
                 if let Ok(expected) = env::var("NATIVE_EXPECT_ENV") {
                     assert_eq!(env::var("ENV_PROBE").unwrap(), expected);
@@ -185,6 +192,9 @@ fn main() {
                     if scenario.contains("scoped") {
                         emit(&mut out, turn_ack.take().unwrap());
                     }
+                } else if scenario == "queued_completion" {
+                    emit(&mut out, ack);
+                    queued_completion(&mut out, &mut input);
                 } else if scenario.starts_with("file") {
                     if scenario.contains("output") {
                         emit(&mut out, ack.clone());
@@ -418,6 +428,13 @@ fn main() {
                     assert!(id == &json!(7) || id == &json!("7"));
                     assert_eq!(msg["result"], json!({"decision":"acceptForSession"}));
                 }
+                if scenario == "file_written" {
+                    notification(
+                        &mut out,
+                        "item/completed",
+                        json!({"threadId":"owned","turnId":"turn","item":context("file")}),
+                    );
+                }
                 if scenario != "file_two" || responses == 2 {
                     complete(&mut out);
                 }
@@ -440,4 +457,69 @@ fn gate() {
 #[cfg(not(unix))]
 fn gate() {
     panic!("gate fixtures require Unix");
+}
+
+#[cfg(unix)]
+fn queued_completion(out: &mut impl Write, input: &mut impl BufRead) {
+    use std::os::unix::net::UnixStream;
+    request(
+        out,
+        json!("large"),
+        "mcpServer/elicitation/request",
+        mcp(""),
+    );
+    let mut prefix = [0];
+    // A >700KiB result has begun writing. Stop consuming stdin, so the one writer
+    // cannot reach the subsequent file decision until the two socket gates open.
+    input.read_exact(&mut prefix).unwrap();
+    assert_eq!(prefix[0], b'{');
+    notification(
+        out,
+        "item/started",
+        json!({"threadId":"owned","turnId":"turn","item":context("file")}),
+    );
+    request(
+        out,
+        json!(7),
+        "item/fileChange/requestApproval",
+        json!({"threadId":"owned","turnId":"turn","itemId":"file","startedAtMs":0}),
+    );
+    let mut gate = UnixStream::connect(env::var("NATIVE_GATE").unwrap()).unwrap();
+    gate.write_all(b"ready").unwrap();
+    let mut release = [0];
+    gate.read_exact(&mut release).unwrap();
+    notification(
+        out,
+        "item/completed",
+        json!({"threadId":"owned","turnId":"turn","item":context("file")}),
+    );
+    request(
+        out,
+        json!("processed"),
+        "mcpServer/elicitation/request",
+        mcp(""),
+    );
+    gate.read_exact(&mut release).unwrap();
+    let mut rest = String::new();
+    input.read_line(&mut rest).unwrap();
+    let large: Value = serde_json::from_str(&format!("{{{rest}")).unwrap();
+    assert_eq!(large["id"], "large");
+    assert_eq!(
+        large["result"]["content"]["opaque"].as_str().unwrap().len(),
+        720_000
+    );
+    rest.clear();
+    input.read_line(&mut rest).unwrap();
+    let next: Value = serde_json::from_str(&rest).unwrap();
+    std::fs::write(env::var("NATIVE_REPLY_LOG").unwrap(), next.to_string()).unwrap();
+    if next.get("method").is_some() {
+        emit(out, json!({"id":next["id"],"result":{}}));
+    } else {
+        assert!(next["id"] == json!(7) || next["id"] == json!("processed"));
+        complete(out);
+    }
+}
+#[cfg(not(unix))]
+fn queued_completion(_: &mut impl Write, _: &mut impl BufRead) {
+    panic!("unix-only synchronization fixture")
 }

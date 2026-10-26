@@ -44,7 +44,11 @@ pub use native_params::{
 };
 mod interactions;
 pub use interactions::{
-    AppServerMessage, AppServerMessageStream, AppServerRequest, AppServerRetention,
+    AppServerMessage, AppServerMessageStream, AppServerReplyOwnership, AppServerRequest,
+    AppServerRetention,
 };
 
 mod interaction_validation;
+
+#[cfg(test)]
+mod retention_tests;

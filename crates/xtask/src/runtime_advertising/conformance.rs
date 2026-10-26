@@ -9,6 +9,22 @@ use syn::{Item, ItemImpl};
 const EVALUATOR: &str = "b19816053d4b6d6efce356ca5a13e5f364fb6916816e16e5114ba7a752c2ab76";
 const ADAPTER: &str = "8e186919375728c3d57dbddf34c86da100f1c8d57cdb2f29c7a58b16c281658f";
 
+// The sole approved builder wraps the application callback and returns the same
+// backend. It cannot replace config or select different advertising flags.
+const CODEX_HANDLER_BUILDER: &str = r#"
+    pub fn with_interaction_handler<F, Fut>(mut self, handler: F) -> Self
+    where
+        F: Fn(CodexInteractionRequest) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<CodexInteractionReply, CodexInteractionError>>
+            + Send + 'static,
+    {
+        self.interaction_handler = Some(interaction::Handler(std::sync::Arc::new(move |request| {
+            Box::pin(handler(request))
+        })));
+        self
+    }
+"#;
+
 pub(super) fn check(source: &Source) -> Result<(), String> {
     for (path, expected) in [
         (
@@ -165,6 +181,11 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
         &format!("crates/agent_api/src/backends/{agent}/mod.rs"),
     )?;
     module(&parent, "backend", "mod backend;")?;
+    // Select between two finite supported Codex shapes. Both still undergo exact
+    // storage/constructor checks; unknown extra fields or methods remain refused.
+    let codex_handler = agent == "codex" && parent.items.iter().any(|item| {
+        matches!(item, Item::Struct(s) if s.ident == name && s.fields.iter().any(|field| field.ident.as_ref().is_some_and(|id| id == "interaction_handler")))
+    });
     let config = format!("{name}Config");
     let fields=match agent {
         "codex"=>"pub binary: Option<PathBuf>, pub codex_home: Option<PathBuf>, pub model: Option<String>, pub default_timeout: Option<Duration>, pub default_working_dir: Option<PathBuf>, pub env: BTreeMap<String,String>, pub allow_mcp_write: bool, pub allow_external_sandbox_exec: bool,",
@@ -174,6 +195,7 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
     let mut config_count = 0;
     let mut storage_count = 0;
     let mut constructor_count = 0;
+    let mut builder_count = 0;
     for item in &parent.items {
         if let Item::Struct(s) = item {
             if s.ident == config {
@@ -188,6 +210,9 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
                 storage_count += 1;
                 let (derive, extra) = match agent {
                     "claude_code" => ("", ", allow_flag_preflight: Arc<OnceCell<bool>>"),
+                    "codex" if codex_handler => {
+                        ("", ", interaction_handler: Option<interaction::Handler>")
+                    }
                     "codex" => ("", ""),
                     _ => ("#[derive(Clone,Debug)]", ""),
                 };
@@ -205,13 +230,20 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
                 }
                 for item in &imp.items {
                     if let syn::ImplItem::Fn(method) = item {
-                        // No alternate producer of Self is accepted by the v1 source adapter.
+                        if codex_handler && method.sig.ident == "with_interaction_handler" {
+                            builder_count += 1;
+                            source::same(method, CODEX_HANDLER_BUILDER, "handler builder")?;
+                            continue;
+                        }
+                        // Every accepted producer preserves the advertising config exactly.
                         if method.sig.ident != "new" {
                             return Err(format!("{name}: unsupported inherent method"));
                         }
                         constructor_count += 1;
                         let storage = if agent == "claude_code" {
                             "Self { config, allow_flag_preflight: Arc::new(OnceCell::new()), }"
+                        } else if codex_handler {
+                            "Self { config, interaction_handler: None, }"
                         } else {
                             "Self { config }"
                         };
@@ -226,6 +258,9 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
                 }
             }
         }
+    }
+    if builder_count != usize::from(codex_handler) {
+        return Err(format!("{name}: missing or ambiguous handler builder"));
     }
     if (config_count, storage_count, constructor_count) != (1, 1, 1) {
         return Err(format!(
@@ -319,4 +354,115 @@ fn backend(source: &Source, agent: &str) -> Result<(), String> {
         return Err(format!("{name}: missing guarded runtime method"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod native_bridge_tests {
+    use super::{check, Source};
+    use std::{collections::BTreeMap, path::Path};
+    #[test]
+    fn approved_native_handler_shape_preserves_real_source_capture() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        check(&Source::workspace(root).unwrap()).unwrap();
+    }
+    #[test]
+    fn legacy_shape_and_only_matching_constructor_builder_combinations_are_supported() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let path = "crates/agent_api/src/backends/codex/mod.rs";
+        let raw = std::fs::read_to_string(root.join(path)).unwrap();
+        let start = raw.find("    /// Register an application handler").unwrap();
+        let end = raw.find("\n}\n\npub use interaction").unwrap();
+        let mut without_builder = raw.clone();
+        without_builder.replace_range(start..end, "");
+        let source = Source::proposed(
+            root,
+            BTreeMap::from([(path.into(), without_builder.clone())]),
+        )
+        .unwrap();
+        assert!(check(&source).unwrap_err().contains("handler builder"));
+        let legacy = without_builder
+            .replace(
+                "    interaction_handler: Option<interaction::Handler>,\n",
+                "",
+            )
+            .replace(
+                "Self {\n            config,\n            interaction_handler: None,\n        }",
+                "Self { config }",
+            );
+        assert!(!legacy.contains("interaction_handler:"));
+        check(&Source::proposed(root, BTreeMap::from([(path.into(), legacy)])).unwrap()).unwrap();
+        let mismatched = raw.replace(
+            "    interaction_handler: Option<interaction::Handler>,\n",
+            "",
+        );
+        assert!(check(
+            &Source::proposed(root, BTreeMap::from([(path.into(), mismatched)])).unwrap()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn altered_native_handler_storage_constructor_and_builder_are_refused() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let path = "crates/agent_api/src/backends/codex/mod.rs";
+        let raw = std::fs::read_to_string(root.join(path)).unwrap();
+        for (old, new, expected) in [
+            (
+                "interaction_handler: Option<interaction::Handler>",
+                "interaction_handler: Option<String>",
+                "CodexBackend",
+            ),
+            (
+                "interaction_handler: None",
+                "interaction_handler: Some(make_handler())",
+                "constructor",
+            ),
+            (
+                "            config,",
+                "            config: CodexBackendConfig::default(),",
+                "constructor",
+            ),
+            (
+                "Box::pin(handler(request))",
+                "Box::pin(handler(alter(request)))",
+                "handler builder",
+            ),
+            (
+                "        self\n    }\n}",
+                "        Self::new(CodexBackendConfig::default())\n    }\n}",
+                "handler builder",
+            ),
+            (
+                "    config: CodexBackendConfig,",
+                "    config: CodexBackendConfig, unauthorized: bool,",
+                "CodexBackend",
+            ),
+            (
+                "impl CodexBackend {",
+                "impl CodexBackend { pub fn unauthorized() -> Self { todo!() }",
+                "inherent method",
+            ),
+        ] {
+            assert!(raw.contains(old), "missing discriminator {old}");
+            let source = Source::proposed(
+                root,
+                BTreeMap::from([(path.into(), raw.replacen(old, new, 1))]),
+            )
+            .unwrap();
+            let error = check(&source).unwrap_err();
+            assert!(error.contains(expected), "{old}: {error}");
+        }
+    }
 }

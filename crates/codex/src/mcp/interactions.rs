@@ -63,6 +63,22 @@ impl Drop for AppServerMessageStream {
     }
 }
 
+/// Opaque revocation handle for one connection-owned reply, including while queued.
+/// It becomes inactive on invalidation or the first actual response I/O.
+pub struct AppServerReplyOwnership {
+    token: u64,
+    active: watch::Receiver<bool>,
+    state: Arc<InteractionState>,
+}
+impl AppServerReplyOwnership {
+    pub fn is_pending(&self) -> bool {
+        *self.active.borrow()
+    }
+    pub fn invalidate(&self) {
+        self.state.invalidate(self.token);
+    }
+}
+
 /// One native request. RPC identity and connection ownership are deliberately private.
 /// Dropping an unanswered request safely refuses it. Debug never exposes its payload.
 pub struct AppServerRequest {
@@ -92,6 +108,14 @@ impl AppServerRequest {
     pub fn invalidate(&self) {
         self.state.invalidate(self.token);
     }
+    /// Retain revocation authority through queuing, until the first actual response I/O.
+    pub fn reply_ownership(&self) -> AppServerReplyOwnership {
+        AppServerReplyOwnership {
+            token: self.token,
+            active: self.active.clone(),
+            state: self.state.clone(),
+        }
+    }
     /// Consume ownership and queue the complete validated native result unchanged.
     pub fn reply(mut self, result: Value) -> Result<(), McpError> {
         if !interaction_validation::valid(&self.method, &result, true) {
@@ -101,11 +125,12 @@ impl AppServerRequest {
                 "invalid native interaction reply".into(),
             ));
         }
-        // The private native ID and JSON-RPC envelope count toward the wire limit.
-        // On failure Drop safely queues refusal while ownership is still active.
-        self.state.check_reply_frame(self.token, &result)?;
+        let queued = self.state.queue(self.token, Some(result));
+        if queued.is_err() {
+            self.state.refuse(self.token);
+        }
         self.answered = true;
-        self.state.queue(self.token, Some(result))
+        queued
     }
     /// Consume ownership and return an explicit unsupported RPC error.
     pub fn unsupported(mut self) -> Result<(), McpError> {
@@ -216,12 +241,20 @@ impl InteractionState {
         if r.queued {
             return Err(McpError::Cancelled);
         }
+        let line = Self::response_frame(&r.id, result.as_ref());
+        if line.len() > MAX_FRAME {
+            return Err(McpError::Transport(
+                "invalid native interaction reply".into(),
+            ));
+        }
+        let bytes = self.reserve(line.len())?;
         r.queued = true;
         self.writer
             .send(super::jsonrpc::WriteMessage::Reply {
                 state: self.clone(),
                 token,
-                result,
+                line,
+                _bytes: AppServerRetention { _bytes: bytes },
             })
             .map_err(|_| McpError::ChannelClosed)
     }
@@ -231,20 +264,10 @@ impl InteractionState {
             None => json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":"client interaction unsupported"}}),
         }.to_string()
     }
-    fn check_reply_frame(&self, token: u64, result: &Value) -> Result<(), McpError> {
+    pub(super) fn render_reply(&self, token: u64, line: String) -> Option<String> {
         let p = self.pending.lock().expect("interaction lock");
-        let r = p.requests.get(&token).ok_or(McpError::Cancelled)?;
-        if Self::response_frame(&r.id, Some(result)).len() > MAX_FRAME {
-            return Err(McpError::Transport(
-                "invalid native interaction reply".into(),
-            ));
-        }
-        Ok(())
-    }
-    pub(super) fn render_reply(&self, token: u64, result: Option<Value>) -> Option<String> {
-        let p = self.pending.lock().expect("interaction lock");
-        let r = p.requests.get(&token)?;
-        Some(Self::response_frame(&r.id, result.as_ref()))
+        p.requests.get(&token)?;
+        Some(line)
     }
     pub(super) fn reply_watch(&self, token: u64) -> Option<watch::Receiver<bool>> {
         self.pending
@@ -339,7 +362,8 @@ mod tests {
         let WriteMessage::Reply {
             state: queued,
             token,
-            result,
+            line,
+            _bytes,
         } = rx.recv().await.unwrap()
         else {
             panic!("reply")
@@ -360,7 +384,7 @@ mod tests {
             std::task::Poll::Ready(Ok(None))
         ));
         assert!(
-            queued.render_reply(token, result).is_none(),
+            queued.render_reply(token, line).is_none(),
             "resolved queued reply must never reach writer"
         );
         let request = state
@@ -375,13 +399,14 @@ mod tests {
         let WriteMessage::Reply {
             state: queued,
             token,
-            result,
+            line,
+            _bytes,
         } = rx.recv().await.unwrap()
         else {
             panic!("refusal")
         };
         let value: serde_json::Value =
-            serde_json::from_str(&queued.render_reply(token, result).unwrap()).unwrap();
+            serde_json::from_str(&queued.render_reply(token, line).unwrap()).unwrap();
         assert_eq!(value["id"], "1");
         assert_eq!(value["error"]["code"], -32601);
         assert!(value.get("result").is_none());

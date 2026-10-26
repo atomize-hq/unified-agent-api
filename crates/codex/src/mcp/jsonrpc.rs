@@ -29,7 +29,8 @@ pub(super) enum WriteMessage {
     Reply {
         state: Arc<InteractionState>,
         token: u64,
-        result: Option<Value>,
+        line: String,
+        _bytes: super::interactions::AppServerRetention,
     },
 }
 
@@ -396,15 +397,16 @@ async fn writer_task(
     hook: NotificationHook,
 ) {
     while let Some(command) = rx.recv().await {
-        let (message, offset) = match command {
-            WriteMessage::Line(line) => (line, 0),
+        let (message, offset, _retention) = match command {
+            WriteMessage::Line(line) => (line, 0, None),
             WriteMessage::Close => break,
             WriteMessage::Reply {
                 state,
                 token,
-                result,
+                line,
+                _bytes,
             } => {
-                let Some(line) = state.render_reply(token, result) else {
+                let Some(line) = state.render_reply(token, line) else {
                     continue;
                 };
                 let Some(mut active) = state.reply_watch(token) else {
@@ -416,7 +418,7 @@ async fn writer_task(
                     _ = active.changed() => continue,
                 };
                 match first {
-                    Ok(Some(n)) if n > 0 => (line, n),
+                    Ok(Some(n)) if n > 0 => (line, n, Some(_bytes)),
                     Ok(None) => continue,
                     _ => {
                         state.fail("app-server write failed");

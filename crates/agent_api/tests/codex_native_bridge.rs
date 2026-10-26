@@ -147,16 +147,22 @@ async fn missing_malformed_oversize_wrong_scope_context_never_calls_host() {
         "file_oversize",
         "mcp_wrong_null",
     ] {
-        let backend = backend(scenario).with_interaction_handler(|_| async {
-            panic!("invalid context reached host");
-            #[allow(unreachable_code)]
-            Ok(CodexInteractionReply::Unsupported)
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = calls.clone();
+        let backend = backend(scenario).with_interaction_handler(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            async {
+                panic!("invalid context reached host");
+                #[allow(unreachable_code)]
+                Ok(CodexInteractionReply::Unsupported)
+            }
         });
         let run = backend.run(request()).await.unwrap();
         drop(run.events);
         let err = run.completion.await.unwrap_err().to_string();
         assert!(!err.contains("秘密"));
         assert!(!err.contains("private"));
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "{scenario}");
     }
 }
 #[tokio::test]
@@ -650,3 +656,10 @@ async fn handler_registration_alone_keeps_unattended_exec_route() {
     drop(run.events);
     assert!(run.completion.await.unwrap().status.success());
 }
+
+#[path = "codex_native_bridge/environment.rs"]
+mod environment;
+
+#[cfg(unix)]
+#[path = "codex_native_bridge/queued_reply.rs"]
+mod queued_reply;
