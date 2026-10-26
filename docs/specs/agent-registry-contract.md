@@ -326,7 +326,10 @@ The separate, read-only Codex0.156.1 pilot diagnostic MAY interpret the five fix
 selector/path/mode triples described in the
 [route-aware readiness scope](../agents/lifecycle/support-depth-codex-pilot-readiness.md).
 It MUST require the complete initial/resume/fork mapping and bind ancestor exec surfaces for
-resume, protocol/config acquisition and implementation source in each operation basis. It MUST
+resume, app-server surfaces for managed initial/resume, protocol/config acquisition and the
+complete participating implementation source in each operation basis. The structural row-ownership
+validator MAY admit those supplemental paths only under that complete fixed diagnostic declaration;
+this does not change generic exact-path ownership. It MUST
 preserve unresolved units and missing runtime-context/evidence requirements. This diagnostic
 exception grants no freeze-writer, closeout, promotion, profile or qualification authority.
 Generic resolution and currentness consumers MUST retain their existing refusals for that scope.

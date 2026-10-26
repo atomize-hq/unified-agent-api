@@ -91,7 +91,7 @@ fn workspace() -> tempfile::TempDir {
         p.starts_with("crates/codex/src/")
             || p.starts_with("crates/agent_api/src/")
             || p.starts_with("crates/wrapper_events/src/")
-            || p.starts_with("crates/xtask/src/support_depth/")
+            || p.starts_with("crates/xtask/src/")
             || (p.starts_with("crates/xtask/src/") && !p["crates/xtask/src/".len()..].contains('/'))
             || p.starts_with("docs/specs/")
             || *p == "scripts/acquire_codex_pilot_protocol.py"
@@ -228,6 +228,16 @@ fn real_acquisition_binds_all_routes_ancestry_protocol_source_and_carried_work()
     let preview = readiness(root.path(), &request()).unwrap().unwrap();
     let o = preview.plan.record.obligations.as_ref().unwrap();
     assert_eq!(o.operations.len(), 3);
+    for id in ["run-initial", "run-resume"] {
+        assert!(o
+            .operations
+            .iter()
+            .find(|op| op.id == id)
+            .unwrap()
+            .surfaces
+            .iter()
+            .any(|s| s.command_path == "codex app-server" && s.surface_id == "--listen"));
+    }
     // M is supplied by the complete capability mapping, once per operation.
     assert_eq!(
         o.operations
@@ -329,4 +339,105 @@ fn protocol_gaps_and_incomplete_mapping_refuse() {
         d["modes"].as_array_mut().unwrap().pop();
     });
     assert!(readiness(root.path(), &request()).is_err());
+}
+
+#[test]
+fn supplemental_classification_rows_roundtrip_only_in_complete_pilot_scope() {
+    let root = workspace();
+    let first = readiness(root.path(), &request()).unwrap().unwrap();
+    let o = first.plan.record.obligations.as_ref().unwrap();
+    for (id, path, leaf) in [
+        ("run-resume", "codex exec", "--output-last-message"),
+        ("run-resume", "codex app-server", "--listen"),
+        ("run-initial", "codex app-server", "--listen"),
+    ] {
+        let unit = o
+            .operations
+            .iter()
+            .find(|op| op.id == id)
+            .unwrap()
+            .surfaces
+            .iter()
+            .find(|s| s.command_path == path && s.surface_id == leaf);
+        // Construct exact acquired identity even on the broken diagnostic that drops app-server.
+        let surface = unit
+            .map(|s| serde_json::to_value(s).unwrap())
+            .unwrap_or_else(
+                || json!({"surface_kind":"flags","command_path":path,"surface_id":leaf}),
+            );
+        let basis = &first
+            .plan
+            .classification_bases
+            .iter()
+            .find(|b| b.operation == id)
+            .unwrap()
+            .sha256;
+        policy(root.path(), |d| {
+            let op = d["operations"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|op| op["id"] == id)
+                .unwrap();
+            op["classification_basis"] = json!(basis);
+            let rows = op
+                .as_object_mut()
+                .unwrap()
+                .entry("classifications")
+                .or_insert(json!([]));
+            rows.as_array_mut().unwrap().push(json!({"surface":surface,"templates":["CORE","ADMIN"],
+                "rationale":"Complete bound pilot effect regime, subject to independent evidence."}));
+        });
+    }
+    let next = readiness(root.path(), &request()).unwrap().unwrap();
+    assert_eq!(
+        next.plan
+            .record
+            .obligations
+            .as_ref()
+            .unwrap()
+            .classification_required
+            .len(),
+        o.classification_required.len() - 3
+    );
+    assert!(next.plan.record.execution.is_none());
+    policy(root.path(), |d| {
+        d["version"] = json!("0.156.2");
+    });
+    assert!(readiness(root.path(), &request()).is_err());
+}
+
+#[test]
+fn nested_acquisition_source_content_and_mode_drift_invalidate_every_basis() {
+    let root = workspace();
+    let before = readiness(root.path(), &request()).unwrap().unwrap();
+    let path = "crates/xtask/src/manifest_union/intake.rs";
+    let file = root.path().join(path);
+    let bytes = fs::read_to_string(&file).unwrap();
+    fs::write(
+        &file,
+        format!("{bytes}\n// New acquired alias interpretation\n"),
+    )
+    .unwrap();
+    git(root.path(), &["add", path]);
+    let content = readiness(root.path(), &request()).unwrap().unwrap();
+    assert!(content
+        .plan
+        .classification_bases
+        .iter()
+        .zip(&before.plan.classification_bases)
+        .all(|(a, b)| a.sha256 != b.sha256));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&file, fs::Permissions::from_mode(0o755)).unwrap();
+        git(root.path(), &["add", path]);
+        let mode = readiness(root.path(), &request()).unwrap().unwrap();
+        assert!(mode
+            .plan
+            .classification_bases
+            .iter()
+            .zip(&content.plan.classification_bases)
+            .all(|(a, b)| a.sha256 != b.sha256));
+    }
 }

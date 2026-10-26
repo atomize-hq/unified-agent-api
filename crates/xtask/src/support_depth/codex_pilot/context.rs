@@ -26,7 +26,7 @@ pub(in crate::support_depth) fn load(
         "crates/codex/src",
         "crates/agent_api/src",
         "crates/wrapper_events/src",
-        "crates/xtask/src/support_depth",
+        "crates/xtask/src",
     ] {
         for path in view.files_under(scope)? {
             let reference = view.reference(&path)?;
@@ -35,11 +35,6 @@ pub(in crate::support_depth) fn load(
         }
     }
     for path in [
-        "crates/xtask/src/support_depth.rs",
-        "crates/xtask/src/git_inputs.rs",
-        "crates/xtask/src/manifest_union.rs",
-        "crates/xtask/src/manifest_report.rs",
-        "crates/xtask/src/manifest_snapshot_schema.rs",
         "Cargo.toml",
         "Cargo.lock",
         "crates/codex/Cargo.toml",

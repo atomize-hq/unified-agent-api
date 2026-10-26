@@ -152,6 +152,12 @@ impl DepthEnrollmentDeclaration {
                     && row.surface.command_path == agent_id;
                 if row.surface.command_path.split(' ').next() != Some(agent_id)
                     || (!global
+                        && !crate::support_depth::codex_pilot::owns_supplemental_surface(
+                            agent_id,
+                            self,
+                            operation,
+                            &row.surface,
+                        )
                         && !self.modes.iter().any(|mode| {
                             operation.serves.contains(&mode.selector)
                                 && mode.command_path == row.surface.command_path

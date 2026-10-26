@@ -150,10 +150,28 @@ pub(super) fn selection(agent: &str, d: &DepthEnrollmentDeclaration) -> Result<(
 
 pub(super) fn paths(mode: &ModeSelector) -> Vec<&str> {
     if mode.command_path == "codex exec resume" {
-        vec!["codex exec", "codex exec resume"]
+        vec!["codex exec", "codex exec resume", "codex app-server"]
+    } else if mode.command_path == "codex exec" {
+        vec!["codex exec", "codex app-server"]
     } else {
         vec![mode.command_path.as_str()]
     }
+}
+
+/// Structural ownership only. The ordinary resolver still refuses these overlapping modes,
+/// and acquisition must independently find each exact identity in the complete bound population.
+pub(crate) fn owns_supplemental_surface(
+    agent: &str,
+    declaration: &DepthEnrollmentDeclaration,
+    operation: &crate::agent_registry::support_depth::OperationDeclaration,
+    surface: &crate::agent_maintenance::support_audit::SurfaceIdentity,
+) -> bool {
+    selection(agent, declaration).is_ok()
+        && declaration
+            .modes
+            .iter()
+            .filter(|mode| operation.serves.contains(&mode.selector))
+            .any(|mode| paths(mode).contains(&surface.command_path.as_str()))
 }
 
 pub(super) fn validate_mode(

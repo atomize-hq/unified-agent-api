@@ -40,11 +40,14 @@ decoder supplies their meaning, while acquisition checks actual parent exec JSON
 resume-last flag arity. Generic mode interpretation and all public writers retain their refusals.
 `decode_route` is a finite diagnostic of selector/safety context, not a second full run validator.
 
-The existing acquisition validator and P/O derivation are reused. Resume owns its exact child
-and exec ancestor populations plus effective globals; original shard identities, normalized-out
-units and claims remain included. Fork owns app-server plus globals. One basis per operation
+The existing acquisition validator and P/O derivation are reused. Resume owns its exact child,
+exec ancestor and app-server populations plus effective globals. Initial owns exec and app-server
+plus globals. These include every acquired CLI unit of the actual unattended/managed variants;
+original shard identities, normalized-out units and claims remain included. Fork owns app-server
+plus globals. The registry's ownership check admits these supplemental paths only under the
+complete fixed pilot declaration; generic contexts retain their exact-path ownership rule. One basis per operation
 binds all served modes, CLI facts, protocol/config content, controlled config bytes and current
-implementation source. Retained work is carried by the existing planner. No new policy store,
+implementation source, including nested acquisition/registry/record interpreter modules. Retained work is carried by the existing planner. No new policy store,
 generic predicate grammar, executor, workflow or required CI check is introduced.
 
 All14 existing acquisition references remain in O. Additional references bind the complete
