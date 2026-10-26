@@ -274,7 +274,7 @@ pub(super) fn derive_with_pilot(
             let mut basis = facts.basis(&operation.id, &selection.enrollment.targets[0], &owned)?;
             if let Some((context, _)) = pilot {
                 basis.facts["pilot"] = context.clone();
-                basis.facts["modes"] = serde_json::to_value(&modes_for_basis(policy, operation))
+                basis.facts["modes"] = serde_json::to_value(modes_for_basis(policy, operation))
                     .map_err(|e| e.to_string())?;
                 basis.sha256 = part_identity(&basis.facts)?;
             }
