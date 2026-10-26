@@ -6,6 +6,9 @@
 //! or acceptance. Production registry loading deliberately continues to refuse depth declarations.
 
 mod acquisition;
+mod acquisition_basis;
+mod acquisition_modes;
+pub use acquisition_basis::ClassificationBasis;
 mod closeout;
 pub(crate) use closeout::{current_closeout_bindings, current_promotion_bindings};
 pub mod debt;
@@ -49,9 +52,15 @@ pub fn resolve_policy(
         rules,
         prior_record,
         debt_inventory,
-        None,
+        ResolutionContext::default(),
     )
     .map_err(|error| format!("support depth agent={agent} version={version}: {error}"))
+}
+
+#[derive(Default)]
+struct ResolutionContext<'a> {
+    baseline: Option<&'a [crate::agent_maintenance::support_audit::DebtInventoryRow]>,
+    intake: bool,
 }
 
 fn resolve(
@@ -61,8 +70,9 @@ fn resolve(
     rules: &str,
     prior_record: Option<&str>,
     debt_inventory: &str,
-    baseline: Option<&[crate::agent_maintenance::support_audit::DebtInventoryRow]>,
+    context: ResolutionContext<'_>,
 ) -> Result<Option<PolicyPart>, String> {
+    let ResolutionContext { baseline, intake } = context;
     let parsed = semver::Version::parse(version).map_err(|e| e.to_string())?;
     if !parsed.pre.is_empty() || !parsed.build.is_empty() || parsed.to_string() != version {
         return Err("version must be one exact MAJOR.MINOR.PATCH".into());
@@ -124,7 +134,9 @@ fn resolve(
     // Without canonical acquisition facts, a free mode label or a flag spelling cannot prove
     // disjointness. Refuse unsupported predicates/exclusions, and all overlapping command scopes.
     for (index, mode) in declaration.modes.iter().enumerate() {
-        if !mode.predicates.is_empty() {
+        if !mode.predicates.is_empty()
+            && (!intake || mode.predicates.len() != 1 || mode.predicates[0].value.is_some())
+        {
             return Err(format!(
                 "selector `{}` requires predicate/alias acquisition intake",
                 mode.selector
@@ -152,6 +164,31 @@ fn resolve(
             }
         }
     }
+    if declaration
+        .operations
+        .iter()
+        .any(|o| o.classifications.is_some())
+        && (declaration.targets.len() != 1 || declaration.modes.len() != 1)
+    {
+        return Err("classified intake currently supports one exact mode and target only".into());
+    }
+    let acquired_policy = declaration
+        .modes
+        .iter()
+        .any(|mode| !mode.predicates.is_empty())
+        || declaration
+            .operations
+            .iter()
+            .any(|operation| operation.classifications.is_some());
+    if intake
+        && acquired_policy
+        && declaration.operations.iter().any(|operation| {
+            operation.shared_mapping
+                == Some(crate::agent_registry::support_depth::SharedMapping::Mapped)
+        })
+    {
+        return Err("predicate/classification intake requires complete mapped flow policy, which is not yet supported".into());
+    }
     if declaration.operations.iter().any(|o| o.is_excluded()) {
         return Err("mode exclusion requires classification/parity-exclusion intake".into());
     }
@@ -169,7 +206,7 @@ fn resolve(
     let templates: BTreeSet<_> = declaration
         .operations
         .iter()
-        .flat_map(|o| o.templates.iter())
+        .flat_map(|o| o.selected_templates())
         .collect();
     let mut policy = PolicyPart {
         identity: String::new(),

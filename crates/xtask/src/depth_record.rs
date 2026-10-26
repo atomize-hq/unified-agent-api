@@ -410,7 +410,7 @@ impl DepthRecord {
         let selected: BTreeSet<_> = enrollment
             .operations
             .iter()
-            .flat_map(|operation| &operation.templates)
+            .flat_map(|operation| operation.selected_templates())
             .collect();
         let stated: BTreeSet<_> = self.policy.templates.iter().map(|r| &r.template).collect();
         if stated != selected || stated.len() != self.policy.templates.len() {

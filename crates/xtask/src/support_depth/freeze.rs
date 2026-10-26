@@ -1,5 +1,5 @@
 //! Read-only maintenance freeze planning. No caller can use a plan as write admission.
-use super::{acquisition, check_current_policy, git_inputs::GitInputs, resolve_policy};
+use super::{acquisition, check_current_policy, git_inputs::GitInputs, resolve, ResolutionContext};
 use crate::{
     agent_lifecycle::maintenance_request_path,
     agent_maintenance::support_audit::{SurfaceIdentity, NON_TUI_SUPPORT_DEBT_PATH},
@@ -29,6 +29,7 @@ pub struct FreezePlan {
     pub required_surfaces: BTreeSet<SurfaceIdentity>,
     /// Previous O's due work is retained across generations, including a P-only new generation.
     pub carried_work: Vec<AcceptanceWork>,
+    pub classification_bases: Vec<super::ClassificationBasis>,
 }
 
 /// Isolated maintenance planner. None is a version with no declaration or retained record.
@@ -87,13 +88,17 @@ fn plan(
     }
     let rules = view.required(&format!("{root}/RULES.json"))?;
     let inventory = view.required(NON_TUI_SUPPORT_DEBT_PATH)?;
-    let Some(policy) = resolve_policy(
+    let Some(policy) = resolve(
         text(&raw_registry)?,
         &request.agent,
         &request.version,
         text(&rules)?,
         previous_record.as_deref().map(text).transpose()?,
         text(&inventory)?,
+        ResolutionContext {
+            intake: true,
+            ..ResolutionContext::default()
+        },
     )?
     else {
         view.verify()?;
@@ -164,7 +169,7 @@ fn plan(
         .map(|o| o.acceptance_work.clone())
         .unwrap_or_default();
     required.extend(carried_work.iter().map(|w| w.surface.clone()));
-    let obligations = acquisition::derive(
+    let acquired = acquisition::derive(
         &mut view,
         root,
         &rules,
@@ -172,6 +177,10 @@ fn plan(
         carried_work.clone(),
         &required,
     )?;
+    let (obligations, classification_bases) = match acquired {
+        Some(acquired) => (Some(acquired.obligations), acquired.classification_bases),
+        None => (None, Vec::new()),
+    };
     if same_event
         && obligations.is_none()
         && prior.as_ref().is_some_and(|p| p.obligations.is_some())
@@ -212,6 +221,7 @@ fn plan(
         previous_record,
         required_surfaces: required,
         carried_work,
+        classification_bases,
     }))
 }
 

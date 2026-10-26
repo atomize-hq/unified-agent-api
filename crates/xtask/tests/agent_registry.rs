@@ -1,3 +1,6 @@
+// The registry's per-unit policy uses the shared surface identity from the public audit module.
+use xtask::agent_maintenance;
+
 #[path = "../src/agent_registry.rs"]
 mod agent_registry;
 mod capability_projection {

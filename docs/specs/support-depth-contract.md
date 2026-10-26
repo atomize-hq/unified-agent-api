@@ -1282,7 +1282,10 @@ consumer MUST reject a member that is not listed and a listed member that is mis
      `obligations` and `execution` members of a part not yet produced. No object states a
      member twice.
    - `enrollment` is written as the declaration writes it: its lists in the declaration's
-     order, and a mode's `targets` present only where the declaration states it. That order is
+     order, and a mode's `targets` present only where the declaration states it. Paired optional
+     operation `classification_basis` and `classifications` are omitted where the declaration
+     omits both; present classification rows and their template lists keep declaration order.
+     That order is
      part of what P states, so a declaration that is reordered is a changed P. Whether a
      record's `enrollment` agrees with the declaration is not decided by the record alone and
      belongs to depth admission.
@@ -1324,12 +1327,20 @@ The policy part:
 | Member | Value |
 | --- | --- |
 | `identity` | The policy identity. |
-| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, except where rule 1 of this section fixes the written form: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Under that rule `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Revision 1 has no override. |
+| `selection` | `{ "agent_id", "enrollment" }`. `enrollment` is the declaration in the form the [registry contract](agent-registry-contract.md#support-depth) gives one, with the same member names and the same rules, except where rule 1 of this section fixes the written form: `lifecycle_path`, `version`, `targets`, `modes`, `operations` and `capabilities`. Under that rule `predicates`, `not_applicable_permitted` and `capabilities` are always written, as `[]` where the declaration states none. It states the operations with their promises, the modes and required values of each, the targets, where a promise permits `not_applicable`, the capability mappings, the classification entries and the mode exclusions. Paired optional operation `classification_basis` and ordered `classifications` are preserved exactly as the registry contract defines them; absence MUST NOT serialize new empty members into existing v1 records. Revision 1 has no override. |
 | `rules_revision` | The revision of the governing rules when P was frozen, a string that is not blank. |
 | `base` | The BASE obligation ids as P resolved them. |
-| `templates` | One `{ "template", "obligations" }` for each obligation template an operation of the selection selects, stating the obligations the template added when P was frozen. |
+| `templates` | One `{ "template", "obligations" }` for each obligation template a parent operation or explicit per-unit classification of the selection selects, stating the obligations the template added when P was frozen. |
 | `path_enabled` | Whether the selection's lifecycle path was enabled for the agent when P was frozen. |
 | `debt_baseline` | The frozen delegation and the initial authorization baseline: a debt row for every row in force for the agent when P was frozen. Each row's `agent_id` is the selection's, and row ids do not repeat. |
+
+An operation's explicit per-unit classifications bind the registry contract's finite semantic
+acquisition basis. Missing rows retain classification_required, including unsupported, passthrough
+and wrapper-only surfaces; matching rows resolve only matching owned surfaces. Stale basis and
+foreign/unowned rows refuse. O's obligations retain BASE, parent templates and M, and add the union
+of per-unit templates. Raw acquisition references still bind timestamp/bookkeeping changes. This
+additive representation changes neither governing rules revision nor record schema revision and
+confers no execution, adequacy or acceptance authority.
 
 `base` and `templates` state which obligations the governing rules select. Without them a change
 to an obligation template would leave a frozen P with the same identity and another meaning.

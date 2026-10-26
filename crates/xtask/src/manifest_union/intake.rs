@@ -12,6 +12,7 @@ pub(crate) fn validate(
     version: &str,
     union: &Value,
     shards: &BTreeMap<String, Value>,
+    selected_paths: &BTreeSet<Vec<String>>,
 ) -> Result<(), String> {
     let rules: RulesFile = serde_json::from_slice(rules).map_err(|e| e.to_string())?;
     assert_supported_sorting(&rules.sorting).map_err(|e| e.to_string())?;
@@ -29,7 +30,11 @@ pub(crate) fn validate(
         {
             return Err(format!("snapshot identity/schema mismatch: {target}"));
         }
-        validate_units(&snapshot, rules.globals.effective_flags_model.enabled)?;
+        validate_units(
+            &snapshot,
+            rules.globals.effective_flags_model.enabled,
+            selected_paths,
+        )?;
         snapshots.insert(target.clone(), snapshot);
     }
     if !snapshots.contains_key(&rules.union.required_target) {
@@ -104,7 +109,11 @@ pub(crate) fn validate(
 }
 
 // Duplicate paths/names and ambiguous flag aliases cannot be hidden by the merger's maps.
-fn validate_units(snapshot: &SnapshotV1, globals: bool) -> Result<(), String> {
+fn validate_units(
+    snapshot: &SnapshotV1,
+    globals: bool,
+    selected_paths: &BTreeSet<Vec<String>>,
+) -> Result<(), String> {
     let aliases = |command: &crate::manifest_snapshot_schema::CommandSnapshot| -> Result<BTreeMap<String,String>,String> {
         let mut result=BTreeMap::new();
         let mut keys=BTreeSet::new();
@@ -137,7 +146,11 @@ fn validate_units(snapshot: &SnapshotV1, globals: bool) -> Result<(), String> {
             return Err("duplicate snapshot command path".into());
         }
         let current = aliases(command)?;
+        // A command may legally own a local alias that another command uses globally. Only
+        // the exact selected invocation scopes need inheritance interpretation; never apply a
+        // parent-prefix assumption to an unrelated child command.
         if globals
+            && selected_paths.contains(&command.path)
             && !command.path.is_empty()
             && current
                 .iter()

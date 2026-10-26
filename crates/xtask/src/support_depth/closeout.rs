@@ -47,7 +47,10 @@ fn current_bindings(
         text(&rules)?,
         Some(text(&raw_record)?),
         text(&inventory)?,
-        Some(&record.policy.debt_baseline),
+        ResolutionContext {
+            baseline: Some(&record.policy.debt_baseline),
+            intake: true,
+        },
     )?
     .ok_or("closeout lost depth enrollment")?;
     check_current_policy(&record.policy, &policy)?;
@@ -118,7 +121,8 @@ fn current_bindings(
         carried,
         &required,
     )?
-    .ok_or("current acquisition has no frozen O")?;
+    .ok_or("current acquisition has no frozen O")?
+    .obligations;
     view.verify()?;
     Ok((policy, obligations))
 }
