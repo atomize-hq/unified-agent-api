@@ -379,7 +379,11 @@ This validation MUST NOT evaluate approval policy or synthesize consent.
 Unknown/malformed requests and invalid replies MUST fail safely with redacted errors. Dropping
 an unanswered request sends an explicit unsupported RPC error when its ownership is still active.
 `is_active()`, `cancelled()` and `invalidate()` expose ownership observation/invalidation without
-exposing the RPC ID. A matching `serverRequest/resolved` (same connection, typed native request ID
+exposing the RPC ID. `reply_ownership()` returns an opaque `AppServerReplyOwnership` with
+`is_pending()` and `invalidate()`, allowing an adapter to retain revocation authority after a
+callback has returned and its result is queued. Ownership becomes inactive at invalidation or the
+first actual response I/O; callback completion alone MUST NOT end item invalidation authority.
+A matching `serverRequest/resolved` (same connection, typed native request ID
 and thread) invalidates the request. Stream drop, cancellation, shutdown, transport failure and EOF
 invalidate pending ownership. The writer MUST recheck ownership at the first actual response I/O
 poll, including after time spent queued or waiting for pipe readiness. No user callback runs inside
@@ -419,3 +423,9 @@ without a shell. The constructor without overrides remains an empty-map wrapper.
 for `config/read { cwd, includeLayers: false }` and `configRequirements/read {}` respectively.
 These read-only calls permit an adapter to preserve native configuration/requirements when deriving
 its explicit runtime root set; transport itself does not derive or replace native permissions.
+
+`StdioServerConfig::for_codex_command(binary, code_home)` prepares the wrapper's existing exec
+binary/home/environment defaults without changing legacy spawn constructors. Explicit binary wins
+ambient `CODEX_BINARY`; a configured home is materialized through the canonical command environment.
+Per-call environment overrides may be appended afterward. UAA performs this preparation inside its
+owned startup deadline/cancellation scope after returning the public run handle.
