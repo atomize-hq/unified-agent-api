@@ -36,6 +36,7 @@ impl AcquisitionFacts<'_> {
         let shard = &self.shards[target];
         let original = rows(self.agent, shard, "commands", false)?;
         let union = rows(self.agent, self.union, "commands", false)?;
+        let conflicts = union_conflicts(self.agent, self.union)?;
         let claims = rows(self.agent, self.wrapper, "coverage", true)?;
         let units = owned
             .iter()
@@ -45,6 +46,7 @@ impl AcquisitionFacts<'_> {
                     "applicable_targets": self.surfaces[surface],
                     "original_shard": original.get(surface),
                     "normalized_union": union.get(surface),
+                    "union_conflicts": conflicts.get(surface),
                     "wrapper_claims": claims.get(surface),
                 })
             })
@@ -68,6 +70,44 @@ impl AcquisitionFacts<'_> {
             facts,
         })
     }
+}
+
+// Union conflicts live on the owning command, including when only its global flag is selected.
+// Index the complete rows by their own unit identity so each leaf binds its values and evidence.
+fn union_conflicts(
+    agent: &str,
+    union: &Value,
+) -> Result<BTreeMap<SurfaceIdentity, Vec<Value>>, String> {
+    let mut result = BTreeMap::<_, Vec<_>>::new();
+    for command in union["commands"]
+        .as_array()
+        .ok_or("missing semantic commands")?
+    {
+        for conflict in command["conflicts"].as_array().into_iter().flatten() {
+            let path: Vec<String> =
+                serde_json::from_value(conflict["path"].clone()).map_err(|e| e.to_string())?;
+            let (shape, leaf) = match conflict["unit"].as_str() {
+                Some("command") => (ReportRowShape::Command, ""),
+                Some("flag") => (
+                    ReportRowShape::Flag,
+                    conflict["key"].as_str().ok_or("conflict lacks flag key")?,
+                ),
+                Some("arg") => (
+                    ReportRowShape::Arg,
+                    conflict["name"].as_str().ok_or("conflict lacks arg name")?,
+                ),
+                _ => return Err("unknown or unprojectable conflict unit".into()),
+            };
+            result
+                .entry(surface_identity(agent, &path, shape, leaf))
+                .or_default()
+                .push(conflict.clone());
+        }
+    }
+    for conflicts in result.values_mut() {
+        *conflicts = canonical_set(std::mem::take(conflicts))?;
+    }
+    Ok(result)
 }
 
 fn rows(

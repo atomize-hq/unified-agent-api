@@ -2,6 +2,142 @@ use super::*;
 const SHARD: &str = "cli_manifests/codex/snapshots/1.2.3/x86_64-unknown-linux-musl.json";
 
 #[test]
+fn selected_leaf_conflicts_and_provenance_invalidate_basis() {
+    const OTHER: &str = "aarch64-apple-darwin";
+    const UNION: &str = "cli_manifests/codex/snapshots/1.2.3/union.json";
+    let read = |root: &Path, path: &str| -> Value {
+        serde_json::from_slice(&fs::read(root.join(path)).unwrap()).unwrap()
+    };
+    // PI-DEF-1: global flags are selected without their owning root command. Exercise local
+    // flags and args too: each leaf must retain its own complete supported conflict facts.
+    for (name, command, member, field, unit) in [
+        ("--model", 0, "flags", "repeatable", "flag"),
+        ("--output", 1, "flags", "repeatable", "flag"),
+        ("PROMPT", 1, "args", "required", "arg"),
+    ] {
+        let root = acquisition();
+        fixture::change_json(root.path(), SHARD, |v| {
+            v["commands"][0]["flags"][0]["long"] = json!("--model")
+        });
+        let mut other = read(root.path(), SHARD);
+        other["binary"]["target_triple"] = json!(OTHER);
+        other["binary"]["platform"] = json!({"os":"macos","arch":"aarch64"});
+        let other_path = format!("cli_manifests/codex/snapshots/1.2.3/{OTHER}.json");
+        fixture::write(root.path(), &other_path, other.to_string());
+        fixture::regenerate(root.path(), "codex");
+        let before = classify(root.path(), &request(), &[name]);
+        let selected_shard = fs::read(root.path().join(SHARD)).unwrap();
+        let union = read(root.path(), UNION);
+        let union_leaf = |v: &Value| {
+            v["commands"][command][member]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["key"] == name || row["name"] == name)
+                .unwrap()
+                .clone()
+        };
+        let canonical_leaf = union_leaf(&union);
+        assert!(before.record.obligations.as_ref().unwrap().operations[0]
+            .surfaces
+            .iter()
+            .all(|s| s.surface_kind != "commands" || s.command_path != "codex"));
+
+        fixture::change_json(root.path(), &other_path, |v| {
+            v["commands"][command][member][0][field] = json!(field != "required")
+        });
+        // Real generators produce the conflict on the owning command, keeping the canonical
+        // selected-target leaf unchanged. A hand-edited union would not test this causal path.
+        fixture::regenerate(root.path(), "codex");
+        let changed_union = read(root.path(), UNION);
+        assert_eq!(fs::read(root.path().join(SHARD)).unwrap(), selected_shard);
+        assert_eq!(union_leaf(&changed_union), canonical_leaf);
+        let conflict = changed_union["commands"][command]["conflicts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["unit"] == unit && c["field"] == field)
+            .unwrap();
+        assert_eq!(conflict[if unit == "flag" { "key" } else { "name" }], name);
+        assert_eq!(conflict["values_by_target"][OTHER], field != "required");
+        let error = plan_freeze(root.path(), &request()).unwrap_err();
+        assert!(
+            error.contains("stale classification_basis"),
+            "{name}: {error}"
+        );
+
+        policy(root.path(), |d| {
+            d["operations"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("classifications");
+            d["operations"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("classification_basis");
+        });
+        let changed = classify(root.path(), &request(), &[name]);
+        assert_ne!(
+            before.classification_bases[0].sha256,
+            changed.classification_bases[0].sha256
+        );
+        let leaf = changed.classification_bases[0].facts["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["surface"]["surface_id"] == name)
+            .unwrap();
+        assert_eq!(leaf["union_conflicts"], json!([conflict]));
+        assert!(changed.classification_bases[0].facts["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|u| u["surface"]["surface_id"] != name)
+            .all(|u| u["union_conflicts"].is_null()));
+
+        // Supported raw-help provenance belongs to the same conflict and must also be bound.
+        let help = if command == 0 {
+            "help.txt"
+        } else {
+            "commands/run/help.txt"
+        };
+        fixture::write(
+            root.path(),
+            &format!("cli_manifests/codex/raw_help/1.2.3/{OTHER}/{help}"),
+            "reviewed help provenance",
+        );
+        fixture::regenerate(root.path(), "codex");
+        let provenance_union = read(root.path(), UNION);
+        let provenance = &provenance_union["commands"][command]["conflicts"][0];
+        assert!(provenance["evidence"]["help_ref_by_target"][OTHER].is_string());
+        assert!(provenance["evidence"]["help_sha256_by_target"][OTHER].is_string());
+        let error = plan_freeze(root.path(), &request()).unwrap_err();
+        assert!(
+            error.contains("stale classification_basis"),
+            "{name}: {error}"
+        );
+        policy(root.path(), |d| {
+            d["operations"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("classifications");
+            d["operations"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("classification_basis");
+        });
+        let with_provenance = plan_freeze(root.path(), &request()).unwrap().unwrap();
+        let leaf = with_provenance.classification_bases[0].facts["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["surface"]["surface_id"] == name)
+            .unwrap();
+        assert_eq!(leaf["union_conflicts"], json!([provenance]));
+    }
+}
+
+#[test]
 fn matching_rows_resolve_only_owned_units_and_add_parent_obligations() {
     let root = acquisition();
     let before = plan_freeze(root.path(), &request()).unwrap().unwrap();

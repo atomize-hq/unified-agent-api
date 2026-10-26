@@ -334,7 +334,10 @@ absent/present distinction. Units retain the complete selected population in can
 including original flags removed by union normalization and all wrapper claim levels. Each unit
 states its SurfaceIdentity, complete applicable target set, original selected-shard row payload,
 normalized union row payload and wrapper claim payloads with owning command scope/level, including
-explicit absent provenance. Unknown/unprojectable row fields or payloads incompatible with B.7's
+explicit absent provenance. Each unit also retains matching owning-command union conflict rows
+by exact path and flag key/argument name, including their complete values and evidence payloads;
+selecting a global flag does not require selecting its owning root command. Unknown/unprojectable
+row fields or payloads incompatible with B.7's
 no-number canonicalization MUST refuse. Nothing is silently filtered to obtain a digest.
 
 RULES and SCHEMA bind their complete raw file digests. Every other supported row field, arity,
