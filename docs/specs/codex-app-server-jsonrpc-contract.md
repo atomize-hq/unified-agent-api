@@ -4,7 +4,8 @@ Status: **Normative**
 Scope: `codex app-server` stdio JSON-RPC (fork flow primitives + streaming notifications)
 
 This document pins a **testable, zero-ambiguity** contract for the subset of the Codex app-server
-protocol that is required to implement Unified Agent API session fork semantics for the Codex
+protocol, verified against Codex `0.156.1` (upstream commit
+`b412ff32c417f855c2b2d1581b77058eed87c84b`), that is required to implement Unified Agent API session fork semantics for the Codex
 backend (`agent_api.session.fork.v1`).
 
 This is a wrapper-facing contract (what `crates/codex` + `crates/agent_api` must implement and
@@ -36,6 +37,8 @@ needed by this repo’s tests.
 ## Handshake (initialize) (pinned)
 
 Before issuing any thread/turn method, clients MUST send `initialize` and await its response.
+For pinned `0.156.1`, that response establishes readiness; a subsequent client `initialized`
+notification is not required. This differs from assuming that MCP handshake rules apply unchanged.
 
 Request (minimum required fields):
 
@@ -95,7 +98,12 @@ Selection algorithm (pinned, deterministic):
      - `cwd = <effective working directory>`,
      - `sortKey = "updated_at"`,
      - `limit = 100` (or the max permitted by the server), and
-     - `cursor = null` on the first call.
+     - `cursor = null` on the first call,
+     - `archived = false`, `modelProviders = []` (all providers), and
+     - `sourceKinds = ["cli", "vscode", "exec", "appServer", "subAgent", "subAgentReview",
+       "subAgentCompact", "subAgentThreadSpawn", "subAgentOther", "unknown"]`.
+       Omitting this filter defaults upstream to interactive sources and excludes exec-created
+       sessions. An empty source list has the same upstream default; it does not mean all sources.
   2) follow pagination by repeating the call with `cursor = nextCursor` until `nextCursor == null`.
   3) choose the fork source thread as the thread with the maximum tuple:
      - `(updatedAt, createdAt, id)` using lexicographic ordering (largest wins).
@@ -111,12 +119,14 @@ Request params (see generated `ThreadForkParams`):
   - `threadId: string` — id of the source thread to fork from
 - Optional (subset used/pinned here):
   - `cwd: string|null` — when set, the forked thread’s cwd (and subsequent turns) is set to this path
-  - `approvalPolicy: "untrusted"|"on-failure"|"on-request"|"never"|null`
+  - `approvalPolicy: "untrusted"|"on-request"|"never"|null`
   - `sandbox: "read-only"|"workspace-write"|"danger-full-access"|null`
   - `persistExtendedHistory: boolean` (default false)
 
 Response shape (see generated `ThreadForkResponse`):
-- The forked thread id MUST be read from: `result.thread.id` (string).
+- The forked thread id MUST be read from: `result.thread.id` (nonblank string).
+- The wrapper's historical typed `on-failure` value is absent from the pinned protocol schema.
+  Passing it to the server fails safely as an RPC error; it MUST NOT be replaced with another policy.
 
 Failure behavior (pinned):
 - Method failures MUST be surfaced as a JSON-RPC error response (`{"error":{code,message,data?}}`).
@@ -132,7 +142,7 @@ Request params (see generated `TurnStartParams`):
   - `threadId: string`
   - `input: UserInput[]`
 - Optional (subset pinned here):
-  - `approvalPolicy: "untrusted"|"on-failure"|"on-request"|"never"|null`
+  - `approvalPolicy: "untrusted"|"on-request"|"never"|null`
   - `cwd: string|null`
 
 Prompt mapping (pinned):
@@ -146,6 +156,24 @@ Prompt mapping (pinned):
   "input": [{ "type": "text", "text": "<prompt>", "text_elements": [] }]
 }
 ```
+
+### Turn acceptance and completion
+
+`turn/start` returns `{ "turn": { "id": "...", "status": "inProgress", "items": [] } }`.
+This is acceptance, not terminal completion. The adapter MUST validate a nonblank accepted turn id,
+a known status and an items array, and then consume notifications until a matching
+`turn/completed` for **both** the forked `threadId` and accepted `turn.id` is observed.
+Unrelated thread/turn messages MUST NOT supply output or complete this run. Unknown notifications
+and malformed nonterminal payloads MAY be ignored. Missing/malformed acceptance, disconnect/EOF
+before completion, malformed terminal payloads, failed or interrupted turns MUST NOT become success.
+The successful terminal turn MUST have `status="completed"`, an items array and no non-null error.
+
+The adapter MUST forward all preceding selected output before stream finality and MUST wait for
+actual owned-process exit before resolving completion. A successful RPC response or synthetic exit
+status cannot substitute for either requirement. Acceptance is bounded by three seconds, and a
+configured nonzero run timeout covers acceptance and the subsequent turn, independently of polling
+completion. Process failure during shutdown MUST fail the run. A forked thread may already have
+been persisted when turn start or completion fails; this operation promises no rollback or retry.
 
 ## Interaction with `agent_api.exec.add_dirs.v1` (pinned current truth)
 
@@ -209,12 +237,14 @@ notifications into `AgentWrapperEvent` values **without** embedding raw backend 
 
 Notification methods (wire) that MUST be handled:
 
-- `agentMessage/delta` → `AgentWrapperEventKind::TextOutput`
+- `item/agentMessage/delta` with object `params.delta: string` → `AgentWrapperEventKind::TextOutput`
   - `event.channel = Some("assistant")`
   - `event.text = Some(delta)` (bounded per `event-envelope-schema-spec.md`; split if needed)
-- `reasoning/text/delta` → `AgentWrapperEventKind::TextOutput` (same bounds as above)
+- `item/reasoning/textDelta` with object `params.delta: string` → `AgentWrapperEventKind::TextOutput` (same bounds as above)
 - `item/started` → `AgentWrapperEventKind::ToolCall` (metadata-only; do not include raw params)
 - `item/completed` → `AgentWrapperEventKind::ToolResult` (metadata-only; do not include raw params)
+  - Read item identity/type from `params.item.id` / `params.item.type`, and scope from
+    `params.threadId` / `params.turnId`. Do not copy command, patch, result or other item payloads.
 - `turn/started` → `AgentWrapperEventKind::Status` (safe `message`, optional)
 - `turn/completed` → `AgentWrapperEventKind::Status` (safe `message`, optional)
 - `error` → `AgentWrapperEventKind::Error`
@@ -239,78 +269,35 @@ For app-server fork flows:
 - The goal is to prevent server-initiated approval requests (which would otherwise hang an
   unattended client).
 
-### Approval request definition (wire, pinned)
+### Server requests and approval-required failure
 
-For the purposes of this contract, an **approval request** is any JSON-RPC notification that
-matches:
+The pinned server requests approvals using JSON-RPC **requests** (with a numeric or string `id`),
+including `item/commandExecution/requestApproval`, `item/fileChange/requestApproval` and
+`item/permissions/requestApproval`. They MUST NOT be parsed as responses to client requests, even
+when their ids coincide. The client MUST respond to unsupported server requests with JSON-RPC
+error `-32601`, preserve the server's id and MUST NOT authorize the action. It MUST expose the
+request method to lifecycle handling, including when the request arrives during `thread/fork`.
+Legacy approval methods and `codex/event` approval notifications remain recognized for compatibility;
+they are not claims about the pinned v2 emission shape.
 
-- `method == "codex/event"`
-- `params` payload is an object, either:
-  - directly as `params`, or
-  - nested under `params.msg` (some servers wrap the payload)
-- `params.type` is `"approval_required"` (preferred) or `"approval"` (alias)
-
-Required payload fields (pinned):
-- `approval_id: string` (alias: `id`)
-- `kind: string` (alias: `approval_kind`)
-
-All other fields are server-defined and MAY be ignored by clients. Clients MUST NOT embed the raw
-payload into Unified Agent API event/completion `data`.
-
-### Fail-fast handling (non-interactive, pinned)
-
-If the server still emits an approval request despite non-interactive configuration, the backend
-MUST fail the run as a backend error (safe message) rather than hanging.
-
-Pinned translation into Unified Agent API failure:
-
-- Safe error message (pinned): `"approval required"`
-- Event/completion ordering (pinned):
-  1) If the consumer-visible events stream exists and is still open, emit exactly one terminal
-     `AgentWrapperEventKind::Error` event with `event.message == "approval required"` (bounded).
-  2) Close the events stream.
-  3) Resolve `completion` with `Err(AgentWrapperError::Backend { message: "approval required" })`.
-
-Interaction with JSON-RPC cancellation (pinned):
-
-- Approval requests MAY occur during `thread/fork`, `turn/start`, or both.
-- If an approval request is observed while a `turn/start` request with JSON-RPC id `N` is in-flight,
-  the client MUST immediately send `$/cancelRequest` for that id before failing:
-
-```json
-{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
-```
-
-This cancellation is best-effort and exists only to ensure the client does not hang waiting for an
-approval roundtrip.
-
-### Example transcript (approval required, non-interactive)
-
-Minimal, deterministic sequence (one JSON object per line):
-
-```json
-{ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "clientInfo": { "name": "tests", "version": "0.0.0" }, "capabilities": { "experimentalApi": true } } }
-{ "jsonrpc": "2.0", "id": 1, "result": { "ready": true } }
-
-{ "jsonrpc": "2.0", "id": 2, "method": "turn/start", "params": { "threadId": "t-1", "approvalPolicy": "never", "input": [{ "type": "text", "text": "prompt", "text_elements": [] }] } }
-{ "jsonrpc": "2.0", "method": "codex/event", "params": { "type": "approval_required", "approval_id": "ap-2", "kind": "exec" } }
-{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": 2 } }
-{ "jsonrpc": "2.0", "id": 2, "error": { "code": -32800, "message": "cancelled" } }
-```
+An approval request MUST fail promptly with safe message `"approval required"`; no approval-response
+UI or approval capability is promised for either value of non-interactive. When a consumer-visible
+stream exists, emit exactly one terminal Error with that message, close the stream and resolve
+completion with `Err(AgentWrapperError::Backend { message: "approval required" })`. Raw approval
+commands, reasons and details MUST NOT appear in public events or errors.
 
 ## Cancellation / termination wiring (pinned)
 
-For app-server-backed runs, explicit cancellation MUST be implemented using JSON-RPC cancellation:
+After acceptance, cancellation and timeout MUST send `turn/interrupt` with
+`{ "threadId": "<forked id>", "turnId": "<accepted id>" }`. This interrupts the actual turn;
+`$/cancelRequest` targets the already-acknowledged RPC and is not the pinned v2 turn cancellation
+mechanism. If cancellation occurs before a turn identity is available, the client MUST close and
+reap its owned app-server without inventing a turn id. Interruption is best effort, followed by
+bounded owned-process cleanup; it MUST NOT require another server response to finish cleanup.
 
-- To cancel an in-flight `turn/start` request with JSON-RPC id `N`, the client MUST send:
-
-```json
-{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
-```
-
-Universal cancellation semantics (event + completion precedence) are owned by
-`docs/specs/unified-agent-api/run-protocol-spec.md` and MUST be enforced by `agent_api` when
-exposing `run_control`.
+Universal cancellation and completion/event-stream precedence remain owned by
+`docs/specs/unified-agent-api/run-protocol-spec.md`. Ordinary MCP cancellation retains its own
+`$/cancelRequest` behavior.
 
 ## Timeout enforcement (pinned)
 
@@ -329,12 +316,8 @@ Countdown semantics (pinned):
 - Timeout enforcement MUST NOT depend on the consumer polling/awaiting `completion`.
 
 Timeout handling (pinned):
-- If the timeout triggers while a `turn/start` request with JSON-RPC id `N` is in-flight, the
-  client MUST send `$/cancelRequest` for id `N`:
-
-```json
-{ "jsonrpc": "2.0", "method": "$/cancelRequest", "params": { "id": N } }
-```
+- If timeout triggers after acceptance, send `turn/interrupt` for the known thread and turn,
+  then close and reap the owned process. Before acceptance, close and reap without a fabricated id.
 
 Pinned translation into Unified Agent API failure:
 - Safe error message (pinned): `"codex backend error: timeout (details redacted when unsafe)"`
@@ -344,11 +327,10 @@ Pinned translation into Unified Agent API failure:
   2) Close the events stream.
   3) Resolve `completion` with `Err(AgentWrapperError::Backend { message: <pinned message> })`.
 
-## Graceful shutdown (pinned)
+## Owned-process shutdown (pinned)
 
-- The app-server protocol does not expose a `shutdown` request in the generated schema.
-- Clients SHOULD terminate by sending `exit` (notification) and closing stdio:
-
-```json
-{ "jsonrpc": "2.0", "method": "exit", "params": null }
-```
+The pinned app-server exposes neither a `shutdown` request nor an `exit` notification as a shutdown
+protocol. The client MUST drain queued writes and close stdin. It MUST await the real child exit;
+after a two-second grace period it MUST kill and reap the child. Completion MUST NOT claim success
+for a failed or forcibly killed process. Initialization and later setup errors also retain owned
+process cleanup. The ordinary MCP shutdown implementation is unchanged.

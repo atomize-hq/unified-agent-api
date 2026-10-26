@@ -174,10 +174,13 @@ impl CodexAppServer {
             capabilities,
         };
 
-        transport
+        if let Err(err) = transport
             .initialize(params, transport.startup_timeout())
             .await
-            .map_err(|err| McpError::Handshake(err.to_string()))?;
+        {
+            let _ = transport.shutdown_app().await;
+            return Err(McpError::Handshake(err.to_string()));
+        }
 
         Ok(Self {
             transport: Arc::new(transport),
@@ -265,9 +268,25 @@ impl CodexAppServer {
                     cursor: cursor.clone(),
                     limit: Some(100),
                     sort_key: Some(super::ThreadListSortKey::UpdatedAt),
-                    archived: None,
-                    model_providers: None,
-                    source_kinds: None,
+                    archived: Some(false),
+                    model_providers: Some(vec![]),
+                    source_kinds: Some(
+                        [
+                            "cli",
+                            "vscode",
+                            "exec",
+                            "appServer",
+                            "subAgent",
+                            "subAgentReview",
+                            "subAgentCompact",
+                            "subAgentThreadSpawn",
+                            "subAgentOther",
+                            "unknown",
+                        ]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    ),
                 })
                 .await?;
 
@@ -317,7 +336,13 @@ impl CodexAppServer {
 
     /// Gracefully shut down the app-server.
     pub async fn shutdown(&self) -> Result<(), McpError> {
-        self.transport.shutdown().await
+        self.shutdown_and_wait().await.map(|_| ())
+    }
+
+    /// Close app-server stdin and wait for its actual process exit, killing and reaping
+    /// after the bounded shutdown grace period if necessary.
+    pub async fn shutdown_and_wait(&self) -> Result<std::process::ExitStatus, McpError> {
+        self.transport.shutdown_app().await
     }
 
     async fn invoke_app_call(

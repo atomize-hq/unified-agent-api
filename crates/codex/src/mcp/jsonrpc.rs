@@ -39,13 +39,14 @@ type PendingRequests = Arc<Mutex<HashMap<RequestId, oneshot::Sender<Result<Value
 
 /// Internal transport that handles stdio JSON-RPC.
 pub(super) struct JsonRpcTransport {
-    writer: mpsc::UnboundedSender<String>,
+    writer: mpsc::UnboundedSender<Option<String>>,
     pending: PendingRequests,
     notification_hook: NotificationHook,
     next_id: AtomicU64,
     tasks: Vec<JoinHandle<()>>,
     child: Arc<Mutex<Option<Child>>>,
     startup_timeout: Duration,
+    is_app: bool,
 }
 
 impl JsonRpcTransport {
@@ -140,6 +141,7 @@ impl JsonRpcTransport {
             pending.clone(),
             notification_hook.clone(),
             config.mirror_stdio,
+            writer_tx.clone(),
         ));
 
         let stderr_handle =
@@ -158,6 +160,7 @@ impl JsonRpcTransport {
             tasks,
             child: Arc::new(Mutex::new(Some(child))),
             startup_timeout: config.startup_timeout,
+            is_app: subcommand == "app-server",
         })
     }
 
@@ -192,7 +195,7 @@ impl JsonRpcTransport {
             guard.insert(id, tx);
         }
 
-        if self.writer.send(serialized).is_err() {
+        if self.writer.send(Some(serialized)).is_err() {
             let mut guard = self.pending.lock().await;
             guard.remove(&id);
             return Err(McpError::ChannelClosed);
@@ -239,7 +242,7 @@ impl JsonRpcTransport {
         });
         let serialized = serde_json::to_string(&message)?;
         self.writer
-            .send(serialized)
+            .send(Some(serialized))
             .map_err(|_| McpError::ChannelClosed)
     }
 
@@ -254,11 +257,28 @@ impl JsonRpcTransport {
             "params": Value::Null
         });
 
-        let _ = self
-            .writer
-            .send(serde_json::to_string(&exit_message).unwrap_or_default());
+        let _ = self.writer.send(Some(
+            serde_json::to_string(&exit_message).unwrap_or_default(),
+        ));
 
         Ok(())
+    }
+
+    pub(super) async fn shutdown_app(&self) -> Result<std::process::ExitStatus, McpError> {
+        debug_assert!(self.is_app);
+        // The pinned app-server has no shutdown/exit RPC. EOF shuts down stdio.
+        let _ = self.writer.send(None);
+        let mut guard = self.child.lock().await;
+        let child = guard.as_mut().ok_or(McpError::ChannelClosed)?;
+        let status = match time::timeout(Duration::from_secs(2), child.wait()).await {
+            Ok(result) => result,
+            Err(_) => {
+                let _ = child.start_kill();
+                child.wait().await
+            }
+        }
+        .map_err(|_| McpError::Transport("app-server process wait failed".into()))?;
+        Ok(status)
     }
 
     pub(super) fn startup_timeout(&self) -> Duration {
@@ -300,8 +320,8 @@ struct RpcError {
     data: Option<Value>,
 }
 
-async fn writer_task(mut stdin: ChildStdin, mut rx: mpsc::UnboundedReceiver<String>) {
-    while let Some(message) = rx.recv().await {
+async fn writer_task(mut stdin: ChildStdin, mut rx: mpsc::UnboundedReceiver<Option<String>>) {
+    while let Some(Some(message)) = rx.recv().await {
         if stdin.write_all(message.as_bytes()).await.is_err() {
             break;
         }
@@ -319,6 +339,7 @@ async fn reader_task(
     pending: PendingRequests,
     notification_hook: NotificationHook,
     mirror_stdio: bool,
+    writer: mpsc::UnboundedSender<Option<String>>,
 ) {
     let mut lines = BufReader::new(stdout).lines();
     loop {
@@ -347,6 +368,43 @@ async fn reader_task(
             }
         };
 
+        // App-server server requests have their own id space (including string ids).
+        // Never misclassify one as a response to our request or authorize an action.
+        if value.get("method").is_some() && value.get("id").is_some() {
+            if let NotificationHook::App { sinks } = &notification_hook {
+                let method = value["method"].as_str().unwrap_or_default();
+                let approval = matches!(
+                    method,
+                    "item/commandExecution/requestApproval"
+                        | "item/fileChange/requestApproval"
+                        | "item/permissions/requestApproval"
+                        | "execCommandApproval"
+                        | "applyPatchApproval"
+                );
+                let reply = serde_json::json!({"jsonrpc":"2.0","id":value["id"],"error":{"code":-32601,"message":"client interaction unsupported"}});
+                let _ = writer.send(Some(reply.to_string()));
+                broadcast_app_event(
+                    AppNotification::Raw {
+                        method: method.to_string(),
+                        params: value["params"].clone(),
+                    },
+                    sinks,
+                )
+                .await;
+                let mut guard = pending.lock().await;
+                for (_, tx) in guard.drain() {
+                    let _ = tx.send(Err(McpError::Server(
+                        if approval {
+                            "approval required"
+                        } else {
+                            "client interaction required"
+                        }
+                        .into(),
+                    )));
+                }
+                continue;
+            }
+        }
         match decode_message(value) {
             Some(Incoming::Response(response)) => {
                 handle_response(response, &pending).await;
@@ -374,6 +432,10 @@ async fn reader_task(
         }
     }
 
+    match &notification_hook {
+        NotificationHook::App { sinks } => sinks.lock().await.clear(),
+        NotificationHook::Codex { .. } => {}
+    }
     let mut guard = pending.lock().await;
     for (_, tx) in guard.drain() {
         let _ = tx.send(Err(McpError::ChannelClosed));

@@ -1,6 +1,11 @@
 # Complete Codex pilot policy proposal
 
-Status: proposed policy, 2026-10-25. Baseline staging
+Status: implementation direction approved, 2026-10-26. The maintainer approved CP-1,
+CP-2 and CP-3's resolved-row direction; CP-3 does **not** approve any U-* row or missing evidence.
+This approval authorizes the bounded fork/approval compatibility repairs and tests; it does not
+install the proposed profile, enroll operations or establish qualification.
+
+Original design dated 2026-10-25. Baseline staging
 `1f38133ffc68f4c7a254f05a6ce63b1543f619d3` (PR #299). This document completes the
 PI-P3 design direction with exact proposed flows, dispositions and implementation prerequisites.
 PI-P1's30 initial assignments remain approved; PI-P2 is implemented; PI-P3 did **not** approve
@@ -29,7 +34,7 @@ mapped intake and positive freeze. A complete design can identify a required rep
 it cannot make that operation ready by assigning a plausible template. No row in this proposal is
 execution evidence, an installed classification, an NA/debt/exclusion or evidence adoption.
 
-Three policy decisions need maintainer approval: CP-1 selects this complete mapped scope and
+The approved implementation direction covers these three policy decisions: CP-1 selects this complete mapped scope and
 templates; CP-2 permits the finite boundary/ancestry/protocol representation below; CP-3 accepts
 only individually resolved appendix rows with their whole bound regimes. Recommend all three as
 an implementation direction, with CP-3 expressly withholding the U-* rows until their prerequisites

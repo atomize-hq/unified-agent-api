@@ -1,7 +1,7 @@
 //! Codex backend tests for timeout enforcement during fork flows.
 //!
 //! Normative source: `docs/specs/codex-app-server-jsonrpc-contract.md` (timeout countdown +
-//! `$\/cancelRequest` + pinned safe timeout message).
+//! `turn/interrupt` + pinned safe timeout message).
 
 use std::time::Duration;
 

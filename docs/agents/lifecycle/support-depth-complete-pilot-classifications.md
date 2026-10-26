@@ -305,3 +305,35 @@ The current fourteen exact raw inputs, independently rehashed for this proposal:
 | `cli_manifests/codex/reports/0.156.1/coverage.any.json` | `6855143fb19ba2fac771248b02325ae12a03be7b6163f9bcb9bf879344466d15` |
 | `cli_manifests/codex/reports/0.156.1/coverage.x86_64-pc-windows-msvc.json` | `5aa368afdc4cb2c2519c6366d1fc59635b8c35cdac68b0296cf35c407866e2f8` |
 | `cli_manifests/codex/reports/0.156.1/coverage.x86_64-unknown-linux-musl.json` | `9bf777fe1bca1bd620663959c339754e4ba4473e73196d20dcd780dc7c67fd4b` |
+
+
+## Bounded compatibility repair follow-up (2026-10-26)
+
+The maintainer approved CP-1/CP-2/CP-3 as implementation direction, with U-* rows withheld.
+The inventory above retains its original classifications and baseline source descriptions.
+The bounded compatibility work updates the controlling
+[app-server contract](../../specs/codex-app-server-jsonrpc-contract.md) and production fork path:
+
+- CP-C1: pinned source and an isolated offline `0.156.1` musl binary show initialize-response
+  readiness without a mandatory client `initialized` notification. The client rejects unsupported
+  server requests, recognizes real approval requests, interrupts accepted turns with their actual
+  thread/turn identities, closes stdin and waits for the owned process. Ordinary MCP retains its
+  existing cancellation and shutdown behavior.
+- CP-C2: last selection now names every pinned source kind, including `exec`, and all providers,
+  preserves exact cwd/non-archived filtering, consumes every page and retains tuple ordering,
+  repeated-cursor refusal and no-match failure. Offline binary observations corroborate that the
+  omitted source filter excludes the exec-created seed used by that probe.
+- CP-C3: `turn/start` response is acceptance. Success requires a valid matching terminal turn,
+  preceding output drain and successful actual child exit; malformed/failed/interrupted turns,
+  wrong identities, missing responses and disconnects cannot establish success.
+- CP-C4: fixtures and selected mappers use the pinned `item/agentMessage/delta`,
+  `item/reasoning/textDelta`, camelCase scope and nested item fields. Server approval requests fail
+  safely with `approval required` without an approval capability. Legacy aliases are retained only
+  as compatibility handling, not assumed pinned emissions.
+
+The production-path fixture tests are in
+[`codex_pinned_fork.rs`](../../../crates/agent_api/tests/codex_pinned_fork.rs), with the preserved
+session-fork suite and ordinary MCP regressions. Generated schema facts, synthetic fixtures and
+isolated offline binary observations are distinct evidence. No successful paid/model turn, A1,
+independent adequacy, enrollment or positive depth verdict is claimed. All 24 unknowns, the 30
+approved initial assignments and 56 carried rows remain subject to their original prerequisites.

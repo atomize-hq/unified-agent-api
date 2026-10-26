@@ -210,11 +210,16 @@ pub(super) fn redact_exec_stream_error(err: &ExecStreamError) -> String {
     }
 }
 
-fn render_backend_error_message(err: &CodexBackendError) -> String {
+pub(super) fn render_backend_error_message(err: &CodexBackendError) -> String {
     match err {
         CodexBackendError::Exec(err) => redact_exec_stream_error(err),
         CodexBackendError::AppServer(codex::mcp::McpError::Handshake(_)) => {
             "codex app-server handshake failed".to_string()
+        }
+        CodexBackendError::AppServer(codex::mcp::McpError::Server(message))
+            if message == super::PINNED_APPROVAL_REQUIRED =>
+        {
+            super::PINNED_APPROVAL_REQUIRED.to_string()
         }
         CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
         CodexBackendError::Timeout { timeout: _timeout } => PINNED_TIMEOUT.to_string(),
