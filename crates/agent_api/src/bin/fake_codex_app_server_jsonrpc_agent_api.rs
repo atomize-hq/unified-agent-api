@@ -349,7 +349,7 @@ fn main() -> io::Result<()> {
                     "approval_required_during_turn_start" => {
                         write_json(
                             &mut out,
-                            &json!({"id":"ap-1","method":"item/commandExecution/requestApproval","params":{"threadId":expected_thread,"turnId":"turn-1","itemId":"cmd-1","command":"secret"}}),
+                            &json!({"id":"ap-1","method":"item/commandExecution/requestApproval","params":{"threadId":expected_thread,"turnId":"turn-1","itemId":"cmd-1","startedAtMs":0,"command":"secret"}}),
                         )?;
                     }
                     "block_until_cancel" => {}

@@ -92,7 +92,7 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
                     approval = true;
                     write_json(
                         &mut out,
-                        &json!({"id":"approval-1","method":"item/fileChange/requestApproval","params":{"threadId":"forked-1","turnId":"turn-1","itemId":"item-1","reason":"SECRET"}}),
+                        &json!({"id":"approval-1","method":"item/fileChange/requestApproval","params":{"threadId":"forked-1","turnId":"turn-1","itemId":"item-1","startedAtMs":0,"reason":"SECRET"}}),
                     )?;
                     continue;
                 }
@@ -130,7 +130,7 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
                     approval = true;
                     write_json(
                         &mut out,
-                        &json!({"id":"approval-1","method":"item/commandExecution/requestApproval","params":{"threadId":"forked-1","turnId":"turn-1","itemId":"item-1","command":"SECRET"}}),
+                        &json!({"id":"approval-1","method":"item/commandExecution/requestApproval","params":{"threadId":"forked-1","turnId":"turn-1","itemId":"item-1","startedAtMs":0,"command":"SECRET"}}),
                     )?;
                     continue;
                 }
@@ -190,7 +190,7 @@ pub(super) fn run(scenario: &str) -> io::Result<()> {
                 notify(
                     &mut out,
                     "item/completed",
-                    json!({"threadId":"forked-1","turnId":"turn-1","item":{"id":"message-1","type":"agentMessage","text":"final output"},"completedAtMs":null}),
+                    json!({"threadId":"forked-1","turnId":"turn-1","item":{"id":"message-1","type":"agentMessage","text":"final output"},"completedAtMs":0}),
                 )?;
                 complete(
                     &mut out,

@@ -260,3 +260,66 @@ async fn pinned_fork_forwards_supported_policies_and_preserves_absence() {
     );
     assert!(!format!("{events:?}").contains("SECRET"));
 }
+
+async fn wrapper_paths(scenario: &str) {
+    use codex::mcp::{ClientInfo, CodexAppServer, McpError, StdioServerConfig, ThreadForkParams};
+    let dir = tempdir().unwrap();
+    let server = CodexAppServer::start_experimental(
+        StdioServerConfig {
+            binary: env!("CARGO_BIN_EXE_fake_codex_app_server_jsonrpc_agent_api").into(),
+            code_home: None,
+            current_dir: Some(dir.path().into()),
+            env: vec![
+                ("FAKE_CODEX_APP_SERVER_SCENARIO".into(), scenario.into()),
+                (
+                    "FAKE_CODEX_APP_SERVER_EXPECT_CWD".into(),
+                    dir.path().as_os_str().to_owned(),
+                ),
+            ],
+            app_server_analytics_default_enabled: false,
+            mirror_stdio: false,
+            startup_timeout: Duration::from_secs(2),
+        },
+        ClientInfo {
+            name: "compatibility-test".into(),
+            version: "0".into(),
+        },
+    )
+    .await
+    .unwrap();
+    if scenario == "pinned_last" {
+        let result = server.select_last_thread_id(dir.path().into()).await;
+        server.shutdown().await.unwrap();
+        assert_eq!(
+            result.expect("explicit sourceKinds must include exec sessions"),
+            Some("z".into())
+        );
+    } else {
+        let result = tokio::time::timeout(
+            Duration::from_millis(800),
+            server.thread_fork(ThreadForkParams {
+                thread_id: "source".into(),
+                cwd: None,
+                approval_policy: Some("never".into()),
+                sandbox: None,
+                persist_extended_history: None,
+            }),
+        )
+        .await;
+        server.shutdown().await.unwrap();
+        assert!(
+            matches!(result, Ok(Err(McpError::Server(ref message))) if message == "approval required"),
+            "server approval request was not surfaced: {result:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn pinned_wrapper_last_filter_covers_exec_sources() {
+    wrapper_paths("pinned_last").await;
+}
+
+#[tokio::test]
+async fn pinned_wrapper_server_approval_request_is_not_a_client_response() {
+    wrapper_paths("pinned_fork_approval").await;
+}
