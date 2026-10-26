@@ -55,7 +55,10 @@ fn app_server_error_maps_to_error_event_with_safe_message_and_no_data() {
     });
     let event = fork::map_app_server_notification("error", &params).expect("mapped");
     assert_eq!(event.kind, AgentWrapperEventKind::Error);
-    assert_eq!(event.message.as_deref(), Some("boom"));
+    assert_eq!(
+        event.message.as_deref(),
+        Some("codex app-server error (details redacted)")
+    );
     assert!(!event.message.as_deref().unwrap().contains(secret));
     assert_eq!(event.data, None);
 }
@@ -78,4 +81,39 @@ fn approval_request_detector_matches_direct_and_wrapped_payloads() {
         "agentMessage/delta",
         &json!({"type": "approval_required"}),
     ));
+}
+
+#[test]
+fn pinned_notification_names_and_nested_item_fields_are_mapped() {
+    for method in ["item/agentMessage/delta", "item/reasoning/textDelta"] {
+        let event = fork::map_app_server_notification(method, &json!({"threadId":"thread-1","turnId":"turn-1","itemId":"item-1","delta":"hello","contentIndex":0})).unwrap();
+        assert_eq!(event.text.as_deref(), Some("hello"));
+        assert_eq!(event.data, None);
+        assert!(fork::map_app_server_notification(method, &json!({"delta":42})).is_none());
+    }
+    for (method, kind) in [
+        ("item/started", AgentWrapperEventKind::ToolCall),
+        ("item/completed", AgentWrapperEventKind::ToolResult),
+    ] {
+        let event = fork::map_app_server_notification(method, &json!({"threadId":"thread-1","turnId":"turn-1","item":{"id":"item-1","type":"commandExecution","command":"SECRET"},"startedAtMs":null,"completedAtMs":null})).unwrap();
+        assert_eq!(event.kind, kind);
+        assert_eq!(
+            tool_field(&event, "backend_item_id").and_then(Value::as_str),
+            Some("item-1")
+        );
+        assert_eq!(
+            tool_field(&event, "thread_id").and_then(Value::as_str),
+            Some("thread-1")
+        );
+        assert_eq!(
+            tool_field(&event, "turn_id").and_then(Value::as_str),
+            Some("turn-1")
+        );
+        assert_eq!(
+            tool_field(&event, "kind").and_then(Value::as_str),
+            Some("commandExecution")
+        );
+        assert!(!format!("{event:?}").contains("SECRET"));
+    }
+    assert!(fork::map_app_server_notification("future/unknown", &json!({})).is_none());
 }

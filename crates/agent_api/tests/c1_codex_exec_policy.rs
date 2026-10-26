@@ -295,21 +295,12 @@ async fn sandbox_mode_extension_overrides_codex_sandbox() {
 }
 
 #[tokio::test]
-async fn non_interactive_false_does_not_force_ask_for_approval() {
+async fn non_interactive_false_preserves_native_approval_default() {
     let backend = CodexBackend::new(CodexBackendConfig {
-        binary: Some(fake_codex_binary()),
-        env: [
-            (
-                "FAKE_CODEX_EXPECT_SANDBOX".to_string(),
-                "workspace-write".to_string(),
-            ),
-            (
-                "FAKE_CODEX_EXPECT_APPROVAL".to_string(),
-                "<absent>".to_string(),
-            ),
-        ]
-        .into_iter()
-        .collect(),
+        binary: Some(env!("CARGO_BIN_EXE_fake_codex_native_bridge").into()),
+        env: [("NATIVE_POLICY".into(), "null".into())]
+            .into_iter()
+            .collect(),
         ..Default::default()
     });
 

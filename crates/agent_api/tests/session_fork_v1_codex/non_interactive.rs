@@ -1,7 +1,7 @@
 //! Codex backend tests for non-interactive fail-fast behavior during fork flows.
 //!
 //! Normative source: `docs/specs/codex-app-server-jsonrpc-contract.md` (approval request detection
-//! + `$\/cancelRequest` + pinned `"approval required"` failure translation).
+//! + `turn/interrupt` + pinned `"approval required"` failure translation).
 
 use std::time::Duration;
 
@@ -14,7 +14,7 @@ use serde_json::json;
 use crate::support::{any_event_contains, drain_to_none, fake_codex_app_server_binary};
 
 #[tokio::test]
-async fn approval_required_fails_fast_sends_cancel_request_and_surfaces_approval_required() {
+async fn approval_required_fails_fast_interrupts_turn_and_surfaces_approval_required() {
     let prompt = "hello world";
     let source_thread_id = "thread-123";
     let secret = "RAW-BACKEND-SECRET-DO-NOT-LEAK";

@@ -1,6 +1,7 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     ffi::OsString,
+    future::poll_fn,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -11,18 +12,31 @@ use std::{
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    process::{Child, ChildStderr, ChildStdin, ChildStdout, Command},
+    io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    process::{Child, ChildStderr, ChildStdin, Command},
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
     time,
 };
 use tracing::{debug, warn};
+mod reader;
+use super::interactions::{AppServerMessageStream, InteractionState};
+use reader::reader_task;
+
+pub(super) enum WriteMessage {
+    Line(String),
+    Close,
+    Reply {
+        state: Arc<InteractionState>,
+        token: u64,
+        line: String,
+        _bytes: super::interactions::AppServerRetention,
+    },
+}
 
 use super::{
-    AppNotification, ApprovalKind, ApprovalRequest, CodexEvent, EventStream, InitializeParams,
-    McpError, RequestId, StdioServerConfig, METHOD_CANCEL, METHOD_CODEX_EVENT, METHOD_EXIT,
-    METHOD_INITIALIZE, METHOD_SHUTDOWN,
+    AppNotification, CodexEvent, EventStream, InitializeParams, McpError, RequestId,
+    StdioServerConfig, METHOD_CANCEL, METHOD_EXIT, METHOD_INITIALIZE, METHOD_SHUTDOWN,
 };
 
 #[derive(Clone)]
@@ -32,20 +46,28 @@ enum NotificationHook {
     },
     App {
         sinks: Arc<Mutex<Vec<mpsc::UnboundedSender<AppNotification>>>>,
+        interactions: Option<InteractionDelivery>,
     },
+}
+
+#[derive(Clone)]
+struct InteractionDelivery {
+    state: Arc<InteractionState>,
+    messages: mpsc::Sender<super::interactions::Delivery>,
 }
 
 type PendingRequests = Arc<Mutex<HashMap<RequestId, oneshot::Sender<Result<Value, McpError>>>>>;
 
 /// Internal transport that handles stdio JSON-RPC.
 pub(super) struct JsonRpcTransport {
-    writer: mpsc::UnboundedSender<String>,
+    writer: mpsc::UnboundedSender<WriteMessage>,
     pending: PendingRequests,
     notification_hook: NotificationHook,
     next_id: AtomicU64,
     tasks: Vec<JoinHandle<()>>,
     child: Arc<Mutex<Option<Child>>>,
     startup_timeout: Duration,
+    is_app: bool,
 }
 
 impl JsonRpcTransport {
@@ -53,22 +75,66 @@ impl JsonRpcTransport {
         let hook = NotificationHook::Codex {
             sinks: Arc::new(Mutex::new(Vec::new())),
         };
-        Self::spawn_with_subcommand(config, "mcp-server", hook).await
+        Self::spawn_with_subcommand(config, "mcp-server", hook, None, BTreeMap::new()).await
     }
 
     pub(super) async fn spawn_app(config: StdioServerConfig) -> Result<Self, McpError> {
         let hook = NotificationHook::App {
             sinks: Arc::new(Mutex::new(Vec::new())),
+            interactions: None,
         };
-        Self::spawn_with_subcommand(config, "app-server", hook).await
+        Self::spawn_with_subcommand(config, "app-server", hook, None, BTreeMap::new()).await
+    }
+
+    pub(super) async fn spawn_app_with_interactions(
+        config: StdioServerConfig,
+        overrides: BTreeMap<String, Value>,
+    ) -> Result<(Self, AppServerMessageStream), McpError> {
+        let (writer, rx) = mpsc::unbounded_channel();
+        let (errors, error_rx) = mpsc::unbounded_channel();
+        let state = InteractionState::new(writer.clone(), errors);
+        // Backpressure is bounded independently of the 16 outstanding native request limit.
+        let (messages, message_rx) = mpsc::channel(16);
+        let hook = NotificationHook::App {
+            sinks: Arc::new(Mutex::new(Vec::new())),
+            interactions: Some(InteractionDelivery {
+                state: state.clone(),
+                messages,
+            }),
+        };
+        let transport =
+            Self::spawn_with_subcommand(config, "app-server", hook, Some((writer, rx)), overrides)
+                .await?;
+        Ok((
+            transport,
+            AppServerMessageStream {
+                rx: message_rx,
+                errors: error_rx,
+                state,
+                terminal: false,
+            },
+        ))
     }
 
     async fn spawn_with_subcommand(
         config: StdioServerConfig,
         subcommand: &str,
         notification_hook: NotificationHook,
+        writer_channel: Option<(
+            mpsc::UnboundedSender<WriteMessage>,
+            mpsc::UnboundedReceiver<WriteMessage>,
+        )>,
+        overrides: BTreeMap<String, Value>,
     ) -> Result<Self, McpError> {
         let mut command = Command::new(&config.binary);
+        for (key, value) in overrides {
+            let native = toml::Value::try_from(value).map_err(|_| {
+                McpError::Transport(
+                    "native startup configuration cannot be represented in TOML".into(),
+                )
+            })?;
+            command.arg("--config").arg(format!("{key}={native}"));
+        }
         command
             .arg(subcommand)
             .args(
@@ -132,18 +198,24 @@ impl JsonRpcTransport {
         let stderr = child.stderr.take();
 
         let pending = Arc::new(Mutex::new(HashMap::new()));
-        let (writer_tx, writer_rx) = mpsc::unbounded_channel();
+        let (writer_tx, writer_rx) = writer_channel.unwrap_or_else(mpsc::unbounded_channel);
 
-        let writer_handle = tokio::spawn(writer_task(stdin, writer_rx));
+        let writer_handle = tokio::spawn(writer_task(stdin, writer_rx, notification_hook.clone()));
         let reader_handle = tokio::spawn(reader_task(
             stdout,
             pending.clone(),
             notification_hook.clone(),
             config.mirror_stdio,
+            writer_tx.clone(),
         ));
 
-        let stderr_handle =
-            stderr.map(|stderr| tokio::spawn(stderr_task(stderr, config.mirror_stdio)));
+        let stderr_handle = stderr.map(|stderr| {
+            tokio::spawn(stderr_task(
+                stderr,
+                config.mirror_stdio,
+                subcommand == "app-server",
+            ))
+        });
 
         let mut tasks = vec![writer_handle, reader_handle];
         if let Some(handle) = stderr_handle {
@@ -158,6 +230,7 @@ impl JsonRpcTransport {
             tasks,
             child: Arc::new(Mutex::new(Some(child))),
             startup_timeout: config.startup_timeout,
+            is_app: subcommand == "app-server",
         })
     }
 
@@ -192,7 +265,7 @@ impl JsonRpcTransport {
             guard.insert(id, tx);
         }
 
-        if self.writer.send(serialized).is_err() {
+        if self.writer.send(WriteMessage::Line(serialized)).is_err() {
             let mut guard = self.pending.lock().await;
             guard.remove(&id);
             return Err(McpError::ChannelClosed);
@@ -218,7 +291,15 @@ impl JsonRpcTransport {
 
     pub(super) async fn register_app_listener(&self) -> EventStream<AppNotification> {
         match &self.notification_hook {
-            NotificationHook::App { sinks } => {
+            NotificationHook::App {
+                interactions: Some(_),
+                ..
+            } => {
+                // The ordered consumer owns notifications; do not retain unbounded duplicates.
+                let (_tx, rx) = mpsc::unbounded_channel();
+                rx
+            }
+            NotificationHook::App { sinks, .. } => {
                 let (tx, rx) = mpsc::unbounded_channel();
                 let mut guard = sinks.lock().await;
                 guard.push(tx);
@@ -232,6 +313,7 @@ impl JsonRpcTransport {
     }
 
     pub(super) fn cancel(&self, request_id: RequestId) -> Result<(), McpError> {
+        self.invalidate_interactions();
         let message = serde_json::json!({
             "jsonrpc": "2.0",
             "method": METHOD_CANCEL,
@@ -239,7 +321,7 @@ impl JsonRpcTransport {
         });
         let serialized = serde_json::to_string(&message)?;
         self.writer
-            .send(serialized)
+            .send(WriteMessage::Line(serialized))
             .map_err(|_| McpError::ChannelClosed)
     }
 
@@ -254,11 +336,39 @@ impl JsonRpcTransport {
             "params": Value::Null
         });
 
-        let _ = self
-            .writer
-            .send(serde_json::to_string(&exit_message).unwrap_or_default());
+        let _ = self.writer.send(WriteMessage::Line(
+            serde_json::to_string(&exit_message).unwrap_or_default(),
+        ));
 
         Ok(())
+    }
+
+    pub(super) async fn shutdown_app(&self) -> Result<std::process::ExitStatus, McpError> {
+        debug_assert!(self.is_app);
+        self.invalidate_interactions();
+        // The pinned app-server has no shutdown/exit RPC. EOF shuts down stdio.
+        let _ = self.writer.send(WriteMessage::Close);
+        let mut guard = self.child.lock().await;
+        let child = guard.as_mut().ok_or(McpError::ChannelClosed)?;
+        let status = match time::timeout(Duration::from_secs(2), child.wait()).await {
+            Ok(result) => result,
+            Err(_) => {
+                let _ = child.start_kill();
+                child.wait().await
+            }
+        }
+        .map_err(|_| McpError::Transport("app-server process wait failed".into()))?;
+        Ok(status)
+    }
+
+    fn invalidate_interactions(&self) {
+        if let NotificationHook::App {
+            interactions: Some(delivery),
+            ..
+        } = &self.notification_hook
+        {
+            delivery.state.close();
+        }
     }
 
     pub(super) fn startup_timeout(&self) -> Duration {
@@ -268,6 +378,7 @@ impl JsonRpcTransport {
 
 impl Drop for JsonRpcTransport {
     fn drop(&mut self) {
+        self.invalidate_interactions();
         for handle in &self.tasks {
             handle.abort();
         }
@@ -280,107 +391,70 @@ impl Drop for JsonRpcTransport {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct RpcResponse {
-    id: Value,
-    result: Option<Value>,
-    error: Option<RpcError>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RpcNotification {
-    method: String,
-    params: Option<Value>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RpcError {
-    code: i64,
-    message: String,
-    data: Option<Value>,
-}
-
-async fn writer_task(mut stdin: ChildStdin, mut rx: mpsc::UnboundedReceiver<String>) {
-    while let Some(message) = rx.recv().await {
-        if stdin.write_all(message.as_bytes()).await.is_err() {
+async fn writer_task(
+    mut stdin: ChildStdin,
+    mut rx: mpsc::UnboundedReceiver<WriteMessage>,
+    hook: NotificationHook,
+) {
+    while let Some(command) = rx.recv().await {
+        let (message, offset, _retention) = match command {
+            WriteMessage::Line(line) => (line, 0, None),
+            WriteMessage::Close => break,
+            WriteMessage::Reply {
+                state,
+                token,
+                line,
+                _bytes,
+            } => {
+                let Some(line) = state.render_reply(token, line) else {
+                    continue;
+                };
+                let Some(mut active) = state.reply_watch(token) else {
+                    continue;
+                };
+                let first = tokio::select! {
+                    biased;
+                    first = poll_fn(|cx| state.poll_reply(token, || std::pin::Pin::new(&mut stdin).poll_write(cx,line.as_bytes()))) => first,
+                    _ = active.changed() => continue,
+                };
+                match first {
+                    Ok(Some(n)) if n > 0 => (line, n, Some(_bytes)),
+                    Ok(None) => continue,
+                    _ => {
+                        state.fail("app-server write failed");
+                        break;
+                    }
+                }
+            }
+        };
+        if stdin
+            .write_all(&message.as_bytes()[offset..])
+            .await
+            .is_err()
+            || stdin.write_all(b"\n").await.is_err()
+            || stdin.flush().await.is_err()
+        {
+            if let NotificationHook::App {
+                interactions: Some(delivery),
+                ..
+            } = &hook
+            {
+                delivery.state.fail("app-server write failed");
+            }
             break;
         }
-        if stdin.write_all(b"\n").await.is_err() {
-            break;
-        }
-        let _ = stdin.flush().await;
     }
-
+    if let NotificationHook::App {
+        interactions: Some(delivery),
+        ..
+    } = hook
+    {
+        delivery.state.close();
+    }
     let _ = stdin.shutdown().await;
 }
 
-async fn reader_task(
-    stdout: ChildStdout,
-    pending: PendingRequests,
-    notification_hook: NotificationHook,
-    mirror_stdio: bool,
-) {
-    let mut lines = BufReader::new(stdout).lines();
-    loop {
-        let line = match lines.next_line().await {
-            Ok(Some(line)) => line,
-            Ok(None) => break,
-            Err(err) => {
-                warn!("failed to read MCP stdout: {err}");
-                break;
-            }
-        };
-
-        if mirror_stdio {
-            eprintln!("[mcp stdout] {line}");
-        }
-
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let value: Value = match serde_json::from_str(&line) {
-            Ok(value) => value,
-            Err(err) => {
-                warn!("failed to parse MCP stdout as JSON: {err}");
-                continue;
-            }
-        };
-
-        match decode_message(value) {
-            Some(Incoming::Response(response)) => {
-                handle_response(response, &pending).await;
-            }
-            Some(Incoming::Notification(notification)) => match &notification_hook {
-                NotificationHook::Codex { sinks } => {
-                    if notification.method == METHOD_CODEX_EVENT {
-                        let params = notification.params.unwrap_or(Value::Null);
-                        let event = parse_codex_event(&params).unwrap_or(CodexEvent::Raw {
-                            method: METHOD_CODEX_EVENT.to_string(),
-                            params,
-                        });
-                        broadcast_codex_event(event, sinks).await;
-                    }
-                }
-                NotificationHook::App { sinks } => {
-                    let params = notification.params.unwrap_or(Value::Null);
-                    let event = parse_app_notification(&notification.method, &params);
-                    broadcast_app_event(event, sinks).await;
-                }
-            },
-            None => {
-                warn!("received malformed MCP message");
-            }
-        }
-    }
-
-    let mut guard = pending.lock().await;
-    for (_, tx) in guard.drain() {
-        let _ = tx.send(Err(McpError::ChannelClosed));
-    }
-}
-
-async fn stderr_task(stderr: ChildStderr, mirror_stdio: bool) {
+async fn stderr_task(stderr: ChildStderr, mirror_stdio: bool, is_app: bool) {
     let mut lines = BufReader::new(stderr).lines();
     loop {
         let line = match lines.next_line().await {
@@ -392,6 +466,9 @@ async fn stderr_task(stderr: ChildStderr, mirror_stdio: bool) {
             }
         };
 
+        if is_app {
+            continue;
+        }
         if mirror_stdio {
             eprintln!("[mcp stderr] {line}");
         } else {
@@ -425,194 +502,4 @@ async fn recv_with_timeout(
         Ok(Err(_)) => Err(McpError::ChannelClosed),
         Err(_) => Err(McpError::Timeout(timeout)),
     }
-}
-
-#[derive(Debug)]
-enum Incoming {
-    Response(RpcResponse),
-    Notification(RpcNotification),
-}
-
-fn decode_message(value: Value) -> Option<Incoming> {
-    let is_notification = value.get("id").is_none() && value.get("method").is_some();
-    if is_notification {
-        let notification: RpcNotification = serde_json::from_value(value).ok()?;
-        return Some(Incoming::Notification(notification));
-    }
-
-    let is_response = value.get("id").is_some();
-    if is_response {
-        let response: RpcResponse = serde_json::from_value(value).ok()?;
-        return Some(Incoming::Response(response));
-    }
-
-    None
-}
-
-async fn handle_response(response: RpcResponse, pending: &PendingRequests) {
-    let Some(id) = parse_request_id(&response.id) else {
-        warn!("received response without numeric id");
-        return;
-    };
-
-    let sender = { pending.lock().await.remove(&id) };
-    let Some(tx) = sender else {
-        return;
-    };
-
-    if let Some(err) = response.error {
-        let mapped = if err.code == -32800 {
-            McpError::Cancelled
-        } else {
-            McpError::Rpc {
-                code: err.code,
-                message: err.message,
-                data: err.data,
-            }
-        };
-        let _ = tx.send(Err(mapped));
-    } else if let Some(result) = response.result {
-        let _ = tx.send(Ok(result));
-    } else {
-        let _ = tx.send(Err(McpError::Transport(
-            "response missing result and error".into(),
-        )));
-    }
-}
-
-fn parse_request_id(value: &Value) -> Option<RequestId> {
-    if let Some(num) = value.as_u64() {
-        return Some(num);
-    }
-
-    value.as_str().and_then(|s| s.parse::<RequestId>().ok())
-}
-
-fn parse_codex_event(value: &Value) -> Option<CodexEvent> {
-    let payload = value.get("msg").unwrap_or(value);
-    let event_type = payload.get("type")?.as_str()?;
-    let conversation_id = payload
-        .get("thread_id")
-        .or_else(|| payload.get("threadId"))
-        .or_else(|| payload.get("session_id"))
-        .or_else(|| payload.get("conversation_id"))
-        .or_else(|| payload.get("conversationId"))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_string();
-
-    match event_type {
-        "task_complete" => Some(CodexEvent::TaskComplete {
-            conversation_id,
-            result: payload
-                .get("result")
-                .cloned()
-                .unwrap_or_else(|| payload.clone()),
-        }),
-        "approval_required" | "approval" => {
-            let approval_id = payload
-                .get("approval_id")
-                .or_else(|| payload.get("id"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string();
-            let raw_kind = payload
-                .get("kind")
-                .or_else(|| payload.get("approval_kind"))
-                .and_then(Value::as_str)
-                .unwrap_or("unknown")
-                .to_string();
-
-            let kind = match raw_kind.to_lowercase().as_str() {
-                "exec" => ApprovalKind::Exec,
-                "apply" => ApprovalKind::Apply,
-                other => ApprovalKind::Unknown(other.to_string()),
-            };
-
-            Some(CodexEvent::ApprovalRequired(ApprovalRequest {
-                approval_id,
-                kind,
-                payload: payload.clone(),
-            }))
-        }
-        "cancelled" | "canceled" => Some(CodexEvent::Cancelled {
-            conversation_id: payload
-                .get("conversation_id")
-                .and_then(Value::as_str)
-                .map(|s| s.to_string()),
-            reason: payload
-                .get("reason")
-                .and_then(Value::as_str)
-                .map(|s| s.to_string()),
-        }),
-        "error" => Some(CodexEvent::Error {
-            message: payload
-                .get("message")
-                .or_else(|| payload.get("error"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            data: payload.get("data").cloned(),
-        }),
-        _ => None,
-    }
-}
-
-async fn broadcast_codex_event(
-    event: CodexEvent,
-    sinks: &Arc<Mutex<Vec<mpsc::UnboundedSender<CodexEvent>>>>,
-) {
-    let mut guard = sinks.lock().await;
-    guard.retain(|tx| tx.send(event.clone()).is_ok());
-}
-
-fn parse_app_notification(method: &str, value: &Value) -> AppNotification {
-    let notification_type = value
-        .get("type")
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_lowercase();
-
-    let thread_id = extract_string(value, &["thread_id", "threadId"]).unwrap_or_default();
-    let turn_id = extract_string(value, &["turn_id", "turnId"]);
-
-    match notification_type.as_str() {
-        "task_complete" | "taskcomplete" => AppNotification::TaskComplete {
-            thread_id,
-            turn_id,
-            result: value.get("result").cloned().unwrap_or(Value::Null),
-        },
-        "item" => AppNotification::Item {
-            thread_id,
-            turn_id,
-            item: value.get("item").cloned().unwrap_or_else(|| value.clone()),
-        },
-        "error" => AppNotification::Error {
-            message: value
-                .get("message")
-                .or_else(|| value.get("error"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-            data: value.get("data").cloned(),
-        },
-        _ => AppNotification::Raw {
-            method: method.to_string(),
-            params: value.clone(),
-        },
-    }
-}
-
-fn extract_string(value: &Value, keys: &[&str]) -> Option<String> {
-    keys.iter()
-        .find_map(|key| value.get(key).and_then(Value::as_str))
-        .map(|s| s.to_string())
-}
-
-async fn broadcast_app_event(
-    event: AppNotification,
-    sinks: &Arc<Mutex<Vec<mpsc::UnboundedSender<AppNotification>>>>,
-) {
-    let mut guard = sinks.lock().await;
-    guard.retain(|tx| tx.send(event.clone()).is_ok());
 }

@@ -64,7 +64,9 @@ impl super::super::termination::TerminationHandle for CodexTerminationHandle {
 #[derive(Clone, Debug)]
 pub(super) struct CodexHarnessAdapter {
     config: CodexBackendConfig,
+    pub(super) interaction_handler: Option<super::interaction::Handler>,
     run_start_cwd: Option<PathBuf>,
+    started_at: tokio::time::Instant,
     termination: Option<Arc<super::super::termination::TerminationState<CodexTerminationHandle>>>,
     handle_state: Arc<Mutex<CodexHandleFacetState>>,
 }
@@ -113,7 +115,9 @@ pub(super) fn new_harness_adapter(
 ) -> CodexHarnessAdapter {
     CodexHarnessAdapter {
         config,
+        interaction_handler: None,
         run_start_cwd,
+        started_at: tokio::time::Instant::now(),
         termination,
         handle_state: Arc::new(Mutex::new(CodexHandleFacetState::default())),
     }
@@ -210,11 +214,21 @@ pub(super) fn redact_exec_stream_error(err: &ExecStreamError) -> String {
     }
 }
 
-fn render_backend_error_message(err: &CodexBackendError) -> String {
+pub(super) fn render_backend_error_message(err: &CodexBackendError) -> String {
     match err {
         CodexBackendError::Exec(err) => redact_exec_stream_error(err),
         CodexBackendError::AppServer(codex::mcp::McpError::Handshake(_)) => {
             "codex app-server handshake failed".to_string()
+        }
+        CodexBackendError::AppServer(codex::mcp::McpError::Server(message))
+            if message == super::PINNED_APPROVAL_REQUIRED =>
+        {
+            super::PINNED_APPROVAL_REQUIRED.to_string()
+        }
+        CodexBackendError::AppServer(codex::mcp::McpError::Server(message))
+            if message == "native approval policy unsupported" =>
+        {
+            "codex native approval policy unsupported (details redacted)".into()
         }
         CodexBackendError::AppServer(_) => "codex app-server rpc error".to_string(),
         CodexBackendError::Timeout { timeout: _timeout } => PINNED_TIMEOUT.to_string(),
@@ -342,8 +356,10 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
     > {
         let config = self.config.clone();
         let run_start_cwd = self.run_start_cwd.clone();
+        let started_at = self.started_at;
         let termination = self.termination.clone();
         let handle_state = Arc::clone(&self.handle_state);
+        let interaction_handler = self.interaction_handler.clone();
         let super::CodexExecPolicy {
             add_dirs,
             non_interactive,
@@ -360,9 +376,14 @@ impl BackendHarnessAdapter for CodexHarnessAdapter {
         let env = req.env;
 
         Box::pin(async move {
-            let spawned = match if let Some(selector) = fork {
+            let spawned = match if fork.is_some() || (!non_interactive && !external_sandbox) {
                 super::fork::spawn_fork_v1_flow(super::fork::ForkFlowRequest {
-                    selector,
+                    selector: fork.clone().or(resume),
+                    is_fork: fork.is_some(),
+                    model_id,
+                    add_dirs,
+                    interaction_handler,
+                    started_at,
                     prompt,
                     working_dir,
                     effective_timeout,

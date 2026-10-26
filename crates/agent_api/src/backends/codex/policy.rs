@@ -35,6 +35,7 @@ pub(super) enum CodexApprovalPolicy {
     OnFailure,
     OnRequest,
     Never,
+    Granular(Value),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -61,6 +62,36 @@ fn parse_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, AgentWrapper
 }
 
 fn parse_codex_approval_policy(value: &Value) -> Result<CodexApprovalPolicy, AgentWrapperError> {
+    if let Some(object) = value.as_object() {
+        let invalid = || AgentWrapperError::InvalidRequest {
+            message: format!("{EXT_CODEX_APPROVAL_POLICY} invalid granular policy"),
+        };
+        if object.len() != 1 {
+            return Err(invalid());
+        }
+        let controls = object
+            .get("granular")
+            .and_then(Value::as_object)
+            .ok_or_else(invalid)?;
+        let required = ["sandbox_approval", "rules", "mcp_elicitations"];
+        if required
+            .iter()
+            .any(|key| !controls.get(*key).is_some_and(Value::is_boolean))
+            || controls.iter().any(|(key, value)| {
+                !matches!(
+                    key.as_str(),
+                    "sandbox_approval"
+                        | "rules"
+                        | "mcp_elicitations"
+                        | "request_permissions"
+                        | "skill_approval"
+                ) || !value.is_boolean()
+            })
+        {
+            return Err(invalid());
+        }
+        return Ok(CodexApprovalPolicy::Granular(value.clone()));
+    }
     let raw = parse_string(value, EXT_CODEX_APPROVAL_POLICY)?;
     match raw {
         "untrusted" => Ok(CodexApprovalPolicy::Untrusted),

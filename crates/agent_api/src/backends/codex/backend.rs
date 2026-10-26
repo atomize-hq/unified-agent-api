@@ -153,8 +153,11 @@ impl AgentWrapperBackend for CodexBackend {
     {
         let config = self.config.clone();
         let run_start_cwd = std::env::current_dir().ok();
+        let interaction_handler = self.interaction_handler.clone();
         Box::pin(async move {
-            let adapter = Arc::new(new_harness_adapter(config.clone(), run_start_cwd, None));
+            let mut adapter = new_harness_adapter(config.clone(), run_start_cwd, None);
+            adapter.interaction_handler = interaction_handler;
+            let adapter = Arc::new(adapter);
 
             let defaults = BackendDefaults {
                 env: config.env,
@@ -182,6 +185,7 @@ impl AgentWrapperBackend for CodexBackend {
 
         let config = self.config.clone();
         let run_start_cwd = std::env::current_dir().ok();
+        let interaction_handler = self.interaction_handler.clone();
         Box::pin(async move {
             let termination_state: Arc<
                 super::super::termination::TerminationState<CodexTerminationHandle>,
@@ -191,11 +195,10 @@ impl AgentWrapperBackend for CodexBackend {
                 Arc::new(move || termination_state.request())
             });
 
-            let adapter = Arc::new(new_harness_adapter(
-                config.clone(),
-                run_start_cwd,
-                Some(termination_state),
-            ));
+            let mut adapter =
+                new_harness_adapter(config.clone(), run_start_cwd, Some(termination_state));
+            adapter.interaction_handler = interaction_handler;
+            let adapter = Arc::new(adapter);
 
             let defaults = BackendDefaults {
                 env: config.env,

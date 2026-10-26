@@ -76,8 +76,18 @@ nested declarations and the fixed embedded runtime-support include. Checking onl
 and delegate files is insufficient: Rust implementations can attach methods from another module.
 Guarded config implementations and noncanonical backend implementations/producers, qualified or
 aliased forms, and guarded type aliases MUST fail. Only the prescribed backend constructor,
-backend trait and existing harness trait implementation sites are supported. Exact `cfg(test)`
-items are excluded from this production graph; other host/feature branches are inspected.
+backend trait and existing harness trait implementation sites are supported, plus the exact Codex
+native interaction-handler builder described below. Exact `cfg(test)` items are excluded from this
+production graph; other host/feature branches are inspected.
+
+Codex supports two finite storage/constructor forms: the previous config-only form, and the native
+handler form with private `Option<interaction::Handler>` storage initialized to `None`. Only the
+latter admits the exact `with_interaction_handler` builder that wraps the supplied callback and
+returns the same backend without replacing config or advertising flags. Storage, constructor and
+builder MUST match their corresponding supported normalized forms together; mismatched forms,
+extra fields/methods and altered callback/config semantics MUST fail. This is a reviewed conformance
+extension for the [Codex native interaction API](../codex-interaction-contract.md), not a change to
+the advertising evaluator, registry projection, model revision or required checks.
 
 Unsupported item macros, procedural attributes/derives, module paths, namespace rebinding and
 expansion MUST fail on that graph. Revision 1 supports ordinary built-in attributes/derives and

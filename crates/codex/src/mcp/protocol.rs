@@ -60,6 +60,29 @@ pub struct StdioServerConfig {
     pub startup_timeout: Duration,
 }
 
+impl StdioServerConfig {
+    /// Prepare the same binary, home layout and baseline environment as an exec command.
+    /// Explicit binary selection wins over ambient `CODEX_BINARY`; per-call `env`
+    /// overrides can be appended afterward. This materializes a configured home.
+    pub fn for_codex_command(
+        binary: Option<PathBuf>,
+        code_home: Option<PathBuf>,
+    ) -> Result<Self, crate::CodexError> {
+        let binary = binary.unwrap_or_else(crate::defaults::default_binary_path);
+        let environment =
+            crate::home::CommandEnvironment::new(binary.clone(), code_home.clone(), true);
+        Ok(Self {
+            binary,
+            code_home,
+            current_dir: None,
+            env: environment.environment_overrides()?,
+            app_server_analytics_default_enabled: false,
+            mirror_stdio: false,
+            startup_timeout: Duration::from_secs(3),
+        })
+    }
+}
+
 /// Client metadata attached to the `initialize` request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ClientInfo {

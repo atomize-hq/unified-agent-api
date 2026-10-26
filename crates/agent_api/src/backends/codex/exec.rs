@@ -147,15 +147,6 @@ fn is_unknown_bypass_flag_stderr(stderr: &str) -> bool {
     UNKNOWN_SIGNALS.iter().any(|signal| stderr.contains(signal))
 }
 
-fn map_approval_policy(policy: &super::CodexApprovalPolicy) -> codex::ApprovalPolicy {
-    match policy {
-        super::CodexApprovalPolicy::Untrusted => codex::ApprovalPolicy::Untrusted,
-        super::CodexApprovalPolicy::OnFailure => codex::ApprovalPolicy::OnFailure,
-        super::CodexApprovalPolicy::OnRequest => codex::ApprovalPolicy::OnRequest,
-        super::CodexApprovalPolicy::Never => codex::ApprovalPolicy::Never,
-    }
-}
-
 fn map_sandbox_mode(mode: &super::CodexSandboxMode) -> codex::SandboxMode {
     match mode {
         super::CodexSandboxMode::ReadOnly => codex::SandboxMode::ReadOnly,
@@ -200,10 +191,18 @@ pub(super) async fn spawn_exec_or_resume_flow(
         builder = builder.dangerously_bypass_approvals_and_sandbox(true);
     }
 
-    if non_interactive {
+    if non_interactive || approval_policy == Some(super::CodexApprovalPolicy::Never) {
         builder = builder.approval_policy(codex::ApprovalPolicy::Never);
+        if !external_sandbox {
+            // Pinned exec ignores root -a and AutoReview can remove its headless
+            // Never default. An explicit config override survives both paths.
+            builder = builder.config_override("approval_policy", "\"never\"");
+        }
     } else if let Some(value) = approval_policy.as_ref() {
-        builder = builder.approval_policy(map_approval_policy(value));
+        let _ = value;
+        return Err(super::CodexBackendError::AppServer(
+            codex::mcp::McpError::Server("unsupported native policy route".into()),
+        ));
     }
 
     if let Some(binary) = config.binary.as_ref() {

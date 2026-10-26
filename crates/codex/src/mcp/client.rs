@@ -163,25 +163,80 @@ impl CodexAppServer {
         client: ClientInfo,
         capabilities: Value,
     ) -> Result<Self, McpError> {
+        let server = Self::spawn_uninitialized(config).await?;
+        if let Err(err) = server.initialize(client, capabilities).await {
+            let _ = server.shutdown_and_wait().await;
+            return Err(err);
+        }
+        Ok(server)
+    }
+
+    /// Launch an owned process without awaiting initialization. Call [`Self::initialize`]
+    /// before thread/turn methods. Separating these steps lets an owner cancel initialization
+    /// while retaining the process handle for shutdown and reaping.
+    pub async fn spawn_uninitialized(config: StdioServerConfig) -> Result<Self, McpError> {
+        Ok(Self {
+            transport: Arc::new(JsonRpcTransport::spawn_app(config).await?),
+        })
+    }
+
+    /// Install ordered, bounded native request/notification delivery before reading stdout.
+    /// The owner must poll this stream, handle errors and reap the process on completion.
+    pub async fn spawn_uninitialized_with_interactions(
+        config: StdioServerConfig,
+    ) -> Result<(Self, super::AppServerMessageStream), McpError> {
+        Self::spawn_uninitialized_with_interactions_and_config(config, Default::default()).await
+    }
+
+    /// Launch with explicit native root CLI configuration overrides. Values must be
+    /// representable in TOML; arguments are passed directly without a shell.
+    pub async fn spawn_uninitialized_with_interactions_and_config(
+        config: StdioServerConfig,
+        overrides: std::collections::BTreeMap<String, Value>,
+    ) -> Result<(Self, super::AppServerMessageStream), McpError> {
+        let (transport, stream) =
+            JsonRpcTransport::spawn_app_with_interactions(config, overrides).await?;
+        Ok((
+            Self {
+                transport: Arc::new(transport),
+            },
+            stream,
+        ))
+    }
+
+    /// Read native effective configuration without configuration layer payloads.
+    pub async fn config_read(&self, cwd: PathBuf) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call("config/read", json!({"cwd":cwd,"includeLayers":false}))
+            .await
+    }
+
+    /// Read native configured requirements, preserving the complete response.
+    pub async fn config_requirements_read(&self) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call("configRequirements/read", json!({}))
+            .await
+    }
+
+    /// Initialize this process. On error or cancellation, the owner must still call
+    /// [`Self::shutdown_and_wait`] before treating the process lifecycle as complete.
+    pub async fn initialize(
+        &self,
+        client: ClientInfo,
+        capabilities: Value,
+    ) -> Result<(), McpError> {
         let capabilities = match capabilities {
             Value::Null => Value::Object(Default::default()),
             other => other,
         };
-        let transport = JsonRpcTransport::spawn_app(config).await?;
         let params = InitializeParams {
             client,
             protocol_version: "2024-11-05".to_string(),
             capabilities,
         };
-
-        transport
-            .initialize(params, transport.startup_timeout())
+        self.transport
+            .initialize(params, self.transport.startup_timeout())
             .await
-            .map_err(|err| McpError::Handshake(err.to_string()))?;
-
-        Ok(Self {
-            transport: Arc::new(transport),
-        })
+            .map(|_| ())
+            .map_err(|err| McpError::Handshake(err.to_string()))
     }
 
     /// Start a new thread (or use a provided ID) via `thread/start`.
@@ -252,6 +307,42 @@ impl CodexAppServer {
             .await
     }
 
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_start_v2(
+        &self,
+        params: super::ThreadStartParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_START, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_resume_v2(
+        &self,
+        params: super::ThreadResumeParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_RESUME, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_fork_v2(
+        &self,
+        params: super::ThreadForkParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_FORK, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn turn_start_v3(
+        &self,
+        params: super::TurnStartParamsV3,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_TURN_START, serde_json::to_value(params)?)
+            .await
+    }
+
     /// Select the deterministic "last" thread id using `thread/list` paging and tuple ordering.
     pub async fn select_last_thread_id(&self, cwd: PathBuf) -> Result<Option<String>, McpError> {
         let mut cursor: Option<String> = None;
@@ -265,9 +356,25 @@ impl CodexAppServer {
                     cursor: cursor.clone(),
                     limit: Some(100),
                     sort_key: Some(super::ThreadListSortKey::UpdatedAt),
-                    archived: None,
-                    model_providers: None,
-                    source_kinds: None,
+                    archived: Some(false),
+                    model_providers: Some(vec![]),
+                    source_kinds: Some(
+                        [
+                            "cli",
+                            "vscode",
+                            "exec",
+                            "appServer",
+                            "subAgent",
+                            "subAgentReview",
+                            "subAgentCompact",
+                            "subAgentThreadSpawn",
+                            "subAgentOther",
+                            "unknown",
+                        ]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    ),
                 })
                 .await?;
 
@@ -317,7 +424,13 @@ impl CodexAppServer {
 
     /// Gracefully shut down the app-server.
     pub async fn shutdown(&self) -> Result<(), McpError> {
-        self.transport.shutdown().await
+        self.shutdown_and_wait().await.map(|_| ())
+    }
+
+    /// Close app-server stdin and wait for its actual process exit, killing and reaping
+    /// after the bounded shutdown grace period if necessary.
+    pub async fn shutdown_and_wait(&self) -> Result<std::process::ExitStatus, McpError> {
+        self.transport.shutdown_app().await
     }
 
     async fn invoke_app_call(

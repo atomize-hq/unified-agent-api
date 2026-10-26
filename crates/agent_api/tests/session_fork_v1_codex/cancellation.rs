@@ -14,7 +14,7 @@ use serde_json::json;
 use crate::support::{drain_to_none, fake_codex_app_server_binary};
 
 #[tokio::test]
-async fn explicit_cancel_sends_cancel_request_and_completion_is_cancelled() {
+async fn explicit_cancel_interrupts_turn_and_completion_is_cancelled() {
     let prompt = "hello world";
     let source_thread_id = "thread-123";
 

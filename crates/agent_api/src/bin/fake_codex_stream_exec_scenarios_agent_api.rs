@@ -66,6 +66,29 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
 
+    // Pinned exec build_exec_config: the headless Never harness override is removed
+    // for AutoReview, then config/CLI overrides determine the policy. Root -a is ignored.
+    if let Ok(expected) = env::var("FAKE_CODEX_EXPECT_EFFECTIVE_APPROVAL") {
+        let mut configured =
+            env::var("FAKE_CODEX_AUTOREVIEW_APPROVAL").unwrap_or_else(|_| "never".into());
+        for pair in args.windows(2) {
+            if pair[0] == "--config" || pair[0] == "-c" {
+                if let Some(value) = pair[1].strip_prefix("approval_policy=") {
+                    configured = value.trim_matches('"').to_string();
+                }
+            }
+        }
+        let effective = if has_flag(&args, "--dangerously-bypass-approvals-and-sandbox") {
+            "never"
+        } else {
+            configured.as_str()
+        };
+        assert_eq!(
+            effective, expected,
+            "effective approval policy must preserve intent"
+        );
+    }
+
     // Optional argv validation used by exec-policy tests.
     if let Ok(expected_sandbox) = env::var("FAKE_CODEX_EXPECT_SANDBOX") {
         let sandbox = flag_value(&args, "--sandbox");

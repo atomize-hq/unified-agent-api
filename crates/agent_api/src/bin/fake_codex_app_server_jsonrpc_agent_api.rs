@@ -1,13 +1,10 @@
+#[path = "fake_codex_app_server_jsonrpc_agent_api/pinned.rs"]
+mod pinned;
+
 use std::{
     env,
     fs::OpenOptions,
     io::{self, BufRead, Write},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
 };
 
 use serde_json::{json, Value};
@@ -64,6 +61,10 @@ fn main() -> io::Result<()> {
         std::process::exit(2);
     }
 
+    if scenario.starts_with("pinned_") {
+        return pinned::run(&scenario);
+    }
+
     let expect_prompt = env::var("FAKE_CODEX_APP_SERVER_EXPECT_PROMPT").ok();
     let expect_source_thread_id = env::var("FAKE_CODEX_APP_SERVER_EXPECT_SOURCE_THREAD_ID").ok();
     let expect_cwd = env::var("FAKE_CODEX_APP_SERVER_EXPECT_CWD").ok();
@@ -71,26 +72,10 @@ fn main() -> io::Result<()> {
         env::var("FAKE_CODEX_APP_SERVER_EXPECT_THREAD_FORK_SANDBOX").ok();
     let secret_sentinel = env::var("FAKE_CODEX_APP_SERVER_SECRET_SENTINEL").ok();
 
-    let cancel_seen = Arc::new(AtomicBool::new(false));
-    if matches!(
-        scenario.as_str(),
-        "approval_required_during_turn_start" | "block_until_cancel"
-    ) {
-        let cancel_seen = Arc::clone(&cancel_seen);
-        thread::spawn(move || {
-            thread::sleep(Duration::from_secs(4));
-            if !cancel_seen.load(Ordering::SeqCst) {
-                eprintln!("expected $/cancelRequest but never saw it");
-                std::process::exit(2);
-            }
-        });
-    }
-
     let stdin = io::stdin();
     let mut out = io::stdout().lock();
 
     let mut forked_thread_id: Option<String> = None;
-    let mut in_flight_turn_start_id: Option<Value> = None;
     let mut thread_list_calls: usize = 0;
 
     for line in stdin.lock().lines() {
@@ -112,28 +97,27 @@ fn main() -> io::Result<()> {
         let params = msg.get("params").cloned().unwrap_or(Value::Null);
 
         if id.is_none() {
-            match method.as_str() {
-                "$/cancelRequest" => {
-                    let target = params.get("id").cloned().expect("cancel params.id");
-                    if in_flight_turn_start_id.as_ref() != Some(&target) {
-                        eprintln!("cancelRequest id mismatch: got {target:?}, expected {in_flight_turn_start_id:?}");
-                        std::process::exit(2);
-                    }
-
-                    cancel_seen.store(true, Ordering::SeqCst);
-                    let Some(turn_id) = in_flight_turn_start_id.take() else {
-                        continue;
-                    };
-                    write_error(&mut out, &turn_id, -32800, "cancelled", None)?;
-                }
-                "exit" => break,
-                _ => {}
+            if method == "exit" {
+                break;
             }
             continue;
         }
 
         let id = id.expect("id present");
+        if method.is_empty() {
+            assert!(msg.get("error").is_some());
+            continue;
+        }
         match method.as_str() {
+            "turn/interrupt" => {
+                assert_eq!(params["threadId"], forked_thread_id.as_deref().unwrap());
+                assert_eq!(params["turnId"], "turn-1");
+                write_result(&mut out, &id, json!({}))?;
+                write_json(
+                    &mut out,
+                    &json!({"method":"turn/completed","params":{"threadId":params["threadId"],"turn":{"id":"turn-1","status":"interrupted","items":[]}}}),
+                )?;
+            }
             "initialize" => {
                 let experimental = params
                     .get("capabilities")
@@ -345,6 +329,13 @@ fn main() -> io::Result<()> {
                     std::process::exit(2);
                 }
 
+                write_result(
+                    &mut out,
+                    &id,
+                    json!({"turn":{"id":"turn-1","status":"inProgress","items":[]}}),
+                )?;
+                let started = json!({"method":"turn/started","params":{"threadId":expected_thread,"turn":{"id":"turn-1","status":"inProgress","items":[]}}});
+                write_json(&mut out, &started)?;
                 match scenario.as_str() {
                     "fork_id_success"
                     | "fork_id_success_oversize_thread_id"
@@ -352,26 +343,16 @@ fn main() -> io::Result<()> {
                     | "fork_last_success_paged" => {
                         write_json(
                             &mut out,
-                            &json!({"jsonrpc":"2.0","method":"turn/started","params": {}}),
+                            &json!({"method":"turn/completed","params":{"threadId":expected_thread,"turn":{"id":"turn-1","status":"completed","items":[]}}}),
                         )?;
-                        write_result(&mut out, &id, json!({"turnId":"turn-1"}))?;
                     }
                     "approval_required_during_turn_start" => {
-                        in_flight_turn_start_id = Some(id.clone());
                         write_json(
                             &mut out,
-                            &json!({"jsonrpc":"2.0","method":"codex/event","params":{"type":"approval_required","approval_id":"ap-1","kind":"exec"}}),
+                            &json!({"id":"ap-1","method":"item/commandExecution/requestApproval","params":{"threadId":expected_thread,"turnId":"turn-1","itemId":"cmd-1","startedAtMs":0,"command":"secret"}}),
                         )?;
-                        // Response is sent when we receive $/cancelRequest.
                     }
-                    "block_until_cancel" => {
-                        in_flight_turn_start_id = Some(id.clone());
-                        write_json(
-                            &mut out,
-                            &json!({"jsonrpc":"2.0","method":"turn/started","params": {}}),
-                        )?;
-                        // Response is sent when we receive $/cancelRequest.
-                    }
+                    "block_until_cancel" => {}
                     other => {
                         eprintln!("turn/start called in unexpected scenario: {other}");
                         std::process::exit(2);

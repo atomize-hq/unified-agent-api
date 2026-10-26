@@ -3,6 +3,8 @@
 Status: PI-P1, PI-P2 and PI-P3 approved by the maintainer on 2026-10-25.
 The first bounded read-only intake is implemented; complete PI-P3 declarations and positive proof
 remain separate work. No live profile or production enrollment is installed.
+The follow-up [complete pilot policy proposal](support-depth-complete-pilot-policy.md) presents
+exact initial/resume/managed-fork declarations, remaining dispositions and pending policy choices.
 Baseline: staging `43a42bbcbc51ce2d21e5144a091d2bde5bac760f` (PR #298), 2026-10-25.
 This is sequence2 of the approved [isolated route design](support-depth-isolated-route-design.md).
 The [depth contract](../../specs/support-depth-contract.md),

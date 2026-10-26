@@ -36,8 +36,8 @@ fn source_bypasses_are_refused_without_rewriting_outputs() {
         ),
         (
             "crates/agent_api/src/backends/codex/mod.rs",
-            "Self { config }",
-            "Self { config: CodexBackendConfig::default() }",
+            "            config,",
+            "            config: CodexBackendConfig::default(),",
             "constructor",
         ),
         (
