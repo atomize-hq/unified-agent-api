@@ -169,12 +169,42 @@ service, classifier DSL, CI job or required check. The appendix is documentation
 
    | Input | Exact proposed admitted regime; refusal outside it |
    | --- | --- |
-   | Process environment | Producer starts with a cleared environment. Only absolute pinned PATH, HOME, CODEX_HOME, TMPDIR, XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, LANG=`C.UTF-8`, TZ=`UTC` and injected CODEX_API_KEY are admitted; all home/XDG/temp paths are private pilot roots. No proxy, provider/base-url, cloud, remote, feature or config environment overrides. API key name/presence/credential intent is bound, secret bytes never enter P/O/logs. Missing credential refuses live positive proof; negative local fixtures use explicit absent credentials |
+   | Producer environment | Start with a cleared environment, then admit only absolute pinned PATH, HOME, CODEX_HOME, TMPDIR, XDG_CONFIG_HOME, XDG_DATA_HOME, XDG_CACHE_HOME, LANG=`C.UTF-8`, TZ=`UTC` and injected CODEX_API_KEY; all home/XDG/temp paths are private pilot roots, CODEX_HOME=H. CODEX_BINARY and RUST_LOG are absent here. Backend binary is explicitly the absolute pinned executable B and backend codex_home is H in every flow. No proxy, provider/base-url, cloud, remote, feature or config environment overrides. Bind credential name/presence/intent, never secret bytes; missing credentials refuse live positive proof, with explicit absence for negative local fixtures |
+   | Effective child environment | Initial/resume and their executed capability probes inherit that producer environment, then the wrapper generates CODEX_BINARY=B, CODEX_HOME=H and RUST_LOG=`error`, then applies the normalized per-call overlay. The direct managed-fork child inherits the producer environment, then applies backend code_home and its normalized overlay; it generates neither CODEX_BINARY nor RUST_LOG, so both remain absent in this fork context. Validate these separate final environments, not only the producer allowlist; overlay precedence and admissible values are defined below |
    | Home and project | New private home H; project W with only scenario-owned Git metadata, source fixture files and session/output artifacts. No ancestor/project/user AGENTS, rules, `.codex`, profiles, hook/skill/plugin/MCP files or symlinks; no preexisting home files except the exact config below. No `/etc/codex` policy directory or unbound managed policy/cloud response. Pin filesystem/host source correspondence; if effective-loader inputs cannot be inventoried or isolated, refuse rather than assuming absence |
    | Config | Only H/config.toml, generated from source-owned constants: model_provider=`openai`, model=`gpt-5`, approval_policy=`never`, sandbox_mode=`workspace-write`, web_search=`disabled`, analytics.enabled=false. No model_providers/base-url overrides, profiles, hooks, notify, apps, plugins, MCP servers or external instruction files. Every boolean key in the pinned config schema's finite features.properties set is explicitly false (including aliases); unknown/additional feature keys refuse. Bind the full generated file bytes and effective feature/default projection. If this disables a feature actually required for the promised flow, stop and bring the exact needed change for review; do not auto-enable defaults |
    | Model and safety variants | Existing typed model string forwarding and error semantics remain; generated reasoning config is exactly model_reasoning_effort=`medium`, model_reasoning_summary=`auto`, model_verbosity=`low` for the existing wrapper model-family rules, no other caller config. Test request-over-backend precedence and open-value runtime rejection. Three existing sandbox values and the accepted noninteractive/approval/external combinations above are all due; they override the controlled default through the actual adapter, not through a test replacement |
    | Cwd, add-dirs, sessions, artifacts | Absolute private W is the default; request/backend/captured-cwd variants use declared private fixture roots. Add-dirs must name declared fixture roots; outside paths are rejected by the qualification context before invocation. Seed sessions are created by the pinned binary in H/W and recorded in before/after manifests; last/id never consult another home. Initial/resume temporary last-message output and fork session persistence are allowed effects. No caller profile/features/hook bypass/output-schema/worktree/terminal/listener/remote argv is admitted |
-   | Context currentness | Compare approved context bytes, declared roots, absence constraints and complete effective source/default facts before each run and again before evidence packaging. Record mutations under declared roots, credential-safe diagnostics and exact binary/source identity. Extra input, unavailable effective config, drift or unexpected service/listener refuses qualification; it does not cause the SDK to reject ordinary callers or broaden P |
+   | Context currentness | Compare approved context bytes, declared roots, absence constraints and complete effective source/default facts, including generated child environment and overlays, before each run and again before evidence packaging. Record mutations under declared roots, credential-safe diagnostics and exact binary/source identity. Extra input, unavailable effective config, drift or unexpected service/listener refuses qualification; it does not cause the SDK to reject ordinary callers or broaden P |
+
+   Effective environment precedence is source-defined. The [request normalizer](../../../crates/agent_api/src/backend_harness/normalize.rs)
+   first merges backend defaults then request entries, so request wins on duplicate keys.
+   For initial/resume, [CommandEnvironment](../../../crates/codex/src/home.rs) injects CODEX_BINARY
+   from the configured executable and CODEX_HOME from the configured home;
+   [defaults](../../../crates/codex/src/defaults.rs) inject RUST_LOG=`error` only when RUST_LOG is
+   absent from the **producer process** environment. [Streaming](../../../crates/codex/src/exec/streaming.rs)
+   then applies the normalized per-call overlay last. [Executed capability probes](../../../crates/codex/src/client_core.rs)
+   use the same injection/overlay order; bind their resolved executable and effective cwd too.
+   The profile admits overlay entries only when they preserve the exact final context values:
+   CODEX_BINARY=B and RUST_LOG=`error` on exec/probes, CODEX_HOME=H on all flows, and the admitted
+   producer values for other keys. Fork overlays must omit CODEX_BINARY and RUST_LOG. A foreign
+   binary/home, changed or empty diagnostic value, new key or unbound credential intent refuses
+   qualification even when the SDK would accept it. Overlay CODEX_BINARY does not select the
+   already configured command executable; both the actual executable and environment intent must
+   independently remain bound to B.
+
+   Fork's [adapter](../../../crates/agent_api/src/backends/codex/fork.rs) constructs StdioServerConfig
+   directly and calls CodexAppServer::with_capabilities; [JSON-RPC launch](../../../crates/codex/src/mcp/jsonrpc.rs)
+   applies code_home first and config.env afterward, without CommandEnvironment injection.
+   It does not traverse [AppRuntime::into_launcher](../../../crates/codex/src/mcp/app.rs), whose
+   [merge_stdio_env](../../../crates/codex/src/mcp/runtime.rs) instead merges code_home, base env,
+   then runtime env before the same transport launch. That neighboring app path also generates
+   neither CODEX_BINARY nor RUST_LOG; its precedence must not be silently substituted for the
+   direct fork path. Include these normalizer/injection/default/probe/launcher sources in the
+   existing content-bound source closure. BASE evidence must check the final effective environment
+   and executable at actual initial/resume, probe and fork spawns, with adverse overlay/home/log
+   drift controls and credential-safe capture. A producer-only allowlist or source inspection alone
+   does not prove that execution boundary. This requirement changes no public SDK behavior.
 
    These are concrete proposed policy constants, not claims that this schema/configuration has
    executed successfully. The newly pinned config schema corroborates names/types; it does not
