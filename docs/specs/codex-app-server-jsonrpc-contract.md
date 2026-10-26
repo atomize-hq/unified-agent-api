@@ -343,3 +343,75 @@ protocol. The client MUST drain queued writes and close stdin. It MUST await the
 after a two-second grace period it MUST kill and reap the child. Completion MUST NOT claim success
 for a failed or forcibly killed process. Initialization and later setup errors also retain owned
 process cleanup. The ordinary MCP shutdown implementation is unchanged.
+
+## Opt-in native client interactions
+
+The additive wrapper constructor
+`CodexAppServer::spawn_uninitialized_with_interactions(config)` returns an owned server and an
+`AppServerMessageStream` installed before stdout is read. The owner MUST initialize the server,
+poll this ordered stream, handle terminal transport errors, and shut down/reap the owned process.
+`AppServerMessage::Notification { method, params }` retains the complete original native method
+and decoded JSON parameters. `AppServerMessage::Request` retains the corresponding native request.
+Notifications and requests MUST arrive in stdout order. In this opt-in mode the ordered stream
+owns notification delivery; per-call `AppCallHandle.events` is closed to avoid unbounded duplicate
+retention. The complete raw call response remains available through `AppCallHandle.response`.
+
+Supported server requests are:
+
+- `item/commandExecution/requestApproval`
+- `item/fileChange/requestApproval`
+- `item/permissions/requestApproval`
+- `item/tool/requestUserInput`
+- `mcpServer/elicitation/request`
+
+`AppServerRequest` exposes the original method/params and consumes response ownership through
+`reply(native_result)` or `unsupported()`. The originating connection and exact native signed
+integer-or-string RPC ID MUST remain private and separate from client call IDs. Native result
+objects MUST be preserved, including session decisions, command/network policy amendments,
+permission profiles/scopes, structured user answers and opaque MCP content/metadata. Shapes are
+validated against the ten checked-in pinned generated request/response schemas in
+`crates/codex/src/mcp/interaction_schemas/`; native `additionalProperties` behavior is retained.
+This validation MUST NOT evaluate approval policy or synthesize consent.
+
+Unknown/malformed requests and invalid replies MUST fail safely with redacted errors. Dropping
+an unanswered request sends an explicit unsupported RPC error when its ownership is still active.
+`is_active()`, `cancelled()` and `invalidate()` expose ownership observation/invalidation without
+exposing the RPC ID. A matching `serverRequest/resolved` (same connection, typed native request ID
+and thread) invalidates the request. Stream drop, cancellation, shutdown, transport failure and EOF
+invalidate pending ownership. The writer MUST recheck ownership at the first actual response I/O
+poll, including after time spent queued or waiting for pipe readiness. No user callback runs inside
+the transport reader/writer or under their locks. Owners remain responsible for thread/turn/item
+association and for invalidating replies when their application scope ends.
+
+App-server stdout frames MUST be limited to 1 MiB before frame allocation grows beyond that bound;
+exactly 1 MiB of UTF-8 payload (excluding the terminating LF) is permitted. There MUST be at most
+16 outstanding native server requests. Ordered delivery uses bounded backpressure for notification
+bursts; it MUST NOT silently drop/truncate notifications. Retained transport request/notification
+JSON shares a 16 MiB budget with adapter retention through
+`AppServerMessageStream::retain_json(bytes) -> AppServerRetention`. Additional owned JSON retained
+by adapters MUST hold a lease; one shared immutable allocation needs only one lease. Moving an
+allocation requires no second lease. Exhaustion fails explicitly. These serialized-byte bounds do
+not claim to measure Rust allocator overhead. App-server stdout/stderr payloads MUST NOT be mirrored
+into ordinary transport logs. Existing constructors retain prompt refusal when no interaction
+consumer is installed. Ordinary MCP approval methods/semantics remain unchanged.
+
+The additive Rust construction APIs `ThreadStartParamsV2`, `ThreadResumeParamsV2`,
+`ThreadForkParamsV2` and `TurnStartParamsV3` preserve the legacy public structs/methods. Their
+`approval_policy: Option<serde_json::Value>` forwards native strings/granular objects unchanged.
+The corresponding `thread_start_v2`, `thread_resume_v2`, `thread_fork_v2` and `turn_start_v3`
+methods use the existing wire methods and return `AppCallHandle`, preserving effective native
+settings in the full response. Thread types support cwd/model/sandbox/config overrides and extended
+history; turn overrides support cwd/model/effort/summary/sandboxPolicy. All four new types carry native
+`runtimeWorkspaceRoots` without inferring its meaning from other path options. Omitted overrides preserve
+native configuration, including the configured reviewer. Rust suffix versions do not change the
+native v2 wire protocol. These source-bound transport fixtures do not establish successful native
+model execution, approval execution or pilot qualification.
+
+`spawn_uninitialized_with_interactions_and_config(config, overrides)` additionally accepts explicit
+root CLI config overrides as a `BTreeMap<String, serde_json::Value>`. Each value MUST be representable
+as a TOML value and is supplied directly as `--config key=<TOML value>` before the subcommand,
+without a shell. The constructor without overrides remains an empty-map wrapper. The additive
+`config_read(cwd)` and `config_requirements_read()` methods return complete `AppCallHandle` responses
+for `config/read { cwd, includeLayers: false }` and `configRequirements/read {}` respectively.
+These read-only calls permit an adapter to preserve native configuration/requirements when deriving
+its explicit runtime root set; transport itself does not derive or replace native permissions.

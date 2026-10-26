@@ -37,3 +37,14 @@ mod test_support;
 mod tests_core;
 #[cfg(all(test, unix))]
 mod tests_runtime_app;
+
+mod native_params;
+pub use native_params::{
+    ThreadForkParamsV2, ThreadResumeParamsV2, ThreadStartParamsV2, TurnStartParamsV3,
+};
+mod interactions;
+pub use interactions::{
+    AppServerMessage, AppServerMessageStream, AppServerRequest, AppServerRetention,
+};
+
+mod interaction_validation;

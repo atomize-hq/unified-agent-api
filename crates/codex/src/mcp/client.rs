@@ -180,6 +180,42 @@ impl CodexAppServer {
         })
     }
 
+    /// Install ordered, bounded native request/notification delivery before reading stdout.
+    /// The owner must poll this stream, handle errors and reap the process on completion.
+    pub async fn spawn_uninitialized_with_interactions(
+        config: StdioServerConfig,
+    ) -> Result<(Self, super::AppServerMessageStream), McpError> {
+        Self::spawn_uninitialized_with_interactions_and_config(config, Default::default()).await
+    }
+
+    /// Launch with explicit native root CLI configuration overrides. Values must be
+    /// representable in TOML; arguments are passed directly without a shell.
+    pub async fn spawn_uninitialized_with_interactions_and_config(
+        config: StdioServerConfig,
+        overrides: std::collections::BTreeMap<String, Value>,
+    ) -> Result<(Self, super::AppServerMessageStream), McpError> {
+        let (transport, stream) =
+            JsonRpcTransport::spawn_app_with_interactions(config, overrides).await?;
+        Ok((
+            Self {
+                transport: Arc::new(transport),
+            },
+            stream,
+        ))
+    }
+
+    /// Read native effective configuration without configuration layer payloads.
+    pub async fn config_read(&self, cwd: PathBuf) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call("config/read", json!({"cwd":cwd,"includeLayers":false}))
+            .await
+    }
+
+    /// Read native configured requirements, preserving the complete response.
+    pub async fn config_requirements_read(&self) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call("configRequirements/read", json!({}))
+            .await
+    }
+
     /// Initialize this process. On error or cancellation, the owner must still call
     /// [`Self::shutdown_and_wait`] before treating the process lifecycle as complete.
     pub async fn initialize(
@@ -266,6 +302,42 @@ impl CodexAppServer {
     pub async fn turn_start_v2(
         &self,
         params: super::TurnStartParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_TURN_START, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_start_v2(
+        &self,
+        params: super::ThreadStartParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_START, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_resume_v2(
+        &self,
+        params: super::ThreadResumeParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_RESUME, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn thread_fork_v2(
+        &self,
+        params: super::ThreadForkParamsV2,
+    ) -> Result<AppCallHandle, McpError> {
+        self.invoke_app_call(METHOD_THREAD_FORK, serde_json::to_value(params)?)
+            .await
+    }
+
+    /// Submit native settings and retain the complete effective response.
+    pub async fn turn_start_v3(
+        &self,
+        params: super::TurnStartParamsV3,
     ) -> Result<AppCallHandle, McpError> {
         self.invoke_app_call(METHOD_TURN_START, serde_json::to_value(params)?)
             .await
