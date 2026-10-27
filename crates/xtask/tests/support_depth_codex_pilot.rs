@@ -228,6 +228,60 @@ fn real_acquisition_binds_all_routes_ancestry_protocol_source_and_carried_work()
     let preview = readiness(root.path(), &request()).unwrap().unwrap();
     let o = preview.plan.record.obligations.as_ref().unwrap();
     assert_eq!(o.operations.len(), 3);
+    // A review inventory must account for every acquired edge, including current managed
+    // initial/resume populations. Documentation is never executable classification policy.
+    let inventory = include_str!(
+        "../../../docs/agents/lifecycle/support-depth-current-pilot-classifications.md"
+    );
+    let mut documented = std::collections::BTreeSet::new();
+    for line in inventory.lines().filter(|line| line.starts_with("| `")) {
+        let cells: Vec<_> = line.trim_matches('|').split('|').map(str::trim).collect();
+        assert_eq!(cells.len(), 6);
+        for (column, operation) in ["run-initial", "run-resume", "run-fork"].iter().enumerate() {
+            if cells[3 + column] != "—" {
+                assert!(documented.insert((
+                    operation.to_string(),
+                    cells[0].trim_matches('`').to_string(),
+                    cells[1].trim_matches('`').to_string(),
+                    cells[2].trim_matches('`').to_string(),
+                )));
+            }
+        }
+    }
+    let acquired: std::collections::BTreeSet<_> = o
+        .operations
+        .iter()
+        .flat_map(|op| {
+            op.surfaces.iter().map(|s| {
+                (
+                    op.id.clone(),
+                    s.surface_kind.clone(),
+                    s.command_path.clone(),
+                    s.surface_id.clone(),
+                )
+            })
+        })
+        .collect();
+    assert_eq!(documented, acquired);
+    assert_eq!(acquired.len(), 207);
+    let observation: Value = serde_json::from_str(include_str!(
+        "../../../cli_manifests/codex/reports/0.156.1/pilot-runtime-context.json"
+    ))
+    .unwrap();
+    for basis in &preview.plan.classification_bases {
+        assert_eq!(
+            basis.facts["pilot"]["expected_config_toml"],
+            observation["expected_config_toml"]
+        );
+        assert_eq!(
+            basis.facts["pilot"]["protocol_sha256"],
+            observation["protocol_sha256"]
+        );
+        assert_eq!(
+            basis.facts["pilot"]["binary_sha256"],
+            observation["binary_sha256"]
+        );
+    }
     for id in ["run-initial", "run-resume"] {
         assert!(o
             .operations
