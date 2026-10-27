@@ -110,8 +110,10 @@ not deterministic execution evidence. No live-model credentials should be suppli
 
 The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
 captures all 15 cases: 6 exec and 9 app-server spawns. Parsed direct-child records matched
-the finite invocation/environment checks; unresolved syscall input remains an explicit
-refusal rather than a complete boundary observation. Five cases changed private project trust config
+the finite invocation/environment checks. Nine cases have complete trace input; six
+retain unknown detached thread syscall records and `incomplete_trace`, so receive no
+complete child-boundary credit. These are resume-last interactive, resume-id unattended/
+external, fork-last external and fork-id unattended/interactive. Five cases changed private project trust config
 by the exact approved addition; all other config drift remains refused. Descendant attempts
 to run git/getconf/lsb_release all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
 errors and unsuccessful completion statuses remain outcomes, not verified execution.
