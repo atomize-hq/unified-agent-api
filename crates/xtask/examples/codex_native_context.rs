@@ -139,7 +139,7 @@ async fn observe(
                 Ok(completion) => {
                     bind_session(completion.data.as_ref(), &mut session_id, &mut consistent);
                     status_success = completion.status.success();
-                    expected_reply = completion.final_text.as_deref().map(str::trim) == Some("ok.");
+                    expected_reply = exact_reply(completion.final_text.as_deref());
                     json!({"phase":"completion","status_success":completion.status.success()})
                 }
                 Err(error) => json!({"phase":"completion","error":error.to_string()}),
@@ -151,6 +151,10 @@ async fn observe(
         "event_count":event_count,"outcome":outcome,"status_success":status_success,
         "session_id":session_id,"session_identity_consistent":consistent,"expected_reply":expected_reply,
         "cancel_requested":cancel_requested,"timeout_seconds":timeout.as_secs(),"execution_verified":false}))
+}
+
+fn exact_reply(text: Option<&str>) -> bool {
+    text == Some("ok.")
 }
 
 fn bind_session(data: Option<&Value>, session: &mut Option<String>, consistent: &mut bool) {
@@ -176,6 +180,20 @@ fn bind_session(data: Option<&Value>, session: &mut Option<String>, consistent: 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn seed_reply_does_not_normalize_native_text() {
+        assert!(exact_reply(Some("ok.")));
+        for text in [
+            None,
+            Some(" ok."),
+            Some("ok. "),
+            Some("ok.\n"),
+            Some("OK."),
+            Some(""),
+        ] {
+            assert!(!exact_reply(text));
+        }
+    }
     #[test]
     fn session_facets_require_consistent_native_ids() {
         let mut id = None;
