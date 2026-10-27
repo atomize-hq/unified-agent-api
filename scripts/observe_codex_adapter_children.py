@@ -17,7 +17,7 @@ import tempfile
 from acquire_codex_pilot_protocol import BINARY_SHA256, digest
 from observe_codex_pilot_context import PROTOCOL, PROTOCOL_SHA256, expected_config, namespace_command
 from codex_native_context_guard import (LIMIT, SELECTORS, VARIANTS, initial_files, read_trace,
-                                        source_binding, validate_child, validate_initial_root, config_refusals)
+                                        source_binding, validate_child, validate_initial_root, config_refusals, process_exits)
 
 BASELINE = "cli_manifests/codex/reports/0.156.1/pilot-runtime-context.json"
 BASELINE_SHA256 = "fa355ec4e9f841e1a9ecb236e688771c0884be344ecb3936feb8c64bc0d410cf"
@@ -75,7 +75,68 @@ def dependencies(programs):
     return sorted(Path(path) for path in libraries)
 
 
-def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant, raw_traces=None):
+def validate_chain(result, variant):
+    if (result.get("selector") != "session-chain" or result.get("variant") != variant
+            or result.get("execution_verified") is not False or result.get("live_execution_authorized") is not False):
+        raise ValueError("unbound chain or unsupported authorization claim")
+    stages = result.get("stages", [])
+    if len(stages) != len(SELECTORS):
+        raise ValueError("missing chain stages")
+    executed, seed, seen, prior, blocked = [], None, set(), None, False
+    for selector, stage in zip(SELECTORS, stages):
+        if stage.get("selector") != selector or type(stage.get("executed")) is not bool:
+            raise ValueError("foreign chain stage")
+        if stage["executed"] is False:
+            if not stage.get("reason") or "adapter" in stage:
+                raise ValueError("unaccounted skipped stage")
+            blocked = True
+            continue
+        if blocked or stage.get("source_session_id") != seed:
+            raise ValueError("execution after refusal or foreign seed")
+        adapter = stage["adapter"]
+        if (adapter.get("selector") != selector or adapter.get("variant") != variant
+                or adapter.get("execution_verified") is not False):
+            raise ValueError("unbound stage request")
+        for field in ("before", "after"):
+            raw = json.dumps(stage[field], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+            if digest(raw) != stage[field+"_sha256"]:
+                raise ValueError("changed stage artifact binding")
+        if prior is not None and stage["before_sha256"] != prior:
+            raise ValueError("native invocation after changed private state")
+        prior = stage["after_sha256"]
+        identity = adapter.get("session_id")
+        valid_id = isinstance(identity, str) and bool(re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", identity)) and identity != "11111111-1111-4111-8111-111111111111"
+        admitted = (adapter.get("status_success") is True and adapter.get("session_identity_consistent") is True
+                    and adapter.get("expected_reply") is True and valid_id)
+        if selector.startswith("resume"):
+            admitted = admitted and identity == seed
+        if selector.startswith("fork"):
+            admitted = admitted and identity not in seen
+        if admitted != (stage.get("state_refusal") is None):
+            raise ValueError("unsupported state admission")
+        executed.append((selector, seed))
+        if admitted:
+            if seed is None:
+                seed = identity
+            seen.add(identity)
+        else:
+            blocked = True
+    if result.get("chain_completed") is not (len(executed) == 5 and not blocked):
+        raise ValueError("unsupported chain completion")
+    return executed
+
+
+def retain_raw(root, destination, stdout, stderr):
+    if destination is None:
+        return
+    destination.mkdir(parents=True, exist_ok=False)
+    for path in (root / "trace").glob("trace.*"):
+        shutil.copyfile(path, destination / path.name)
+    (destination / "driver.stdout").write_bytes(stdout[:LIMIT])
+    (destination / "driver.stderr").write_bytes(stderr[:LIMIT])
+
+
+def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant, raw_traces=None, scenario="boundary"):
     with tempfile.TemporaryDirectory(prefix="codex-adapter-") as temporary:
         root = Path(temporary)
         for name in ("home", "work/.git/objects", "work/.git/refs/heads", "tmp", "xdg/config",
@@ -93,27 +154,42 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
         for library in libraries:
             command += ["--ro-bind", str(library), str(library)]
         command += ["--ro-bind", str(driver), "/bin/adapter-observe", "--ro-bind", str(tracer), "/bin/strace",
-                    "/bin/strace", "-ff", "-qq", "-v", "-xx", "-s", "65536", "-e",
+                    "/bin/strace", "-ff", "-q", "-ttt", "-v", "-xx", "-s", "65536", "-e",
                     "trace=execve,chdir,fchdir,clone,clone3,fork,vfork", "-o", "/pilot/trace/trace",
-                    "/bin/adapter-observe", selector, variant]
+                    "/bin/adapter-observe", "session-chain" if scenario == "session-chain" else
+                    "cancel-initial-json" if scenario == "cancellation" else selector, variant]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        destination = raw_traces / (scenario + "-" + selector + "-" + variant) if raw_traces is not None else None
         try:
-            stdout, stderr = process.communicate(timeout=20)
+            stdout, stderr = process.communicate(timeout=175 if scenario == "session-chain" else 20)
         except subprocess.TimeoutExpired:
             process.kill()  # Death of the namespace owner reaps/kills its private process tree.
-            process.communicate()
+            stdout, stderr = process.communicate()
+            retain_raw(root, destination, stdout, stderr)
             raise ValueError("producer namespace exceeded its owned deadline")
+        retain_raw(root, destination, stdout, stderr)
         if process.returncode or len(stdout) + len(stderr) > LIMIT:
             raise ValueError("producer failed or exceeded output limit")
         result = json.loads(stdout)
-        transport = "app-server" if variant == "interactive" or selector.startswith("fork") else "exec"
-        if (result.get("selector") != selector or result.get("variant") != variant
-                or result.get("transport") != transport or result.get("execution_verified") is not False):
-            raise ValueError("producer returned another request or unsupported execution claim")
-        child, descendants, unresolved = read_trace(root / "trace")
-        if child["producer_environment"] != environment:
-            raise ValueError("producer inherited an unbound environment")
-        validate_child(child, selector, variant, environment)
+        if scenario == "session-chain":
+            stages = validate_chain(result, variant)
+            children, descendants, unresolved = read_trace(root / "trace", multiple=True)
+            if len(stages) != len(children):
+                raise ValueError("native spawn count differs from executed stages")
+        else:
+            transport = "app-server" if variant == "interactive" or selector.startswith("fork") else "exec"
+            if (result.get("selector") != selector or result.get("variant") != variant
+                    or result.get("transport") != transport or result.get("execution_verified") is not False):
+                raise ValueError("producer returned another request or unsupported execution claim")
+            child, descendants, unresolved = read_trace(root / "trace")
+            children, stages = [child], [(selector, None)]
+        for child, (stage_selector, session) in zip(children, stages):
+            if child["producer_environment"] != environment:
+                raise ValueError("producer inherited an unbound environment")
+            if session is None:
+                validate_child(child, stage_selector, variant, environment)
+            else:
+                validate_child(child, stage_selector, variant, environment, session)
         with (root / "home/config.toml").open("rb") as stream:
             config_after = stream.read(LIMIT + 1)
         if len(config_after) > LIMIT:
@@ -121,20 +197,21 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
         # Retain negative observations. A changed config cannot become a passed
         # context merely because the adapter's initial execve matched.
         trace_refusals = ["incomplete_trace"] if unresolved else []
+        try:
+            exits = process_exits(root / "trace")
+        except ValueError:
+            exits = None
+            trace_refusals.append("incomplete_process_exit")
         refusals = config_refusals(config, config_after) + trace_refusals
         traces = [{"file": path.name, "sha256": file_digest(path), "bytes": path.stat().st_size}
                   for path in sorted((root / "trace").glob("trace.*"))]
-        if raw_traces is not None:
-            destination = raw_traces / (selector + "-" + variant)
-            destination.mkdir(parents=True, exist_ok=False)
-            for path in (root / "trace").glob("trace.*"):
-                shutil.copyfile(path, destination / path.name)
-        return {"request": {"selector": selector, "variant": variant}, "adapter": result,
-                "child": child, "descendant_exec_attempts": descendants,
+        return {"request": {"selector": selector, "variant": variant, "scenario": scenario}, "adapter": result,
+                "child": children[0] if scenario != "session-chain" else None, "children": children, "descendant_exec_attempts": descendants,
                 "before": before, "after": native_manifest(root), "traces": traces,
                 "config_after_toml": config_after.decode(), "context_refusals": refusals,
                 "unresolved_trace_records": unresolved, "trace_refusals": trace_refusals,
-                "diagnostics": stderr.decode(errors="replace"), "child_boundary_observed": not unresolved,
+                "process_exits": exits,
+                "diagnostics": stderr.decode(errors="replace"), "child_boundary_observed": not trace_refusals,
                 "context_complete": False, "execution_verified": False}
 
 
@@ -156,18 +233,24 @@ def observe(root, binary, tracer, bwrap, raw_traces=None):
     recorded_hashes = {"native_codex": hashes[str(binary)], "built_adapter_producer": hashes[str(driver)],
                        "strace": hashes[str(tracer)], "bubblewrap": hashes[str(Path(bwrap))]}
     recorded_hashes.update({"gnu_runtime:" + str(path): hashes[str(path)] for path in libraries})
-    recorded_hashes.update({str(path.relative_to(root)): hashes[str(path)] for path in inputs if root in path.parents})
+    recorded_hashes.update({str(path.relative_to(root)): hashes[str(path)] for path in inputs if path.parent == root / "scripts"})
     cases = []
     for selector in SELECTORS:
         for variant in VARIANTS:
             cases.append(run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant, raw_traces))
             print(f"Observed {selector}/{variant} (no verified execution)", flush=True)
+    fixtures, cancellations = [], []
+    for variant in VARIANTS:
+        fixtures.append(run_case(bwrap, binary, driver, tracer, libraries, config, "initial-json", variant, raw_traces, "session-chain"))
+        cancellations.append(run_case(bwrap, binary, driver, tracer, libraries, config, "initial-json", variant, raw_traces, "cancellation"))
+        print(f"Observed offline session/cancellation fixture/{variant} (no verified execution)", flush=True)
     if source_binding(root) != source or any(file_digest(Path(path)) != sha for path, sha in hashes.items()):
         raise ValueError("producer source, native binary or launch inputs changed during observation")
     return {"schema_version": 1, "version": "0.156.1", "target": "x86_64-unknown-linux-musl",
             "source": source, "input_sha256": recorded_hashes, "protocol_sha256": PROTOCOL_SHA256,
             "reviewed_baseline_sha256": BASELINE_SHA256, "expected_config_toml": config,
-            "unbound_object_feature_defaults": unbound, "cases": cases, "packet_binding": None,
+            "unbound_object_feature_defaults": unbound, "cases": cases, "session_fixtures": fixtures,
+            "cancellation_cases": cancellations, "packet_binding": None,
             "context_complete": False, "execution_verified": False,
             "remaining": ["tool_registry and other unexposed effective defaults",
                           "native descendant/loader/provider effects and positive execution context",
