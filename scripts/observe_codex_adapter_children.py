@@ -114,8 +114,13 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
         if child["producer_environment"] != environment:
             raise ValueError("producer inherited an unbound environment")
         validate_child(child, selector, variant, environment)
-        if (root / "home/config.toml").read_text() != config:
-            raise ValueError("controlled config drifted during native execution")
+        with (root / "home/config.toml").open("rb") as stream:
+            config_after = stream.read(LIMIT + 1)
+        if len(config_after) > LIMIT:
+            raise ValueError("native config exceeds observation limit")
+        # Retain negative observations. A changed config cannot become a passed
+        # context merely because the adapter's initial execve matched.
+        refusals = [] if config_after == config.encode() else ["controlled_config_drift"]
         traces = [{"file": path.name, "sha256": file_digest(path), "bytes": path.stat().st_size}
                   for path in sorted((root / "trace").glob("trace.*"))]
         if raw_traces is not None:
@@ -126,6 +131,7 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
         return {"request": {"selector": selector, "variant": variant}, "adapter": result,
                 "child": child, "descendant_exec_attempts": descendants,
                 "before": before, "after": native_manifest(root), "traces": traces,
+                "config_after_toml": config_after.decode(), "context_refusals": refusals,
                 "diagnostics": stderr.decode(errors="replace"), "child_boundary_observed": True,
                 "context_complete": False, "execution_verified": False}
 

@@ -50,8 +50,9 @@ pre-spawn security boundary for ordinary callers or maintenance-writer admission
 The SDK has its ordinary three-second owned timeout; the outer namespace has a20-second
 deadline and is killed/reaped on overrun. Startup/session/output mutations are inventoried
 with file digests, modes, directory types and symlink targets. Observer trace files are
-recorded separately and excluded from native mutation attribution. Controlled config
-must be unchanged after the run.
+recorded separately and excluded from native mutation attribution. Changed controlled
+config is retained as an explicit context refusal alongside the observed spawn, never
+as a passed context. The post-run config bytes are recorded for review.
 
 The existing approved context decisions remain in force: preserve native feature values
 (including six reported true despite false config), and inventory pinned native startup
@@ -74,6 +75,12 @@ and errors remain in the audit, distinct from the SDK's directly observed child.
 are neither hidden nor approved for a later positive execution context. Successful
 native command/sandbox behavior, provider/auth/default/loader semantics, independent
 adequacy/adoption and the full allowed/denied regimes remain required.
+
+The private Git fixture also exposes a native config mutation: Codex can append
+`[projects."/pilot/work"]` with `trust_level = "trusted"`. A request to allow only
+that exact addition was submitted to the maintainer. Until explicitly approved and
+implemented as a byte-exact postcondition, it remains `controlled_config_drift`; no
+generic config write, other project or host trust is approved by the audit.
 
 Individual207 classification edges remain proposals. The existing53 operation/obligation/
 target template baseline is unchanged, and is not53 test cases. Packet binding is explicitly
