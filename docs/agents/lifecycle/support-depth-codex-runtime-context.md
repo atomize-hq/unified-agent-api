@@ -58,9 +58,9 @@ inventory proves that startup itself creates bundled assets and state before fea
 
 ## Maintainer context decisions
 
-These recommendations clarify the private pilot's reviewed context; they do not restrict
-normal SDK callers or approve individual classification rows. Both were submitted to the
-maintainer during this slice. Until explicitly approved, retain the affected context gaps.
+The maintainer explicitly approved both clarifications below in this task. They define
+the private pilot's reviewed context; they do not restrict normal SDK callers, approve
+individual classification rows or establish execution evidence or qualification.
 
 1. Keep the explicit false configuration unchanged and bind the observed native effective
    feature values, including the six true values. Do not patch Codex or claim an all-off
