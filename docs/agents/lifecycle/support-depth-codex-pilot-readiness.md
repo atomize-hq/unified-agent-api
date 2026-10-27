@@ -87,5 +87,8 @@ New per-operation populations require fresh reviewed whole-regime rows. This sli
 unresolved rows, reports missing runtime context, producer/adequacy and isolated-chain proof,
 and cannot clear those items by supplying a plausible rationale or candidate basis.
 
-Next is exact current-route effect classification and packet-specific execution evidence, then
-the public isolated maintenance chain. Production enrollment follows the reviewed isolated proof.
+The [runtime-context observation and current classification inventory](support-depth-codex-runtime-context.md)
+now records offline native config/feature/startup facts and exact proposals. It does not establish
+the complete runtime context, install classifications or clear the diagnostic's remaining items.
+Packet-specific execution evidence and the public isolated maintenance chain follow. Production
+enrollment follows the reviewed isolated proof.

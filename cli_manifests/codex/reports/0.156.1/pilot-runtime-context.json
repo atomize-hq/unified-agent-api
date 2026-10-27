@@ -1,0 +1,3088 @@
+{
+  "acquisition_helper_sha256": "9ace5d058eaf5fd4d13a15308ba27529d2af03220291678e9dbe1be4b12afb7a",
+  "after": [
+    {
+      "path": "home/config.toml",
+      "sha256": "8929c7909c0e4e053a00f1623ba3fe6a74aee8ec0eded6d611749dc77a5cc078"
+    },
+    {
+      "path": "home/goals_1.sqlite",
+      "sha256": "c47be589c562d0c0660ce81b904f2996775d71f954382f787a136fd3c45abb66"
+    },
+    {
+      "path": "home/installation_id",
+      "sha256": "18fcf4859caf047089dc6a31ebd9db16b46aaeb1a83ebb9727e4edca504bdb80"
+    },
+    {
+      "path": "home/logs_2.sqlite",
+      "sha256": "1f413e905abc12d593f3af48ce752f59baa440c941b8be8c3aae1e8d33998698"
+    },
+    {
+      "path": "home/logs_2.sqlite-shm",
+      "sha256": "7885fd0feb8000d2df5f9f68e006f2b619af9ff29b495ae76e22fdb98d6ac4da"
+    },
+    {
+      "path": "home/logs_2.sqlite-wal",
+      "sha256": "d803220467746f07d289a85a0471d220b79b03fb3a52253662447f45ada6715b"
+    },
+    {
+      "path": "home/memories_1.sqlite",
+      "sha256": "141d7c04e9f97e559b424d8647954f8d8ed3acd05d425e4b8627a2167f30baac"
+    },
+    {
+      "path": "home/queue_1.sqlite",
+      "sha256": "c5e2d71b3b4ae779a970d84f956b0060e416388fe5e45382ffcc88f44e413373"
+    },
+    {
+      "path": "home/queue_1.sqlite-shm",
+      "sha256": "4f697541428f634dedac8a7bc44aaaa86169f12d28328f6b14410201023a370f"
+    },
+    {
+      "path": "home/queue_1.sqlite-wal",
+      "sha256": "a3c05bd5f006d07ba949e35bf4962ae7c3d028e78a63ca99936b33f2d4e07e8d"
+    },
+    {
+      "path": "home/skills/.system/.codex-system-skills.marker",
+      "sha256": "0364a0277a83943bb7c0c457ad8097e97ef8b6720d895cea15024d92fc426285"
+    },
+    {
+      "path": "home/skills/.system/imagegen/LICENSE.txt",
+      "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9"
+    },
+    {
+      "path": "home/skills/.system/imagegen/SKILL.md",
+      "sha256": "681ddb4ad6d06a2acc78a3535b583f8d0c1ea800ecda3d56370d3310fd2cd4ba"
+    },
+    {
+      "path": "home/skills/.system/imagegen/agents/openai.yaml",
+      "sha256": "9ca574af14580dc7a2a3dc37a1796d17f93cb8850be66501f0799ef8603e9dc0"
+    },
+    {
+      "path": "home/skills/.system/imagegen/assets/imagegen-small.svg",
+      "sha256": "cff5f34f57ff60b3ee92eaedd17b15e96dd4b9e776df3e78936c9e00d42be294"
+    },
+    {
+      "path": "home/skills/.system/imagegen/assets/imagegen.png",
+      "sha256": "95952f644064eb9e890f98d8db07216347186526e4c41ad66d3420629eb86e20"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/cli.md",
+      "sha256": "ecfc2e09261a0feb3482517a5fa0ff410cb7d1958e3cbd2ac6b61586f5b81405"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/codex-network.md",
+      "sha256": "c88298ca4481f6116a16fa7987434fc977f8b311c1bbc0c3d862ffd0c5981148"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/image-api.md",
+      "sha256": "dc975d7af8a4888967251a0276014b4a71ea30455294944b762256373ce3e569"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/prompting.md",
+      "sha256": "b210b051c775860267080941eba968212bf0ac7fce581d75c5dcc217d8293f8b"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/sample-prompts.md",
+      "sha256": "70474177d151855b175c6133de2aae1d90b7f146b0dab50ec830972c47d72183"
+    },
+    {
+      "path": "home/skills/.system/imagegen/scripts/image_gen.py",
+      "sha256": "b4345cf835e5b593b97df6bb2b70bda493b8a97eee4cabbc99b2fa57dba9b448"
+    },
+    {
+      "path": "home/skills/.system/imagegen/scripts/remove_chroma_key.py",
+      "sha256": "a5893c4bd04b21abced33731ea89d2ac428e81d92a0368eb18ffbe4fda5253e2"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/LICENSE.txt",
+      "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/SKILL.md",
+      "sha256": "aa6829e21df2223167c85d2e49b6337a7345c84c1033f1ec10182c7882b36d45"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/agents/openai.yaml",
+      "sha256": "44b9efac6be1bae32d869aa2942fecbe4dcae82682ee03e4120f2f9b7d4658ec"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/assets/openai-small.svg",
+      "sha256": "45be1f0757eb18889eefb1e7db79668ef46a275dc4e0e78e8df5ebd7f6cdeadc"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/assets/openai.png",
+      "sha256": "156cc84d7332bfe95b310350bd470b690d22aa33d65340cc6c2e06022946194c"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/codex-self-knowledge.md",
+      "sha256": "8c8fb00e6e5cb1977924f5164684a6095427fa828bbc765225f17d9aeb79a912"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/latest-model.md",
+      "sha256": "bdf241d505eb071b1c7b0b732f842b701348cf6eab95d1c36fd97edac64dd158"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/mcp-diagnostics.md",
+      "sha256": "49bbd2f73df7bbd7f86c80425dea4da2d301c22046080399a36bfc0ca49509e9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/model-migration.md",
+      "sha256": "bef46671036c8e483b7f65df931171217d55a8d26098851c2f89784db8edca2f"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/model-selection.md",
+      "sha256": "ba2d164abbca30435a460a0bc3a7d82398dce2bdf092705c98ba55b3f3af38a8"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/official-docs.md",
+      "sha256": "7962f2dce55089b93bde4115bb89fd42f20993c1597a2b13edd4956f463875b9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/prompting-guide.md",
+      "sha256": "548d4ca73a34cd4b0041ef05a899592e8c50772b8f3a76c579ec941e403e19f6"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/upgrade-guide.md",
+      "sha256": "ecac89155f910f064fd306e89c74585cabdb2142aba4f2acc0cead092ae1d1a5"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/upgrading-to-gpt-6-astra.md",
+      "sha256": "62ef6d22684662a019d203834fe1205a07e4ca4c65dddcbabe1bb51efe1aa840"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/fetch-codex-manual.mjs",
+      "sha256": "f53eb6d2f286e9efcc397e8bee93a938e37296c90953e4e06e94899ef1b6c363"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/resolve-latest-model-info",
+      "sha256": "7354dbb030ca0736dd633a7ca1b930cf640abd40370725dea3a458cb51d49523"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/resolve-latest-model-info.cjs",
+      "sha256": "eeb1bb486018e16b37edfc06b1a37179dbc672982d501040d4f7142f29dd2e64"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/SKILL.md",
+      "sha256": "71b95b8219644f95d633721e7f7cd3c469edfc8fe50f8415d400dfb2d74bc7b9"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/agents/openai.yaml",
+      "sha256": "fecaf35d692bd3d33d1a065648258d12e393afa9055d78adf6e57b42f4142f6d"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/assets/plugin-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/assets/plugin-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/references/installing-and-updating.md",
+      "sha256": "91c4781d48568fcc708b45566b08fb610ad1c88672720ae512f9525a1cf9cb20"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/references/plugin-json-spec.md",
+      "sha256": "eeb640130f69636affaa299d4170d5a7ae6a0ff978296ddf75c409ce6dd87b91"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/create_basic_plugin.py",
+      "sha256": "272cb14e02ad7c76ac40777443c49cfecfa333ee28ab7f6214210b72c8fd02ae"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/identifier_validation.py",
+      "sha256": "a6d51ce4a9a7e8f85626ff5808a467a67574e7f8cdf1167ffb467c5f67e57223"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/read_marketplace_name.py",
+      "sha256": "ba24e6d91eed6f778bde022a967be335c6253983b5ecd1c5e30c8483385887fd"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py",
+      "sha256": "6a630dfbdc2bca6952580da9c2c7ece08030926819ccd81d9deb518c24c1b0ed"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/validate_plugin.py",
+      "sha256": "f4eeadb733b28b0c3e714de263a76d6542866a672f3e99bdffcf4dbcdf85e944"
+    },
+    {
+      "path": "home/skills/.system/review-agent/SKILL.md",
+      "sha256": "07079efd0dc76f05fade424e5dfb048dce1de2df7626e1a4f56292a4f3f92228"
+    },
+    {
+      "path": "home/skills/.system/review-agent/agents/openai.yaml",
+      "sha256": "4d867a46d15e36ac880176484aae160f59855340c6059b2ea6ab9fbc9af084de"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/SKILL.md",
+      "sha256": "6656e54755638e8efcf275a472b9672eaa8a9a1b9e59dc210e275b03b59e1e66"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/agents/openai.yaml",
+      "sha256": "d07d21b93fcf3d4dc8d9a3399c05fc226a49a333a96d3e1c68b451b8dd9eade6"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/assets/skill-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/assets/skill-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/license.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/references/openai_yaml.md",
+      "sha256": "ffac39318e408108141d40f820968e59f70434a891694f9bf1d25be8237b150c"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/generate_openai_yaml.py",
+      "sha256": "816df12072d74faf924d802a6599a139997e1441e90bfe4869ec304f2e5e2851"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/init_skill.py",
+      "sha256": "bf0656a5f9d8d8cdecf0245eaf27e1df8e0e9b6d40ccdda814eb8e3d5f6992c8"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/quick_validate.py",
+      "sha256": "ee6dba90f44d37171c5a6edb8095979c54919ff6822c1a907afca2e78c48738c"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/SKILL.md",
+      "sha256": "d68b77e5bbb34dedab89d134da52855f140fc4b4299b80104f534e3b9e98f8ee"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/agents/openai.yaml",
+      "sha256": "5ce223d8b1070b82c42298538f1b8d376f788eb9e7a42a987e8c094070d73f0e"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/assets/skill-installer-small.svg",
+      "sha256": "3928703ff00dc1a681e7a22401843b7edcbd4b2051651ce4c43b75f7e140504e"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/assets/skill-installer.png",
+      "sha256": "d0a230b1a79b71b858b7c215a0fbb0768d6459c14ea4ef80c61592629bf0e605"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/github_utils.py",
+      "sha256": "61c1bbe2ae217433b4b6f9f09f21aca4df52c12598068343ade719f706e4859b"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/install-skill-from-github.py",
+      "sha256": "38f311b75664bb063808f982c600271ebc4b560830f491705190f88a94e3e781"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/list-skills.py",
+      "sha256": "9d6dfb2abf3afeee7f027a89fb1626b918a973da18f4eb6c25681286301beb41"
+    },
+    {
+      "path": "home/state_5.sqlite",
+      "sha256": "4eeb710c739848e62f0d53d04057e17375b4af741c9b441f2a546f6ed860c79f"
+    },
+    {
+      "path": "home/state_5.sqlite-shm",
+      "sha256": "6990e994c0b27058ac8760eb11a2a3eda651ea6c086df1a733111af1ece9a064"
+    },
+    {
+      "path": "home/state_5.sqlite-wal",
+      "sha256": "03eb5cb4c0486d625f81b81f3a88ce8f43063327e75c7f06126e19615c1c065a"
+    }
+  ],
+  "after_config_reads": [
+    {
+      "path": "home/config.toml",
+      "sha256": "8929c7909c0e4e053a00f1623ba3fe6a74aee8ec0eded6d611749dc77a5cc078"
+    },
+    {
+      "path": "home/goals_1.sqlite",
+      "sha256": "c47be589c562d0c0660ce81b904f2996775d71f954382f787a136fd3c45abb66"
+    },
+    {
+      "path": "home/installation_id",
+      "sha256": "18fcf4859caf047089dc6a31ebd9db16b46aaeb1a83ebb9727e4edca504bdb80"
+    },
+    {
+      "path": "home/logs_2.sqlite",
+      "sha256": "1f413e905abc12d593f3af48ce752f59baa440c941b8be8c3aae1e8d33998698"
+    },
+    {
+      "path": "home/logs_2.sqlite-shm",
+      "sha256": "7885fd0feb8000d2df5f9f68e006f2b619af9ff29b495ae76e22fdb98d6ac4da"
+    },
+    {
+      "path": "home/logs_2.sqlite-wal",
+      "sha256": "d803220467746f07d289a85a0471d220b79b03fb3a52253662447f45ada6715b"
+    },
+    {
+      "path": "home/memories_1.sqlite",
+      "sha256": "141d7c04e9f97e559b424d8647954f8d8ed3acd05d425e4b8627a2167f30baac"
+    },
+    {
+      "path": "home/queue_1.sqlite",
+      "sha256": "c5e2d71b3b4ae779a970d84f956b0060e416388fe5e45382ffcc88f44e413373"
+    },
+    {
+      "path": "home/queue_1.sqlite-shm",
+      "sha256": "4f697541428f634dedac8a7bc44aaaa86169f12d28328f6b14410201023a370f"
+    },
+    {
+      "path": "home/queue_1.sqlite-wal",
+      "sha256": "a3c05bd5f006d07ba949e35bf4962ae7c3d028e78a63ca99936b33f2d4e07e8d"
+    },
+    {
+      "path": "home/skills/.system/.codex-system-skills.marker",
+      "sha256": "0364a0277a83943bb7c0c457ad8097e97ef8b6720d895cea15024d92fc426285"
+    },
+    {
+      "path": "home/skills/.system/imagegen/LICENSE.txt",
+      "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9"
+    },
+    {
+      "path": "home/skills/.system/imagegen/SKILL.md",
+      "sha256": "681ddb4ad6d06a2acc78a3535b583f8d0c1ea800ecda3d56370d3310fd2cd4ba"
+    },
+    {
+      "path": "home/skills/.system/imagegen/agents/openai.yaml",
+      "sha256": "9ca574af14580dc7a2a3dc37a1796d17f93cb8850be66501f0799ef8603e9dc0"
+    },
+    {
+      "path": "home/skills/.system/imagegen/assets/imagegen-small.svg",
+      "sha256": "cff5f34f57ff60b3ee92eaedd17b15e96dd4b9e776df3e78936c9e00d42be294"
+    },
+    {
+      "path": "home/skills/.system/imagegen/assets/imagegen.png",
+      "sha256": "95952f644064eb9e890f98d8db07216347186526e4c41ad66d3420629eb86e20"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/cli.md",
+      "sha256": "ecfc2e09261a0feb3482517a5fa0ff410cb7d1958e3cbd2ac6b61586f5b81405"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/codex-network.md",
+      "sha256": "c88298ca4481f6116a16fa7987434fc977f8b311c1bbc0c3d862ffd0c5981148"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/image-api.md",
+      "sha256": "dc975d7af8a4888967251a0276014b4a71ea30455294944b762256373ce3e569"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/prompting.md",
+      "sha256": "b210b051c775860267080941eba968212bf0ac7fce581d75c5dcc217d8293f8b"
+    },
+    {
+      "path": "home/skills/.system/imagegen/references/sample-prompts.md",
+      "sha256": "70474177d151855b175c6133de2aae1d90b7f146b0dab50ec830972c47d72183"
+    },
+    {
+      "path": "home/skills/.system/imagegen/scripts/image_gen.py",
+      "sha256": "b4345cf835e5b593b97df6bb2b70bda493b8a97eee4cabbc99b2fa57dba9b448"
+    },
+    {
+      "path": "home/skills/.system/imagegen/scripts/remove_chroma_key.py",
+      "sha256": "a5893c4bd04b21abced33731ea89d2ac428e81d92a0368eb18ffbe4fda5253e2"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/LICENSE.txt",
+      "sha256": "4dd13869245e356246a5b770723247bbb80a8f07a181d1d3d873a1734297cdb9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/SKILL.md",
+      "sha256": "aa6829e21df2223167c85d2e49b6337a7345c84c1033f1ec10182c7882b36d45"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/agents/openai.yaml",
+      "sha256": "44b9efac6be1bae32d869aa2942fecbe4dcae82682ee03e4120f2f9b7d4658ec"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/assets/openai-small.svg",
+      "sha256": "45be1f0757eb18889eefb1e7db79668ef46a275dc4e0e78e8df5ebd7f6cdeadc"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/assets/openai.png",
+      "sha256": "156cc84d7332bfe95b310350bd470b690d22aa33d65340cc6c2e06022946194c"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/codex-self-knowledge.md",
+      "sha256": "8c8fb00e6e5cb1977924f5164684a6095427fa828bbc765225f17d9aeb79a912"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/latest-model.md",
+      "sha256": "bdf241d505eb071b1c7b0b732f842b701348cf6eab95d1c36fd97edac64dd158"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/mcp-diagnostics.md",
+      "sha256": "49bbd2f73df7bbd7f86c80425dea4da2d301c22046080399a36bfc0ca49509e9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/model-migration.md",
+      "sha256": "bef46671036c8e483b7f65df931171217d55a8d26098851c2f89784db8edca2f"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/model-selection.md",
+      "sha256": "ba2d164abbca30435a460a0bc3a7d82398dce2bdf092705c98ba55b3f3af38a8"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/official-docs.md",
+      "sha256": "7962f2dce55089b93bde4115bb89fd42f20993c1597a2b13edd4956f463875b9"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/prompting-guide.md",
+      "sha256": "548d4ca73a34cd4b0041ef05a899592e8c50772b8f3a76c579ec941e403e19f6"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/upgrade-guide.md",
+      "sha256": "ecac89155f910f064fd306e89c74585cabdb2142aba4f2acc0cead092ae1d1a5"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/references/upgrading-to-gpt-6-astra.md",
+      "sha256": "62ef6d22684662a019d203834fe1205a07e4ca4c65dddcbabe1bb51efe1aa840"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/fetch-codex-manual.mjs",
+      "sha256": "f53eb6d2f286e9efcc397e8bee93a938e37296c90953e4e06e94899ef1b6c363"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/resolve-latest-model-info",
+      "sha256": "7354dbb030ca0736dd633a7ca1b930cf640abd40370725dea3a458cb51d49523"
+    },
+    {
+      "path": "home/skills/.system/openai-docs/scripts/resolve-latest-model-info.cjs",
+      "sha256": "eeb1bb486018e16b37edfc06b1a37179dbc672982d501040d4f7142f29dd2e64"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/SKILL.md",
+      "sha256": "71b95b8219644f95d633721e7f7cd3c469edfc8fe50f8415d400dfb2d74bc7b9"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/agents/openai.yaml",
+      "sha256": "fecaf35d692bd3d33d1a065648258d12e393afa9055d78adf6e57b42f4142f6d"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/assets/plugin-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/assets/plugin-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/references/installing-and-updating.md",
+      "sha256": "91c4781d48568fcc708b45566b08fb610ad1c88672720ae512f9525a1cf9cb20"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/references/plugin-json-spec.md",
+      "sha256": "eeb640130f69636affaa299d4170d5a7ae6a0ff978296ddf75c409ce6dd87b91"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/create_basic_plugin.py",
+      "sha256": "272cb14e02ad7c76ac40777443c49cfecfa333ee28ab7f6214210b72c8fd02ae"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/identifier_validation.py",
+      "sha256": "a6d51ce4a9a7e8f85626ff5808a467a67574e7f8cdf1167ffb467c5f67e57223"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/read_marketplace_name.py",
+      "sha256": "ba24e6d91eed6f778bde022a967be335c6253983b5ecd1c5e30c8483385887fd"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py",
+      "sha256": "6a630dfbdc2bca6952580da9c2c7ece08030926819ccd81d9deb518c24c1b0ed"
+    },
+    {
+      "path": "home/skills/.system/plugin-creator/scripts/validate_plugin.py",
+      "sha256": "f4eeadb733b28b0c3e714de263a76d6542866a672f3e99bdffcf4dbcdf85e944"
+    },
+    {
+      "path": "home/skills/.system/review-agent/SKILL.md",
+      "sha256": "07079efd0dc76f05fade424e5dfb048dce1de2df7626e1a4f56292a4f3f92228"
+    },
+    {
+      "path": "home/skills/.system/review-agent/agents/openai.yaml",
+      "sha256": "4d867a46d15e36ac880176484aae160f59855340c6059b2ea6ab9fbc9af084de"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/SKILL.md",
+      "sha256": "6656e54755638e8efcf275a472b9672eaa8a9a1b9e59dc210e275b03b59e1e66"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/agents/openai.yaml",
+      "sha256": "d07d21b93fcf3d4dc8d9a3399c05fc226a49a333a96d3e1c68b451b8dd9eade6"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/assets/skill-creator-small.svg",
+      "sha256": "6591bf8ea9bb9435890dbdea299e0d2bd05f3aa893a335d26e4c535e93c8e7fb"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/assets/skill-creator.png",
+      "sha256": "a4024b0306ddb05847e1012879d37aaf1e658205199da596f5145ed7a88d9162"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/license.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/references/openai_yaml.md",
+      "sha256": "ffac39318e408108141d40f820968e59f70434a891694f9bf1d25be8237b150c"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/generate_openai_yaml.py",
+      "sha256": "816df12072d74faf924d802a6599a139997e1441e90bfe4869ec304f2e5e2851"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/init_skill.py",
+      "sha256": "bf0656a5f9d8d8cdecf0245eaf27e1df8e0e9b6d40ccdda814eb8e3d5f6992c8"
+    },
+    {
+      "path": "home/skills/.system/skill-creator/scripts/quick_validate.py",
+      "sha256": "ee6dba90f44d37171c5a6edb8095979c54919ff6822c1a907afca2e78c48738c"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/SKILL.md",
+      "sha256": "d68b77e5bbb34dedab89d134da52855f140fc4b4299b80104f534e3b9e98f8ee"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/agents/openai.yaml",
+      "sha256": "5ce223d8b1070b82c42298538f1b8d376f788eb9e7a42a987e8c094070d73f0e"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/assets/skill-installer-small.svg",
+      "sha256": "3928703ff00dc1a681e7a22401843b7edcbd4b2051651ce4c43b75f7e140504e"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/assets/skill-installer.png",
+      "sha256": "d0a230b1a79b71b858b7c215a0fbb0768d6459c14ea4ef80c61592629bf0e605"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/github_utils.py",
+      "sha256": "61c1bbe2ae217433b4b6f9f09f21aca4df52c12598068343ade719f706e4859b"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/install-skill-from-github.py",
+      "sha256": "38f311b75664bb063808f982c600271ebc4b560830f491705190f88a94e3e781"
+    },
+    {
+      "path": "home/skills/.system/skill-installer/scripts/list-skills.py",
+      "sha256": "9d6dfb2abf3afeee7f027a89fb1626b918a973da18f4eb6c25681286301beb41"
+    },
+    {
+      "path": "home/state_5.sqlite",
+      "sha256": "4eeb710c739848e62f0d53d04057e17375b4af741c9b441f2a546f6ed860c79f"
+    },
+    {
+      "path": "home/state_5.sqlite-shm",
+      "sha256": "6990e994c0b27058ac8760eb11a2a3eda651ea6c086df1a733111af1ece9a064"
+    },
+    {
+      "path": "home/state_5.sqlite-wal",
+      "sha256": "03eb5cb4c0486d625f81b81f3a88ce8f43063327e75c7f06126e19615c1c065a"
+    }
+  ],
+  "before": [
+    {
+      "path": "home/config.toml",
+      "sha256": "8929c7909c0e4e053a00f1623ba3fe6a74aee8ec0eded6d611749dc77a5cc078"
+    }
+  ],
+  "binary_sha256": "0b2e9301d6100dddda3b9d5c80ebaeaa3a2f1962388f2f36f6b96a9f08b1f33f",
+  "collector_sha256": "ded6b109f277af6d6c5f92bc683c5a215fb928f6486e66513af58cd5f1f46fc4",
+  "diagnostics": "\u001b[2m2026-10-27T01:11:53.414674Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.\n",
+  "environment": {
+    "CODEX_BINARY": "/bin/codex",
+    "CODEX_HOME": "/pilot/home",
+    "HOME": "/pilot/home",
+    "LANG": "C.UTF-8",
+    "PATH": "/bin",
+    "RUST_LOG": "error",
+    "TMPDIR": "/pilot/tmp",
+    "TZ": "UTC",
+    "XDG_CACHE_HOME": "/pilot/xdg/cache",
+    "XDG_CONFIG_HOME": "/pilot/xdg/config",
+    "XDG_DATA_HOME": "/pilot/xdg/data"
+  },
+  "expected_config_toml": "model_provider = \"openai\"\nmodel = \"gpt-5\"\napproval_policy = \"never\"\nsandbox_mode = \"workspace-write\"\nweb_search = \"disabled\"\n[analytics]\nenabled = false\n[features]\nagent_message_board = false\nanalytics_plan_history = false\napi_key_model_discovery = false\napply_patch_freeform = false\napply_patch_preserve_line_endings = false\napply_patch_streaming_events = false\napps = false\napps_mcp_path_override = false\nauth_elicitation = false\nbackground_paginated_rollout_migration = false\nbedrock_setup_wizard = false\nbrowser_use = false\nbrowser_use_external = false\nbrowser_use_full_cdp_access = false\nchronicle = false\ncode_mode = false\ncode_mode_buffered_exec = false\ncode_mode_host = false\ncode_mode_interrupt = false\ncode_mode_only = false\ncode_mode_prewarm = false\ncodex_apps_mcp_2026_07_28 = false\ncodex_git_commit = false\ncodex_hooks = false\ncollab = false\ncollaboration_modes = false\ncompaction_image_budget = false\ncomputer_use = false\nconcurrent_reasoning_summaries = false\nconnectors = false\ncontent_item_kinds = false\ncontext_management = false\ncurrent_time_reminder = false\ncwd_relative_turn_diffs = false\ndaemon_auto_start = false\ndefault_mode_request_user_input = false\ndeferred_executor = false\ndeferred_tool_world_state = false\nelevated_windows_sandbox = false\nenable_experimental_windows_sandbox = false\nenable_fanout = false\nenable_mcp_apps = false\nenable_request_compression = false\nexec_permission_approvals = false\nexecuted_tool_call_metadata = false\nexecutor_capability_discovery = false\nexperimental_use_unified_exec_tool = false\nexperimental_windows_sandbox = false\nexternal_agent_memory_import = false\nexternal_migration = false\nfast_mode = false\ngoals = false\nguardian_approval = false\nguardian_enhanced_node_repl_transcripts = false\nguardian_ext = false\nguardian_node_repl_transcript_images = false\nguardian_reuse_parent_compaction = false\nguardianv2 = false\nhooks = false\nimage_detail_original = false\nimage_generation = false\nimage_resize_notice = false\nimagegenext = false\nin_app_browser = false\nin_app_chat = false\nin_app_dictation = false\nin_app_local_automation = false\nin_app_updates = false\nitem_ids = false\njs_repl = false\njs_repl_tools_only = false\nlocal_thread_store_compression = false\nlocal_thread_store_shared_compression = false\nmcp_2026_07_28 = false\nmcp_oauth_refresh_coordination = false\nmemories = false\nmemory_tool = false\nmentions_v2 = false\nmulti_agent = false\nmulti_agent_mode = false\nmulti_agent_v2 = false\nnetwork_proxy = false\nnon_prefixed_mcp_tool_names = false\nnonfatal_clock_read_errors = false\nomit_app_server_notification_media = false\npersonality = false\nplugin_hooks = false\nplugin_sharing = false\nplugins = false\npowershell_shell_version = false\nprevent_idle_sleep = false\npsp = false\nrealtime_conversation = false\nreasoning_effort_override = false\nrecommended_plugins = false\nremote_compaction_v2 = false\nremote_control = false\nremote_models = false\nremote_plugin = false\nrequest_permissions = false\nrequest_permissions_tool = false\nrequest_rule = false\nresize_all_images = false\nrespect_system_proxy = false\nresponses_websockets = false\nresponses_websockets_v2 = false\nretain_client_developer_messages = false\nrollout_budget = false\nruntime_metrics = false\nsearch_tool = false\nsecret_auth_storage = false\nsend_async_message = false\nsend_message_to_user_async = false\nshell_snapshot = false\nshell_snapshot_v2 = false\nshell_tool = false\nshell_zsh_fork = false\nskill_env_var_dependency_prompt = false\nskill_mcp_dependency_install = false\nskill_search = false\nskip_host_skill_discovery = false\nsleep_tool = false\nsqlite = false\nstandalone_web_search = false\nsteer = false\nstep_model_switching = false\nsystem_proxy_fallback = false\ntelepathy = false\nterminal_resize_reflow = false\nterminal_visualization_instructions = false\ntoken_budget = false\ntool_call_mcp_elicitation = false\ntool_search = false\ntool_search_always_defer_mcp_tools = false\ntool_suggest = false\ntranscript_v2 = false\ntui_app_server = false\nunavailable_dummy_tools = false\nunbounded_connection_retries = false\nundo = false\nunified_exec = false\nunified_exec_tty = false\nunified_exec_zsh_fork = false\nunified_image_budget = false\nuse_agent_identity = false\nuse_legacy_landlock = false\nuse_linux_sandbox_bwrap = false\nuse_xaa = false\nview_image = false\nweb_search = false\nweb_search_cached = false\nweb_search_request = false\nwindows_sandbox_service = false\nworkspace_dependencies = false\nworkspace_owner_usage_nudge = false\nworktrees = false\nwrite_stdin_approval = false\n",
+  "feature_diagnostics": "",
+  "features_list": {
+    "agent_message_board": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "analytics_plan_history": {
+      "enabled": false,
+      "stage": "experimental"
+    },
+    "api_key_model_discovery": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "apply_patch_freeform": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "apply_patch_preserve_line_endings": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "apply_patch_streaming_events": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "apps": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "apps_mcp_path_override": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "artifact": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "auth_elicitation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "background_paginated_rollout_migration": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "bedrock_setup_wizard": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "browser_use": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "browser_use_external": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "browser_use_full_cdp_access": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "chronicle": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "code_mode": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "code_mode_buffered_exec": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "code_mode_host": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "code_mode_interrupt": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "code_mode_only": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "code_mode_prewarm": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "codex_apps_mcp_2026_07_28": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "codex_git_commit": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "collaboration_modes": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "compaction_image_budget": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "computer_use": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "concurrent_reasoning_summaries": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "content_item_kinds": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "context_management": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "current_time_reminder": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "cwd_relative_turn_diffs": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "daemon_auto_start": {
+      "enabled": false,
+      "stage": "experimental"
+    },
+    "default_mode_request_user_input": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "deferred_executor": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "deferred_tool_world_state": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "elevated_windows_sandbox": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "enable_fanout": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "enable_mcp_apps": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "enable_request_compression": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "exec_permission_approvals": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "executed_tool_call_metadata": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "executor_capability_discovery": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "experimental_windows_sandbox": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "external_agent_memory_import": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "external_migration": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "fast_mode": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "goals": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "guardian_approval": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "guardian_enhanced_node_repl_transcripts": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "guardian_ext": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "guardian_node_repl_transcript_images": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "guardian_reuse_parent_compaction": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "guardianv2": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "guardianv2.thread_context": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "hooks": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "image_detail_original": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "image_generation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "image_resize_notice": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "in_app_browser": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "in_app_chat": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "in_app_dictation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "in_app_local_automation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "in_app_updates": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "item_ids": {
+      "enabled": true,
+      "stage": "removed"
+    },
+    "js_repl": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "js_repl_tools_only": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "local_thread_store_compression": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "local_thread_store_shared_compression": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "mcp_2026_07_28": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "mcp_oauth_refresh_coordination": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "memories": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "mentions_v2": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "multi_agent": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "multi_agent_mode": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "multi_agent_v2": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "network_proxy": {
+      "enabled": false,
+      "stage": "experimental"
+    },
+    "non_prefixed_mcp_tool_names": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "nonfatal_clock_read_errors": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "omit_app_server_notification_media": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "personality": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "plugin_hooks": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "plugin_sharing": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "plugins": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "powershell_shell_version": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "prevent_idle_sleep": {
+      "enabled": false,
+      "stage": "experimental"
+    },
+    "psp": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "realtime_conversation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "reasoning_effort_override": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "recommended_plugins": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "remote_compaction_v2": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "remote_control": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "remote_models": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "remote_plugin": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "request_permissions_tool": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "request_rule": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "resize_all_images": {
+      "enabled": true,
+      "stage": "removed"
+    },
+    "respect_system_proxy": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "responses_websockets": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "responses_websockets_v2": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "retain_client_developer_messages": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "rollout_budget": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "runtime_metrics": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "search_tool": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "secret_auth_storage": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "send_async_message": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "send_message_to_user_async": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "shell_snapshot": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "shell_snapshot_v2": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "shell_tool": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "shell_zsh_fork": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "skill_env_var_dependency_prompt": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "skill_mcp_dependency_install": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "skill_search": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "skip_host_skill_discovery": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "sleep_tool": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "sqlite": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "standalone_web_search": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "steer": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "step_model_switching": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "system_proxy_fallback": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "terminal_resize_reflow": {
+      "enabled": true,
+      "stage": "removed"
+    },
+    "terminal_visualization_instructions": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "token_budget": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "tool_call_mcp_elicitation": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "tool_search": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "tool_search_always_defer_mcp_tools": {
+      "enabled": true,
+      "stage": "removed"
+    },
+    "tool_suggest": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "transcript_v2": {
+      "enabled": false,
+      "stage": "deprecated"
+    },
+    "tui_app_server": {
+      "enabled": true,
+      "stage": "removed"
+    },
+    "unavailable_dummy_tools": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "unbounded_connection_retries": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "undo": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "unified_exec": {
+      "enabled": true,
+      "stage": "stable"
+    },
+    "unified_exec_tty": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "unified_exec_zsh_fork": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "unified_image_budget": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "use_agent_identity": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "use_legacy_landlock": {
+      "enabled": false,
+      "stage": "deprecated"
+    },
+    "use_linux_sandbox_bwrap": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "use_xaa": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "view_image": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "web_search_cached": {
+      "enabled": false,
+      "stage": "deprecated"
+    },
+    "web_search_request": {
+      "enabled": false,
+      "stage": "deprecated"
+    },
+    "windows_sandbox_service": {
+      "enabled": false,
+      "stage": "under development"
+    },
+    "workspace_dependencies": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "workspace_owner_usage_nudge": {
+      "enabled": false,
+      "stage": "removed"
+    },
+    "worktrees": {
+      "enabled": false,
+      "stage": "stable"
+    },
+    "write_stdin_approval": {
+      "enabled": false,
+      "stage": "under development"
+    }
+  },
+  "isolation": "bubblewrap: empty root, private pid/user/net namespaces; no credentials",
+  "launcher_sha256": "11e350f9154f8c8e30482fb087f4c3d033907452b7a5d82d027b6662d07f3ab6",
+  "limits": [
+    "Config-only direct native launch; not a production adapter spawn observation",
+    "No thread/turn, model, approval, command or file-change execution",
+    "Config projection and feature listing do not expose every resolved internal default",
+    "No packet E, A1 attestation, independent adequacy, enrollment or qualification"
+  ],
+  "protocol_sha256": "964601de43f695ef07f1d992c4c14a7418346bdd8dbe90c4ac9123ec0a5e1fb2",
+  "schema_version": 1,
+  "target": "x86_64-unknown-linux-musl",
+  "transcript": [
+    {
+      "sent": {
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "capabilities": {
+            "experimentalApi": true
+          },
+          "clientInfo": {
+            "name": "codex_pilot_context",
+            "version": "0.1"
+          }
+        }
+      }
+    },
+    {
+      "received": {
+        "id": 1,
+        "result": {
+          "codexHome": "/pilot/home",
+          "platformFamily": "unix",
+          "platformOs": "linux",
+          "userAgent": "codex_pilot_context/0.156.1 (Linux Unknown; x86_64) unknown (codex_pilot_context; 0.1)"
+        }
+      }
+    },
+    {
+      "sent": {
+        "id": 2,
+        "method": "config/read",
+        "params": {
+          "cwd": "/pilot/work",
+          "includeLayers": true
+        }
+      }
+    },
+    {
+      "received": {
+        "emittedAtMs": 1793063513416,
+        "method": "configWarning",
+        "params": {
+          "details": null,
+          "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime."
+        }
+      }
+    },
+    {
+      "received": {
+        "emittedAtMs": 1793063513416,
+        "method": "remoteControl/status/changed",
+        "params": {
+          "environmentId": null,
+          "installationId": "1e8d11f7-ba08-4b7b-8d31-ecc809a12a34",
+          "serverName": "codex-pilot",
+          "status": "disabled"
+        }
+      }
+    },
+    {
+      "received": {
+        "id": 2,
+        "result": {
+          "config": {
+            "agents": null,
+            "allow_login_shell": true,
+            "allow_symlinked_codex_home": null,
+            "analytics": {
+              "enabled": false
+            },
+            "approval_policy": "never",
+            "approvals_reviewer": null,
+            "apps": null,
+            "apps_mcp_product_sku": null,
+            "audio": null,
+            "auto_review": null,
+            "background_terminal_max_timeout": 300000,
+            "browser_use": null,
+            "chatgpt_base_url": "https://chatgpt.com/backend-api/",
+            "check_for_update_on_startup": null,
+            "cli_auth_credentials_store": "file",
+            "compact_prompt": null,
+            "computer_use": null,
+            "default_permissions": null,
+            "desktop": null,
+            "developer_instructions": null,
+            "disable_paste_burst": null,
+            "experimental_compact_prompt_file": null,
+            "experimental_realtime_start_instructions": null,
+            "experimental_realtime_webrtc_call_base_url": null,
+            "experimental_realtime_ws_backend_prompt": null,
+            "experimental_realtime_ws_base_url": null,
+            "experimental_realtime_ws_model": null,
+            "experimental_realtime_ws_startup_context": null,
+            "experimental_thread_store": null,
+            "experimental_thread_store_endpoint": null,
+            "experimental_use_unified_exec_tool": null,
+            "features": {
+              "agent_message_board": false,
+              "analytics_plan_history": false,
+              "api_key_model_discovery": false,
+              "apply_patch_freeform": false,
+              "apply_patch_preserve_line_endings": false,
+              "apply_patch_streaming_events": false,
+              "apps": false,
+              "auth_elicitation": false,
+              "background_paginated_rollout_migration": false,
+              "bedrock_setup_wizard": false,
+              "browser_use": false,
+              "browser_use_external": false,
+              "browser_use_full_cdp_access": false,
+              "chronicle": false,
+              "code_mode": false,
+              "code_mode_buffered_exec": false,
+              "code_mode_host": false,
+              "code_mode_interrupt": false,
+              "code_mode_only": false,
+              "code_mode_prewarm": false,
+              "codex_apps_mcp_2026_07_28": false,
+              "codex_git_commit": false,
+              "codex_hooks": false,
+              "collab": false,
+              "collaboration_modes": false,
+              "compaction_image_budget": false,
+              "computer_use": false,
+              "concurrent_reasoning_summaries": false,
+              "connectors": false,
+              "content_item_kinds": false,
+              "context_management": false,
+              "current_time_reminder": false,
+              "cwd_relative_turn_diffs": false,
+              "daemon_auto_start": false,
+              "default_mode_request_user_input": false,
+              "deferred_executor": false,
+              "deferred_tool_world_state": false,
+              "elevated_windows_sandbox": false,
+              "enable_experimental_windows_sandbox": false,
+              "enable_fanout": false,
+              "enable_mcp_apps": false,
+              "enable_request_compression": false,
+              "exec_permission_approvals": false,
+              "executed_tool_call_metadata": false,
+              "executor_capability_discovery": false,
+              "experimental_use_unified_exec_tool": false,
+              "experimental_windows_sandbox": false,
+              "external_agent_memory_import": false,
+              "external_migration": false,
+              "fast_mode": false,
+              "goals": false,
+              "guardian_approval": false,
+              "guardian_enhanced_node_repl_transcripts": false,
+              "guardian_ext": false,
+              "guardian_node_repl_transcript_images": false,
+              "guardian_reuse_parent_compaction": false,
+              "guardianv2": false,
+              "hooks": false,
+              "image_detail_original": false,
+              "image_generation": false,
+              "image_resize_notice": false,
+              "imagegenext": false,
+              "in_app_browser": false,
+              "in_app_chat": false,
+              "in_app_dictation": false,
+              "in_app_local_automation": false,
+              "in_app_updates": false,
+              "item_ids": false,
+              "js_repl": false,
+              "js_repl_tools_only": false,
+              "local_thread_store_compression": false,
+              "local_thread_store_shared_compression": false,
+              "mcp_2026_07_28": false,
+              "mcp_oauth_refresh_coordination": false,
+              "memories": false,
+              "memory_tool": false,
+              "mentions_v2": false,
+              "multi_agent": false,
+              "multi_agent_mode": false,
+              "multi_agent_v2": false,
+              "network_proxy": false,
+              "non_prefixed_mcp_tool_names": false,
+              "nonfatal_clock_read_errors": false,
+              "omit_app_server_notification_media": false,
+              "personality": false,
+              "plugin_hooks": false,
+              "plugin_sharing": false,
+              "plugins": false,
+              "powershell_shell_version": false,
+              "prevent_idle_sleep": false,
+              "psp": false,
+              "realtime_conversation": false,
+              "reasoning_effort_override": false,
+              "recommended_plugins": false,
+              "remote_compaction_v2": false,
+              "remote_control": false,
+              "remote_models": false,
+              "remote_plugin": false,
+              "request_permissions": false,
+              "request_permissions_tool": false,
+              "request_rule": false,
+              "resize_all_images": false,
+              "respect_system_proxy": false,
+              "responses_websockets": false,
+              "responses_websockets_v2": false,
+              "retain_client_developer_messages": false,
+              "rollout_budget": false,
+              "runtime_metrics": false,
+              "search_tool": false,
+              "secret_auth_storage": false,
+              "send_async_message": false,
+              "send_message_to_user_async": false,
+              "shell_snapshot": false,
+              "shell_snapshot_v2": false,
+              "shell_tool": false,
+              "shell_zsh_fork": false,
+              "skill_env_var_dependency_prompt": false,
+              "skill_mcp_dependency_install": false,
+              "skill_search": false,
+              "skip_host_skill_discovery": false,
+              "sleep_tool": false,
+              "sqlite": false,
+              "standalone_web_search": false,
+              "steer": false,
+              "step_model_switching": false,
+              "system_proxy_fallback": false,
+              "telepathy": false,
+              "terminal_resize_reflow": false,
+              "terminal_visualization_instructions": false,
+              "token_budget": false,
+              "tool_call_mcp_elicitation": false,
+              "tool_search": false,
+              "tool_search_always_defer_mcp_tools": false,
+              "tool_suggest": false,
+              "transcript_v2": false,
+              "tui_app_server": false,
+              "unavailable_dummy_tools": false,
+              "unbounded_connection_retries": false,
+              "undo": false,
+              "unified_exec": false,
+              "unified_exec_tty": false,
+              "unified_exec_zsh_fork": false,
+              "unified_image_budget": false,
+              "use_agent_identity": false,
+              "use_legacy_landlock": false,
+              "use_linux_sandbox_bwrap": false,
+              "use_xaa": false,
+              "view_image": false,
+              "web_search": false,
+              "web_search_cached": false,
+              "web_search_request": false,
+              "windows_sandbox_service": false,
+              "workspace_dependencies": false,
+              "workspace_owner_usage_nudge": false,
+              "worktrees": false,
+              "write_stdin_approval": false
+            },
+            "feedback": null,
+            "file_opener": "vscode",
+            "forced_chatgpt_workspace_id": null,
+            "forced_login_method": null,
+            "ghost_snapshot": null,
+            "goals": null,
+            "hide_agent_reasoning": false,
+            "history": {
+              "max_bytes": null,
+              "persistence": "save-all"
+            },
+            "hooks": null,
+            "include_apps_instructions": true,
+            "include_collaboration_mode_instructions": true,
+            "include_environment_context": true,
+            "include_permissions_instructions": true,
+            "instructions": null,
+            "js_repl_node_module_dirs": null,
+            "js_repl_node_path": null,
+            "log_dir": null,
+            "marketplaces": {},
+            "mcp_enterprise_managed_auth": null,
+            "mcp_oauth_callback_port": null,
+            "mcp_oauth_callback_url": null,
+            "mcp_oauth_credentials_store": "auto",
+            "mcp_optional_startup_grace_ms": null,
+            "mcp_servers": {},
+            "memories": null,
+            "model": "gpt-5",
+            "model_auto_compact_token_limit": null,
+            "model_auto_compact_token_limit_scope": null,
+            "model_catalog_json": null,
+            "model_context_window": null,
+            "model_instructions_file": null,
+            "model_post_turn_compact_threshold_percent": null,
+            "model_provider": "openai",
+            "model_providers": {},
+            "model_reasoning_effort": null,
+            "model_reasoning_summary": null,
+            "model_verbosity": null,
+            "notice": null,
+            "notify": null,
+            "openai_base_url": null,
+            "orchestrator": null,
+            "oss_provider": null,
+            "otel": null,
+            "permissions": null,
+            "personality": null,
+            "plan_mode_reasoning_effort": null,
+            "plugins": {},
+            "profile": null,
+            "profiles": {},
+            "project_doc_fallback_filenames": [],
+            "project_doc_max_bytes": 32768,
+            "project_root_markers": [
+              ".git"
+            ],
+            "projects": null,
+            "realtime": null,
+            "responses_api_metadata": null,
+            "review_model": null,
+            "sandbox_mode": "workspace-write",
+            "sandbox_workspace_write": null,
+            "service_tier": null,
+            "shell_environment_policy": {
+              "exclude": null,
+              "experimental_use_profile": null,
+              "filters": null,
+              "ignore_default_excludes": null,
+              "include_only": null,
+              "inherit": null,
+              "set": null
+            },
+            "show_raw_agent_reasoning": null,
+            "skills": null,
+            "sqlite_home": null,
+            "suppress_unstable_features_warning": null,
+            "thread_unload_delay_secs": null,
+            "tool_output_token_limit": null,
+            "tool_suggest": null,
+            "tools": null,
+            "tui": null,
+            "web_search": "disabled",
+            "windows": null
+          },
+          "layers": [
+            {
+              "config": {
+                "analytics": {
+                  "enabled": false
+                },
+                "approval_policy": "never",
+                "features": {
+                  "agent_message_board": false,
+                  "analytics_plan_history": false,
+                  "api_key_model_discovery": false,
+                  "apply_patch_freeform": false,
+                  "apply_patch_preserve_line_endings": false,
+                  "apply_patch_streaming_events": false,
+                  "apps": false,
+                  "apps_mcp_path_override": false,
+                  "auth_elicitation": false,
+                  "background_paginated_rollout_migration": false,
+                  "bedrock_setup_wizard": false,
+                  "browser_use": false,
+                  "browser_use_external": false,
+                  "browser_use_full_cdp_access": false,
+                  "chronicle": false,
+                  "code_mode": false,
+                  "code_mode_buffered_exec": false,
+                  "code_mode_host": false,
+                  "code_mode_interrupt": false,
+                  "code_mode_only": false,
+                  "code_mode_prewarm": false,
+                  "codex_apps_mcp_2026_07_28": false,
+                  "codex_git_commit": false,
+                  "codex_hooks": false,
+                  "collab": false,
+                  "collaboration_modes": false,
+                  "compaction_image_budget": false,
+                  "computer_use": false,
+                  "concurrent_reasoning_summaries": false,
+                  "connectors": false,
+                  "content_item_kinds": false,
+                  "context_management": false,
+                  "current_time_reminder": false,
+                  "cwd_relative_turn_diffs": false,
+                  "daemon_auto_start": false,
+                  "default_mode_request_user_input": false,
+                  "deferred_executor": false,
+                  "deferred_tool_world_state": false,
+                  "elevated_windows_sandbox": false,
+                  "enable_experimental_windows_sandbox": false,
+                  "enable_fanout": false,
+                  "enable_mcp_apps": false,
+                  "enable_request_compression": false,
+                  "exec_permission_approvals": false,
+                  "executed_tool_call_metadata": false,
+                  "executor_capability_discovery": false,
+                  "experimental_use_unified_exec_tool": false,
+                  "experimental_windows_sandbox": false,
+                  "external_agent_memory_import": false,
+                  "external_migration": false,
+                  "fast_mode": false,
+                  "goals": false,
+                  "guardian_approval": false,
+                  "guardian_enhanced_node_repl_transcripts": false,
+                  "guardian_ext": false,
+                  "guardian_node_repl_transcript_images": false,
+                  "guardian_reuse_parent_compaction": false,
+                  "guardianv2": false,
+                  "hooks": false,
+                  "image_detail_original": false,
+                  "image_generation": false,
+                  "image_resize_notice": false,
+                  "imagegenext": false,
+                  "in_app_browser": false,
+                  "in_app_chat": false,
+                  "in_app_dictation": false,
+                  "in_app_local_automation": false,
+                  "in_app_updates": false,
+                  "item_ids": false,
+                  "js_repl": false,
+                  "js_repl_tools_only": false,
+                  "local_thread_store_compression": false,
+                  "local_thread_store_shared_compression": false,
+                  "mcp_2026_07_28": false,
+                  "mcp_oauth_refresh_coordination": false,
+                  "memories": false,
+                  "memory_tool": false,
+                  "mentions_v2": false,
+                  "multi_agent": false,
+                  "multi_agent_mode": false,
+                  "multi_agent_v2": false,
+                  "network_proxy": false,
+                  "non_prefixed_mcp_tool_names": false,
+                  "nonfatal_clock_read_errors": false,
+                  "omit_app_server_notification_media": false,
+                  "personality": false,
+                  "plugin_hooks": false,
+                  "plugin_sharing": false,
+                  "plugins": false,
+                  "powershell_shell_version": false,
+                  "prevent_idle_sleep": false,
+                  "psp": false,
+                  "realtime_conversation": false,
+                  "reasoning_effort_override": false,
+                  "recommended_plugins": false,
+                  "remote_compaction_v2": false,
+                  "remote_control": false,
+                  "remote_models": false,
+                  "remote_plugin": false,
+                  "request_permissions": false,
+                  "request_permissions_tool": false,
+                  "request_rule": false,
+                  "resize_all_images": false,
+                  "respect_system_proxy": false,
+                  "responses_websockets": false,
+                  "responses_websockets_v2": false,
+                  "retain_client_developer_messages": false,
+                  "rollout_budget": false,
+                  "runtime_metrics": false,
+                  "search_tool": false,
+                  "secret_auth_storage": false,
+                  "send_async_message": false,
+                  "send_message_to_user_async": false,
+                  "shell_snapshot": false,
+                  "shell_snapshot_v2": false,
+                  "shell_tool": false,
+                  "shell_zsh_fork": false,
+                  "skill_env_var_dependency_prompt": false,
+                  "skill_mcp_dependency_install": false,
+                  "skill_search": false,
+                  "skip_host_skill_discovery": false,
+                  "sleep_tool": false,
+                  "sqlite": false,
+                  "standalone_web_search": false,
+                  "steer": false,
+                  "step_model_switching": false,
+                  "system_proxy_fallback": false,
+                  "telepathy": false,
+                  "terminal_resize_reflow": false,
+                  "terminal_visualization_instructions": false,
+                  "token_budget": false,
+                  "tool_call_mcp_elicitation": false,
+                  "tool_search": false,
+                  "tool_search_always_defer_mcp_tools": false,
+                  "tool_suggest": false,
+                  "transcript_v2": false,
+                  "tui_app_server": false,
+                  "unavailable_dummy_tools": false,
+                  "unbounded_connection_retries": false,
+                  "undo": false,
+                  "unified_exec": false,
+                  "unified_exec_tty": false,
+                  "unified_exec_zsh_fork": false,
+                  "unified_image_budget": false,
+                  "use_agent_identity": false,
+                  "use_legacy_landlock": false,
+                  "use_linux_sandbox_bwrap": false,
+                  "use_xaa": false,
+                  "view_image": false,
+                  "web_search": false,
+                  "web_search_cached": false,
+                  "web_search_request": false,
+                  "windows_sandbox_service": false,
+                  "workspace_dependencies": false,
+                  "workspace_owner_usage_nudge": false,
+                  "worktrees": false,
+                  "write_stdin_approval": false
+                },
+                "model": "gpt-5",
+                "model_provider": "openai",
+                "sandbox_mode": "workspace-write",
+                "web_search": "disabled"
+              },
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            {
+              "config": {},
+              "name": {
+                "file": "/etc/codex/config.toml",
+                "type": "system"
+              },
+              "version": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+            }
+          ],
+          "origins": {
+            "analytics.enabled": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "approval_policy": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.agent_message_board": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.analytics_plan_history": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.api_key_model_discovery": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.apply_patch_freeform": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.apply_patch_preserve_line_endings": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.apply_patch_streaming_events": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.apps": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.apps_mcp_path_override": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.auth_elicitation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.background_paginated_rollout_migration": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.bedrock_setup_wizard": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.browser_use": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.browser_use_external": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.browser_use_full_cdp_access": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.chronicle": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode.enabled": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode_buffered_exec": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode_host": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode_interrupt": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode_only": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.code_mode_prewarm": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.codex_apps_mcp_2026_07_28": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.codex_git_commit": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.codex_hooks": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.collab": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.collaboration_modes": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.compaction_image_budget": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.computer_use": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.concurrent_reasoning_summaries": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.connectors": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.content_item_kinds": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.context_management": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.current_time_reminder": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.cwd_relative_turn_diffs": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.daemon_auto_start": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.default_mode_request_user_input": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.deferred_executor": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.deferred_tool_world_state": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.elevated_windows_sandbox": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.enable_experimental_windows_sandbox": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.enable_fanout": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.enable_mcp_apps": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.enable_request_compression": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.exec_permission_approvals": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.executed_tool_call_metadata": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.executor_capability_discovery": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.experimental_use_unified_exec_tool": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.experimental_windows_sandbox": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.external_agent_memory_import": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.external_migration": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.fast_mode": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.goals": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardian_approval": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardian_enhanced_node_repl_transcripts": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardian_ext": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardian_node_repl_transcript_images": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardian_reuse_parent_compaction": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.guardianv2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.hooks": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.image_detail_original": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.image_generation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.image_resize_notice": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.imagegenext": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.in_app_browser": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.in_app_chat": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.in_app_dictation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.in_app_local_automation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.in_app_updates": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.item_ids": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.js_repl": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.js_repl_tools_only": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.local_thread_store_compression": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.local_thread_store_shared_compression": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.mcp_2026_07_28": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.mcp_oauth_refresh_coordination": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.memories": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.memory_tool": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.mentions_v2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.multi_agent": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.multi_agent_mode": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.multi_agent_v2.enabled": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.network_proxy": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.network_proxy.enabled": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.non_prefixed_mcp_tool_names": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.nonfatal_clock_read_errors": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.omit_app_server_notification_media": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.personality": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.plugin_hooks": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.plugin_sharing": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.plugins": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.powershell_shell_version": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.prevent_idle_sleep": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.psp": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.realtime_conversation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.reasoning_effort_override": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.recommended_plugins": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.remote_compaction_v2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.remote_control": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.remote_models": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.remote_plugin": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.request_permissions": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.request_permissions_tool": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.request_rule": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.resize_all_images": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.respect_system_proxy": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.responses_websockets": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.responses_websockets_v2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.retain_client_developer_messages": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.rollout_budget": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.runtime_metrics": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.search_tool": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.secret_auth_storage": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.send_async_message": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.send_message_to_user_async": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.shell_snapshot": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.shell_snapshot_v2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.shell_tool": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.shell_zsh_fork": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.skill_env_var_dependency_prompt": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.skill_mcp_dependency_install": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.skill_search": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.skip_host_skill_discovery": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.sleep_tool.enabled": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.sqlite": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.standalone_web_search": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.steer": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.step_model_switching": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.system_proxy_fallback": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.telepathy": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.terminal_resize_reflow": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.terminal_visualization_instructions": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.token_budget": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.tool_call_mcp_elicitation": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.tool_search": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.tool_search_always_defer_mcp_tools": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.tool_suggest": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.transcript_v2": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.tui_app_server": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unavailable_dummy_tools": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unbounded_connection_retries": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.undo": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unified_exec": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unified_exec_tty": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unified_exec_zsh_fork": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.unified_image_budget": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.use_agent_identity": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.use_legacy_landlock": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.use_linux_sandbox_bwrap": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.use_xaa": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.view_image": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.web_search": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.web_search_cached": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.web_search_request": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.windows_sandbox_service": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.workspace_dependencies": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.workspace_owner_usage_nudge": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.worktrees": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "features.write_stdin_approval": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "model": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "model_provider": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "sandbox_mode": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            },
+            "web_search": {
+              "name": {
+                "file": "/pilot/home/config.toml",
+                "profile": null,
+                "type": "user"
+              },
+              "version": "sha256:a088e58464a1ea9f7c8736606aa115a8c1cc54898425c9f4b3f6eca01ee14b84"
+            }
+          }
+        }
+      }
+    },
+    {
+      "sent": {
+        "id": 3,
+        "method": "configRequirements/read",
+        "params": {}
+      }
+    },
+    {
+      "received": {
+        "id": 3,
+        "result": {
+          "requirements": null
+        }
+      }
+    }
+  ],
+  "unbound_object_feature_defaults": [
+    "tool_registry"
+  ],
+  "version": "0.156.1"
+}

@@ -1,5 +1,10 @@
 # Complete pilot: exact surfaces and proposed dispositions
 
+Historical inventory. The [current exact table](support-depth-current-pilot-classifications.md)
+accounts for the managed initial/resume routes landed in PR #300 and acquired in PR #301.
+Use it with the [native runtime observation](support-depth-codex-runtime-context.md);
+the historical population counts below do not describe those current routes.
+
 Status: proposal accompanying the [complete policy](support-depth-complete-pilot-policy.md),
 2026-10-25, baseline `1f38133ffc68f4c7a254f05a6ce63b1543f619d3`. PI-P1's30 approved
 initial assignments are preserved separately in the table. Every other proposal requires
