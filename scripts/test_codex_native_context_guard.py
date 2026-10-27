@@ -17,6 +17,29 @@ def exec_line(path, args, environment, result="0"):
 
 
 class NativeContextGuardTests(unittest.TestCase):
+    def test_multi_child_launch_order_uses_complete_timestamps(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'trace.4').write_text('1.000000 '+exec_line('/bin/adapter-observe',[],[])+'\nclone3({}, 88) = 9\nclone3({}, 88) = 12\n')
+            for pid,stamp in [(9,'2.000000 '),(12,'3.000000 ')]:
+                (root/f'trace.{pid}').write_text('chdir('+quoted('/pilot/work')+') = 0\n'+stamp+exec_line('/bin/codex',[],[])+'\n')
+            self.assertEqual([c['pid'] for c in guard.read_trace(root,multiple=True)[0]], [9,12])
+            (root/'trace.12').write_text(exec_line('/bin/codex',[],[])+'\n')
+            with self.assertRaises(ValueError):
+                guard.read_trace(root,multiple=True)
+
+    def test_process_exit_requires_one_final_terminal_record_per_traced_pid(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'trace.4').write_text('+++ exited with 0 +++\n')
+            (root/'trace.5').write_text('+++ killed by SIGKILL +++\n')
+            self.assertEqual(guard.process_exits(root), {'4': {'exit_code': 0}, '5': {'signal': 'SIGKILL'}})
+            for text in ['', '???( <detached ...>\n', '+++ exited with 0 +++\nchdir(',
+                         '+++ exited with 0 +++\n+++ exited with 1 +++\n']:
+                (root/'trace.5').write_text(text)
+                with self.subTest(text=text), self.assertRaises(ValueError):
+                    guard.process_exits(root)
+
     def test_only_exact_approved_native_private_project_config_addition_passes(self):
         before = 'model = "gpt-5"\n'
         self.assertEqual(guard.config_refusals(before, before.encode()), [])
@@ -50,9 +73,44 @@ class NativeContextGuardTests(unittest.TestCase):
                                  case['request']['variant'], case['child']['producer_environment'])
             expected_refusals = guard.config_refusals(report['expected_config_toml'], case['config_after_toml'].encode())
             trace_refusals = ['incomplete_trace'] if case['unresolved_trace_records'] else []
+            if case['process_exits'] is None:
+                trace_refusals.append('incomplete_process_exit')
+            else:
+                self.assertEqual(set(case['process_exits']), {t['file'].split('.')[-1] for t in case['traces']})
             self.assertEqual(case['trace_refusals'], trace_refusals)
             self.assertEqual(case['child_boundary_observed'], not trace_refusals)
             self.assertEqual(case['context_refusals'], expected_refusals + trace_refusals)
+        from observe_codex_adapter_children import validate_chain
+        self.assertEqual([c['request']['variant'] for c in report['session_fixtures']], list(guard.VARIANTS))
+        for case in report['session_fixtures']:
+            stages = validate_chain(case['adapter'], case['request']['variant'])
+            self.assertEqual(len(stages), len(case['children']))
+            self.assertFalse(case['execution_verified'])
+        self.assertEqual([c['request']['variant'] for c in report['cancellation_cases']], list(guard.VARIANTS))
+        for case in report['cancellation_cases']:
+            self.assertFalse(case['execution_verified'])
+
+    def test_failed_seed_cannot_claim_continuation_or_unbound_artifacts(self):
+        from observe_codex_adapter_children import validate_chain
+        from acquire_codex_pilot_protocol import digest
+        import copy
+        bound = digest(b'[]')
+        first = {'selector':'initial-json', 'executed':True, 'source_session_id':None,
+                 'before':[], 'after':[], 'before_sha256':bound, 'after_sha256':bound,
+                 'adapter':{'selector':'initial-json', 'variant':'unattended', 'execution_verified':False,
+                            'status_success':False, 'session_identity_consistent':True, 'session_id':None, 'expected_reply':False},
+                 'state_refusal':'failed seed'}
+        report = {'selector':'session-chain', 'variant':'unattended', 'execution_verified':False,
+                  'live_execution_authorized':False, 'chain_completed':False,
+                  'stages':[first]+[{'selector':s,'executed':False,'reason':'failed seed'} for s in guard.SELECTORS[1:]]}
+        self.assertEqual(validate_chain(report,'unattended'), [('initial-json',None)])
+        for mutate in [lambda r:r.update(chain_completed=True),
+                       lambda r:r['stages'][0].update(before_sha256='foreign'),
+                       lambda r:r['stages'][0].update(state_refusal=None),
+                       lambda r:r['stages'][1].update(executed=True)]:
+            changed=copy.deepcopy(report);mutate(changed)
+            with self.assertRaises(ValueError):
+                validate_chain(changed,'unattended')
 
     def test_initial_context_refuses_foreign_loaders_config_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:

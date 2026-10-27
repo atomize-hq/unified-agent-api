@@ -51,7 +51,23 @@ def parse_exec(line):
             "success": tail == ") = 0", "result": tail[4:]}
 
 
-def read_trace(root):
+def process_exits(root):
+    exits = {}
+    for path in sorted(root.glob("trace.*")):
+        lines = path.read_text().splitlines()
+        terminals = [line for line in lines if re.search(r"\+\+\+ (exited with|killed by) ", line)]
+        if not lines or len(terminals) != 1 or lines[-1] != terminals[0]:
+            raise ValueError("missing or ambiguous final process exit")
+        match = re.fullmatch(r"(?:[0-9]+\.[0-9]+ )?\+\+\+ (?:exited with ([0-9]+)|killed by (SIG[A-Z0-9]+)(?: \(core dumped\))?) \+\+\+", lines[-1])
+        if not match:
+            raise ValueError("malformed final process exit")
+        exits[path.suffix[1:]] = {"exit_code": int(match[1])} if match[1] else {"signal": match[2]}
+    if not exits:
+        raise ValueError("missing process exits")
+    return exits
+
+
+def read_trace(root, multiple=False):
     files = sorted(root.glob("trace.*"))
     if not files or len(files) > 512 or sum(p.stat().st_size for p in files) > LIMIT:
         raise ValueError("missing or oversized trace")
@@ -60,6 +76,11 @@ def read_trace(root):
     for path in files:
         pid, cwd = int(path.suffix[1:]), None
         for number, line in enumerate(path.read_text().splitlines(), 1):
+            original_line = line
+            timestamp = re.match(r"([0-9]+)\.([0-9]{6}) (.*)$", line)
+            time_us = int(timestamp[1]) * 1000000 + int(timestamp[2]) if timestamp else None
+            if timestamp:
+                line = timestamp[3]
             if line.startswith("chdir("):
                 raw, separator, result = line[len("chdir("):].partition(") = ")
                 if not separator:
@@ -73,7 +94,7 @@ def read_trace(root):
             elif line.startswith("fchdir("):
                 raise ValueError("unresolved fd-based cwd")
             elif line.startswith("execve("):
-                events.append(dict(parse_exec(line), pid=pid, cwd=cwd))
+                events.append(dict(parse_exec(line), pid=pid, cwd=cwd, time_us=time_us))
             elif line.startswith(("clone(", "clone3(", "fork(", "vfork(")):
                 match = re.fullmatch(r"(?:clone3?|fork|vfork)\((.*)\) = ([1-9][0-9]*|-1 [A-Z0-9_]+(?: \(.*\))?)", line)
                 if not match or any(token in match[1] for token in ("...", "<", ">")):
@@ -93,7 +114,7 @@ def read_trace(root):
                         raise ValueError("ambiguous child ownership")
                     parents[child] = pid
             elif line and not line.startswith(("--- ", "+++ ")):
-                unresolved.append({"file": path.name, "pid": pid, "line": number, "text": line})
+                unresolved.append({"file": path.name, "pid": pid, "line": number, "text": original_line})
     if not parents.keys() <= traced_pids:
         raise ValueError("missing trace for a successfully spawned process")
     producers = [e for e in events if e["executable"] == "/bin/adapter-observe" and e["success"]]
@@ -102,14 +123,18 @@ def read_trace(root):
     producer = producers[0]
     children = [e for e in events if e["executable"] == "/bin/codex"
                 and parents.get(e["pid"]) == producer["pid"]]
-    if len(children) != 1:
+    if not children or (not multiple and len(children) != 1) or len(children) > 5:
         raise ValueError("missing or ambiguous direct adapter child")
-    child = dict(children[0], parent_pid=producer["pid"], producer_environment=producer["environment"])
-    descendants = [e for e in events if e is not producer and e is not children[0]]
-    return child, descendants, unresolved
+    if multiple:
+        if any(c['time_us'] is None for c in children) or len({c['time_us'] for c in children}) != len(children):
+            raise ValueError("missing or ambiguous chain launch order")
+        children.sort(key=lambda c: c['time_us'])
+    owned = [dict(c, parent_pid=producer["pid"], producer_environment=producer["environment"]) for c in children]
+    descendants = [e for e in events if e is not producer and all(e is not c for c in children)]
+    return (owned if multiple else owned[0]), descendants, unresolved
 
 
-def validate_child(child, selector, variant, producer_environment):
+def validate_child(child, selector, variant, producer_environment, session=SESSION):
     if selector not in SELECTORS or variant not in VARIANTS:
         raise ValueError("unknown fixed request")
     expected_environment = dict(producer_environment, CODEX_BINARY="/bin/codex", RUST_LOG="error")
@@ -126,7 +151,7 @@ def validate_child(child, selector, variant, producer_environment):
         expected = ["/bin/codex"] + prefix + ["exec", "--color", "never", "--skip-git-repo-check",
                                                "--json", "--output-last-message", "<private-output>"]
         if selector.startswith("resume"):
-            expected += ["resume"] + (["--last"] if "-last-" in selector else [SESSION]) + ["-"]
+            expected += ["resume"] + (["--last"] if "-last-" in selector else [session]) + ["-"]
     actual = list(child["argv"])
     if "--output-last-message" in actual:
         index = actual.index("--output-last-message") + 1

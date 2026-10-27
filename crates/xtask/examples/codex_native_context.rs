@@ -1,5 +1,8 @@
 //! Offline observer driver. Use only through scripts/observe_codex_adapter_children.py.
 //! Native execution failures are observations, never successful obligation verdicts.
+#[path = "codex_native_context/fixture.rs"]
+mod fixture;
+
 use agent_api::{
     backends::codex::{CodexBackend, CodexBackendConfig},
     AgentWrapperBackend, AgentWrapperRunRequest,
@@ -9,7 +12,11 @@ use serde_json::{json, Value};
 use std::{collections::BTreeMap, time::Duration};
 use xtask::support_depth::codex_pilot::{decode_route, PilotTransport};
 
-fn extensions(selector: &str, variant: &str) -> Result<BTreeMap<String, Value>, String> {
+fn extensions(
+    selector: &str,
+    variant: &str,
+    session: &str,
+) -> Result<BTreeMap<String, Value>, String> {
     let mut result = BTreeMap::new();
     match selector {
         "initial-json" => {}
@@ -22,7 +29,7 @@ fn extensions(selector: &str, variant: &str) -> Result<BTreeMap<String, Value>, 
             let value = if selector.contains("-last-") {
                 json!({"selector":"last"})
             } else {
-                json!({"selector":"id","id":"11111111-1111-4111-8111-111111111111"})
+                json!({"selector":"id","id":session})
             };
             result.insert(key.into(), value);
         }
@@ -59,7 +66,32 @@ async fn main() -> Result<(), String> {
     {
         return Err("requires private producer context".into());
     }
-    let extensions = extensions(&args[0], &args[1])?;
+    let result = if args[0] == "session-chain" {
+        fixture::run(&args[1]).await?
+    } else {
+        let cancel = args[0] == "cancel-initial-json";
+        let selector = if cancel { "initial-json" } else { &args[0] };
+        observe(
+            selector,
+            &args[1],
+            "11111111-1111-4111-8111-111111111111",
+            cancel,
+            Duration::from_secs(3),
+        )
+        .await?
+    };
+    println!("{result}");
+    Ok(())
+}
+
+async fn observe(
+    selector: &str,
+    variant: &str,
+    session: &str,
+    cancel_on_session: bool,
+    timeout: Duration,
+) -> Result<Value, String> {
+    let extensions = extensions(selector, variant, session)?;
     let route = decode_route(&extensions, true)?;
     let backend = CodexBackend::new(CodexBackendConfig {
         binary: Some("/bin/codex".into()),
@@ -69,42 +101,105 @@ async fn main() -> Result<(), String> {
         ..Default::default()
     });
     let request = AgentWrapperRunRequest {
-        prompt: "Reply with ok.".into(),
-        timeout: Some(Duration::from_secs(3)),
+        prompt: "Reply with exactly the text: ok.".into(),
+        timeout: Some(timeout),
         extensions,
         ..Default::default()
     };
     let mut event_count = 0;
-    let outcome = match backend.run(request).await {
+    let mut session_id = None;
+    let mut consistent = true;
+    let mut cancel_requested = false;
+    let mut status_success = false;
+    let mut expected_reply = false;
+    let run = if cancel_on_session {
+        backend
+            .run_control(request)
+            .await
+            .map(|control| (control.handle, Some(control.cancel)))
+    } else {
+        backend.run(request).await.map(|handle| (handle, None))
+    };
+    let outcome = match run {
         Err(error) => json!({"phase":"request","error":error.to_string()}),
-        Ok(run) => {
+        Ok((run, cancel)) => {
             let events = async {
                 let mut stream = run.events;
-                while stream.next().await.is_some() {
+                while let Some(event) = stream.next().await {
                     event_count += 1;
+                    bind_session(event.data.as_ref(), &mut session_id, &mut consistent);
+                    if cancel_on_session && session_id.is_some() && !cancel_requested {
+                        cancel.as_ref().expect("owned cancellation handle").cancel();
+                        cancel_requested = true;
+                    }
                 }
             };
             let (_, completion) = tokio::join!(events, run.completion);
             match completion {
                 Ok(completion) => {
+                    bind_session(completion.data.as_ref(), &mut session_id, &mut consistent);
+                    status_success = completion.status.success();
+                    expected_reply = completion.final_text.as_deref().map(str::trim) == Some("ok.");
                     json!({"phase":"completion","status_success":completion.status.success()})
                 }
                 Err(error) => json!({"phase":"completion","error":error.to_string()}),
             }
         }
     };
-    println!(
-        "{}",
-        json!({"selector":route.selector,"variant":args[1],
+    Ok(json!({"selector":route.selector,"variant":variant,
         "transport":match route.transport {PilotTransport::Exec=>"exec",PilotTransport::AppServer=>"app-server"},
-        "event_count":event_count,"outcome":outcome,"execution_verified":false})
-    );
-    Ok(())
+        "event_count":event_count,"outcome":outcome,"status_success":status_success,
+        "session_id":session_id,"session_identity_consistent":consistent,"expected_reply":expected_reply,
+        "cancel_requested":cancel_requested,"timeout_seconds":timeout.as_secs(),"execution_verified":false}))
+}
+
+fn bind_session(data: Option<&Value>, session: &mut Option<String>, consistent: &mut bool) {
+    let Some(data) = data.filter(|data| {
+        data.get("schema").and_then(Value::as_str) == Some("agent_api.session.handle.v1")
+    }) else {
+        return;
+    };
+    let id = data
+        .get("session")
+        .and_then(|value| value.get("id"))
+        .and_then(Value::as_str);
+    match id.filter(|id| fixture::valid_id(id)) {
+        Some(id) if session.as_deref().map_or(true, |old| old == id) => {
+            *session = Some(id.into());
+        }
+        _ => {
+            *consistent = false;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn session_facets_require_consistent_native_ids() {
+        let mut id = None;
+        let mut consistent = true;
+        let facet = |id: &str| json!({"schema":"agent_api.session.handle.v1","session":{"id":id}});
+        bind_session(
+            Some(&facet("aaaaaaaa-1111-4111-8111-111111111111")),
+            &mut id,
+            &mut consistent,
+        );
+        assert!(consistent);
+        assert!(id.is_some());
+        bind_session(
+            Some(&facet("bbbbbbbb-1111-4111-8111-111111111111")),
+            &mut id,
+            &mut consistent,
+        );
+        assert!(!consistent);
+        let mut missing = None;
+        let mut valid = true;
+        bind_session(Some(&facet("not-a-session")), &mut missing, &mut valid);
+        assert!(!valid);
+        assert!(missing.is_none());
+    }
     #[test]
     fn fixed_requests_match_all_production_route_variants_and_reject_unknowns() {
         for selector in [
@@ -115,7 +210,11 @@ mod tests {
             "fork-id-stdio",
         ] {
             for variant in ["unattended", "interactive", "external"] {
-                let route = decode_route(&extensions(selector, variant).unwrap(), true).unwrap();
+                let route = decode_route(
+                    &extensions(selector, variant, "11111111-1111-4111-8111-111111111111").unwrap(),
+                    true,
+                )
+                .unwrap();
                 assert_eq!(route.selector, selector);
                 assert_eq!(
                     route.transport == PilotTransport::AppServer,
@@ -123,7 +222,7 @@ mod tests {
                 );
             }
         }
-        assert!(extensions("unknown", "unattended").is_err());
-        assert!(extensions("initial-json", "unknown").is_err());
+        assert!(extensions("unknown", "unattended", "unused").is_err());
+        assert!(extensions("initial-json", "unknown", "unused").is_err());
     }
 }

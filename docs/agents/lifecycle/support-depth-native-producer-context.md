@@ -2,7 +2,7 @@
 
 Baseline: staging `80c3555ebdf70e0218fe5c33008d98a294e013e9` (PR #302).
 This is the first native-producer increment: a fixed offline context and observations
-of actual production adapter spawns. It creates no packet P/O/E, classification
+of actual production adapter spawns. The session-fixture extension is described below. It creates no packet P/O/E, classification
 assignment, writer profile, qualification or production enrollment.
 
 ## What runs
@@ -49,7 +49,7 @@ An extra option, foreign environment key/home/log/binary, output escape or route
 refuses. This postcondition detects SDK drift **after private execution**; it is not a
 pre-spawn security boundary for ordinary callers or maintenance-writer admission.
 
-The SDK has its ordinary three-second owned timeout; the outer namespace has a 20-second
+The ordinary boundary audit has a three-second owned timeout; its outer namespace has a 20-second
 deadline and is killed/reaped on overrun. Startup/session/output mutations are inventoried
 with file digests, modes, directory types and symlink targets. Observer trace files are
 recorded separately and excluded from native mutation attribution. Changed controlled
@@ -109,16 +109,12 @@ state ids, private output names, process ids and outcomes may vary; this is an a
 not deterministic execution evidence. No live-model credentials should be supplied.
 
 The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
-captures all 15 cases: 6 exec and 9 app-server spawns. Parsed direct-child records matched
-the finite invocation/environment checks. Nine cases have complete trace input; six
-retain unknown detached thread syscall records and `incomplete_trace`, so receive no
-complete child-boundary credit. These are resume-last interactive, resume-id unattended/
-external, fork-last external and fork-id unattended/interactive. Five cases changed private project trust config
-by the exact approved addition; all other config drift remains refused. Descendant attempts
-to run git/getconf/lsb_release all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
-errors and unsuccessful completion statuses remain outcomes, not verified execution.
-The audit source commit/tree and launch hashes are recorded; later documentation/test/data
-commits do not turn this historical audit into evidence for another packet or source revision.
+is refreshed from a clean source revision; its source/tree and measured helper hashes identify
+that observation. The [fixture readiness extension](support-depth-native-execution-fixture.md)
+adds explicit per-process exit coverage, session-state bindings and cancellation observations.
+The original PR #303 capture remains in Git at `9966b2f2`; it had nine complete and six
+incomplete cases, all retained honestly. The new collector does not reinterpret those results.
+Later documentation/test/data commits do not turn an audit into evidence for another packet.
 
 The [depth contract](../../specs/support-depth-contract.md#obligation-templates) and
 [evidence contract](../../specs/support-depth-evidence-v1.md) still control classification,
