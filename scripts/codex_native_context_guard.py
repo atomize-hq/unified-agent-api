@@ -8,6 +8,13 @@ LIMIT = 2 * 1024 * 1024
 SELECTORS = ("initial-json", "resume-last-json", "resume-id-json", "fork-last-stdio", "fork-id-stdio")
 VARIANTS = ("unattended", "interactive", "external")
 SESSION = "11111111-1111-4111-8111-111111111111"
+PRIVATE_PROJECT_TRUST = '\n[projects."/pilot/work"]\ntrust_level = "trusted"\n'
+
+
+def config_refusals(before, after):
+    # Maintainer approved exactly this native addition for the owned private fixture.
+    # Whole bytes are compared: no other project, value, reformat or base change passes.
+    return [] if after in (before.encode(), (before + PRIVATE_PROJECT_TRUST).encode()) else ["controlled_config_drift"]
 
 
 def parse_exec(line):

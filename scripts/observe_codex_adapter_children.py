@@ -17,7 +17,7 @@ import tempfile
 from acquire_codex_pilot_protocol import BINARY_SHA256, digest
 from observe_codex_pilot_context import PROTOCOL, PROTOCOL_SHA256, expected_config, namespace_command
 from codex_native_context_guard import (LIMIT, SELECTORS, VARIANTS, initial_files, read_trace,
-                                        source_binding, validate_child, validate_initial_root)
+                                        source_binding, validate_child, validate_initial_root, config_refusals)
 
 BASELINE = "cli_manifests/codex/reports/0.156.1/pilot-runtime-context.json"
 BASELINE_SHA256 = "fa355ec4e9f841e1a9ecb236e688771c0884be344ecb3936feb8c64bc0d410cf"
@@ -120,7 +120,7 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
             raise ValueError("native config exceeds observation limit")
         # Retain negative observations. A changed config cannot become a passed
         # context merely because the adapter's initial execve matched.
-        refusals = [] if config_after == config.encode() else ["controlled_config_drift"]
+        refusals = config_refusals(config, config_after)
         traces = [{"file": path.name, "sha256": file_digest(path), "bytes": path.stat().st_size}
                   for path in sorted((root / "trace").glob("trace.*"))]
         if raw_traces is not None:

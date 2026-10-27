@@ -17,6 +17,18 @@ def exec_line(path, args, environment, result="0"):
 
 
 class NativeContextGuardTests(unittest.TestCase):
+    def test_only_exact_approved_native_private_project_config_addition_passes(self):
+        before = 'model = "gpt-5"\n'
+        self.assertEqual(guard.config_refusals(before, before.encode()), [])
+        approved = (before + guard.PRIVATE_PROJECT_TRUST).encode()
+        self.assertEqual(guard.config_refusals(before, approved), [])
+        for changed in [approved.replace(b'/pilot/work', b'/host/project'),
+                        approved.replace(b'"trusted"', b'"untrusted"'),
+                        approved + b'\nextra = true\n',
+                        approved.replace(b'gpt-5', b'foreign-model'),
+                        approved.replace(b'trust_level =', b'trust_level=')]:
+            self.assertEqual(guard.config_refusals(before, changed), ['controlled_config_drift'])
+
     def test_recorded_native_audit_accounts_for_all_cases_and_grants_no_execution(self):
         from acquire_codex_pilot_protocol import digest
         root = Path(__file__).resolve().parents[1]
@@ -36,7 +48,7 @@ class NativeContextGuardTests(unittest.TestCase):
             self.assertFalse(case['context_complete'])
             guard.validate_child(case['child'], case['request']['selector'],
                                  case['request']['variant'], case['child']['producer_environment'])
-            expected_refusals = [] if case['config_after_toml'] == report['expected_config_toml'] else ['controlled_config_drift']
+            expected_refusals = guard.config_refusals(report['expected_config_toml'], case['config_after_toml'].encode())
             self.assertEqual(case['context_refusals'], expected_refusals)
 
     def test_initial_context_refuses_foreign_loaders_config_and_symlinks(self):

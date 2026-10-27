@@ -51,8 +51,9 @@ The SDK has its ordinary three-second owned timeout; the outer namespace has a20
 deadline and is killed/reaped on overrun. Startup/session/output mutations are inventoried
 with file digests, modes, directory types and symlink targets. Observer trace files are
 recorded separately and excluded from native mutation attribution. Changed controlled
-config is retained as an explicit context refusal alongside the observed spawn, never
-as a passed context. The post-run config bytes are recorded for review.
+config outside the exact approved native addition below is retained as an explicit context
+refusal alongside the observed spawn. The post-run config bytes are recorded for review;
+a passing config postcondition is not a complete context or execution verdict.
 
 The existing approved context decisions remain in force: preserve native feature values
 (including six reported true despite false config), and inventory pinned native startup
@@ -77,10 +78,11 @@ native command/sandbox behavior, provider/auth/default/loader semantics, indepen
 adequacy/adoption and the full allowed/denied regimes remain required.
 
 The private Git fixture also exposes a native config mutation: Codex can append
-`[projects."/pilot/work"]` with `trust_level = "trusted"`. A request to allow only
-that exact addition was submitted to the maintainer. Until explicitly approved and
-implemented as a byte-exact postcondition, it remains `controlled_config_drift`; no
-generic config write, other project or host trust is approved by the audit.
+`[projects."/pilot/work"]` with `trust_level = "trusted"`. The maintainer explicitly
+approved only that exact native addition in this task. The byte-exact postcondition accepts
+unchanged config or the original bytes plus that exact stanza. Other project paths, trust
+values, extra keys, base changes or reformatting remain `controlled_config_drift`. This
+does not authorize live calls, skill execution, host/user project trust or a generic config write.
 
 Individual207 classification edges remain proposals. The existing53 operation/obligation/
 target template baseline is unchanged, and is not53 test cases. Packet binding is explicitly
@@ -107,7 +109,7 @@ not deterministic execution evidence. No live-model credentials should be suppli
 The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
 captures all15 cases:6 exec and9 app-server spawns. All complete child boundaries matched
 the finite invocation/environment checks. Five cases changed private project trust config
-and retain explicit context refusals. Descendant attempts to run git/getconf/lsb_release
+by the exact approved addition; all other config drift remains refused. Descendant attempts to run git/getconf/lsb_release
 all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
 errors and unsuccessful completion statuses remain outcomes, not verified execution.
 The audit source commit/tree and launch hashes are recorded; later documentation/test/data
