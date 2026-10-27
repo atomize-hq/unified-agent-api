@@ -1829,6 +1829,7 @@ name = "xtask"
 version = "0.3.7"
 dependencies = [
  "clap",
+ "futures-util",
  "hex",
  "jsonschema",
  "proc-macro2",
@@ -1842,6 +1843,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "time",
+ "tokio",
  "toml_edit",
  "unified-agent-api",
  "unified-agent-api-claude-code",
