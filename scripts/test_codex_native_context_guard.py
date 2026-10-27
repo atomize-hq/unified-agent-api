@@ -17,6 +17,28 @@ def exec_line(path, args, environment, result="0"):
 
 
 class NativeContextGuardTests(unittest.TestCase):
+    def test_recorded_native_audit_accounts_for_all_cases_and_grants_no_execution(self):
+        from acquire_codex_pilot_protocol import digest
+        root = Path(__file__).resolve().parents[1]
+        report = json.loads((root/'cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json').read_text())
+        pairs = [(c['request']['selector'], c['request']['variant']) for c in report['cases']]
+        self.assertEqual(len(pairs), 15)
+        self.assertEqual(set(pairs), {(s, v) for s in guard.SELECTORS for v in guard.VARIANTS})
+        self.assertIsNone(report['packet_binding'])
+        self.assertFalse(report['execution_verified'])
+        self.assertFalse(report['context_complete'])
+        for name in ['codex_native_context_guard.py', 'observe_codex_adapter_children.py',
+                     'observe_codex_pilot_context.py', 'acquire_codex_pilot_protocol.py']:
+            self.assertEqual(report['input_sha256']['scripts/'+name], digest((root/'scripts'/name).read_bytes()))
+        for case in report['cases']:
+            self.assertFalse(case['execution_verified'])
+            self.assertFalse(case['adapter']['execution_verified'])
+            self.assertFalse(case['context_complete'])
+            guard.validate_child(case['child'], case['request']['selector'],
+                                 case['request']['variant'], case['child']['producer_environment'])
+            expected_refusals = [] if case['config_after_toml'] == report['expected_config_toml'] else ['controlled_config_drift']
+            self.assertEqual(case['context_refusals'], expected_refusals)
+
     def test_initial_context_refuses_foreign_loaders_config_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

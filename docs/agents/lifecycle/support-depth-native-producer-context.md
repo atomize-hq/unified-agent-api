@@ -104,6 +104,19 @@ trace paths should be outside tracked source (or in ignored private scratch). Fi
 state ids, private output names, process ids and outcomes may vary; this is an audit capture,
 not deterministic execution evidence. No live-model credentials should be supplied.
 
+The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
+captures all15 cases:6 exec and9 app-server spawns. All complete child boundaries matched
+the finite invocation/environment checks. Five cases changed private project trust config
+and retain explicit context refusals. Descendant attempts to run git/getconf/lsb_release
+all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
+errors and unsuccessful completion statuses remain outcomes, not verified execution.
+The audit source commit/tree and launch hashes are recorded; later documentation/test/data
+commits do not turn this historical audit into evidence for another packet or source revision.
+
+The [depth contract](../../specs/support-depth-contract.md#obligation-templates) and
+[evidence contract](../../specs/support-depth-evidence-v1.md) still control classification,
+currentness, adequacy and adoption. This producer increment grants none of those authorities.
+
 Next: finish remaining positive-context prerequisites, then capture actual native turn and
 interaction cases through production adapters, with separate live-call authorization,
 packet binding, independent adequacy and authenticated adoption. Install only reviewed
