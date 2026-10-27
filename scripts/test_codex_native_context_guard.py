@@ -65,12 +65,13 @@ class NativeContextGuardTests(unittest.TestCase):
         for name in ['codex_native_context_guard.py', 'observe_codex_adapter_children.py',
                      'observe_codex_pilot_context.py', 'acquire_codex_pilot_protocol.py']:
             self.assertEqual(report['input_sha256']['scripts/'+name], digest((root/'scripts'/name).read_bytes()))
-        for case in report['cases']:
+        for case in report['cases'] + report['session_fixtures'] + report['cancellation_cases']:
             self.assertFalse(case['execution_verified'])
             self.assertFalse(case['adapter']['execution_verified'])
             self.assertFalse(case['context_complete'])
-            guard.validate_child(case['child'], case['request']['selector'],
-                                 case['request']['variant'], case['child']['producer_environment'])
+            if case['request']['scenario'] != 'session-chain':
+                guard.validate_child(case['child'], case['request']['selector'],
+                                     case['request']['variant'], case['child']['producer_environment'])
             expected_refusals = guard.config_refusals(report['expected_config_toml'], case['config_after_toml'].encode())
             trace_refusals = ['incomplete_trace'] if case['unresolved_trace_records'] else []
             if case['process_exits'] is None:
@@ -85,10 +86,16 @@ class NativeContextGuardTests(unittest.TestCase):
         for case in report['session_fixtures']:
             stages = validate_chain(case['adapter'], case['request']['variant'])
             self.assertEqual(len(stages), len(case['children']))
+            for (selector, session), child in zip(stages, case['children']):
+                guard.validate_child(child, selector, case['request']['variant'],
+                                     child['producer_environment'], session or guard.SESSION)
             self.assertFalse(case['execution_verified'])
         self.assertEqual([c['request']['variant'] for c in report['cancellation_cases']], list(guard.VARIANTS))
         for case in report['cancellation_cases']:
             self.assertFalse(case['execution_verified'])
+            if case['adapter']['cancel_requested']:
+                self.assertEqual(case['adapter']['outcome'].get('error'), 'backend error: cancelled')
+                self.assertFalse(case['adapter']['status_success'])
 
     def test_failed_seed_cannot_claim_continuation_or_unbound_artifacts(self):
         from observe_codex_adapter_children import validate_chain

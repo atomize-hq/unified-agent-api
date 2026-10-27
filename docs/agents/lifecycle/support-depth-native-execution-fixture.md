@@ -67,6 +67,22 @@ These postconditions observe private execution. They do not establish a general 
 security boundary, evidence authentication, independent adequacy or successful model execution.
 All `context_complete`/`execution_verified` flags remain false and packet binding remains null.
 
+## Recorded offline result
+
+The [refreshed audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
+records source `69fae8a658e012d66027592cc1b8c2b8e7331356` and all 21 cases. All 992 traced
+PIDs have final exit/signal records. Sixteen cases have complete child-boundary observations;
+five retain unknown syscall records and `incomplete_trace`: resume-last interactive, resume-id
+external, fork-last unattended and fork-id unattended/external. The earlier comparison and
+pre-repair capture remain private review records; no sample is retried into passing credit.
+
+All three session-chain attempts timed out at their initial seed and record the other four
+steps as unrun. No seed or successful continuation/fork is claimed. All three cancellation
+cases observed a native session ID, requested cancellation through the public handle and
+received the cancelled completion. These are observations of this private offline fixture,
+not per-tuple adequacy or qualification. Eleven exact approved private-project config additions
+were inventoried; every other config mutation remains refused.
+
 ## Remaining runtime facts
 
 Provider `openai`, model `gpt-5`, the full controlled config and credential absence are bound input
