@@ -322,6 +322,19 @@ mapping completeness or approve a partial value regime through rationale text. A
 remains `classification_required`; absence of both optional members preserves old v1 bytes and
 identities and supplies no per-unit classification authority. Present rows retain declaration order.
 
+The separate, read-only Codex0.156.1 pilot diagnostic MAY interpret the five fixed typed
+selector/path/mode triples described in the
+[route-aware readiness scope](../agents/lifecycle/support-depth-codex-pilot-readiness.md).
+It MUST require the complete initial/resume/fork mapping and bind ancestor exec surfaces for
+resume, app-server surfaces for managed initial/resume, protocol/config acquisition and the
+complete participating implementation source in each operation basis. The structural row-ownership
+validator MAY admit those supplemental paths only under that complete fixed diagnostic declaration;
+this does not change generic exact-path ownership. It MUST
+preserve unresolved units and missing runtime-context/evidence requirements. This diagnostic
+exception grants no freeze-writer, closeout, promotion, profile or qualification authority.
+Generic resolution and currentness consumers MUST retain their existing refusals for that scope.
+No extra declaration fields or alternate approved classification inventory are introduced.
+
 The first classified intake supports one exact mode and target. Newly supported predicate or
 per-unit intake refuses mapped operation selections, including on true acquisition absence, until
 complete flow policy is separately implemented and reviewed. Legacy predicate-free/field-absent

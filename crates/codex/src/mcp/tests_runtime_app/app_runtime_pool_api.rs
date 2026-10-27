@@ -34,6 +34,7 @@ async fn app_runtime_pool_api_reuses_and_restarts_stdio() {
         code_home: Some(code_home.clone()),
         current_dir: None,
         env: vec![
+            ("PATH".into(), env!("PATH").into()),
             (OsString::from("APP_POOL_ENV"), OsString::from("default")),
             (OsString::from("POOL_ONLY"), OsString::from("base")),
         ],
@@ -223,7 +224,7 @@ async fn app_runtime_pool_api_stop_all_shuts_down_runtimes() {
         binary: server_path.clone(),
         code_home: Some(code_home.clone()),
         current_dir: None,
-        env: Vec::new(),
+        env: vec![("PATH".into(), env!("PATH").into())],
         app_server_analytics_default_enabled: false,
         mirror_stdio: false,
         startup_timeout: Duration::from_secs(3),

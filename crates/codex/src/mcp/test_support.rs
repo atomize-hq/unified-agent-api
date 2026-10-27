@@ -371,7 +371,9 @@ pub(super) fn test_config(binary: PathBuf) -> StdioServerConfig {
         binary,
         code_home: None,
         current_dir: None,
-        env: Vec::new(),
+        // Sibling capability probes replace process PATH. Fixture Python lookup belongs to
+        // this child, and must not depend on whichever probe is running concurrently.
+        env: vec![("PATH".into(), env!("PATH").into())],
         app_server_analytics_default_enabled: false,
         mirror_stdio: false,
         startup_timeout: Duration::from_secs(5),

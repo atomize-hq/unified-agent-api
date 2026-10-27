@@ -183,10 +183,13 @@ async fn app_runtime_lifecycle_starts_and_stops_without_mutation() {
         binary: server_path.clone(),
         code_home: Some(code_home.clone()),
         current_dir: None,
-        env: vec![(
-            OsString::from("APP_RUNTIME_LIFECYCLE"),
-            OsString::from("default"),
-        )],
+        env: vec![
+            ("PATH".into(), env!("PATH").into()),
+            (
+                OsString::from("APP_RUNTIME_LIFECYCLE"),
+                OsString::from("default"),
+            ),
+        ],
         app_server_analytics_default_enabled: false,
         mirror_stdio: false,
         startup_timeout: Duration::from_secs(3),

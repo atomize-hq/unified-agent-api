@@ -4,6 +4,9 @@
 //! is one the manifest root lists, and everything else that policy resolution needs a second
 //! input for, is not decided here.
 
+#[path = "support_depth/pilot_scope.rs"]
+pub(crate) mod pilot_scope;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -152,6 +155,12 @@ impl DepthEnrollmentDeclaration {
                     && row.surface.command_path == agent_id;
                 if row.surface.command_path.split(' ').next() != Some(agent_id)
                     || (!global
+                        && !pilot_scope::owns_supplemental_surface(
+                            agent_id,
+                            self,
+                            operation,
+                            &row.surface,
+                        )
                         && !self.modes.iter().any(|mode| {
                             operation.serves.contains(&mode.selector)
                                 && mode.command_path == row.surface.command_path
