@@ -49,7 +49,10 @@ class NativeContextGuardTests(unittest.TestCase):
             guard.validate_child(case['child'], case['request']['selector'],
                                  case['request']['variant'], case['child']['producer_environment'])
             expected_refusals = guard.config_refusals(report['expected_config_toml'], case['config_after_toml'].encode())
-            self.assertEqual(case['context_refusals'], expected_refusals)
+            trace_refusals = ['incomplete_trace'] if case['unresolved_trace_records'] else []
+            self.assertEqual(case['trace_refusals'], trace_refusals)
+            self.assertEqual(case['child_boundary_observed'], not trace_refusals)
+            self.assertEqual(case['context_refusals'], expected_refusals + trace_refusals)
 
     def test_initial_context_refuses_foreign_loaders_config_and_symlinks(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -140,13 +143,50 @@ class NativeContextGuardTests(unittest.TestCase):
             root = Path(temp)
             (root/'trace.4').write_text(exec_line('/bin/adapter-observe', ['/bin/adapter-observe'], [])+'\nclone3({flags=CLONE_VM|CLONE_VFORK}, 88) = 5\n')
             (root/'trace.5').write_text('chdir('+quoted('/pilot/work')+') = 0\n'+exec_line('/bin/codex', ['/bin/codex'], [])+'\n')
-            child, descendants = guard.read_trace(root)
+            child, descendants, unresolved = guard.read_trace(root)
             self.assertEqual(child['pid'], 5)
             self.assertEqual(child['parent_pid'], 4)
             self.assertEqual(descendants, [])
+            self.assertEqual(unresolved, [])
             (root/'trace.4').write_text(exec_line('/bin/adapter-observe', ['/bin/adapter-observe'], [])+'\n')
             with self.assertRaises(ValueError):
                 guard.read_trace(root)
+
+    def test_incomplete_ownership_or_cwd_records_cannot_establish_a_boundary(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            producer = exec_line('/bin/adapter-observe', ['/bin/adapter-observe'], [])+'\n'
+            clone = 'clone3({flags=CLONE_VM|CLONE_VFORK}, 88) = 5\n'
+            cwd = 'chdir('+quoted('/pilot/work')+') = 0\n'
+            child = exec_line('/bin/codex', ['/bin/codex'], [])+'\n'
+            (root/'trace.5').write_text(cwd+child)
+            for extra in ['clone3({flags=CLONE_VM',
+                          'clone3({flags=CLONE_VM...}, 88) = 6',
+                          'clone3({flags=CLONE_VM}, 88) = 6']:
+                (root/'trace.4').write_text(producer+clone+extra+'\n')
+                with self.subTest(extra=extra), self.assertRaises(ValueError):
+                    guard.read_trace(root)
+            (root/'trace.4').write_text(producer+clone)
+            for transition in ['chdir('+quoted('/outside')+') = ?',
+                               'chdir('+quoted('/outside')+' <unfinished ...>',
+                               'fchdir(9) = 0']:
+                (root/'trace.5').write_text(cwd+transition+'\n'+child)
+                with self.subTest(transition=transition), self.assertRaises(ValueError):
+                    guard.read_trace(root)
+            (root/'trace.5').write_text(cwd+'chdir('+quoted('/absent')+') = -1 ENOENT\n'+child)
+            self.assertEqual(guard.read_trace(root)[0]['cwd'], '/pilot/work')
+
+    def test_unknown_detached_syscall_is_retained_as_incomplete_input(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'trace.4').write_text(exec_line('/bin/adapter-observe', ['/bin/adapter-observe'], [])+'\nclone3({flags=CLONE_VM|CLONE_VFORK}, 88) = 5\n')
+            (root/'trace.5').write_text('chdir('+quoted('/pilot/work')+') = 0\n'+exec_line('/bin/codex', ['/bin/codex'], [])+'\nclone(child_stack=NULL, flags=CLONE_THREAD|CLONE_FS) = 6\n')
+            (root/'trace.6').write_text('???( <detached ...>\n')
+            child, descendants, unresolved = guard.read_trace(root)
+            self.assertEqual(child['pid'], 5)
+            self.assertEqual(descendants, [])
+            self.assertEqual(unresolved, [{'file': 'trace.6', 'pid': 6, 'line': 1,
+                                          'text': '???( <detached ...>'}])
 
 
 if __name__ == '__main__':

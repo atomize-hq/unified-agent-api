@@ -110,7 +110,7 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
         if (result.get("selector") != selector or result.get("variant") != variant
                 or result.get("transport") != transport or result.get("execution_verified") is not False):
             raise ValueError("producer returned another request or unsupported execution claim")
-        child, descendants = read_trace(root / "trace")
+        child, descendants, unresolved = read_trace(root / "trace")
         if child["producer_environment"] != environment:
             raise ValueError("producer inherited an unbound environment")
         validate_child(child, selector, variant, environment)
@@ -120,7 +120,8 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
             raise ValueError("native config exceeds observation limit")
         # Retain negative observations. A changed config cannot become a passed
         # context merely because the adapter's initial execve matched.
-        refusals = config_refusals(config, config_after)
+        trace_refusals = ["incomplete_trace"] if unresolved else []
+        refusals = config_refusals(config, config_after) + trace_refusals
         traces = [{"file": path.name, "sha256": file_digest(path), "bytes": path.stat().st_size}
                   for path in sorted((root / "trace").glob("trace.*"))]
         if raw_traces is not None:
@@ -132,7 +133,8 @@ def run_case(bwrap, binary, driver, tracer, libraries, config, selector, variant
                 "child": child, "descendant_exec_attempts": descendants,
                 "before": before, "after": native_manifest(root), "traces": traces,
                 "config_after_toml": config_after.decode(), "context_refusals": refusals,
-                "diagnostics": stderr.decode(errors="replace"), "child_boundary_observed": True,
+                "unresolved_trace_records": unresolved, "trace_refusals": trace_refusals,
+                "diagnostics": stderr.decode(errors="replace"), "child_boundary_observed": not unresolved,
                 "context_complete": False, "execution_verified": False}
 
 

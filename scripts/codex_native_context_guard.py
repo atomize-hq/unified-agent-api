@@ -55,25 +55,47 @@ def read_trace(root):
     files = sorted(root.glob("trace.*"))
     if not files or len(files) > 512 or sum(p.stat().st_size for p in files) > LIMIT:
         raise ValueError("missing or oversized trace")
-    events, parents = [], {}
+    events, parents, unresolved = [], {}, []
+    traced_pids = {int(path.suffix[1:]) for path in files}
     for path in files:
         pid, cwd = int(path.suffix[1:]), None
-        for line in path.read_text().splitlines():
-            if line.startswith("chdir(") and line.endswith(") = 0"):
-                raw = line[len("chdir("):-len(") = 0")]
-                # Reuse the strict byte decoder for the cwd string too.
-                cwd = parse_exec(f"execve({raw}, [], []) = 0")["executable"]
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if line.startswith("chdir("):
+                raw, separator, result = line[len("chdir("):].partition(") = ")
+                if not separator:
+                    raise ValueError("incomplete cwd transition")
+                # Reuse the strict byte/result decoder, including failed chdir calls.
+                transition = parse_exec(f"execve({raw}, [], []) = {result}")
+                if transition["success"]:
+                    cwd = transition["executable"]
+                    if not cwd.startswith("/"):
+                        raise ValueError("unresolved relative cwd transition")
             elif line.startswith("fchdir("):
                 raise ValueError("unresolved fd-based cwd")
             elif line.startswith("execve("):
                 events.append(dict(parse_exec(line), pid=pid, cwd=cwd))
             elif line.startswith(("clone(", "clone3(", "fork(", "vfork(")):
-                match = re.search(r"\) = ([0-9]+)$", line)
-                if match:
-                    child = int(match[1])
+                match = re.fullmatch(r"(?:clone3?|fork|vfork)\((.*)\) = ([1-9][0-9]*|-1 [A-Z0-9_]+(?: \(.*\))?)", line)
+                if not match or any(token in match[1] for token in ("...", "<", ">")):
+                    raise ValueError("incomplete process ownership record")
+                stack = []
+                for char in match[1]:
+                    if char in "([{":
+                        stack.append(char)
+                    elif char in ")]}":
+                        if not stack or stack.pop() != {")": "(", "]": "[", "}": "{"}[char]:
+                            raise ValueError("malformed process ownership arguments")
+                if stack:
+                    raise ValueError("incomplete process ownership arguments")
+                if not match[2].startswith("-1 "):
+                    child = int(match[2])
                     if child in parents:
                         raise ValueError("ambiguous child ownership")
                     parents[child] = pid
+            elif line and not line.startswith(("--- ", "+++ ")):
+                unresolved.append({"file": path.name, "pid": pid, "line": number, "text": line})
+    if not parents.keys() <= traced_pids:
+        raise ValueError("missing trace for a successfully spawned process")
     producers = [e for e in events if e["executable"] == "/bin/adapter-observe" and e["success"]]
     if len(producers) != 1:
         raise ValueError("missing or ambiguous producer process")
@@ -84,7 +106,7 @@ def read_trace(root):
         raise ValueError("missing or ambiguous direct adapter child")
     child = dict(children[0], parent_pid=producer["pid"], producer_environment=producer["environment"])
     descendants = [e for e in events if e is not producer and e is not children[0]]
-    return child, descendants
+    return child, descendants, unresolved
 
 
 def validate_child(child, selector, variant, producer_environment):

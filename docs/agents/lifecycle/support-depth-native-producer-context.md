@@ -18,8 +18,10 @@ stands in for Codex, and no observer hook is added to ordinary SDK behavior.
 Linux syscall tracing records successful and failed execve calls, complete argv/env,
 cwd changes and clone/fork ownership. A native child must be the direct child of the
 built driver; an unrelated or nested process cannot establish that observation. The
-trace parser rejects missing, truncated, ambiguous and oversized inputs. Trace hashes
-and parsed records are retained; `--raw-traces` optionally preserves the complete bounded
+trace parser rejects missing spawned-process files, malformed or truncated known syscall
+records, ambiguous ownership and oversized inputs. Unknown/detached syscall records are
+retained with file, PID, line and original text; they set `incomplete_trace` and remove
+complete child-boundary credit for that case. Trace hashes and parsed records are retained; `--raw-traces` optionally preserves the complete bounded
 raw inputs in a private directory for inspection. Tracing changes timing and is not
 timing/performance or successful-execution evidence.
 
@@ -107,8 +109,9 @@ state ids, private output names, process ids and outcomes may vary; this is an a
 not deterministic execution evidence. No live-model credentials should be supplied.
 
 The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
-captures all 15 cases: 6 exec and 9 app-server spawns. All complete child boundaries matched
-the finite invocation/environment checks. Five cases changed private project trust config
+captures all 15 cases: 6 exec and 9 app-server spawns. Parsed direct-child records matched
+the finite invocation/environment checks; unresolved syscall input remains an explicit
+refusal rather than a complete boundary observation. Five cases changed private project trust config
 by the exact approved addition; all other config drift remains refused. Descendant attempts
 to run git/getconf/lsb_release all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
 errors and unsuccessful completion statuses remain outcomes, not verified execution.
