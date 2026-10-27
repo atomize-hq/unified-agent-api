@@ -10,7 +10,7 @@ assignment, writer profile, qualification or production enrollment.
 `scripts/observe_codex_adapter_children.py` builds the source-owned
 `xtask` example `codex_native_context` with Cargo's locked dependency graph. The driver
 uses `CodexBackend::run` and the existing typed pilot route decoder. It runs all five
-selectors with unattended, interactive and external variants:15 separate fresh private
+selectors with unattended, interactive and external variants: 15 separate fresh private
 contexts. Initial/resume use exec or app-server as the real adapter selects; fork always
 uses app-server. Unknown selectors/variants refuse. No fake CLI or native-binary shim
 stands in for Codex, and no observer hook is added to ordinary SDK behavior.
@@ -47,7 +47,7 @@ An extra option, foreign environment key/home/log/binary, output escape or route
 refuses. This postcondition detects SDK drift **after private execution**; it is not a
 pre-spawn security boundary for ordinary callers or maintenance-writer admission.
 
-The SDK has its ordinary three-second owned timeout; the outer namespace has a20-second
+The SDK has its ordinary three-second owned timeout; the outer namespace has a 20-second
 deadline and is killed/reaped on overrun. Startup/session/output mutations are inventoried
 with file digests, modes, directory types and symlink targets. Observer trace files are
 recorded separately and excluded from native mutation attribution. Changed controlled
@@ -84,8 +84,8 @@ unchanged config or the original bytes plus that exact stanza. Other project pat
 values, extra keys, base changes or reformatting remain `controlled_config_drift`. This
 does not authorize live calls, skill execution, host/user project trust or a generic config write.
 
-Individual207 classification edges remain proposals. The existing53 operation/obligation/
-target template baseline is unchanged, and is not53 test cases. Packet binding is explicitly
+Individual 207 classification edges remain proposals. The existing 53 operation/obligation/
+target template baseline is unchanged, and is not 53 test cases. Packet binding is explicitly
 absent. The read-only evaluator and every public writer keep their existing refusals; no
 runtime evaluator consumes this audit as E or uses it to clear unknowns.
 
@@ -107,10 +107,10 @@ state ids, private output names, process ids and outcomes may vary; this is an a
 not deterministic execution evidence. No live-model credentials should be supplied.
 
 The [recorded native audit](../../../cli_manifests/codex/reports/0.156.1/pilot-adapter-children.json)
-captures all15 cases:6 exec and9 app-server spawns. All complete child boundaries matched
+captures all 15 cases: 6 exec and 9 app-server spawns. All complete child boundaries matched
 the finite invocation/environment checks. Five cases changed private project trust config
-by the exact approved addition; all other config drift remains refused. Descendant attempts to run git/getconf/lsb_release
-all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
+by the exact approved addition; all other config drift remains refused. Descendant attempts
+to run git/getconf/lsb_release all failed in this minimal namespace and are retained. SDK timeouts, RPC errors, no-session
 errors and unsuccessful completion statuses remain outcomes, not verified execution.
 The audit source commit/tree and launch hashes are recorded; later documentation/test/data
 commits do not turn this historical audit into evidence for another packet or source revision.
