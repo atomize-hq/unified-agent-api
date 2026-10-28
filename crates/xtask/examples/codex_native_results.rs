@@ -238,7 +238,7 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
                 .map_err(|_| "configured Codex home is unavailable")
         })
         .transpose()?;
-    let version = io::version(&binary)?;
+    let version = io::version(&binary).await?;
     if args
         .expected_version
         .as_ref()

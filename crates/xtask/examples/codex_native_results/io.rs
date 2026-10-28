@@ -1,13 +1,7 @@
 //! Only finite, nonsecret diagnostics are retained. No auth/config/environment file reads.
 use sha2::{Digest, Sha256};
-use std::{
-    fs,
-    io::Read,
-    path::Path,
-    process::{Command, Stdio},
-    time::Duration,
-};
-use wait_timeout::ChildExt;
+use std::{fs, io::Read, path::Path, process::Stdio, time::Duration};
+use tokio::{io::AsyncReadExt, process::Command};
 
 pub fn fingerprint(path: &Path) -> Result<String, String> {
     let mut f = fs::File::open(path).map_err(|_| "cannot read executable identity")?;
@@ -36,33 +30,35 @@ pub fn fingerprint(path: &Path) -> Result<String, String> {
     }
     Ok(hex::encode(hash.finalize()))
 }
-pub fn version(binary: &Path) -> Result<String, String> {
+pub async fn version(binary: &Path) -> Result<String, String> {
+    version_with_timeout(binary, Duration::from_secs(5)).await
+}
+async fn version_with_timeout(binary: &Path, timeout: Duration) -> Result<String, String> {
     let mut child = Command::new(binary)
         .arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
+        .kill_on_drop(true)
         .spawn()
         .map_err(|_| "cannot probe selected Codex executable")?;
-    let result = child
-        .wait_timeout(Duration::from_secs(5))
-        .map_err(|_| "cannot wait for version probe");
-    let status = match result {
-        Ok(Some(s)) => s,
-        _ => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("Codex version probe failed or timed out".into());
-        }
-    };
-    let mut bytes = Vec::new();
-    child
+    let mut stdout = child
         .stdout
         .take()
         .ok_or("missing version output")?
-        .take(4097)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "cannot read version response")?;
+        .take(4097);
+    let mut bytes = Vec::new();
+    // Waiting and draining share one deadline, including when a launcher exits
+    // but a descendant retains stdout. Dropping the read future closes the pipe.
+    let probe = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut bytes)) };
+    let status = match tokio::time::timeout(timeout, probe).await {
+        Ok(Ok((status, _))) => status,
+        _ => {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            return Err("Codex version probe failed or timed out".into());
+        }
+    };
     if !status.success() || bytes.len() > 4096 {
         return Err("Codex version probe failed or exceeded bounds".into());
     }
@@ -107,8 +103,8 @@ mod tests {
         assert!(output_path("target/native-results/first").is_ok());
     }
     #[cfg(unix)]
-    #[test]
-    fn version_probe_withholds_foreign_stdout_and_stderr() {
+    #[tokio::test]
+    async fn version_probe_withholds_foreign_stdout_and_stderr() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let binary = dir.path().join("native");
@@ -118,10 +114,30 @@ mod tests {
         )
         .unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
-        let error = version(&binary).unwrap_err();
+        let error = version(&binary).await.unwrap_err();
         assert!(!error.contains("sensitive"));
         assert!(!error.contains("secret-error"));
         fs::write(&binary, "#!/bin/sh\necho 'codex-cli 0.162.1'\n").unwrap();
-        assert_eq!(version(&binary).unwrap(), "0.162.1");
+        assert_eq!(version(&binary).await.unwrap(), "0.162.1");
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn version_deadline_includes_stdout_held_by_a_launcher_descendant() {
+        use std::{os::unix::fs::PermissionsExt, time::Instant};
+        let dir = tempfile::tempdir().unwrap();
+        let binary = dir.path().join("launcher");
+        // This finite synthetic descendant holds stdout after its launcher exits.
+        // Wait for it below so the test leaves no test child running.
+        fs::write(&binary, "#!/bin/sh\nsleep 1 &\necho 'codex-cli 0.162.1'\n").unwrap();
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        let started = Instant::now();
+        let result = version_with_timeout(&binary, Duration::from_millis(50)).await;
+        let elapsed = started.elapsed();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(
+            result.is_err(),
+            "a retained pipe must exhaust the probe deadline"
+        );
+        assert!(elapsed < Duration::from_millis(500), "{elapsed:?}");
     }
 }
