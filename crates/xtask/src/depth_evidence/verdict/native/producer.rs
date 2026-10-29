@@ -2,6 +2,7 @@
 use super::*;
 use crate::depth_evidence::native::CollectArgs;
 use std::{fs, path::PathBuf};
+mod control;
 pub(in crate::depth_evidence::verdict) mod execution;
 pub(in crate::depth_evidence::verdict) mod registration;
 mod retained;
@@ -236,17 +237,33 @@ pub(super) fn collect(
     p: &Profile,
     api: &impl StartApi,
 ) -> Result<(), String> {
-    collect_with(
+    let interrupts = control::Interrupts::new()?;
+    let api = control::Host {
+        inner: api,
+        cancel: interrupts.flag(),
+    };
+    collect_inner(
         root,
         args,
         p,
-        api,
+        &api,
+        interrupts.flag(),
         |root, prefix| {
-            crate::depth_ci::native::build(root, prefix, &p.graph, &p.environment, &p.toolchain)
+            crate::depth_ci::native::build(
+                root,
+                prefix,
+                &p.graph,
+                &p.environment,
+                &p.toolchain,
+                interrupts.flag(),
+            )
         },
-        execution::run,
+        |root, args, binary, built, plan| {
+            execution::run(root, args, binary, built, plan, interrupts.flag())
+        },
     )
 }
+#[cfg(test)]
 pub(in crate::depth_evidence::verdict) fn collect_with(
     root: &Path,
     args: CollectArgs,
@@ -261,6 +278,32 @@ pub(in crate::depth_evidence::verdict) fn collect_with(
         &form::Plan,
     ) -> Result<execution::Execution, String>,
 ) -> Result<(), String> {
+    collect_inner(
+        root,
+        args,
+        p,
+        api,
+        &std::sync::atomic::AtomicBool::new(false),
+        build,
+        run,
+    )
+}
+fn collect_inner(
+    root: &Path,
+    args: CollectArgs,
+    p: &Profile,
+    api: &impl StartApi,
+    cancel: &std::sync::atomic::AtomicBool,
+    build: impl FnOnce(&Path, &str) -> Result<crate::depth_ci::native::Built, String>,
+    run: impl FnOnce(
+        &Path,
+        &CollectArgs,
+        &Path,
+        &crate::depth_ci::native::Built,
+        &form::Plan,
+    ) -> Result<execution::Execution, String>,
+) -> Result<(), String> {
+    control::check(cancel)?;
     if !args.live || !args.register {
         return Err(
             "native execution and start registration require explicit --live --register".into(),
@@ -289,7 +332,9 @@ pub(in crate::depth_evidence::verdict) fn collect_with(
     // The build uses a fresh closed environment, never the caller's native credentials.
     let preview = preview(&root, &p.graph, &p.environment, &p.toolchain, &prefix)?;
     source_check(&root, api, p, &binding, &current, &mut view, &preview)?;
+    control::check(cancel)?;
     let built = build(&root, &prefix)?;
+    control::check(cancel)?;
     if built.build != preview {
         return Err("measured native build differs from pre-build source closure".into());
     }
@@ -341,10 +386,12 @@ pub(in crate::depth_evidence::verdict) fn collect_with(
         scope: plan.scope.clone(),
         plan: plan_ref.clone(),
     };
+    control::check(cancel)?;
     let registration = register(api, p, binding.pr, &start)?;
     retained.registration(&canonical(&registration.reference())?)?;
     // All post-registration failures leave the registered plan intact. Never create another attempt.
     let ready = (|| -> Result<(), String> {
+        control::check(cancel)?;
         source_check(&root, api, p, &binding, &current, &mut view, &built.build)?;
         retained.verify()?;
         if host::bind(api, p, &current)? != binding

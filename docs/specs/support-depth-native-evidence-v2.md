@@ -187,9 +187,14 @@ interactive initial/resume/fork/cancellation diagnostics, with actual built harn
 profile requesting another population refuses before registration; this population does not assert
 adequacy for all 53 template tuples. The disposable native project must be outside producer source.
 Each completed case is journaled before the next case. The parent owns a Unix process group and a
-420-second deadline, kills/reaps that group on completion/timeout and retains finite typed case
+420-second deadline, kills that group and reaps the direct child on completion/timeout, retaining finite typed case
 observations. A later truncated journal, missing final output or timeout cannot erase earlier valid
 case failures; malformed values and raw child stdout/stderr/error text are never copied into proof.
+The foreground command catches SIGINT/SIGTERM: it stops further dispatch, kills the owned native
+group, reaps the direct collector and retains completed typed journals before returning incomplete.
+The standalone command owns the signal driver until cleanup returns, then exits; no persistent
+worker or job is created. An active invocation installs process-lifetime signal handlers and is
+intended for the standalone command, not an embedding application.
 Unrun cases remain in every applicable requested population. No native attempt is retried to pass.
 
 The observed context is separate from intent and currently states that effective native configuration

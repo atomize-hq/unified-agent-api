@@ -31,7 +31,9 @@ pub(crate) fn build(
     graph: &DependencyGraph,
     environment: &Environment,
     expected_toolchain: &FileRef,
+    cancel: &std::sync::atomic::AtomicBool,
 ) -> Result<Built, String> {
+    active(cancel)?;
     if *environment != {
         let mut e = super::collector::environment(profile::Profile::Core);
         e.features.clear();
@@ -110,6 +112,7 @@ pub(crate) fn build(
             }
         }
     }
+    active(cancel)?;
     let env = BuildEnv::new(root, profile::Profile::Core)?;
     let metadata: Value = serde_json::from_str(&required(
         env.command(&env.cargo).args([
@@ -125,6 +128,7 @@ pub(crate) fn build(
         16_777_216,
     )?)
     .map_err(|_| "invalid native build metadata")?;
+    active(cancel)?;
     let tree = required(
         env.command(&env.cargo).args([
             "tree",
@@ -155,6 +159,7 @@ pub(crate) fn build(
     {
         return Err("native Cargo closure differs from reviewed graph".into());
     }
+    active(cancel)?;
     let output = required(
         env.command(&env.cargo).args([
             "build",
@@ -171,6 +176,7 @@ pub(crate) fn build(
         ]),
         16_777_216,
     )?;
+    active(cancel)?;
     let mut compiled = BTreeSet::new();
     let mut features = BTreeMap::new();
     let mut scripts = vec![];
@@ -236,4 +242,41 @@ pub(crate) fn build(
         ],
         _target: env.target,
     })
+}
+
+fn active(cancel: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+    if cancel.load(std::sync::atomic::Ordering::Acquire) {
+        Err("foreground native build interrupted".into())
+    } else {
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn interrupted_native_build_refuses_before_workspace_or_build_dispatch() {
+        let graph = DependencyGraph {
+            schema_version: 1,
+            roots: vec![],
+            packages: vec![],
+            inputs: vec![],
+            scopes: vec![],
+        };
+        let env = super::super::collector::environment(profile::Profile::Core);
+        let toolchain = reference("toolchain", b"not read");
+        let flag = std::sync::atomic::AtomicBool::new(true);
+        let error = match build(
+            Path::new("/never-read"),
+            "not-created",
+            &graph,
+            &env,
+            &toolchain,
+            &flag,
+        ) {
+            Ok(_) => panic!("interrupted build executed"),
+            Err(error) => error,
+        };
+        assert!(error.contains("interrupted"));
+    }
 }

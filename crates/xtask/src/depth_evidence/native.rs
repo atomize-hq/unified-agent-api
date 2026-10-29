@@ -152,7 +152,8 @@ pub struct CollectArgs {
     #[arg(long)]
     pub attempt: String,
 }
-/// Run the compiled isolated producer. An absent profile refuses before any I/O or probe.
+/// Run the standalone compiled producer. An absent profile refuses before any I/O or probe.
+/// An active invocation installs process-lifetime SIGINT/SIGTERM handlers; use the xtask command.
 pub fn collect(workspace: &std::path::Path, args: CollectArgs) -> Result<(), String> {
     super::verdict::collect_native(workspace, args)
 }
