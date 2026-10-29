@@ -57,6 +57,13 @@ The current public binding implementation admits only the earlier run/CORE shape
 are explicit implementation/activation prerequisites, not something this document already enables.
 Production enrollment and unsupported-writer refusals retain their existing boundaries.
 
+Native admission needs one narrow target adaptation: revision 1 currently equates both
+`Build.host_target` and build `Environment.target` with the obligation target in
+`verdict.rs::qualifying`. For native revision 2, independently corroborate those build fields
+against the profile's GNU wrapper target, and the obligation/acquisition/runtime identity against
+its pinned musl native target. Require the exact approved pair; never relabel a GNU build as musl
+to pass the old equality. Preserve revision-1 target checks.
+
 ## One foreground attempt
 
 1. **Prepare locally.** Load coherent frozen request/Event/P/O and the independently bound packet
@@ -107,7 +114,8 @@ A local path or uploaded hash does not replace authenticated source/host resolut
 
 A **native-only receipt revision 2** keeps the same common top-level members but uses a distinct
 strict producer form: `kind = maintainer_native`, repository identity, packet PR, registration id,
-completion id and approved collector reference. Preserve the existing revision-1 GitHub Actions
+completion id and approved collector reference. Both host comment references include their exact
+body SHA-256, separate from the committed bundle digest. Preserve the existing revision-1 GitHub Actions
 shape/semantics and unknown-field refusals. Dispatch by supported revision/kind into the existing
 private evaluator facts; avoid a public trusted-object constructor or a general plugin interface.
 The depth record stays revision 1 and continues to reference receipt bytes by path/SHA-256.
@@ -122,11 +130,20 @@ receipt is a derived claim: it cannot approve its own producer or broaden the fr
 ## Complete population and host checks
 
 The adapter derives the packet PR from the fixed isolated host/request binding, not a receipt.
-Paginate the whole packet's comments independently of E's chosen references; classify registrations
-by the full Event/P/O, profile/version/target and applicable source/context identity. A matching
-start is applicable **before** inspecting outcome, completion or proof availability. Bind each
-registration to at most one matching completion. Missing/duplicate/malformed completions, wrong
-packet/author/body, unknown relevant records, inaccessible proof and unstable/incomplete pagination
+Paginate the whole packet's comments independently of E's chosen references. Independently
+establish canonical maintainer authority before admitting an unreferenced comment into the producer
+population. Definitively unauthorized unreferenced copies of start/finish records are chatter,
+not registrations or duplicate completions. A selected or previously bound reference whose author
+is missing/revoked remains unverified; indeterminate authority lookup is never treated as absent.
+The completion's completeness statement lists applicable registration ids, including prior attempts;
+check that set against host discovery and retain ids bound by earlier completions/current evidence.
+This does not recover deleted, never-bound history; NE-P1's honesty limitation below still applies.
+
+Classify authoritative registrations by the full Event/P/O, profile/version/target and applicable
+source/context identity. A matching start is applicable **before** inspecting outcome, completion
+or proof availability. Bind each registration to at most one authoritative matching completion.
+Missing/duplicate/malformed authoritative completions, wrong packet or body, unresolved authority
+of a bound record, unknown relevant records, inaccessible proof and unstable/incomplete pagination
 remain unverified. Re-read authority, packet/source tips and the discovered population at the end.
 Apply finite discovery bounds by refusing excess, not truncating to a favorable subset.
 
@@ -191,7 +208,9 @@ Minimum admission tests: wrong host/profile/packet/Event/P/O/version/target; sta
 mode/dependency/context; post-hoc or ambiguous registration; unauthorized author; edited/deleted
 reference; complete pagination with an unfavorable unselected attempt; missing/unfinished/duplicate
 completion; failed or missing cases; mismatched bundle/blob/executable; missing or stale adequacy;
-contradictory attempts; changed-record opaque-verdict refusal; unchanged revision-1 behavior and
+contradictory attempts; unauthorized copied-start/duplicate-finish chatter versus revoked bound
+references and unavailable authority lookup; truthful GNU-build/musl-native target pairs and swapped
+or mismatched targets; changed-record opaque-verdict refusal; unchanged revision-1 behavior and
 production/unsupported-route refusal. A fake host positive is not a live execution endorsement.
 
 Then perform the [real isolated public maintenance chain](support-depth-isolated-proof-plan.md):
