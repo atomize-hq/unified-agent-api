@@ -73,8 +73,11 @@ fn record(current: &Evaluation) -> Result<DepthRecord, String> {
         &current.current.version,
     )
 }
-fn bound(view: &mut GitInputs, record: &DepthRecord) -> Result<BTreeSet<u64>, String> {
-    let mut ids = BTreeSet::new();
+fn bound(
+    view: &mut GitInputs,
+    record: &DepthRecord,
+) -> Result<BTreeMap<u64, form::CommentRef>, String> {
+    let mut ids = BTreeMap::new();
     for reference in record
         .execution
         .iter()
@@ -84,11 +87,21 @@ fn bound(view: &mut GitInputs, record: &DepthRecord) -> Result<BTreeSet<u64>, St
         let Some(raw) = read(view, reference)? else {
             return Err("missing bound evidence".into());
         };
+        if raw.len() > 1_048_576 {
+            return Err("bound receipt exceeds size limit".into());
+        }
         let value: serde_json::Value =
             serde_json::from_slice(&raw).map_err(|_| "invalid bound receipt")?;
         if value["schema_version"] == 2 {
             let r = form::NativeReceipt::parse(text(&raw)?)?;
-            ids.extend([r.producer.registration.id, r.producer.completion.id]);
+            for reference in [r.producer.registration, r.producer.completion] {
+                if ids
+                    .insert(reference.id, reference.clone())
+                    .is_some_and(|prior| prior != reference)
+                {
+                    return Err("conflicting bound native host body commitments".into());
+                }
+            }
         }
     }
     Ok(ids)
@@ -213,8 +226,17 @@ pub(super) fn admit(
         return Err("native packet claim differs from host".into());
     }
     registry(root, api, p, &binding, view)?;
-    let bound = bound(view, &rec)?;
+    let commitments = bound(view, &rec)?;
+    let bound = commitments.keys().copied().collect();
     let comments = host::comments(api, p, binding.pr, &bound)?;
+    for (id, expected) in &commitments {
+        if !comments
+            .iter()
+            .any(|c| c.id == *id && c.authorized && c.reference() == *expected)
+        {
+            return Err("bound native host body changed or lost authority".into());
+        }
+    }
     let attempts = population::discover(
         &comments,
         &current.current,

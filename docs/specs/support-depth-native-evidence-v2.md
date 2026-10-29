@@ -68,6 +68,10 @@ retry/select the latest green or reset the population. A terminal failed case is
 Permission is checked before an unreferenced comment can enter the authoritative population.
 Definitively unauthorized unreferenced copies are chatter. A selected/previously bound host
 reference with revoked/missing authority refuses; an indeterminate lookup never means absence.
+Every E-bound receipt retains its exact start/finish body digests even when unselected; conflicting
+commitments for one host id refuse. Every authoritative finish must resolve an exact retained
+authoritative start before its generation can be deemed irrelevant. A surviving finish whose
+start was deleted is evidence of unavailable history, not ignorable chatter.
 Comment ids, host authors and actual canonical repository write/maintain/admin permission are
 independently resolved. Permission responses must identify the same user, not just a role string.
 Full pagination, unique ids, stable closing reads and finite bounds are mandatory. Deleted never-

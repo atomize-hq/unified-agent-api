@@ -62,6 +62,7 @@ pub(super) fn discover(
     let mut ids = BTreeSet::new();
     let mut eligible = BTreeSet::new();
     let mut starts = BTreeMap::new();
+    let mut all_starts = BTreeMap::new();
     let mut finishes = Vec::new();
     for c in comments {
         if c.id == 0 || !ids.insert(c.id) {
@@ -81,6 +82,7 @@ pub(super) fn discover(
         }
         if let Some(raw) = start {
             let s = form::Start::parse(raw)?;
+            all_starts.insert(c.id, c.reference());
             if !same_generation(&s.scope, scope) {
                 continue;
             }
@@ -99,6 +101,15 @@ pub(super) fn discover(
     }
     if !bound.is_subset(&eligible) {
         return Err("missing or revoked bound native record".into());
+    }
+    // A surviving finish still binds a registration even when that start was deleted.
+    // Missing history cannot establish that an attempt belongs to an irrelevant generation.
+    for (_, finish) in &finishes {
+        if all_starts.get(&finish.registration.id) != Some(&finish.registration) {
+            return Err(
+                "native completion has a missing or changed authoritative registration".into(),
+            );
+        }
     }
     let mut attempts = Vec::new();
     let mut used = BTreeSet::new();

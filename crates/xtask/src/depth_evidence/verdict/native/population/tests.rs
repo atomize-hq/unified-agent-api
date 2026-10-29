@@ -125,3 +125,41 @@ fn edited_registration_or_favorable_prefix_omission_refuses() {
     let fb = finish(&b, 40, vec![30]);
     assert!(discover_for(&[a, b, fb], &[]).is_err());
 }
+#[test]
+fn surviving_authoritative_finish_cannot_hide_its_deleted_start() {
+    let a = start(10);
+    let fa = finish(&a, 20, vec![10]);
+    let b = start(30);
+    let fb = finish(&b, 40, vec![10, 30]);
+    assert_eq!(
+        discover_for(&[a.clone(), fa.clone(), b, fb.clone()], &[])
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        discover_for(&[a, fa, fb], &[]).is_err(),
+        "surviving finish binds the missing later registration"
+    );
+}
+#[test]
+fn another_generation_is_irrelevant_only_after_its_start_is_resolved() {
+    let a = start(10);
+    let fa = finish(&a, 20, vec![10]);
+    let mut v: serde_json::Value = serde_json::from_str(
+        block(&start(30).body, "depth-native-start-v1")
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    v["scope"]["policy_identity"] = json!("0".repeat(64));
+    let b = comment(30, "depth-native-start-v1", &v);
+    let fb = finish(&b, 40, vec![30]);
+    assert_eq!(
+        discover_for(&[a.clone(), fa.clone(), b, fb.clone()], &[])
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(discover_for(&[a, fa, fb], &[]).is_err());
+}

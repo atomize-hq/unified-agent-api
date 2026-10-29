@@ -18,7 +18,7 @@ impl Github {
             .args([
                 "--kill-after=5",
                 "30",
-                "gh",
+                "/usr/bin/gh",
                 "api",
                 "--hostname",
                 "github.com",

@@ -187,6 +187,25 @@ fn native_completion_attestations_are_required_individually() {
         let mut v: serde_json::Value = serde_json::from_str(raw).unwrap();
         v[field] = json!(false);
         f.attempts[0].completion["body"] = json!(body.replace(raw, &v.to_string()));
+        // Retain the changed body honestly; this test exercises the false-attestation guard.
+        let digest = crate::depth_ci::reference(
+            "",
+            f.attempts[0].completion["body"]
+                .as_str()
+                .unwrap()
+                .as_bytes(),
+        )
+        .sha256;
+        f.attempts[0].receipt.producer.completion.body_sha256 = digest.clone();
+        f.attempts[0].receipt.adequacy.endorsement.body_sha256 = digest;
+        let reference = save(
+            f.f.root.path(),
+            &f.attempts[0].selected.path,
+            &f.attempts[0].receipt,
+        );
+        f.attempts[0].selected = reference;
+        git(f.f.root.path(), &["add", "."]);
+        f.select(0);
         f.comments();
         assert_eq!(
             f.evaluate().unwrap_err(),
@@ -249,4 +268,46 @@ fn immutable_aggregate_claims_cannot_filter_obligations_cases_or_native_facts() 
         f.select(1);
         assert!(f.evaluate().is_err(), "selected {attack}");
     }
+}
+#[test]
+fn every_e_bound_native_receipt_retains_its_exact_host_body_commitments() {
+    let mut f = NativeFixture::new();
+    f.install(30, CaseOutcome::Passed);
+    f.select(0);
+    f.f.current.record.execution.as_mut().unwrap().results[0]
+        .evidence
+        .push(f.attempts[1].selected.clone());
+    seal(&mut f.f.current.record);
+    assert_eq!(f.evaluate().unwrap().result, DepthResult::Verified);
+    let body = f.attempts[1].completion["body"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    f.attempts[1].completion["body"] = json!(format!(
+        "{body}\nStable edit to unselected, previously bound comment."
+    ));
+    f.comments();
+    assert!(
+        f.evaluate().is_err(),
+        "unselected bound body edit must refuse"
+    );
+}
+#[test]
+fn e_receipts_cannot_state_conflicting_bodies_for_one_host_id() {
+    let mut f = NativeFixture::new();
+    f.install(30, CaseOutcome::Passed);
+    f.select(0);
+    let mut conflicting = f.attempts[1].receipt.clone();
+    conflicting.producer.registration = f.attempts[0].receipt.producer.registration.clone();
+    conflicting.producer.registration.body_sha256 = "0".repeat(64);
+    let reference = save(f.f.root.path(), &f.attempts[1].selected.path, &conflicting);
+    git(f.f.root.path(), &["add", "."]);
+    f.f.current.record.execution.as_mut().unwrap().results[0]
+        .evidence
+        .push(reference);
+    seal(&mut f.f.current.record);
+    assert_eq!(
+        f.evaluate().unwrap_err(),
+        "conflicting bound native host body commitments"
+    );
 }
