@@ -111,7 +111,9 @@ mapping digest; checking that body, author authority and independent review is l
 ## Approved initial trust boundary
 
 Only recognized existing repository GitHub Actions producers may qualify execution evidence in
-the initial profile. Local relay/gate output remains diagnostic. The profile MUST identify the
+the initial revision-1 profile. The approved NE-P1/NE-P2 [native revision-2 mechanism](support-depth-native-evidence-v2.md)
+adds a separately governed isolated maintainer-attested producer; its live profile remains absent.
+Ordinary local relay/gate and unregistered native output remains diagnostic. The profile MUST identify the
 approved collector/workflow implementation revision and existing maintainer change authority,
 rooted in reviewed integration code. Observing a code hash or authenticated artifact does not
 approve a candidate collector. D1 installs no approved producer allowlist or host adapter.

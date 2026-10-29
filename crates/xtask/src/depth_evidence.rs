@@ -11,6 +11,7 @@ pub(crate) use results::production_results;
 #[cfg(test)]
 pub(crate) use results::test_results;
 pub use results::{evaluate_isolated_record, EvidenceVerdicts};
+pub mod native;
 pub mod payload;
 mod validate;
 mod verdict;
@@ -229,4 +230,27 @@ pub struct Endorsement {
 pub enum EndorsementKind {
     PrReview,
     IssueComment,
+}
+
+// Borrowed common claims, never authenticated facts or a public admission constructor.
+#[derive(Clone, Copy)]
+struct Claims<'a> {
+    scope: &'a Scope,
+    build: &'a Build,
+    provenance: &'a [Provenance],
+    cases: &'a Cases,
+    adequacy: &'a Adequacy,
+    collector: &'a FileRef,
+}
+impl EvidenceReceipt {
+    fn claims(&self) -> Claims<'_> {
+        Claims {
+            scope: &self.scope,
+            build: &self.build,
+            provenance: &self.provenance,
+            cases: &self.cases,
+            adequacy: &self.adequacy,
+            collector: &self.producer.collector,
+        }
+    }
 }
