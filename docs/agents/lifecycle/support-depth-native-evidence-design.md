@@ -135,8 +135,11 @@ establish canonical maintainer authority before admitting an unreferenced commen
 population. Definitively unauthorized unreferenced copies of start/finish records are chatter,
 not registrations or duplicate completions. A selected or previously bound reference whose author
 is missing/revoked remains unverified; indeterminate authority lookup is never treated as absent.
-The completion's completeness statement lists applicable registration ids, including prior attempts;
-check that set against host discovery and retain ids bound by earlier completions/current evidence.
+Each completion lists applicable registration ids, including prior attempts, through its own
+host-observed completion snapshot. Compare that list with that prefix, not future registrations;
+a bounded host comment-id watermark in the completion defines the snapshot. Current evaluation
+separately includes all subsequently discovered registrations and previously bound ids. Retain ids
+bound by earlier completions/current evidence.
 This does not recover deleted, never-bound history; NE-P1's honesty limitation below still applies.
 
 Classify authoritative registrations by the full Event/P/O, profile/version/target and applicable
