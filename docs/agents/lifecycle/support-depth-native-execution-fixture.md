@@ -5,6 +5,11 @@ This increment extends the existing example and collector. It changes no public 
 registry assignment, packet writer, evidence admission, profile, qualification or enrollment.
 Live calls remain prohibited. There is no live switch, credential input, service or background job.
 
+For optional installed-version diagnostics, use the separate
+[portable native result command](support-depth-native-results.md). It leaves authentication with
+the caller and exports the existing case-result format. It does not change this pinned offline
+fixture, reinterpret its negative observations or create qualified maintenance evidence.
+
 ## Fixed fixture
 
 The collector still uses a clean committed source tree, the pinned musl Codex 0.156.1 binary,
