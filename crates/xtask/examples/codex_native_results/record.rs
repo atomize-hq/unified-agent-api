@@ -1,5 +1,4 @@
 use agent_api::AgentWrapperEventKind;
-use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use xtask::depth_evidence::CaseOutcome;
@@ -12,28 +11,8 @@ pub const STEPS: [&str; 6] = [
     "fork-id",
     "cancel",
 ];
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct Observation {
-    pub session_id: Option<String>,
-    pub consistent: bool,
-    pub completion_success: bool,
-    pub reply_matches: bool,
-    pub cancel_requested: bool,
-    pub cancelled: bool,
-    pub unexpected_item: bool,
-}
-pub fn valid_id(id: &str) -> bool {
-    id.len() == 36
-        && id.bytes().enumerate().all(|(i, c)| {
-            if [8, 13, 18, 23].contains(&i) {
-                c == b'-'
-            } else {
-                c.is_ascii_hexdigit() && !c.is_ascii_uppercase()
-            }
-        })
-        && id != "11111111-1111-4111-8111-111111111111"
-        && id != "00000000-0000-0000-0000-000000000000"
-}
+pub use xtask::depth_evidence::native::native_session_id as valid_id;
+pub use xtask::depth_evidence::native::NativeObservation as Observation;
 /// Native strings are not copied into the report unless they have the finite ID grammar.
 pub fn bind_session(data: Option<&Value>, id: &mut Option<String>, consistent: &mut bool) {
     if let Some(d) = data.filter(|d| d["schema"] == "agent_api.session.handle.v1") {

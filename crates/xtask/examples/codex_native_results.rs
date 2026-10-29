@@ -21,7 +21,10 @@ use std::{
     time::{Duration, Instant},
 };
 use xtask::{
-    depth_evidence::{CaseIdentity, CaseOutcome, CaseResult, Cases},
+    depth_evidence::{
+        native::{NativeFailure, NativeStep as StepResult},
+        CaseIdentity, CaseOutcome, CaseResult, Cases,
+    },
     depth_record::FileRef,
 };
 
@@ -42,6 +45,9 @@ impl Variant {
 #[derive(Parser)]
 #[command(about = "Opt-in Codex/UAA native result collection. Local results remain unverified.")]
 struct Args {
+    /// Explicit source workspace for a closed-build collector moved to a fresh target directory.
+    #[arg(long)]
+    workspace: Option<PathBuf>,
     /// Required acknowledgment: native calls use the caller's authentication and usage allowance.
     #[arg(long, required = true)]
     live: bool,
@@ -68,14 +74,6 @@ struct Args {
     output_dir: String,
 }
 const REPLY: &str = "UAA_SMOKE_OK";
-#[derive(Serialize)]
-struct StepResult {
-    case: CaseIdentity,
-    observation: record::Observation,
-    outcome: CaseOutcome,
-    elapsed_ms: u128,
-    failure: Option<&'static str>,
-}
 fn identity(variant: Variant, step: &str, executable: &str) -> CaseIdentity {
     CaseIdentity {
         name: format!("codex-native/{}/{step}", variant.name()),
@@ -87,7 +85,7 @@ async fn observe(
     variant: Variant,
     step: &str,
     seed: Option<&str>,
-) -> (record::Observation, Option<&'static str>) {
+) -> (record::Observation, Option<NativeFailure>) {
     let mut extensions = BTreeMap::new();
     if matches!(variant, Variant::Interactive) {
         extensions.insert("agent_api.exec.non_interactive".into(), json!(false));
@@ -119,7 +117,7 @@ async fn observe(
     };
     let control = match backend.run_control(request).await {
         Ok(c) => c,
-        Err(_) => return (observation, Some("request_refused")),
+        Err(_) => return (observation, Some(NativeFailure::RequestRefused)),
     };
     let events = async {
         let mut stream = control.handle.events;
@@ -156,9 +154,9 @@ async fn observe(
         }
         Err(AgentWrapperError::Backend { message }) if message == "cancelled" => {
             observation.cancelled = true;
-            Some("cancelled")
+            Some(NativeFailure::Cancelled)
         }
-        Err(_) => Some("completion_failed"),
+        Err(_) => Some(NativeFailure::CompletionFailed),
     };
     (observation, failure)
 }
@@ -292,6 +290,23 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
                 elapsed_ms: started.elapsed().as_millis(),
                 failure,
             });
+            // A completed case survives a later crash/timeout. create_new prevents retries from
+            // silently replacing outcomes; no raw native text or credential material is journaled.
+            let bytes = serde_json::to_vec(results.last().ok_or("missing case result")?)
+                .map_err(|_| "cannot encode native case")?;
+            if bytes.len() > 1_048_576 {
+                return Err("native case exceeds output bound".into());
+            }
+            use std::io::Write;
+            let mut journal = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(output.join(format!("case-{}.json", results.len() - 1)))
+                .map_err(|_| "cannot preserve native case journal")?;
+            journal
+                .write_all(&bytes)
+                .and_then(|()| journal.sync_all())
+                .map_err(|_| "cannot preserve native case journal")?;
         }
     }
     let unchanged = io::fingerprint(&binary).ok().as_deref() == Some(native_sha.as_str());
@@ -346,8 +361,12 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let args = Args::parse();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let result = match root.canonicalize() {
+    let root = args
+        .workspace
+        .clone()
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir);
+    let result = match root.and_then(|p| p.canonicalize()) {
         Ok(root) => collect(&root, args).await,
         Err(_) => Err("repository checkout is unavailable".into()),
     };
@@ -378,6 +397,7 @@ mod tests {
         let home = tmp.path().join("empty-native-home");
         fs::create_dir(&home).unwrap();
         let args = Args {
+            workspace: None,
             live: true,
             binary,
             working_dir: tmp.path().into(),

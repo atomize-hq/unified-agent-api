@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 mod bundle;
 pub(super) mod host;
 mod population;
+pub(super) mod producer;
 
 pub(super) struct Profile {
     pub repository: form::Repository,
@@ -345,4 +346,18 @@ pub(super) fn admit(
         return Err("selected native attempt is not in complete authenticated population".into());
     }
     Ok(outcome_verdict(passed, failed, incomplete))
+}
+
+pub(super) fn collect(root: &Path, args: form::CollectArgs) -> Result<(), String> {
+    let p = LIVE_PROFILE.as_ref().ok_or(
+        "native evidence profile is not installed; no registration or native execution started",
+    )?;
+    producer::collect(root, args, p, &host::Github)
+}
+
+pub(super) fn prepare_finish(root: &Path, args: form::PrepareFinishArgs) -> Result<String, String> {
+    let p = LIVE_PROFILE
+        .as_ref()
+        .ok_or("native evidence profile is not installed; no completion template prepared")?;
+    producer::prepare_finish(root, args, p, &host::Github)
 }

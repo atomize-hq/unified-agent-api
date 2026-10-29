@@ -11,6 +11,7 @@ use std::{path::Path, process::Command};
 
 mod collector;
 mod graph;
+pub(crate) mod native;
 pub(crate) mod profile;
 pub const REPOSITORY: &str = "atomize-hq/unified-agent-api";
 pub const FIXTURE: &str = "crates/xtask/tests/fixtures/depth-ci/record.json";

@@ -1,6 +1,6 @@
 # Native support-depth evidence, revision 2
 
-Status: Normative for the approved NE-P1/NE-P2 admission increment.
+Status: Normative for the approved NE-P1/NE-P2 admission and foreground producer increments.
 The [depth contract](support-depth-contract.md) and revision-1
 [evidence predicates](support-depth-evidence-v1.md) govern adequacy, currentness and reuse.
 The [approved design](../agents/lifecycle/support-depth-native-evidence-design.md) explains the
@@ -14,7 +14,8 @@ Use revision-1 UTF-8, named-object, unique-field, string/path/digest/Git identit
 limits. No unknown fields, positional objects or null members. Numeric host ids are positive u64.
 Source, repository, context and case approval are fixed by private source-owned profile data;
 public constructors, receipt fields, local remotes and environment values cannot select trust.
-No native call, GitHub write, credential read or live profile installation is added here.
+Admission remains read-only. Only an explicitly authorized invocation of the foreground producer
+below may register and execute; it installs no live profile and never reads credentials.
 
 A native receipt has exactly revision-1's top-level members, with `schema_version: 2` and this
 `producer` in place of the revision-1 producer. Reuse Scope, Build, Provenance, Cases and Adequacy
@@ -141,6 +142,71 @@ No public Verdict, parsed receipt or successful diagnostic grants write authorit
 Public evaluation recognizes revision 2 but returns unverified without an installed native profile,
 before any host access. The first increment includes strict forms, complete population resolution,
 immutable bundle checks and the private admission adapter, tested with synthetic host records.
-The live collector, actual context closure, complete native adequacy, finite public-path selection
-expansion and host/profile installation follow separately. Production and unsupported paths retain
+The foreground collector is specified below; actual context closure, complete native adequacy,
+finite public-path selection expansion and host/profile installation remain separate prerequisites. Production and unsupported paths retain
 refusal. No credential fixture, real model execution or extra required CI job is introduced.
+
+## Foreground producer implementation
+
+`xtask depth-native-collect` implements one isolated foreground attempt. The compiled native
+profile also governs this command: an absent profile refuses before filesystem access, host reads,
+registration, probes or execution. CLI values select only the explicit native executable, disposable
+project, optional existing native home and a new storage leaf; they cannot select a repository,
+trusted source, target, context approval or case mapping. Both `--live` and `--register` are required.
+No completion, adequacy adoption, receipt, enrollment or opaque verdict is written by collection.
+
+The command independently binds the frozen standing request's Event/P/O/version to the record and
+packet PR, and checks source inventories, bytes and modes against protected canonical source before
+build-time code executes. It reuses the closed Cargo environment, locked registry verification,
+dependency graph and toolchain capture used by the Actions producer, without inventing an Actions
+run header. The GNU `xtask` example build has no root features. Reviewed compiled feature units and
+build-script identities come from `crates/xtask/data/depth-native-build-units-v1.json`, exactly
+`{features,build_scripts}`, covered by the approved source graph. Actual compiled units, compiler,
+link/runtime libraries, source graph and environment must match the source-owned profile.
+The build target directory remains owned until the native child exits. Build credentials and the
+fresh build HOME are never used as native authentication.
+
+Two other fixed source inputs must be covered by that graph:
+`crates/xtask/data/depth-native-context-intent-v1.json` holds bounded nonsecret intent bytes matching
+the profile's intent digest; `crates/xtask/data/depth-native-mappings-v1.json` is an array of existing
+`AdequacyMapping` objects, exactly one for every due obligation and matching its approved assertion
+bindings. Executor attribution is `github:<actual-registration-login>:<actual-registration-user-id>`.
+These files and their approved values are prerequisites of a future profile installation; this
+increment does not install them, select an isolated host or approve a mapping.
+
+Collection reserves a new existing-parent report directory and retains the canonical plan before
+one start POST. It independently rereads the full host body, actual author and canonical repository
+write/maintain/admin authority. Failed or ambiguous registration never retries or starts a native
+probe. The exact host reference is retained in `registration.json`, a local attempt descriptor
+outside the closed bundle index. Source/packet/executable drift or a different executor after
+registration retains an incomplete attempt and starts no native calls.
+
+The closed-built existing `codex_native_results` collector runs once, using the caller's normal
+native environment. Its current supported case population is the twelve existing unattended and
+interactive initial/resume/fork/cancellation diagnostics, with actual built harness digests. A fixed
+profile requesting another population refuses before registration; this population does not assert
+adequacy for all 53 template tuples. The disposable native project must be outside producer source.
+Each completed case is journaled before the next case. The parent owns a Unix process group and a
+420-second deadline, kills that group and reaps the direct child on completion/timeout, retaining finite typed case
+observations. A later truncated journal, missing final output or timeout cannot erase earlier valid
+case failures; malformed values and raw child stdout/stderr/error text are never copied into proof.
+The foreground command catches SIGINT/SIGTERM: it stops further dispatch, kills the owned native
+group, reaps the direct collector and retains completed typed journals before returning incomplete.
+The standalone command owns the signal driver until cleanup returns, then exits; no persistent
+worker or job is created. An active invocation installs process-lifetime signal handlers and is
+intended for the standalone command, not an embedding application.
+Unrun cases remain in every applicable requested population. No native attempt is retried to pass.
+
+The observed context is separate from intent and currently states that effective native configuration
+is unresolved and `complete` is false. Successful case collection cannot change that fact or qualify
+it. The producer retains one claim per due obligation and exact shared-case projections, with the
+strict canonical v2 index, existing size bounds, safe regular files and no overwrite. Context closure,
+complete adequacy, an installed profile and owning-path integration remain separate prerequisites.
+
+`xtask depth-native-prepare-finish --attempt <leaf> --evidence-commit <full-commit>` independently
+reads the registered plan and complete bundle from authenticated immutable proof, reruns shared
+content checks, snapshots applicable authoritative starts and rechecks closing host state. It prints
+an **unposted template** with all four human attestation booleans false. An authorized maintainer
+must review and explicitly attest the concrete execution, outcomes, registration ordering and
+completeness before an exact completion statement can be posted. This command never POSTs, creates
+an adoption, signs for the maintainer or turns its content inspection into an admitted verdict.

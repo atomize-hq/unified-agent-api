@@ -5,6 +5,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::BTreeMap,
 };
+mod producer;
 mod regressions;
 #[derive(Default)]
 struct Fake {

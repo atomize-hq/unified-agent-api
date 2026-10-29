@@ -498,3 +498,14 @@ pub(super) use github::isolated_record_results;
 pub use github::prove_core as prove_isolated_core;
 
 mod native;
+
+pub(super) fn collect_native(root: &Path, args: super::native::CollectArgs) -> Result<(), String> {
+    native::collect(root, args)
+}
+
+pub(super) fn prepare_native_finish(
+    root: &Path,
+    args: super::native::PrepareFinishArgs,
+) -> Result<String, String> {
+    native::prepare_finish(root, args)
+}
