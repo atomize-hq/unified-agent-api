@@ -1,12 +1,24 @@
-use super::{payload::DependencyGraph, EvidenceReceipt};
+#[cfg(test)]
+use super::EvidenceReceipt;
+use super::{payload::DependencyGraph, Claims};
 use crate::{git_inputs::GitInputs, runtime_advertising::source::Source};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, path::Path};
 
+#[cfg(test)]
 pub(super) fn check(
     workspace: &Path,
     view: &mut GitInputs,
     receipt: &EvidenceReceipt,
+    graph: &DependencyGraph,
+    hosted: bool,
+) -> Result<(), String> {
+    check_claims(workspace, view, receipt.claims(), graph, hosted)
+}
+pub(super) fn check_claims(
+    workspace: &Path,
+    view: &mut GitInputs,
+    receipt: Claims<'_>,
     graph: &DependencyGraph,
     hosted: bool,
 ) -> Result<(), String> {
@@ -27,12 +39,12 @@ pub(super) fn check(
         }
     }
     let files = if hosted {
-        vec![&receipt.producer.collector]
+        vec![receipt.collector]
     } else {
         vec![
             &receipt.build.toolchain,
             &receipt.cases.raw_output,
-            &receipt.producer.collector,
+            receipt.collector,
         ]
     };
     for file in files {

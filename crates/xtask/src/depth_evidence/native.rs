@@ -108,6 +108,7 @@ pub struct Plan {
 #[serde(deny_unknown_fields)]
 pub struct Bundle {
     pub schema_version: u64,
+    pub observed_context: FileRef,
     pub plan: FileRef,
     pub claims: Vec<FileRef>,
     pub files: Vec<FileRef>,

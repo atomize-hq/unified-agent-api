@@ -48,3 +48,47 @@ fn native_common_claims_keep_exact_mapping_and_shape_guards() {
     v["scope"]["policy_identity"] = json!("bad");
     assert!(NativeReceipt::parse(&v.to_string()).is_err());
 }
+#[test]
+fn native_attempt_payload_forms_reject_ambiguous_or_incomplete_objects() {
+    use xtask::depth_evidence::native::{Bundle, Finish, Plan, Start};
+    let r = NativeReceipt::parse(&native().to_string()).unwrap();
+    let file = json!({"path":"reports/file.json","sha256":"a".repeat(64)});
+    let observed = json!({"path":"reports/context.json","sha256":"b".repeat(64)});
+    let start = json!({"schema_version":1,"profile":"isolated-codex-native-v1","repository":r.producer.repository,"pull_request":3,"packet_head":"a".repeat(40),"scope":r.scope,"plan":file});
+    let finish = json!({"schema_version":1,"registration":r.producer.registration,"evidence_commit":"b".repeat(40),"bundle":file,"executor_identity":"actual-executor","population_through_id":4,"registrations":[4],"execution_attested":true,"outcomes_attested":true,"registration_order_attested":true,"completeness_attested":true});
+    let plan = json!({"schema_version":1,"scope":r.scope,"packet_head":"a".repeat(40),"build":r.build,"native":{"version":"0.156.1","target":"x86_64-unknown-linux-musl","executable_sha256":"c".repeat(64),"acquisition":file},"context":file,"collector":file,"requested":r.cases.requested});
+    let bundle = json!({"schema_version":1,"plan":file,"observed_context":observed,"claims":[file],"files":[file,observed]});
+    type Accepts = fn(&str) -> bool;
+    let forms: [(Value, Accepts); 4] = [
+        (start, |s| Start::parse(s).is_ok()),
+        (finish, |s| Finish::parse(s).is_ok()),
+        (plan, |s| Plan::parse(s).is_ok()),
+        (bundle, |s| Bundle::parse(s).is_ok()),
+    ];
+    for (v, accepts) in forms {
+        assert!(accepts(&v.to_string()));
+        for key in v.as_object().unwrap().keys() {
+            let mut bad = v.clone();
+            bad.as_object_mut().unwrap().remove(key);
+            assert!(!accepts(&bad.to_string()), "missing {key}");
+            let mut bad = v.clone();
+            bad[key] = Value::Null;
+            assert!(!accepts(&bad.to_string()), "null {key}");
+        }
+        let mut bad = v.clone();
+        bad["trusted"] = json!(true);
+        assert!(!accepts(&bad.to_string()));
+        let mut bad = v.clone();
+        bad["schema_version"] = json!(2);
+        assert!(!accepts(&bad.to_string()));
+        let raw = v.to_string().replacen(
+            "\"schema_version\":1",
+            "\"schema_version\":1,\"schema_version\":1",
+            1,
+        );
+        assert!(!accepts(&raw));
+        assert!(!accepts(
+            &serde_json::to_string(&v.as_object().unwrap().values().collect::<Vec<_>>()).unwrap()
+        ));
+    }
+}

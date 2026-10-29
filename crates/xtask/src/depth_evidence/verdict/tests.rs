@@ -669,3 +669,5 @@ fn unchanged_adequacy_mapping_survives_an_unrelated_source_commit() {
         DepthResult::Verified
     );
 }
+
+mod native_admission;

@@ -80,13 +80,20 @@ maintainer's NE-P1 honesty attestation, not an append-only-log claim.
 requested}`. Schema version is 1; scope/head match registration. Build and requested case identities
 use revision-1 forms. Native is exactly `{version,target,executable_sha256,acquisition}`: canonical version, acquired
 native target, actual executable SHA-256 and a file reference to the pinned acquisition facts.
-The executable itself is not committed or uploaded. Context and collector are file references.
+The executable itself is not committed or uploaded. Each aggregate bundle is bounded to 16 MiB
+across its indexed payloads. Context and collector are file references. Plan.context binds pre-execution nonsecret context intent,
+not an observation of effective native behavior.
+Plan and bundle identity bytes use compact UTF-8 JSON with object keys sorted bytewise, no
+insignificant whitespace, and array order preserved; numeric revision/host ids use integer encoding.
 The frozen source-owned case population must match requested, with no missing or extra case.
 The entire plan exists before native execution; registration commits its exact digest.
 
-`bundle` is a bounded canonical index exactly `{schema_version, plan, claims, files}`:
+`bundle` is a bounded canonical index exactly `{schema_version, plan, observed_context, claims, files}`:
 
 - schema_version is 1; plan matches the registration reference.
+- observed_context is a separate file reference to the post-registration measured, finite nonsecret
+  context projection. Its path differs from plan.context; both must match their separately approved
+  profile expectations. Unknown effective context cannot be cleared by an intent file or attestation.
 - claims is a nonempty unique list of file references, one per due obligation covered by this
   attempt; its exact population is fixed by the approved profile/record.
 - files is a unique-path list of every retained referenced payload. Every listed claim, plan,
@@ -106,10 +113,13 @@ commit and compares complete source-owned expectations, current coherent working
 scope inventories. A caller's local file or supplied hash is insufficient. The packet head must
 contain the frozen generation; proof commit must descend from that head. The canonical protected
 source and fixed isolated repository identity/baseline are checked before and after resolution.
+The governing registry is checked separately against protected isolated staging, including when it
+is a build input under `crates/xtask/data/`; canonical production source need not enroll depth.
+All other approved producer inputs remain rooted in canonical protected source.
 Actual build/source/toolchain/graph/environment, collector/executable, target pair and context
 must match independently approved profile expectations; an attestation cannot clear an unknown.
 For native v2, Build.host_target and build Environment.target bind the GNU wrapper build; scope's
-obligation target and native provenance bind the musl acquisition. Require the exact approved pair.
+obligation target and native binary provenance bind the exact musl acquisition file reference. Require the exact approved pair.
 
 Receipts are derived only after start/finish and adequacy host references exist. Their common
 fields must exactly match the authenticated claim, with its mapping and independently resolved

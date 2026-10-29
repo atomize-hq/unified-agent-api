@@ -103,6 +103,16 @@ fn evaluate(
         view.verify()?;
         return Ok(Verdict::unverified("missing or changed selected receipt"));
     };
+    if raw.len() > 1_048_576 {
+        return Err("evidence receipt exceeds 1048576 bytes".into());
+    }
+    let header: serde_json::Value =
+        serde_json::from_slice(&raw).map_err(|_| "invalid evidence JSON")?;
+    if header["schema_version"] == 2 {
+        let verdict = native::evaluate(workspace, &mut view, selected, current, text(&raw)?)?;
+        view.verify()?;
+        return Ok(verdict);
+    }
     let receipt = EvidenceReceipt::parse(text(&raw)?)?;
     // Malformed referenced payloads are form errors even when no producer is installed.
     let payloads = load_payloads(&mut view, &receipt)?;
@@ -265,26 +275,30 @@ fn reconcile(
             incomplete = true;
             continue;
         }
-        let requested: BTreeSet<_> = receipt.cases.requested.iter().collect();
-        let executed: BTreeSet<_> = receipt.cases.executed.iter().map(|r| &r.case).collect();
-        // A qualifying observed counterexample remains a failure even alongside missing cases.
-        let counterexample = receipt
-            .cases
-            .executed
-            .iter()
-            .any(|r| requested.contains(&r.case) && r.outcome == CaseOutcome::Failed);
-        let complete = !requested.is_empty()
-            && requested == executed
-            && receipt
-                .cases
-                .executed
-                .iter()
-                .all(|r| r.outcome == CaseOutcome::Passed);
+        let (complete, counterexample) = case_outcomes(&receipt.cases);
         failed |= counterexample;
         passed |= complete;
         incomplete |= !counterexample && !complete;
     }
-    Ok(if passed && failed {
+    Ok(outcome_verdict(passed, failed, incomplete))
+}
+fn case_outcomes(cases: &Cases) -> (bool, bool) {
+    let requested: BTreeSet<_> = cases.requested.iter().collect();
+    let executed: BTreeSet<_> = cases.executed.iter().map(|r| &r.case).collect();
+    let counterexample = cases
+        .executed
+        .iter()
+        .any(|r| requested.contains(&r.case) && r.outcome == CaseOutcome::Failed);
+    let complete = !requested.is_empty()
+        && requested == executed
+        && cases
+            .executed
+            .iter()
+            .all(|r| r.outcome == CaseOutcome::Passed);
+    (complete, counterexample)
+}
+fn outcome_verdict(passed: bool, failed: bool, incomplete: bool) -> Verdict {
+    if passed && failed {
         Verdict::unverified("contradictory qualifying runs require investigation")
     } else if failed {
         Verdict {
@@ -298,7 +312,7 @@ fn reconcile(
             result: DepthResult::Verified,
             reason: "current complete execution and independently adopted adequacy".into(),
         }
-    })
+    }
 }
 
 fn qualifying(
@@ -334,6 +348,50 @@ fn qualifying(
             && r.scope.enrollment_origin != EnrollmentOrigin::Production)
     {
         return Err("scope/build/provenance lacks independent current binding".into());
+    }
+    qualify_claims(
+        workspace,
+        view,
+        current,
+        r.claims(),
+        Proof {
+            graph,
+            environment,
+            adoption: run.adoption.as_ref(),
+            repository: &r.producer.repository,
+            hosted: run.hosted.is_some(),
+        },
+    )
+}
+struct Proof<'a> {
+    graph: &'a DependencyGraph,
+    environment: &'a Environment,
+    adoption: Option<&'a Adoption>,
+    repository: &'a str,
+    hosted: bool,
+}
+fn qualify_claims(
+    workspace: &Path,
+    view: &mut GitInputs,
+    current: &Evaluation,
+    r: Claims<'_>,
+    proof: Proof<'_>,
+) -> Result<(), String> {
+    let c = &current.current;
+    let graph = proof.graph;
+    if *proof.environment != current.environment
+        || r.build.toolchain != current.toolchain
+        || r.build.features != proof.environment.features
+        || r.scope.agent_id != c.agent_id
+        || r.scope.version != c.version
+        || r.scope.obligation != c.obligation
+        || r.scope.rules_revision != c.rules_revision
+        || r.scope.trust_revision != c.trust_revision
+        || r.scope.review_revision != c.review_revision
+        || (c.enrollment_origin == EnrollmentOrigin::Production
+            && r.scope.enrollment_origin != EnrollmentOrigin::Production)
+    {
+        return Err("scope/build lacks current corroboration".into());
     }
     if r.scope.policy_identity != c.policy_identity
         || r.scope.obligations_identity != c.obligations_identity
@@ -373,9 +431,8 @@ fn qualifying(
     if inputs != r.build.covered_inputs.iter().collect() || r.provenance.is_empty() {
         return Err("incomplete covered build/provenance inputs".into());
     }
-    let adoption = run
+    let adoption = proof
         .adoption
-        .as_ref()
         .ok_or("missing authenticated adequacy adoption")?;
     let mapping = &r.adequacy.mapping;
     if adoption.endorsement != r.adequacy.endorsement
@@ -384,7 +441,7 @@ fn qualifying(
         || adoption.reviewer == adoption.executor
         || mapping.obligation != c.obligation
         || mapping.assertions.is_empty()
-        || adoption.endorsement.repository != r.producer.repository
+        || adoption.endorsement.repository != proof.repository
     {
         return Err("adequacy adoption does not bind this execution/mapping".into());
     }
@@ -428,7 +485,7 @@ fn qualifying(
     if r.provenance.iter().any(|p| !inputs.contains(&p.file)) {
         return Err("upstream provenance is not covered".into());
     }
-    super::currentness::check(workspace, view, r, graph, run.hosted.is_some())
+    super::currentness::check_claims(workspace, view, r, graph, proof.hosted)
 }
 
 #[cfg(test)]
@@ -439,3 +496,5 @@ pub use github::prove as prove_isolated_ci;
 
 pub(super) use github::isolated_record_results;
 pub use github::prove_core as prove_isolated_core;
+
+mod native;

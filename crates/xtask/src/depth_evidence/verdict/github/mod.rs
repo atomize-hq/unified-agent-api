@@ -6,10 +6,10 @@ use crate::{
     depth_record::Event,
 };
 use serde_json::{json, Value};
-mod adoption;
+pub(super) mod adoption;
 mod artifact;
 mod profile;
-mod transport;
+pub(super) mod transport;
 use transport::*;
 
 #[derive(Debug)]

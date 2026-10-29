@@ -82,11 +82,13 @@ pub(super) fn plan(r: &Plan) -> Result<(), String> {
     Ok(())
 }
 pub(super) fn bundle(r: &Bundle) -> Result<(), String> {
+    v::file(&r.observed_context)?;
     revision(r.schema_version)?;
     v::file(&r.plan)?;
     v::files(&r.claims)?;
     v::files(&r.files)?;
-    if r.claims.is_empty()
+    if !r.files.contains(&r.observed_context)
+        || r.claims.is_empty()
         || !r.files.contains(&r.plan)
         || r.claims.iter().any(|f| !r.files.contains(f))
     {

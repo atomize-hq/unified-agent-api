@@ -21,7 +21,9 @@ use crate::agent_registry::support_depth::{
     DepthEnrollmentDeclaration, LifecyclePath, ObligationId, ObligationTemplate,
 };
 
+mod obligations;
 pub mod request;
+pub(crate) use obligations::due;
 
 pub const DEPTH_RECORD_SCHEMA_VERSION: u64 = 1;
 /// The record's file in `reports/<version>/` of its manifest root (Annex B.1).
