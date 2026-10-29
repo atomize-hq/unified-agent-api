@@ -58,6 +58,30 @@ pub(super) fn discover(
     pr: u64,
     bound: &BTreeSet<u64>,
 ) -> Result<Vec<Attempt>, String> {
+    scan(comments, scope, repo, pr, bound, false).map(|(attempts, _)| attempts)
+}
+// Completion preparation may list still-open attempts; admission continues requiring every finish.
+pub(super) fn snapshot(
+    comments: &[Comment],
+    scope: &Scope,
+    repo: &form::Repository,
+    pr: u64,
+    own: &form::CommentRef,
+) -> Result<Vec<u64>, String> {
+    let (attempts, ids) = scan(comments, scope, repo, pr, &BTreeSet::from([own.id]), true)?;
+    if attempts.iter().any(|a| a.registration.id == own.id) {
+        return Err("native attempt already has a completion".into());
+    }
+    Ok(ids)
+}
+fn scan(
+    comments: &[Comment],
+    scope: &Scope,
+    repo: &form::Repository,
+    pr: u64,
+    bound: &BTreeSet<u64>,
+    allow_open: bool,
+) -> Result<(Vec<Attempt>, Vec<u64>), String> {
     use std::collections::BTreeMap;
     let mut ids = BTreeSet::new();
     let mut eligible = BTreeSet::new();
@@ -118,6 +142,10 @@ pub(super) fn discover(
             .iter()
             .filter(|(_, f)| f.registration.id == *id)
             .collect();
+        if matching.is_empty() && allow_open {
+            used.insert(*id);
+            continue;
+        }
         if matching.len() != 1 {
             return Err("missing or duplicate native completion".into());
         }
@@ -154,7 +182,7 @@ pub(super) fn discover(
     if !bound.is_subset(&used) {
         return Err("bound native record is outside the applicable population".into());
     }
-    Ok(attempts)
+    Ok((attempts, starts.keys().copied().collect()))
 }
 #[cfg(test)]
 mod tests;

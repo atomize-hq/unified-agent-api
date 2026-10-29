@@ -62,6 +62,10 @@ enum Command {
     IsolatedMaintenanceBindingCheck,
     /// Collect an isolated CI witness into target/depth-ci; grants no admission.
     DepthCiCollect,
+    /// Foreground packet-bound native attempt; refuses until its reviewed isolated profile is installed.
+    DepthNativeCollect(xtask::depth_evidence::native::CollectArgs),
+    /// Prepare an unposted completion template from immutable proof, with attestations false.
+    DepthNativePrepareFinish(xtask::depth_evidence::native::PrepareFinishArgs),
     /// Collect the fixed isolated Codex CORE profile, without enrollment or writes to reports.
     DepthCoreCollect,
     /// Read-only authenticated per-obligation CORE preview in a disposable checkout.
@@ -201,6 +205,31 @@ fn main() {
                 1
             }
         },
+        Command::DepthNativePrepareFinish(args) => {
+            let result = std::env::current_dir()
+                .map_err(|_| "workspace unavailable".to_owned())
+                .and_then(|root| xtask::depth_evidence::native::prepare_finish(&root, args));
+            match result {
+                Ok(body) => {
+                    println!("{body}");
+                    0
+                }
+                Err(error) => {
+                    eprintln!("{error}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::DepthNativeCollect(args) => {
+            let result = std::env::current_dir()
+                .map_err(|_| "workspace unavailable".to_owned())
+                .and_then(|root| xtask::depth_evidence::native::collect(&root, args));
+            if let Err(error) = result {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+            0
+        }
         Command::DepthCoreCollect => {
             let root = std::env::current_dir().expect("workspace");
             if let Err(e) = xtask::depth_ci::collect_core(&root) {

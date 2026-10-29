@@ -130,3 +130,87 @@ macro_rules! parsed {
     })*};
 }
 parsed!(Start=>start, Finish=>finish, Plan=>plan, Bundle=>bundle, Claim=>claim);
+
+/// Explicit foreground invocation options. None of these values selects an admission profile.
+#[derive(Debug, clap::Args)]
+pub struct CollectArgs {
+    /// Acknowledge use of the caller's native authentication and usage allowance.
+    #[arg(long, required = true)]
+    pub live: bool,
+    /// Authorize exactly one pre-execution start-registration POST; no finish is posted.
+    #[arg(long, required = true)]
+    pub register: bool,
+    #[arg(long)]
+    pub binary: std::path::PathBuf,
+    /// Disposable native project, separate from this source checkout.
+    #[arg(long)]
+    pub working_dir: std::path::PathBuf,
+    /// Forward an existing native home without reading or copying credentials.
+    #[arg(long)]
+    pub codex_home: Option<std::path::PathBuf>,
+    /// Fresh storage leaf, chosen before registration; never used to select trust.
+    #[arg(long)]
+    pub attempt: String,
+}
+/// Run the compiled isolated producer. An absent profile refuses before any I/O or probe.
+pub fn collect(workspace: &std::path::Path, args: CollectArgs) -> Result<(), String> {
+    super::verdict::collect_native(workspace, args)
+}
+
+/// Finite diagnostic journal shared by the existing runner and the packet producer.
+/// These are observations, never authenticated execution or adequacy facts.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeObservation {
+    pub session_id: Option<String>,
+    pub consistent: bool,
+    pub completion_success: bool,
+    pub reply_matches: bool,
+    pub cancel_requested: bool,
+    pub cancelled: bool,
+    pub unexpected_item: bool,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeFailure {
+    RequestRefused,
+    Cancelled,
+    CompletionFailed,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeStep {
+    pub case: CaseIdentity,
+    pub observation: NativeObservation,
+    pub outcome: CaseOutcome,
+    pub elapsed_ms: u128,
+    pub failure: Option<NativeFailure>,
+}
+
+pub fn native_session_id(id: &str) -> bool {
+    id.len() == 36
+        && id.bytes().enumerate().all(|(i, c)| {
+            if [8, 13, 18, 23].contains(&i) {
+                c == b'-'
+            } else {
+                c.is_ascii_hexdigit() && !c.is_ascii_uppercase()
+            }
+        })
+        && id != "11111111-1111-4111-8111-111111111111"
+        && id != "00000000-0000-0000-0000-000000000000"
+}
+
+/// Prepare an unposted template from committed proof. All human attestations start false.
+#[derive(Debug, clap::Args)]
+pub struct PrepareFinishArgs {
+    #[arg(long)]
+    pub attempt: String,
+    #[arg(long)]
+    pub evidence_commit: String,
+}
+pub fn prepare_finish(
+    workspace: &std::path::Path,
+    args: PrepareFinishArgs,
+) -> Result<String, String> {
+    super::verdict::prepare_native_finish(workspace, args)
+}

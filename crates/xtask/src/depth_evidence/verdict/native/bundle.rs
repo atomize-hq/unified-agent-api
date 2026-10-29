@@ -20,7 +20,7 @@ fn canonical<T: serde::Serialize>(file: &FileRef, value: &T) -> Result<(), Strin
     }
     Ok(())
 }
-fn approve_inputs(
+pub(super) fn approve_inputs(
     root: &Path,
     p: &Profile,
     canonical: &Tree,
@@ -115,16 +115,24 @@ pub(super) fn resolve(
     {
         return Err("native execution/completeness attestation absent".into());
     }
+    resolve_content(root, api, p, binding, &a.start, finish, current)
+}
+// Content inspection is shared with the unposted finish-template preparer. It does not
+// authenticate an execution statement or produce evaluator authority.
+pub(super) fn resolve_content(
+    root: &Path,
+    api: &impl Api,
+    p: &Profile,
+    binding: &Binding,
+    start: &form::Start,
+    finish: &form::Finish,
+    current: &Evaluation,
+) -> Result<Resolved, String> {
+    host::ancestor(api, &p.repository, &start.packet_head, &binding.packet_head)?;
     host::ancestor(
         api,
         &p.repository,
-        &a.start.packet_head,
-        &binding.packet_head,
-    )?;
-    host::ancestor(
-        api,
-        &p.repository,
-        &a.start.packet_head,
+        &start.packet_head,
         &finish.evidence_commit,
     )?;
     host::ancestor(
@@ -133,7 +141,7 @@ pub(super) fn resolve(
         &finish.evidence_commit,
         &binding.packet_head,
     )?;
-    let registered = Tree::read(api, &p.repository, &a.start.packet_head)?;
+    let registered = Tree::read(api, &p.repository, &start.packet_head)?;
     let frozen = crate::depth_record::DepthRecord::parse(
         text(&registered.bytes(root, &p.record_path)?)?,
         &current.current.agent_id,
@@ -142,14 +150,14 @@ pub(super) fn resolve(
     if frozen.event != current.record.event
         || frozen.policy != current.record.policy
         || frozen.obligations != current.record.obligations
-        || !super::super::generation(&frozen, &a.start.scope)
+        || !super::super::generation(&frozen, &start.scope)
     {
         return Err("native registration did not bind the frozen generation".into());
     }
     let source = Tree::read(api, &p.repository, &finish.evidence_commit)?;
     let index = parse(&source.file(root, &finish.bundle)?, form::Bundle::parse)?;
     canonical(&finish.bundle, &index)?;
-    if index.plan != a.start.plan || index.files.iter().any(|f| f.path == finish.bundle.path) {
+    if index.plan != start.plan || index.files.iter().any(|f| f.path == finish.bundle.path) {
         return Err("native bundle plan or cycle differs".into());
     }
     let prefix = format!(
@@ -180,8 +188,8 @@ pub(super) fn resolve(
     };
     let plan = parse(get(&index.plan)?, form::Plan::parse)?;
     canonical(&index.plan, &plan)?;
-    if plan.scope != a.start.scope
-        || plan.packet_head != a.start.packet_head
+    if plan.scope != start.scope
+        || plan.packet_head != start.packet_head
         || plan.native != p.native
         || plan.context.sha256 != p.context_intent_sha256
         || index.observed_context.sha256 != p.context_sha256
@@ -195,7 +203,7 @@ pub(super) fn resolve(
         api,
         &p.repository,
         &plan.build.source_commit,
-        &a.start.packet_head,
+        &start.packet_head,
     )?;
     approve_inputs(root, p, &binding.canonical, &built, &plan.build)?;
     let graph = parse(get(&plan.build.dependency_graph)?, DependencyGraph::parse)?;

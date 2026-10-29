@@ -36,6 +36,61 @@ pub(super) fn resolve(
     compiled: &BTreeSet<String>,
     profile: profile::Profile,
 ) -> Result<DependencyGraph, String> {
+    let mut result = resolve_for(root, view, metadata, compiled, profile.package())?;
+    for path in [
+        "Cargo.toml",
+        "Cargo.lock",
+        profile.contract(),
+        profile.fixture(),
+    ] {
+        view.required(path)?;
+        result.inputs.push(view.reference(path)?);
+    }
+    result.scopes.push(profile.directory().into());
+    for path in view.files_under(profile.directory())? {
+        result.inputs.push(view.reference(&path)?);
+    }
+    if profile == profile::Profile::Core {
+        let record = profile.record(
+            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
+        )?;
+        for input in record.obligations.unwrap().acquired_inputs {
+            view.required(&input.path)?;
+            let current = view.reference(&input.path)?;
+            if current != input {
+                return Err("acquired CORE provenance differs from frozen O".into());
+            }
+            result.inputs.push(current);
+        }
+    }
+    if let Some(scope) = profile.requirements() {
+        result.scopes.push(scope.into());
+        for path in view.files_under(scope)? {
+            result.inputs.push(view.reference(&path)?);
+        }
+    }
+    result.inputs.sort();
+    result.inputs.dedup();
+    result.scopes.sort();
+    result.scopes.dedup();
+    result.packages.sort_by(|a, b| a.id.cmp(&b.id));
+    let profile: Value = serde_json::from_slice(&view.required(&profile.build_profile())?)
+        .map_err(|e| e.to_string())?;
+    if profile["schema_version"] != 1
+        || serde_json::to_value(&result.packages).map_err(|e| e.to_string())? != profile["packages"]
+    {
+        return Err("resolved package closure is outside the reviewed profile".into());
+    }
+    DependencyGraph::parse(&serde_json::to_string(&result).map_err(|e| e.to_string())?)
+}
+
+pub(super) fn resolve_for(
+    root: &Path,
+    view: &mut GitInputs,
+    metadata: &Value,
+    compiled: &BTreeSet<String>,
+    package: &str,
+) -> Result<DependencyGraph, String> {
     let packages = metadata["packages"]
         .as_array()
         .ok_or("missing Cargo packages")?;
@@ -44,7 +99,7 @@ pub(super) fn resolve(
         .ok_or("missing Cargo resolved graph")?;
     let root_package = packages
         .iter()
-        .find(|p| p["name"] == profile.package())
+        .find(|p| p["name"] == package)
         .ok_or("missing affected crate")?;
     let root_id = root_package["id"]
         .as_str()
@@ -58,7 +113,7 @@ pub(super) fn resolve(
         .iter()
         .map(|n| Ok((n["id"].as_str().ok_or("invalid node id")?, n)))
         .collect::<Result<_, String>>()?;
-    let seen = expected(metadata, profile)?;
+    let seen = expected_for(metadata, package)?;
     if &seen != compiled {
         return Err("resolved/compiled dependency populations disagree".into());
     }
@@ -163,50 +218,11 @@ pub(super) fn resolve(
                 .collect(),
         });
     }
-    for path in [
-        "Cargo.toml",
-        "Cargo.lock",
-        profile.contract(),
-        profile.fixture(),
-    ] {
-        view.required(path)?;
-        result.inputs.push(view.reference(path)?);
-    }
-    result.scopes.push(profile.directory().into());
-    for path in view.files_under(profile.directory())? {
-        result.inputs.push(view.reference(&path)?);
-    }
-    if profile == profile::Profile::Core {
-        let record = profile.record(
-            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
-        )?;
-        for input in record.obligations.unwrap().acquired_inputs {
-            view.required(&input.path)?;
-            let current = view.reference(&input.path)?;
-            if current != input {
-                return Err("acquired CORE provenance differs from frozen O".into());
-            }
-            result.inputs.push(current);
-        }
-    }
-    if let Some(scope) = profile.requirements() {
-        result.scopes.push(scope.into());
-        for path in view.files_under(scope)? {
-            result.inputs.push(view.reference(&path)?);
-        }
-    }
     result.inputs.sort();
     result.inputs.dedup();
     result.scopes.sort();
     result.scopes.dedup();
     result.packages.sort_by(|a, b| a.id.cmp(&b.id));
-    let profile: Value = serde_json::from_slice(&view.required(&profile.build_profile())?)
-        .map_err(|e| e.to_string())?;
-    if profile["schema_version"] != 1
-        || serde_json::to_value(&result.packages).map_err(|e| e.to_string())? != profile["packages"]
-    {
-        return Err("resolved package closure is outside the reviewed profile".into());
-    }
     DependencyGraph::parse(&serde_json::to_string(&result).map_err(|e| e.to_string())?)
 }
 
@@ -215,6 +231,9 @@ pub(super) fn expected(
     metadata: &Value,
     profile: profile::Profile,
 ) -> Result<BTreeSet<String>, String> {
+    expected_for(metadata, profile.package())
+}
+pub(super) fn expected_for(metadata: &Value, package: &str) -> Result<BTreeSet<String>, String> {
     let packages = metadata["packages"]
         .as_array()
         .ok_or("missing Cargo packages")?;
@@ -223,7 +242,7 @@ pub(super) fn expected(
         .ok_or("missing Cargo graph")?;
     let root_id = packages
         .iter()
-        .find(|p| p["name"] == profile.package())
+        .find(|p| p["name"] == package)
         .and_then(|p| p["id"].as_str())
         .ok_or("missing affected root")?
         .to_owned();

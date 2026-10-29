@@ -13,18 +13,18 @@ use std::{
     process::Stdio,
 };
 
-struct BuildEnv {
+pub(super) struct BuildEnv {
     profile: profile::Profile,
     rustc: PathBuf,
-    cargo: PathBuf,
+    pub(super) cargo: PathBuf,
     sysroot: PathBuf,
     cargo_home: PathBuf,
     home: tempfile::TempDir,
-    target: tempfile::TempDir,
+    pub(super) target: tempfile::TempDir,
     root: PathBuf,
 }
 impl BuildEnv {
-    fn new(root: &Path, profile: profile::Profile) -> Result<Self, String> {
+    pub(super) fn new(root: &Path, profile: profile::Profile) -> Result<Self, String> {
         let which = |binary: &str| -> Result<PathBuf, String> {
             let bytes =
                 output(Command::new("rustup").args(["which", "--toolchain", TOOLCHAIN, binary]))?;
@@ -60,7 +60,7 @@ impl BuildEnv {
             root: root.into(),
         })
     }
-    fn command(&self, program: &Path) -> Command {
+    pub(super) fn command(&self, program: &Path) -> Command {
         let mut c = Command::new("/usr/bin/timeout");
         c.args(["--kill-after=5", "180"])
             .arg(program)
@@ -120,14 +120,14 @@ fn capture(c: &mut Command, limit: u64) -> Result<(bool, String), String> {
         String::from_utf8(bytes).map_err(|e| e.to_string())?,
     ))
 }
-fn required(c: &mut Command, limit: u64) -> Result<String, String> {
+pub(super) fn required(c: &mut Command, limit: u64) -> Result<String, String> {
     let (ok, raw) = capture(c, limit)?;
     if !ok {
         return Err("isolated producer command failed".into());
     }
     Ok(raw)
 }
-fn identity(path: &Path) -> Result<String, String> {
+pub(super) fn identity(path: &Path) -> Result<String, String> {
     Ok(reference("", &fs::read(path).map_err(|e| e.to_string())?).sha256)
 }
 fn fingerprint(path: &Path, base: &Path, rows: &mut Vec<(String, String)>) -> Result<(), String> {
@@ -155,7 +155,11 @@ fn fingerprint(path: &Path, base: &Path, rows: &mut Vec<(String, String)>) -> Re
     }
     Ok(())
 }
-fn toolchain(env: &BuildEnv, executable: &Path, scripts: &[Value]) -> Result<String, String> {
+pub(super) fn toolchain(
+    env: &BuildEnv,
+    executable: &Path,
+    scripts: &[Value],
+) -> Result<String, String> {
     let mut standard = vec![];
     let stdlib = env.sysroot.join("lib/rustlib").join(TARGET).join("lib");
     fingerprint(&stdlib, &stdlib, &mut standard)?;
@@ -507,44 +511,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     )?;
     let prefix = format!("{}/{run_id}-{run_attempt}", profile.evidence());
     cases.raw_output = reference(format!("{prefix}/raw.txt"), raw.as_bytes());
-    let mut environment = Environment {
-        schema_version: 1,
-        target: TARGET.into(),
-        features: profile.features(),
-        variables: [
-            (
-                "CARGO_CONFIG_POLICY",
-                "no repository/ancestor/home configuration",
-            ),
-            ("CARGO_HOME", "verified locked registry cache"),
-            ("HOME", "fresh empty directory"),
-            ("PATH", "pinned Rust toolchain bin:/usr/bin:/bin"),
-            ("RUSTUP_TOOLCHAIN", TOOLCHAIN),
-            ("RUSTC", "pinned rustc executable"),
-            (
-                "CARGO_ENCODED_RUSTFLAGS",
-                "remap WORKSPACE=/depth-input,TARGET=/depth-target,CARGO_HOME=/depth-cargo;debuginfo=0",
-            ),
-            ("CARGO_NET_OFFLINE", "true"),
-            ("CARGO_INCREMENTAL", "0"),
-            ("SOURCE_DATE_EPOCH", "0"),
-            ("LANG", "C"),
-            ("LC_ALL", "C"),
-            ("TZ", "UTC"),
-        ]
-        .into_iter()
-        .map(|(name, value)| Variable {
-            name: name.into(),
-            value: value.into(),
-        })
-        .collect(),
-    };
-    if profile == profile::Profile::Core {
-        environment.variables.push(Variable {
-            name: "CARGO_BUILD_JOBS".into(),
-            value: "2".into(),
-        });
-    }
+    let environment = environment(profile);
     Environment::parse(&serde_json::to_string(&environment).map_err(|e| e.to_string())?)?;
     view.required(COLLECTOR)?;
     let build = Build {
@@ -607,6 +574,47 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         toolchain_report: report,
         raw_output: raw,
     })
+}
+pub(super) fn environment(profile: profile::Profile) -> Environment {
+    let mut environment = Environment {
+        schema_version: 1,
+        target: TARGET.into(),
+        features: profile.features(),
+        variables: [
+            (
+                "CARGO_CONFIG_POLICY",
+                "no repository/ancestor/home configuration",
+            ),
+            ("CARGO_HOME", "verified locked registry cache"),
+            ("HOME", "fresh empty directory"),
+            ("PATH", "pinned Rust toolchain bin:/usr/bin:/bin"),
+            ("RUSTUP_TOOLCHAIN", TOOLCHAIN),
+            ("RUSTC", "pinned rustc executable"),
+            (
+                "CARGO_ENCODED_RUSTFLAGS",
+                "remap WORKSPACE=/depth-input,TARGET=/depth-target,CARGO_HOME=/depth-cargo;debuginfo=0",
+            ),
+            ("CARGO_NET_OFFLINE", "true"),
+            ("CARGO_INCREMENTAL", "0"),
+            ("SOURCE_DATE_EPOCH", "0"),
+            ("LANG", "C"),
+            ("LC_ALL", "C"),
+            ("TZ", "UTC"),
+        ]
+        .into_iter()
+        .map(|(name, value)| Variable {
+            name: name.into(),
+            value: value.into(),
+        })
+        .collect(),
+    };
+    if profile == profile::Profile::Core {
+        environment.variables.push(Variable {
+            name: "CARGO_BUILD_JOBS".into(),
+            value: "2".into(),
+        });
+    }
+    environment
 }
 pub(super) fn collect(workspace: &Path) -> Result<(), String> {
     let root = fs::canonicalize(workspace).map_err(|e| e.to_string())?;
