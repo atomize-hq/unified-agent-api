@@ -1,7 +1,9 @@
 # Packet-bound native evidence integration
 
 Status: NE-P1 and NE-P2 approved by the maintainer on 2026-10-28.
-Admission implementation is the first increment; producer execution and activation follow separately.
+Admission and the foreground producer are implemented through PR #307. The
+[context and case-coverage closure plan](support-depth-native-context-coverage.md) proposes the
+remaining work; owning-path integration and activation follow separately.
 Baseline: staging `51bdfbfa518d8a1ee1a2a596f246ac8629ec287a` (PR #305).
 The [evidence contract](../../specs/support-depth-evidence-v1.md) and
 [depth contract](../../specs/support-depth-contract.md) remain normative until amended through

@@ -39,5 +39,7 @@ statement and independent adequacy adoption before authorizing any posting. Neit
 a finish or automatically edits E, closes a packet, promotes a version or activates depth.
 
 Required CI uses fake hosts and finite fake native children. It requires no login or model calls.
-The next integration work must close effective context and reviewed case coverage, connect native
-verdicts to the existing record-sealed consumer path, then prove the isolated maintenance chain.
+The [context and case-coverage closure plan](support-depth-native-context-coverage.md) proposes
+the remaining observation methods and exact coverage work. Its NC-P1/NC-P2 decisions await approval.
+Then connect native verdicts to the existing record-sealed consumer path and prove the isolated
+maintenance chain.
