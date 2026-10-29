@@ -432,7 +432,8 @@ mod tests {
         let (_tmp, mut args) = fake_args(&root);
         let output = root.join(&args.output_dir);
         args.expected_version = Some(semver::Version::new(0, 156, 1));
-        assert!(collect(&root, args).await.unwrap_err().contains("differs"));
+        let error = collect(&root, args).await.unwrap_err();
+        assert!(error.contains("differs"), "unexpected refusal: {error}");
         assert!(!output.exists());
         let (_tmp, mut args) = fake_args(&root);
         let output = root.join(&args.output_dir);

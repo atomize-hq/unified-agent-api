@@ -5,19 +5,19 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Body {
-    schema_version: u64,
-    source_commit: String,
-    mappings: Vec<Entry>,
+pub(in crate::depth_evidence::verdict) struct Body {
+    pub(in crate::depth_evidence::verdict) schema_version: u64,
+    pub(in crate::depth_evidence::verdict) source_commit: String,
+    pub(in crate::depth_evidence::verdict) mappings: Vec<Entry>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Entry {
-    mapping_sha256: String,
-    reviewer_identity: String,
-    executor_identity: String,
-    independence_attested: bool,
-    counterfactual_adopted: bool,
+pub(in crate::depth_evidence::verdict) struct Entry {
+    pub(in crate::depth_evidence::verdict) mapping_sha256: String,
+    pub(in crate::depth_evidence::verdict) reviewer_identity: String,
+    pub(in crate::depth_evidence::verdict) executor_identity: String,
+    pub(in crate::depth_evidence::verdict) independence_attested: bool,
+    pub(in crate::depth_evidence::verdict) counterfactual_adopted: bool,
 }
 
 pub(super) fn resolve(
@@ -145,7 +145,7 @@ pub(super) fn resolve(
     }
     Ok(complete)
 }
-fn body(raw: &str) -> Result<Option<Body>, String> {
+pub(in crate::depth_evidence::verdict) fn body(raw: &str) -> Result<Option<Body>, String> {
     let marker = "```depth-adequacy-v1\n";
     if !raw.contains(marker) {
         return Ok(None);

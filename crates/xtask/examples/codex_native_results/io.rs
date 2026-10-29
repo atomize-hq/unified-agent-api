@@ -34,14 +34,14 @@ pub async fn version(binary: &Path) -> Result<String, String> {
     version_with_timeout(binary, Duration::from_secs(5)).await
 }
 async fn version_with_timeout(binary: &Path, timeout: Duration) -> Result<String, String> {
-    let mut child = Command::new(binary)
+    let mut command = Command::new(binary);
+    command
         .arg("--version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|_| "cannot probe selected Codex executable")?;
+        .kill_on_drop(true);
+    let mut child = spawn_probe(|| command.spawn()).await?;
     let mut stdout = child
         .stdout
         .take()
@@ -70,6 +70,20 @@ async fn version_with_timeout(binary: &Path, timeout: Duration) -> Result<String
         .and_then(|s| semver::Version::parse(s).ok())
         .ok_or("unrecognized Codex version response (details withheld)")?;
     Ok(parsed.to_string())
+}
+// Match the wrapper's bounded handling of a transient pre-exec ETXTBSY. No process
+// has started on this error; never retry an executed version probe or another spawn failure.
+async fn spawn_probe<T>(mut spawn: impl FnMut() -> std::io::Result<T>) -> Result<T, String> {
+    for attempt in 0..5 {
+        match spawn() {
+            Ok(child) => return Ok(child),
+            Err(error) if cfg!(unix) && error.raw_os_error() == Some(26) && attempt < 4 => {
+                tokio::time::sleep(Duration::from_millis(2 << attempt)).await;
+            }
+            Err(_) => return Err("cannot probe selected Codex executable".into()),
+        }
+    }
+    unreachable!("bounded spawn returns on its final attempt")
 }
 pub fn output_path(raw: &str) -> Result<(), String> {
     if raw.len() > 4096
@@ -104,6 +118,35 @@ mod tests {
     }
     #[cfg(unix)]
     #[tokio::test]
+    async fn probe_retries_only_pre_exec_busy_and_stops_at_its_bound() {
+        let mut attempts = 0;
+        let value = spawn_probe(|| {
+            attempts += 1;
+            if attempts < 3 {
+                Err(std::io::Error::from_raw_os_error(26))
+            } else {
+                Ok(7)
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!((value, attempts), (7, 3));
+        for (errno, expected) in [(26, 5), (2, 1), (13, 1)] {
+            let mut attempts = 0;
+            let result: Result<(), String> = spawn_probe(|| {
+                attempts += 1;
+                Err(std::io::Error::from_raw_os_error(errno))
+            })
+            .await;
+            assert_eq!(
+                result.unwrap_err(),
+                "cannot probe selected Codex executable"
+            );
+            assert_eq!(attempts, expected);
+        }
+    }
+    #[cfg(unix)]
+    #[tokio::test]
     async fn version_probe_withholds_foreign_stdout_and_stderr() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
@@ -123,21 +166,18 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn version_deadline_includes_stdout_held_by_a_launcher_descendant() {
-        use std::{os::unix::fs::PermissionsExt, time::Instant};
+        use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let binary = dir.path().join("launcher");
         // This finite synthetic descendant holds stdout after its launcher exits.
         // Wait for it below so the test leaves no test child running.
         fs::write(&binary, "#!/bin/sh\nsleep 1 &\necho 'codex-cli 0.162.1'\n").unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
-        let started = Instant::now();
         let result = version_with_timeout(&binary, Duration::from_millis(50)).await;
-        let elapsed = started.elapsed();
         tokio::time::sleep(Duration::from_secs(1)).await;
-        assert!(
-            result.is_err(),
-            "a retained pipe must exhaust the probe deadline"
-        );
-        assert!(elapsed < Duration::from_millis(500), "{elapsed:?}");
+        let error = result.unwrap_err();
+        assert!(error.contains("timed out"), "unexpected refusal: {error}");
+        // Without a deadline on draining, this finite descendant yields a valid
+        // version instead of a timeout. Wall-clock scheduling latency is not the predicate.
     }
 }

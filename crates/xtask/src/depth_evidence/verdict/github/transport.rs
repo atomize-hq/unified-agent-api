@@ -39,7 +39,10 @@ impl Api for Github {
         capture(&mut command, limit)
     }
 }
-fn capture(command: &mut Command, limit: usize) -> Result<Vec<u8>, String> {
+pub(in crate::depth_evidence::verdict) fn capture(
+    command: &mut Command,
+    limit: usize,
+) -> Result<Vec<u8>, String> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

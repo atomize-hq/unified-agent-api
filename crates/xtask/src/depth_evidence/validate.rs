@@ -9,50 +9,6 @@ impl EvidenceReceipt {
         if self.schema_version != 1 {
             return Err("unsupported depth evidence schema_version".into());
         }
-        let scope = &self.scope;
-        text(&scope.agent_id)?;
-        text(&scope.version)?;
-        let version = semver::Version::parse(&scope.version).map_err(|e| e.to_string())?;
-        if !version.pre.is_empty()
-            || !version.build.is_empty()
-            || version.to_string() != scope.version
-        {
-            return Err("evidence version must be canonical MAJOR.MINOR.PATCH".into());
-        }
-        match &scope.event {
-            Event::Maintenance {
-                request_commit,
-                request_recorded_at,
-                trigger_kind,
-                opened_from,
-            } => {
-                for field in [
-                    request_commit,
-                    request_recorded_at,
-                    trigger_kind,
-                    opened_from,
-                ] {
-                    text(field)?;
-                }
-            }
-            Event::Onboarding {
-                approval_commit,
-                approval_recorded_at,
-            } => {
-                text(approval_commit)?;
-                text(approval_recorded_at)?;
-            }
-        }
-        obligation(&scope.obligation)?;
-        sha256("policy_identity", &scope.policy_identity)?;
-        sha256("obligations_identity", &scope.obligations_identity)?;
-        for revision in [
-            &scope.rules_revision,
-            &scope.trust_revision,
-            &scope.review_revision,
-        ] {
-            text(revision)?;
-        }
         let producer = &self.producer;
         repository(&producer.repository)?;
         path(&producer.workflow_path)?;
@@ -68,69 +24,135 @@ impl EvidenceReceipt {
         positive(producer.run_attempt)?;
         text(&producer.job)?;
         text(&producer.artifact_name)?;
-        let build = &self.build;
-        git_identity(&build.source_commit)?;
-        git_identity(&build.source_tree)?;
-        text(&build.host_target)?;
-        file(&build.toolchain)?;
-        file(&build.environment)?;
-        file(&build.dependency_graph)?;
-        strings(&build.features)?;
-        files(&build.covered_inputs)?;
-        strings(&build.absent_inputs)?;
-        for absent in &build.absent_inputs {
-            path(absent)?;
-            if build
-                .covered_inputs
-                .iter()
-                .chain([
-                    &build.toolchain,
-                    &build.environment,
-                    &build.dependency_graph,
-                ])
-                .any(|f| &f.path == absent)
-            {
-                return Err(format!("input is both covered and absent: {absent}"));
+        common(self.claims())
+    }
+}
+pub(super) fn common(r: Claims<'_>) -> Result<(), String> {
+    scope(r.scope)?;
+    build(r.build)?;
+    provenance(r.provenance)?;
+    cases(r.cases)?;
+    mapping(&r.adequacy.mapping)?;
+    endorsement(&r.adequacy.endorsement)?;
+    file(r.collector)?;
+    if r.adequacy.endorsement.mapping_sha256 != r.adequacy.mapping.sha256()? {
+        return Err("adequacy mapping_sha256 disagrees with mapping content".into());
+    }
+    Ok(())
+}
+pub(super) fn scope(scope: &Scope) -> Result<(), String> {
+    text(&scope.agent_id)?;
+    text(&scope.version)?;
+    let version = semver::Version::parse(&scope.version).map_err(|e| e.to_string())?;
+    if !version.pre.is_empty() || !version.build.is_empty() || version.to_string() != scope.version
+    {
+        return Err("evidence version must be canonical MAJOR.MINOR.PATCH".into());
+    }
+    match &scope.event {
+        Event::Maintenance {
+            request_commit,
+            request_recorded_at,
+            trigger_kind,
+            opened_from,
+        } => {
+            for field in [
+                request_commit,
+                request_recorded_at,
+                trigger_kind,
+                opened_from,
+            ] {
+                text(field)?;
             }
         }
-        unique(&self.provenance, |p| &p.file.path)?;
-        for source in &self.provenance {
-            text(&source.origin)?;
-            file(&source.file)?;
+        Event::Onboarding {
+            approval_commit,
+            approval_recorded_at,
+        } => {
+            text(approval_commit)?;
+            text(approval_recorded_at)?;
         }
-        unique(&self.cases.requested, |c| c)?;
-        for case in &self.cases.requested {
-            case_identity(case)?;
-        }
-        unique(&self.cases.executed, |r| &r.case)?;
-        for result in &self.cases.executed {
-            case_identity(&result.case)?;
-        }
-        file(&self.cases.raw_output)?;
-        let mapping = &self.adequacy.mapping;
-        obligation(&mapping.obligation)?;
-        text(&mapping.reviewer_identity)?;
-        text(&mapping.executor_identity)?;
-        unique(&mapping.assertions, |a| &a.case)?;
-        for assertion in &mapping.assertions {
-            case_identity(&assertion.case)?;
-            file(&assertion.assertion)?;
-            files(&assertion.production_inputs)?;
-            text(&assertion.counterfactual)?;
-        }
-        let endorsement = &self.adequacy.endorsement;
-        repository(&endorsement.repository)?;
-        positive(endorsement.pull_request)?;
-        positive(endorsement.id)?;
-        text(&endorsement.author)?;
-        git_identity(&endorsement.source_commit)?;
-        sha256("body_sha256", &endorsement.body_sha256)?;
-        sha256("mapping_sha256", &endorsement.mapping_sha256)?;
-        if endorsement.mapping_sha256 != mapping.sha256()? {
-            return Err("adequacy mapping_sha256 disagrees with mapping content".into());
-        }
-        Ok(())
     }
+    obligation(&scope.obligation)?;
+    sha256("policy_identity", &scope.policy_identity)?;
+    sha256("obligations_identity", &scope.obligations_identity)?;
+    for revision in [
+        &scope.rules_revision,
+        &scope.trust_revision,
+        &scope.review_revision,
+    ] {
+        text(revision)?;
+    }
+    Ok(())
+}
+pub(super) fn build(build: &Build) -> Result<(), String> {
+    git_identity(&build.source_commit)?;
+    git_identity(&build.source_tree)?;
+    text(&build.host_target)?;
+    file(&build.toolchain)?;
+    file(&build.environment)?;
+    file(&build.dependency_graph)?;
+    strings(&build.features)?;
+    files(&build.covered_inputs)?;
+    strings(&build.absent_inputs)?;
+    for absent in &build.absent_inputs {
+        path(absent)?;
+        if build
+            .covered_inputs
+            .iter()
+            .chain([
+                &build.toolchain,
+                &build.environment,
+                &build.dependency_graph,
+            ])
+            .any(|f| &f.path == absent)
+        {
+            return Err(format!("input is both covered and absent: {absent}"));
+        }
+    }
+    Ok(())
+}
+pub(super) fn provenance(provenance: &[Provenance]) -> Result<(), String> {
+    unique(provenance, |p| &p.file.path)?;
+    for source in provenance {
+        text(&source.origin)?;
+        file(&source.file)?;
+    }
+    Ok(())
+}
+pub(super) fn cases(cases: &Cases) -> Result<(), String> {
+    unique(&cases.requested, |c| c)?;
+    for case in &cases.requested {
+        case_identity(case)?;
+    }
+    unique(&cases.executed, |r| &r.case)?;
+    for result in &cases.executed {
+        case_identity(&result.case)?;
+    }
+    file(&cases.raw_output)?;
+    Ok(())
+}
+pub(super) fn mapping(mapping: &AdequacyMapping) -> Result<(), String> {
+    obligation(&mapping.obligation)?;
+    text(&mapping.reviewer_identity)?;
+    text(&mapping.executor_identity)?;
+    unique(&mapping.assertions, |a| &a.case)?;
+    for assertion in &mapping.assertions {
+        case_identity(&assertion.case)?;
+        file(&assertion.assertion)?;
+        files(&assertion.production_inputs)?;
+        text(&assertion.counterfactual)?;
+    }
+    Ok(())
+}
+pub(super) fn endorsement(endorsement: &Endorsement) -> Result<(), String> {
+    repository(&endorsement.repository)?;
+    positive(endorsement.pull_request)?;
+    positive(endorsement.id)?;
+    text(&endorsement.author)?;
+    git_identity(&endorsement.source_commit)?;
+    sha256("body_sha256", &endorsement.body_sha256)?;
+    sha256("mapping_sha256", &endorsement.mapping_sha256)?;
+    Ok(())
 }
 
 pub(super) fn text(value: &str) -> Result<(), String> {
@@ -194,7 +216,7 @@ fn obligation(value: &ObligationRef) -> Result<(), String> {
     Ok(())
 }
 
-fn case_identity(value: &CaseIdentity) -> Result<(), String> {
+pub(super) fn case_identity(value: &CaseIdentity) -> Result<(), String> {
     text(&value.name)?;
     sha256("case executable_sha256", &value.executable_sha256)
 }
@@ -210,14 +232,14 @@ pub(super) fn git_identity(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn positive(value: u64) -> Result<(), String> {
+pub(super) fn positive(value: u64) -> Result<(), String> {
     if value == 0 {
         return Err("evidence host id/attempt must be positive".into());
     }
     Ok(())
 }
 
-fn repository(value: &str) -> Result<(), String> {
+pub(super) fn repository(value: &str) -> Result<(), String> {
     text(value)?;
     let parts: Vec<_> = value.split('/').collect();
     if parts.len() != 2
