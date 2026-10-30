@@ -43,7 +43,9 @@ and fresh UUIDs, never copy sessions, and require the exact native session-not-f
 failure is not success. The attempt bound is 900 seconds; no external bypass is enabled.
 
 Bounded project metadata comparison records changes without opening project file contents. The
-original project/config/environment baseline remains checked during empty-project cases. This is
+original project/config/environment baseline remains checked during empty-project cases. Canonical
+roles and existing directory identities are checked before descent; an ancestor alias or replaced
+directory refuses before traversing a foreign tree. Failed eligibility skips the follow-up sample. This is
 partial effect observation, not atomic confinement, content equality or complete mutation proof.
 
 Each completed case retains its ordinary outcome journal first, then its finite context journal.

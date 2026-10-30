@@ -370,7 +370,11 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
             if let Some(capture) = &capture {
                 let after = scenario.eligible(guard.as_ref(), project.as_ref());
                 let mut context = capture.finish(after);
-                context.project_unchanged = scenario.unchanged(project.as_ref());
+                context.project_unchanged = if after {
+                    scenario.unchanged(project.as_ref())
+                } else {
+                    None
+                };
                 if !before
                     || !after
                     || !context.diagnostics_valid
