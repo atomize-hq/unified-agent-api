@@ -66,6 +66,7 @@ pub struct CaseContext {
     pub local_before: bool,
     pub local_after: bool,
     pub launches: Vec<Launch>,
+    #[serde(deserialize_with = "projection::required_nullable")]
     pub config: Option<Config>,
     pub bindings: Vec<Binding>,
     pub missing: Vec<Fact>,

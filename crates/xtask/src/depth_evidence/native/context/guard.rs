@@ -60,8 +60,20 @@ pub struct LocalGuard {
     project: PathBuf,
     system: PathBuf,
     config: Option<(serde_json::Value, Stamp)>,
+    environment: BTreeMap<OsString, OsString>,
     home_stamp: Stamp,
     project_stamp: Stamp,
+}
+// Retained only in memory. Bind nonsecret input values and auth-channel presence,
+// never credential bytes or reviewed non-effect channel values.
+fn environment_inputs(env: &BTreeMap<OsString, OsString>) -> BTreeMap<OsString, OsString> {
+    env.iter()
+        .filter_map(|(key, value)| match key.to_str()? {
+            "SHLVL" | "_" | "PWD" | "OLDPWD" | "TERM" | "COLORTERM" | "NO_COLOR" => None,
+            "OPENAI_API_KEY" | "CODEX_API_KEY" => Some((key.clone(), OsString::new())),
+            _ => Some((key.clone(), value.clone())),
+        })
+        .collect()
 }
 pub fn role(path: &Path) -> Result<PathBuf, Refusal> {
     if !path.is_absolute()
@@ -235,6 +247,7 @@ impl LocalGuard {
             project,
             system: system.into(),
             config,
+            environment: environment_inputs(env),
             home_stamp,
             project_stamp,
         })

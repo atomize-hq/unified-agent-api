@@ -161,10 +161,8 @@ pub(super) fn run(
     {
         return Err("native/collector executable changed after registration".into());
     }
-    let work = args
-        .working_dir
-        .canonicalize()
-        .map_err(|_| "native working directory unavailable")?;
+    let work = form::context::guard::role(&args.working_dir)
+        .map_err(|_| "native working directory role refused")?;
     if !work.is_dir() || work == root || work.starts_with(root) {
         return Err("native project must be separate from producer source".into());
     }

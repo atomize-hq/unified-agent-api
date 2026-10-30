@@ -25,7 +25,9 @@ pub struct Launch {
 pub struct Config {
     pub model_gpt5: bool,
     pub provider_openai: bool,
+    #[serde(deserialize_with = "required_nullable")]
     pub approval: Option<Approval>,
+    #[serde(deserialize_with = "required_nullable")]
     pub sandbox: Option<Sandbox>,
     pub origins_present: bool,
     // Existing API requests includeLayers:false; never invent layer/turn closure.
@@ -68,4 +70,13 @@ pub(crate) fn environment_known(env: &BTreeMap<OsString, OsString>) -> bool {
             _ => false,
         }
     })
+}
+
+// A nullable field is still a required member of the finite projection.
+pub fn required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
 }

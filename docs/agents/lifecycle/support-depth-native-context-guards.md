@@ -19,8 +19,9 @@ OS-home/XDG/project inputs refuse with finite codes. Recognized boolean feature 
 explicitly false; native effective values may differ and remain to be measured. Known pinned bundled
 system-skill files are checked against the existing offline acquisition's exact names and digests;
 extra files, symlinks, incomplete inventories and changed bytes refuse. This checks permitted asset
-presence, not skill execution or complete loader behavior. Auth refresh does not invalidate the
-nonsecret snapshot. Context/config/role identity drift refuses; these checks are not an OS sandbox
+presence, not skill execution or complete loader behavior. Relevant nonsecret environment values and authentication-channel presence are bound in memory;
+changed values or removals refuse. Credential values and reviewed non-effect channels are excluded,
+so auth refresh does not invalidate the nonsecret snapshot. Context/config/role identity drift refuses; these checks are not an OS sandbox
 or an atomic guarantee against concurrent changes.
 
 The wrapper emits private finite tracing events after final command overlays and after successful

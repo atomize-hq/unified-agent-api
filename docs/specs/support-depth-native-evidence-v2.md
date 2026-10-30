@@ -223,7 +223,8 @@ content-bound. Receipt revision 2 and existing payload/aggregate bounds are unch
 
 `observed_context` is exactly `{schema_version:1, complete:<boolean>, cases:[CaseContext...]}`.
 The case population is bounded to 4096 and MUST equal the plan's exact requested population for
-positive admission; duplicates, unknown fields and unsupported revisions refuse. Missing/unrun
+positive admission; duplicates, unknown fields and unsupported revisions refuse. Nullable members
+MUST be explicitly present as null or a supported value; omission refuses. Missing/unrun
 contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `CaseContext` is exactly:
 
 - `case`: existing actual `CaseIdentity`; `route`: `initial_exec`, `resume_exec` or `app_server`.
@@ -267,6 +268,9 @@ selected home consistently, rechecks before/after each case, and observes actual
 through passive private finite diagnostics. It serializes only known enums/booleans/case identities,
 never raw native strings, env/config frames, credential bytes or their hashes. The full inherited
 environment plus final command overlays is checked; overlay inspection alone is insufficient.
+The local recheck MUST bind relevant nonsecret environment values and auth-channel presence in
+memory. Changed values, additions or removals refuse; credential values and reviewed non-effect
+channel values MUST NOT be retained in that snapshot.
 The fixed guard's protocol/config and bundled-asset inputs are the existing pinned
 `pilot-protocol-facts.json` and `pilot-runtime-context.json` under the version's report directory;
 both MUST be in the independently approved build/source closure before compilation.

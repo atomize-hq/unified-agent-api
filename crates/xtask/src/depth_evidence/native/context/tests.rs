@@ -215,3 +215,80 @@ fn local_guard_preserves_auth_and_rejects_aliases_loaders_and_nonsecret_drift() 
         "refreshed-auth-native-owned"
     );
 }
+
+#[test]
+fn nullable_members_are_required_and_explicit_null_is_preserved() {
+    let (obs, _, _, _, _) = fixture();
+    let valid = serde_json::to_value(&obs).unwrap();
+    assert!(Observation::parse(&serde_json::to_vec(&valid).unwrap()).is_ok());
+    let mut omitted = valid.clone();
+    omitted["cases"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("config");
+    assert!(Observation::parse(&serde_json::to_vec(&omitted).unwrap()).is_err());
+    // The parent journal decoder must reject omission too, before normalization.
+    assert!(serde_json::from_value::<CaseContext>(omitted["cases"][0].clone()).is_err());
+    let config = serde_json::json!({
+        "model_gpt5":true,"provider_openai":true,"approval":null,"sandbox":null,
+        "origins_present":false,"layers_complete":false,"requirements_empty":true
+    });
+    assert!(serde_json::from_value::<Config>(config.clone()).is_ok());
+    for member in ["approval", "sandbox"] {
+        let mut omitted = config.clone();
+        omitted.as_object_mut().unwrap().remove(member);
+        assert!(serde_json::from_value::<Config>(omitted).is_err());
+    }
+}
+#[test]
+#[cfg(target_os = "linux")]
+fn local_guard_binds_effectful_environment_values_and_presence_without_secrets() {
+    use std::{collections::BTreeMap, ffi::OsString, fs};
+    let tmp = tempfile::tempdir_in("/tmp").unwrap();
+    let home = tmp.path().join("home");
+    let work = tmp.path().join("work");
+    fs::create_dir(&home).unwrap();
+    fs::create_dir(&work).unwrap();
+    let env: BTreeMap<OsString, OsString> = BTreeMap::from([
+        ("HOME".into(), tmp.path().as_os_str().into()),
+        ("PATH".into(), "/usr/bin:/bin".into()),
+        ("TMPDIR".into(), "/tmp".into()),
+        ("OPENAI_API_KEY".into(), "sk-must-not-retain".into()),
+        ("TERM".into(), "xterm".into()),
+    ]);
+    let g = guard::LocalGuard::inspect_with_system(
+        &home,
+        &work,
+        &env,
+        &tmp.path().join("absent-system"),
+    )
+    .unwrap();
+    for (key, value) in [
+        ("HOME", "/tmp"),
+        ("PATH", "/usr/bin"),
+        ("TMPDIR", "/var/tmp"),
+    ] {
+        let mut changed = env.clone();
+        changed.insert(key.into(), value.into());
+        assert_eq!(
+            g.recheck(&changed),
+            Err(guard::Refusal::InputDrift),
+            "{key}"
+        );
+        changed.remove(std::ffi::OsStr::new(key));
+        assert_eq!(
+            g.recheck(&changed),
+            Err(guard::Refusal::InputDrift),
+            "removed {key}"
+        );
+    }
+    let mut refresh = env.clone();
+    refresh.insert("OPENAI_API_KEY".into(), "sk-new-secret".into());
+    refresh.insert("TERM".into(), "other-reviewed-terminal".into());
+    assert!(g.recheck(&refresh).is_ok());
+    let retained = format!("{g:?}");
+    assert!(!retained.contains("must-not-retain"));
+    assert!(!retained.contains("xterm"));
+    refresh.remove(std::ffi::OsStr::new("OPENAI_API_KEY"));
+    assert_eq!(g.recheck(&refresh), Err(guard::Refusal::InputDrift));
+}
