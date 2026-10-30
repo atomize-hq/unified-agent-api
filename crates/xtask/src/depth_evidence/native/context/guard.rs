@@ -1,6 +1,8 @@
 //! Producer-only local checks. Never read, inventory, hash or copy authentication stores.
 use super::environment_known;
 mod assets;
+mod project;
+pub use project::ProjectGuard;
 use std::{
     collections::BTreeMap,
     ffi::OsString,

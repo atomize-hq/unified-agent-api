@@ -135,7 +135,7 @@ fn sigint_and_sigterm_kill_owned_descendants_and_keep_prior_failure() {
         }
         let cases: Cases =
             serde_json::from_slice(&fs::read(tmp.path().join("retained.json")).unwrap()).unwrap();
-        assert_eq!(cases.requested.len(), 12);
+        assert_eq!(cases.requested.len(), 28);
         assert_eq!(cases.executed.len(), 1);
         assert_eq!(cases.executed[0].outcome, CaseOutcome::Failed);
     }

@@ -102,7 +102,7 @@ derivation. Apply the same standard to each additional unexposed relevant defaul
 
 ### Existing fixed-digest integration
 
-Today `native/bundle.rs` compares the entire observed context's digest with `Profile.context_sha256`.
+PR #308 replaced `native/bundle.rs`'s whole observed-context digest comparison with typed expectations.
 Actual role paths and per-case observations cannot be preapproved as one machine-specific blob.
 Separate stable reviewed expectations from variable retained observations; keep both content-bound
 in the existing plan/bundle. The private admission path must parse the strict finite projection,
@@ -139,8 +139,9 @@ native and hermetic case groups, binding each actual executable independently. R
 helpers/assertions where practical; do not turn Cargo's overall exit status into invented individual
 case outcomes. Keep locally executed hermetic outcomes labeled as such under NE-P1's local execution
 trust. An existing CI run is reuse only if the current evaluator independently admits its exact
-scope/provenance; never splice a favorable CI case into native execution. Current twelve-name
-`requested()`/pre-registration equality must be updated before a broader profile can register.
+scope/provenance; never splice a favorable CI case into native execution. The shared fixed `native/cases.rs` population now contains 28 native continuity/cancellation/no-match
+cases; any further population/harness expansion must update pre-registration equality before
+registration.
 There is no generic arbitrary-test command or second evidence evaluator.
 
 Mappings may factor independent dimensions only where substantive independent review establishes
@@ -216,3 +217,21 @@ required gates (`make preflight`, default-feature workspace tests, backend type-
 three agents' manifest/tip/acquisition gates) and both review lanes. Closure is achieved only when
 all required facts/rows/mappings are resolved and current all-due results are independently admitted;
 a reviewed plan alone does not make `complete:false` true or the full pipeline proven.
+
+## Context/case implementation progress after PR #308
+
+Actual owning-child thread replies and turn acceptance now have separate finite, content-bound
+partial observations. Bounded disposable-project metadata sampling detects scenario changes while
+withholding file contents and auth/native-home state. These do not clear any of the six complete
+context facts. The native population is 28 fixed cases, adding resume/fork last/id cancellation and
+fresh-project no-match controls to both existing regimes. All original baselines remain bound during
+those controls. Cancellation means owned request cancellation; accepted-turn timeout/drop/exit and
+bounded command/file allow/deny effects remain separate assertions.
+
+C1's real backend policy matrix now covers both last/id selectors, with no-spawn invalid-intent
+assertions across all three request regimes. The existing acquisition comparison explicitly checks
+94 identities, 207 edges and 53 tuples, and retains claim-only `--full-auto` as unresolved. These
+changes supply concrete assertions for future mappings, not approved classifications or installed
+adequacy. Hermetic and native executable identities must still be bound independently before a
+mixed population can register. Keep the existing native receipts and private profile absent until
+all required observation methods, values, mappings and registered native corroboration are complete.

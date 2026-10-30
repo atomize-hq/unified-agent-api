@@ -6,6 +6,8 @@ mod context;
 mod io;
 #[path = "codex_native_results/record.rs"]
 mod record;
+#[path = "codex_native_results/scenario.rs"]
+mod scenario;
 use agent_api::{
     backends::codex::{CodexBackend, CodexBackendConfig},
     AgentWrapperBackend, AgentWrapperError, AgentWrapperRunRequest,
@@ -90,8 +92,10 @@ async fn observe(
     variant: Variant,
     step: &str,
     seed: Option<&str>,
+    project: Option<&Path>,
 ) -> (record::Observation, Option<NativeFailure>) {
     let mut extensions = BTreeMap::new();
+    let operation = record::operation(step);
     if matches!(variant, Variant::Interactive) {
         extensions.insert("agent_api.exec.non_interactive".into(), json!(false));
         extensions.insert(
@@ -99,13 +103,13 @@ async fn observe(
             json!("on-request"),
         );
     }
-    if step.starts_with("resume") || step.starts_with("fork") {
-        let key = if step.starts_with("resume") {
+    if operation.starts_with("resume") || operation.starts_with("fork") {
+        let key = if operation.starts_with("resume") {
             "agent_api.session.resume.v1"
         } else {
             "agent_api.session.fork.v1"
         };
-        let selector = if step.ends_with("-last") {
+        let selector = if operation.ends_with("-last") {
             json!({"selector":"last"})
         } else {
             json!({"selector":"id","id":seed})
@@ -114,7 +118,7 @@ async fn observe(
     }
     let request=AgentWrapperRunRequest {
         prompt:format!("Reply with exactly the single token {REPLY} and no other text. Do not run tools or change files."),
-        timeout:Some(Duration::from_secs(30)), extensions,..Default::default()
+        timeout:Some(Duration::from_secs(xtask::depth_evidence::native::cases::REQUEST_TIMEOUT_SECONDS)), working_dir:project.map(Path::to_path_buf), extensions,..Default::default()
     };
     let mut observation = record::Observation {
         consistent: true,
@@ -122,6 +126,13 @@ async fn observe(
     };
     let control = match backend.run_control(request).await {
         Ok(c) => c,
+        Err(AgentWrapperError::Backend { message })
+            if step.starts_with("no-match-")
+                && matches!(message.as_str(), "no session found" | "session not found") =>
+        {
+            observation.session_not_found = true;
+            return (observation, None);
+        }
         Err(_) => return (observation, Some(NativeFailure::RequestRefused)),
     };
     let events = async {
@@ -138,7 +149,9 @@ async fn observe(
                 observation.unexpected_item = true;
                 control.cancel.cancel();
             }
-            if step == "cancel" && observation.session_id.is_some() && !observation.cancel_requested
+            if step.starts_with("cancel")
+                && observation.session_id.is_some()
+                && !observation.cancel_requested
             {
                 control.cancel.cancel();
                 observation.cancel_requested = true;
@@ -155,6 +168,13 @@ async fn observe(
             );
             observation.completion_success = c.status.success();
             observation.reply_matches = c.final_text.as_deref() == Some(REPLY);
+            None
+        }
+        Err(AgentWrapperError::Backend { message })
+            if step.starts_with("no-match-")
+                && matches!(message.as_str(), "no session found" | "session not found") =>
+        {
+            observation.session_not_found = true;
             None
         }
         Err(AgentWrapperError::Backend { message }) if message == "cancelled" => {
@@ -260,6 +280,14 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
     {
         return Err("native context refused: binary".into());
     }
+    let project = if args.context_guard {
+        Some(
+            xtask::depth_evidence::native::context::guard::ProjectGuard::inspect(&work)
+                .map_err(|e| e.to_string())?,
+        )
+    } else {
+        None
+    };
     let capture = if args.context_guard {
         Some(context::Capture::install()?)
     } else {
@@ -301,7 +329,7 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
         binary: Some(binary.clone()),
         codex_home: home,
         model: args.model,
-        default_working_dir: Some(work),
+        default_working_dir: Some(work.clone()),
         ..Default::default()
     });
     let mut results = Vec::new();
@@ -312,10 +340,8 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
             if stopped {
                 break;
             }
-            let before = guard
-                .as_ref()
-                .map(|g| g.recheck(&context::environment()).is_ok())
-                .unwrap_or(true);
+            let scenario = scenario::Scenario::new(step, guard.as_ref())?;
+            let before = scenario.eligible(guard.as_ref(), project.as_ref());
             if let Some(capture) = &capture {
                 capture.begin(
                     identity(*variant, step, &runner_sha),
@@ -325,7 +351,14 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
             }
             let started = Instant::now();
             let (observation, mut failure) = if before {
-                observe(&backend, *variant, step, state.seed()).await
+                observe(
+                    &backend,
+                    *variant,
+                    step,
+                    scenario.absent_id().or(state.seed()),
+                    scenario.project(),
+                )
+                .await
             } else {
                 (
                     record::Observation::default(),
@@ -335,11 +368,18 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
             let mut outcome = state.record(step, &observation);
             let mut context_bytes = None;
             if let Some(capture) = &capture {
-                let after = guard
-                    .as_ref()
-                    .is_some_and(|g| g.recheck(&context::environment()).is_ok());
-                let context = capture.finish(after);
-                if !before || !after || !context.diagnostics_valid {
+                let after = scenario.eligible(guard.as_ref(), project.as_ref());
+                let mut context = capture.finish(after);
+                context.project_unchanged = if after {
+                    scenario.unchanged(project.as_ref())
+                } else {
+                    None
+                };
+                if !before
+                    || !after
+                    || !context.diagnostics_valid
+                    || context.project_unchanged == Some(false)
+                {
                     outcome = CaseOutcome::Failed;
                     failure = Some(NativeFailure::ContextRefused);
                 }
@@ -505,7 +545,7 @@ mod tests {
         let raw = fs::read(output.join("observations.json")).unwrap();
         let cases: Cases =
             serde_json::from_slice(&fs::read(output.join("cases.json")).unwrap()).unwrap();
-        assert_eq!(cases.requested.len(), 12);
+        assert_eq!(cases.requested.len(), 28);
         assert_eq!(cases.executed.len(), 1);
         assert_eq!(cases.executed[0].outcome, CaseOutcome::Failed);
         assert_eq!(cases.raw_output.sha256, hex::encode(Sha256::digest(&raw)));
@@ -592,5 +632,54 @@ mod tests {
             "target/results"
         ])
         .is_ok());
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn missing_session_controls_use_real_backend_refusals_for_all_selectors() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let binary = tmp.path().join("fake");
+        fs::write(&binary,r#"#!/usr/bin/python3
+import sys,json
+if 'app-server' not in sys.argv:
+ print('no session found: sk-native-error',file=sys.stderr);sys.exit(1)
+for line in sys.stdin:
+ req=json.loads(line)
+ if 'id' not in req: continue
+ method=req['method']
+ if method=='initialize': result={'userAgent':'fixture'}
+ elif method=='thread/list': result={'data':[],'nextCursor':None}
+ elif method=='config/read': result={'config':{},'origins':{}}
+ elif method=='configRequirements/read': result={'requirements':None}
+ else:
+  print(json.dumps({'id':req['id'],'error':{'code':-1,'message':'session not found: sk-native-error'}}),flush=True);continue
+ print(json.dumps({'id':req['id'],'result':result}),flush=True)
+"#).unwrap();
+        fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+        let backend = CodexBackend::new(CodexBackendConfig {
+            binary: Some(binary),
+            default_working_dir: Some(tmp.path().into()),
+            ..Default::default()
+        });
+        for variant in [Variant::Unattended, Variant::Interactive] {
+            for step in [
+                "no-match-resume-last",
+                "no-match-resume-id",
+                "no-match-fork-last",
+                "no-match-fork-id",
+            ] {
+                let (obs, _) = observe(
+                    &backend,
+                    variant,
+                    step,
+                    Some("aaaaaaaa-1111-4111-8111-111111111111"),
+                    None,
+                )
+                .await;
+                assert!(obs.session_not_found, "{variant:?}/{step}");
+                assert!(!obs.completion_success && obs.session_id.is_none());
+                assert!(!serde_json::to_string(&obs).unwrap().contains("sk-native"));
+            }
+        }
     }
 }

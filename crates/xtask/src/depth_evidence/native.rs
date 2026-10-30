@@ -1,6 +1,7 @@
 //! Untrusted revision-2 native forms. Parsing never establishes host or execution authority.
 use super::*;
 use serde::{Deserialize, Serialize};
+pub mod cases;
 pub mod context;
 mod validate;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -171,6 +172,7 @@ pub struct NativeObservation {
     pub cancel_requested: bool,
     pub cancelled: bool,
     pub unexpected_item: bool,
+    pub session_not_found: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]

@@ -1,6 +1,8 @@
 //! Passive finite launch diagnostics; no SDK dispatch/validation changes.
 mod projection;
+mod replies;
 pub(crate) use projection::*;
+pub(crate) use replies::{thread_reply, turn_reply, ReplyRoles};
 use serde::Serialize;
 use std::{collections::BTreeMap, ffi::OsString, path::Path};
 use tokio::process::Command;

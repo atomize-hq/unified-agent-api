@@ -241,8 +241,10 @@ async fn native_initial_resume_fork_policy_matrix_and_model_precedence() {
     let granular = json!({"granular":{"sandbox_approval":true,"rules":false,"mcp_elicitations":true,"request_permissions":false,"skill_approval":false}});
     for selector in [
         None,
-        Some("agent_api.session.resume.v1"),
-        Some("agent_api.session.fork.v1"),
+        Some(("agent_api.session.resume.v1", "last")),
+        Some(("agent_api.session.resume.v1", "id")),
+        Some(("agent_api.session.fork.v1", "last")),
+        Some(("agent_api.session.fork.v1", "id")),
     ] {
         for policy in [
             None,
@@ -277,10 +279,15 @@ async fn native_initial_resume_fork_policy_matrix_and_model_precedence() {
                     .extensions
                     .insert("backend.codex.exec.approval_policy".into(), policy);
             }
-            if let Some(selector) = selector {
-                request
-                    .extensions
-                    .insert(selector.into(), json!({"selector":"id","id":"source"}));
+            if let Some((selector, selection)) = selector {
+                request.extensions.insert(
+                    selector.into(),
+                    if selection == "last" {
+                        json!({"selector":"last"})
+                    } else {
+                        json!({"selector":"id","id":"source"})
+                    },
+                );
             }
             let run = backend.run(request).await.unwrap();
             drop(run.events);
@@ -663,3 +670,6 @@ mod environment;
 #[cfg(unix)]
 #[path = "codex_native_bridge/queued_reply.rs"]
 mod queued_reply;
+
+#[path = "codex_native_bridge/policy_validation.rs"]
+mod policy_validation;

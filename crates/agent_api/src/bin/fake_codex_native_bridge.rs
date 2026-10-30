@@ -38,6 +38,9 @@ fn mcp(scenario: &str) -> Value {
     params
 }
 fn main() {
+    if let Ok(marker) = env::var("NATIVE_SPAWN_MARKER") {
+        std::fs::write(marker, b"spawned").unwrap();
+    }
     assert!(
         env::args().any(|arg| arg == "app-server"),
         "native route required"

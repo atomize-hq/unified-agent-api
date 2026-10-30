@@ -439,8 +439,14 @@ impl CodexAppServer {
         params: Value,
     ) -> Result<AppCallHandle, McpError> {
         let events = self.transport.register_app_listener().await;
+        let roles = crate::native_context::ReplyRoles::from_params(&params);
         let (request_id, raw_response) = self.transport.request(method, params).await?;
-        let response = map_app_response(raw_response, method, self.transport.diagnostic_owner());
+        let response = map_app_response(
+            raw_response,
+            method,
+            self.transport.diagnostic_owner(),
+            roles,
+        );
 
         Ok(AppCallHandle {
             request_id,

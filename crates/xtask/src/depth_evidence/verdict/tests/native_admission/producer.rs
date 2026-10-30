@@ -228,12 +228,12 @@ fn registered_failed_run_keeps_all_due_claims_full_population_and_v2_bundle() {
         .any(|f| f.path.ends_with("registration.json")));
     let plan =
         form::Plan::parse(&fs::read_to_string(root.join(bundle.plan.path)).unwrap()).unwrap();
-    assert_eq!(plan.requested.len(), 12);
+    assert_eq!(plan.requested.len(), 28);
     for file in &bundle.claims {
         let bytes = fs::read(root.join(&file.path)).unwrap();
         assert_eq!(crate::depth_ci::reference(&file.path, &bytes), *file);
         let claim = form::Claim::parse(std::str::from_utf8(&bytes).unwrap()).unwrap();
-        assert_eq!(claim.cases.requested.len(), 12);
+        assert_eq!(claim.cases.requested.len(), 28);
         assert_eq!(claim.cases.executed[0].outcome, CaseOutcome::Failed);
     }
 }

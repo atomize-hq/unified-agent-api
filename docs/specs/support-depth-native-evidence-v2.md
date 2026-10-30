@@ -182,12 +182,12 @@ outside the closed bundle index. Source/packet/executable drift or a different e
 registration retains an incomplete attempt and starts no native calls.
 
 The closed-built existing `codex_native_results` collector runs once, using the caller's normal
-native environment. Its current supported case population is the twelve existing unattended and
-interactive initial/resume/fork/cancellation diagnostics, with actual built harness digests. A fixed
+native environment. Its current supported case population is 28 fixed unattended and
+interactive diagnostics: initial/resume/fork, cancellation for each selector and four no-match controls per variant, with actual built harness digests. A fixed
 profile requesting another population refuses before registration; this population does not assert
 adequacy for all 53 template tuples. The disposable native project must be outside producer source.
 Each completed case is journaled before the next case. The parent owns a Unix process group and a
-420-second deadline, kills that group and reaps the direct child on completion/timeout, retaining finite typed case
+900-second deadline, kills that group and reaps the direct child on completion/timeout, retaining finite typed case
 observations. A later truncated journal, missing final output or timeout cannot erase earlier valid
 case failures; malformed values and raw child stdout/stderr/error text are never copied into proof.
 The foreground command catches SIGINT/SIGTERM: it stops further dispatch, kills the owned native
@@ -239,6 +239,25 @@ contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `Cas
   `read_only|workspace_write|danger_full_access`. The payload MUST equal the case's source-owned
   expectation. A present config requires known model/provider/approval/sandbox, origins and empty
   supported requirements. The existing layer-free/pre-turn API is not complete layer or turn proof.
+- `thread_settings`: explicitly null, or exactly `{operation, model_gpt5, provider_openai,
+  service_tier_default, approval, reviewer_user, sandbox_mode, cwd_matches, runtime_roots_match,
+  instructions_empty}`. `operation` is `start|resume|fork`; predicates are booleans. `approval` is
+  explicitly null or a tagged `mode` of `never|on_request|untrusted|on_failure`, or `granular` with
+  all five boolean fields `sandbox_approval`, `rules`, `mcp_elicitations`, `request_permissions`,
+  `skill_approval`. `sandbox_mode` is explicitly null or the finite existing sandbox enum. Only
+  actual thread responses supply this projection. Missing/unknown native fields MUST NOT become
+  empty/default values. `service_tier_default` requires explicit native null. Sandbox mode alone
+  does not establish complete sandbox settings. `instructions_empty` requires an explicit empty
+  array and is not complete loader proof. Role comparisons use exact canonical assigned paths;
+  their raw values MUST NOT be retained.
+- `turn_accepted`: explicitly null or boolean from the owning native `turn/start` response,
+  after that case's thread response. Missing, duplicate, foreign-owner or reordered diagnostics
+  cannot supply this observation. Acceptance is distinct from completion and effective-turn proof.
+- `project_unchanged`: explicitly null or boolean from bounded metadata-only comparison of the
+  disposable project, including each fresh no-match project. No file contents or native-home/auth
+  inventory are read by this comparison. Relevant additions, removals, type/identity/mode/time/size
+  changes refuse the current no-tools scenario. This sampling MUST NOT be represented as content
+  equality, atomic confinement, complete mutation-scope proof or proof about escaped writes.
 - `bindings`: one exact source-approved binding for each required fact, no duplicates. Each is
   exactly `{fact, source:<FileRef>, corroboration:<CaseIdentity>}`. Required facts are `layer_inputs`,
   `authentication_resolver`, `transitive_runtime`, `effective_turn`, `loader_effects`, `mutation_scope`.
@@ -263,7 +282,7 @@ The private adapter MUST independently validate these predicates and all source/
 establish what an emitted observation means under NE-P1's honest-maintainer trust boundary; JSON
 cannot self-authenticate local execution. Complete synthetic fixtures prove predicates only.
 
-The first guarded collector inspects local non-auth eligibility before its version probe, forwards
+The guarded collector inspects local non-auth eligibility before its version probe, forwards
 selected home consistently, rechecks before/after each case, and observes actual production paths
 through passive private finite diagnostics. It serializes only known enums/booleans/case identities,
 never raw native strings, env/config frames, credential bytes or their hashes. The full inherited
@@ -281,3 +300,27 @@ false. A separate config-only process, old offline trace, intent or actual child
 clear them. Existing complete-attempt retention, authenticated adoption, private profile installation
 and independently sealed consumer authority remain required. No live model call or background job
 is part of this implementation.
+
+### Fixed case population and negative controls
+
+The shared source-owned case inventory is `native/cases.rs`. Both variants retain initial,
+resume-last/id and fork-last/id continuity, cancellation of a request for each of those five
+selectors, and no-match resume-last/id and fork-last/id controls. The producer plan, collector and
+journal recovery MUST use the same 28 identities and actual collector digest. Per-request timeout
+is 30 seconds; the attempt bound is the fixed population times that budget plus 60 seconds.
+These individual cases are not the 53 due tuples or an adequacy mapping.
+
+No-match controls own fresh empty disposable projects and generated fresh UUIDs; they copy no
+sessions or credentials and do not delete caller sessions. Only the exact backend `no session found`
+or `session not found` result, with no observed session or successful completion, passes. A generic
+spawn, policy, protocol, timeout or provider error is not that result. Normal continuity keeps the
+initial seed. Last-selector cancellation requires a known project session; it MUST NOT infer native
+metadata ordering from observation order or claim to prove that ordering. Cancellation of resume/fork
+cannot be replaced by initial cancellation. These cases observe owned request cancellation, not a claim
+that every cancellation occurred after native turn acceptance.
+
+Original context/config/environment/project checks remain bound while an empty-project control is
+running; creating a fresh case guard MUST NOT reset the original baseline. Each finite outcome is
+still journaled before its context and before the next case. Unknown contexts remain incomplete.
+No new external-sandbox execution, native tool approval, classification/mapping installation or
+positive evidence is authorized by these additions.

@@ -36,23 +36,7 @@ pub(super) fn fingerprint(path: &Path) -> Result<String, String> {
     Ok(hex::encode(h.finalize()))
 }
 pub(in crate::depth_evidence::verdict) fn requested(sha: &str) -> Vec<CaseIdentity> {
-    ["unattended", "interactive"]
-        .iter()
-        .flat_map(|v| {
-            [
-                "initial",
-                "resume-last",
-                "resume-id",
-                "fork-last",
-                "fork-id",
-                "cancel",
-            ]
-            .map(|step| CaseIdentity {
-                name: format!("codex-native/{v}/{step}"),
-                executable_sha256: sha.into(),
-            })
-        })
-        .collect()
+    form::cases::requested(sha)
 }
 pub(in crate::depth_evidence::verdict) struct Execution {
     pub cases: Cases,
@@ -198,7 +182,11 @@ pub(super) fn run(
     if !cfg!(unix) {
         return Err("owned native process cleanup requires Unix".into());
     }
-    let status = wait_owned(c, cancel, Duration::from_secs(420))?;
+    let status = wait_owned(
+        c,
+        cancel,
+        Duration::from_secs(form::cases::ATTEMPT_TIMEOUT_SECONDS),
+    )?;
     // Completed finite journals survive timeout, a missing final file, or a failed final probe.
     let (steps, journal_valid) = read_steps(root, &output, &plan.requested);
     let cases = project(&plan.requested, &output, &steps)?;
