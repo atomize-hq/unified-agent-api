@@ -264,6 +264,28 @@ fn real_acquisition_binds_all_routes_ancestry_protocol_source_and_carried_work()
         .collect();
     assert_eq!(documented, acquired);
     assert_eq!(acquired.len(), 207);
+    let identities: std::collections::BTreeSet<_> = acquired
+        .iter()
+        .map(|(_, kind, path, id)| (kind, path, id))
+        .collect();
+    assert_eq!(identities.len(), 94);
+    // --full-auto is present only in wrapper claims at this pinned version. Keeping its
+    // obligation does not manufacture native support or erase the unresolved classification.
+    let union: Value = serde_json::from_str(include_str!(
+        "../../../cli_manifests/codex/snapshots/0.156.1/union.json"
+    ))
+    .unwrap();
+    assert!(!union["commands"][0]["flags"]
+        .to_string()
+        .contains("--full-auto"));
+    for operation in ["run-initial", "run-resume", "run-fork"] {
+        assert!(acquired.contains(&(
+            operation.into(),
+            "global_flags".into(),
+            "codex".into(),
+            "--full-auto".into()
+        )));
+    }
     let observation: Value = serde_json::from_str(include_str!(
         "../../../cli_manifests/codex/reports/0.156.1/pilot-runtime-context.json"
     ))

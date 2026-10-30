@@ -3,14 +3,7 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 use xtask::depth_evidence::CaseOutcome;
 
-pub const STEPS: [&str; 6] = [
-    "initial",
-    "resume-last",
-    "resume-id",
-    "fork-last",
-    "fork-id",
-    "cancel",
-];
+pub use xtask::depth_evidence::native::cases::{operation, STEPS};
 pub use xtask::depth_evidence::native::native_session_id as valid_id;
 pub use xtask::depth_evidence::native::NativeObservation as Observation;
 /// Native strings are not copied into the report unless they have the finite ID grammar.
@@ -47,14 +40,37 @@ impl State {
         if self.stopped {
             return CaseOutcome::Aborted;
         }
+        if step.starts_with("no-match-") {
+            if STEPS.get(self.next) == Some(&step)
+                && o.session_not_found
+                && o.consistent
+                && o.session_id.is_none()
+                && !o.completion_success
+                && !o.reply_matches
+                && !o.cancel_requested
+                && !o.cancelled
+                && !o.unexpected_item
+            {
+                self.next += 1;
+                return CaseOutcome::Passed;
+            }
+            self.stopped = true;
+            return CaseOutcome::Failed;
+        }
         let id = o.session_id.as_deref().filter(|id| valid_id(id));
-        let identity = match step {
-            "initial" | "cancel" => id.is_some(),
-            "resume-last" | "resume-id" => id.is_some() && id == self.seed.as_deref(),
+        let identity = match operation(step) {
+            "initial" => id.is_some(),
+            // Native "last" uses metadata ordering, including timestamp ties. Cancellation
+            // proves an owned known-project session, not an inferred chronological ordering.
+            "resume-last" if step.starts_with("cancel") => {
+                id.is_some_and(|id| self.seen.contains(id))
+            }
+            "resume-last" => id.is_some() && id == self.seed.as_deref(),
+            "resume-id" => id.is_some() && id == self.seed.as_deref(),
             "fork-last" | "fork-id" => id.is_some_and(|id| !self.seen.contains(id)),
             _ => false,
         };
-        let completion = if step == "cancel" {
+        let completion = if step.starts_with("cancel") {
             o.cancel_requested && o.cancelled && !o.completion_success
         } else {
             o.completion_success && o.reply_matches && !o.cancelled
@@ -151,6 +167,21 @@ mod tests {
         for (step, id) in STEPS[..5].iter().zip([SEED, SEED, SEED, FORK, OTHER]) {
             assert_eq!(s.record(step, &success(id)), CaseOutcome::Passed);
         }
+        for (step, id) in [
+            ("cancel-resume-last", OTHER),
+            ("cancel-resume-id", SEED),
+            ("cancel-fork-last", "dddddddd-1111-4111-8111-111111111111"),
+            ("cancel-fork-id", "eeeeeeee-1111-4111-8111-111111111111"),
+        ] {
+            let o = Observation {
+                session_id: Some(id.into()),
+                consistent: true,
+                cancel_requested: true,
+                cancelled: true,
+                ..Default::default()
+            };
+            assert_eq!(s.record(step, &o), CaseOutcome::Passed);
+        }
         let cancelled = Observation {
             session_id: Some(OTHER.into()),
             consistent: true,
@@ -178,6 +209,21 @@ mod tests {
                 for (step, id) in STEPS[..5].iter().zip([SEED, SEED, SEED, FORK, OTHER]) {
                     assert_eq!(s.record(step, &success(id)), CaseOutcome::Passed);
                 }
+                for (step, id) in [
+                    ("cancel-resume-last", OTHER),
+                    ("cancel-resume-id", SEED),
+                    ("cancel-fork-last", "dddddddd-1111-4111-8111-111111111111"),
+                    ("cancel-fork-id", "eeeeeeee-1111-4111-8111-111111111111"),
+                ] {
+                    let o = Observation {
+                        session_id: Some(id.into()),
+                        consistent: true,
+                        cancel_requested: true,
+                        cancelled: true,
+                        ..Default::default()
+                    };
+                    assert_eq!(s.record(step, &o), CaseOutcome::Passed);
+                }
                 let o = Observation {
                     session_id: Some(OTHER.into()),
                     consistent: true,
@@ -194,6 +240,77 @@ mod tests {
                     }
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod absence_tests {
+    use super::*;
+    #[test]
+    fn missing_session_controls_require_exact_refusal_and_no_session_or_success() {
+        for attack in 0..4 {
+            let mut state = State {
+                next: 10,
+                ..Default::default()
+            };
+            let mut obs = Observation {
+                consistent: true,
+                session_not_found: true,
+                ..Default::default()
+            };
+            match attack {
+                0 => (),
+                1 => obs.session_not_found = false,
+                2 => obs.session_id = Some("aaaaaaaa-1111-4111-8111-111111111111".into()),
+                _ => obs.completion_success = true,
+            }
+            assert_eq!(
+                state.record("no-match-resume-last", &obs),
+                if attack == 0 {
+                    CaseOutcome::Passed
+                } else {
+                    CaseOutcome::Failed
+                }
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod last_cancellation_tests {
+    use super::*;
+    #[test]
+    fn last_cancellation_does_not_infer_native_metadata_order_from_observation_order() {
+        let known = [
+            "aaaaaaaa-1111-4111-8111-111111111111",
+            "bbbbbbbb-1111-4111-8111-111111111111",
+        ];
+        for id in known
+            .into_iter()
+            .chain(["cccccccc-1111-4111-8111-111111111111"])
+        {
+            let mut state = State {
+                next: 5,
+                seed: Some(known[0].into()),
+                seen: known.into_iter().map(String::from).collect(),
+                ..Default::default()
+            };
+            let obs = Observation {
+                session_id: Some(id.into()),
+                consistent: true,
+                cancel_requested: true,
+                cancelled: true,
+                ..Default::default()
+            };
+            assert_eq!(
+                state.record("cancel-resume-last", &obs),
+                if known.contains(&id) {
+                    CaseOutcome::Passed
+                } else {
+                    CaseOutcome::Failed
+                }
+            );
         }
     }
 }

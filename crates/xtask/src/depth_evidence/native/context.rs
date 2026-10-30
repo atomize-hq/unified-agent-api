@@ -5,7 +5,9 @@ use std::collections::BTreeSet;
 #[path = "../../../../codex/src/native_context/projection.rs"]
 mod projection;
 pub(crate) use projection::environment_known;
-pub use projection::{Approval, Config, Launch, Route, Sandbox};
+pub use projection::{
+    Approval, Config, Launch, Route, Sandbox, ThreadApproval, ThreadOperation, ThreadSettings,
+};
 pub const TRACE_TARGET: &str = projection::TARGET;
 pub(crate) const INPUTS: [&str; 2] = [
     "cli_manifests/codex/reports/0.156.1/pilot-runtime-context.json",
@@ -68,6 +70,12 @@ pub struct CaseContext {
     pub launches: Vec<Launch>,
     #[serde(deserialize_with = "projection::required_nullable")]
     pub config: Option<Config>,
+    #[serde(deserialize_with = "projection::required_nullable")]
+    pub thread_settings: Option<ThreadSettings>,
+    #[serde(deserialize_with = "projection::required_nullable")]
+    pub turn_accepted: Option<bool>,
+    #[serde(deserialize_with = "projection::required_nullable")]
+    pub project_unchanged: Option<bool>,
     pub bindings: Vec<Binding>,
     pub missing: Vec<Fact>,
     pub derived_defaults: Vec<DerivedDefault>,
@@ -86,6 +94,9 @@ pub(crate) struct ExpectedCase {
     pub case: CaseIdentity,
     pub route: Route,
     pub config: Option<Config>,
+    pub thread_settings: Option<ThreadSettings>,
+    pub turn_accepted: Option<bool>,
+    pub project_unchanged: Option<bool>,
     pub bindings: Vec<Binding>,
     pub derived_defaults: Vec<DerivedDefault>,
 }
@@ -173,6 +184,9 @@ impl Observation {
                 || !c.local_after
                 || !c.diagnostics_valid
                 || c.config != e.config
+                || c.thread_settings != e.thread_settings
+                || c.turn_accepted != e.turn_accepted
+                || c.project_unchanged != e.project_unchanged
                 || c.launches.len() != 2
                 || c.launches[0].spawned
                 || !c.launches[1].spawned
@@ -269,6 +283,9 @@ pub(crate) fn synthetic(cases: &[CaseIdentity], source: &FileRef) -> (Observatio
                     },
                 ],
                 config: None,
+                thread_settings: None,
+                turn_accepted: None,
+                project_unchanged: None,
                 bindings: Fact::ALL
                     .into_iter()
                     .map(|fact| Binding {
@@ -290,6 +307,9 @@ pub(crate) fn synthetic(cases: &[CaseIdentity], source: &FileRef) -> (Observatio
                 case: c.case.clone(),
                 route: c.route,
                 config: c.config.clone(),
+                thread_settings: c.thread_settings.clone(),
+                turn_accepted: c.turn_accepted,
+                project_unchanged: c.project_unchanged,
                 bindings: c.bindings.clone(),
                 derived_defaults: vec![],
             })

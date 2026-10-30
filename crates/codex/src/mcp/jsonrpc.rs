@@ -514,10 +514,15 @@ pub(super) fn map_app_response(
     rx: oneshot::Receiver<Result<Value, McpError>>,
     method: &str,
     owner: u64,
+    roles: Option<crate::native_context::ReplyRoles>,
 ) -> oneshot::Receiver<Result<Value, McpError>> {
     let read = match method {
         "config/read" => 1,
         "configRequirements/read" => 2,
+        "thread/start" => 3,
+        "thread/resume" => 4,
+        "thread/fork" => 5,
+        "turn/start" => 6,
         _ => 0,
     };
     let (tx, mapped) = oneshot::channel();
@@ -527,6 +532,16 @@ pub(super) fn map_app_response(
             match read {
                 1 => crate::native_context::config_reply(value, owner),
                 2 => crate::native_context::requirements_reply(value, owner),
+                3..=5 => {
+                    use crate::native_context::ThreadOperation;
+                    let operation = match read {
+                        3 => ThreadOperation::Start,
+                        4 => ThreadOperation::Resume,
+                        _ => ThreadOperation::Fork,
+                    };
+                    crate::native_context::thread_reply(value, operation, roles.as_ref(), owner);
+                }
+                6 => crate::native_context::turn_reply(value, owner),
                 _ => (),
             }
         }

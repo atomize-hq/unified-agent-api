@@ -11,7 +11,9 @@ use tracing::{
     Event, Id, Metadata, Subscriber,
 };
 use xtask::depth_evidence::{
-    native::context::{self, guard::LocalGuard, CaseContext, Config, Launch, Route},
+    native::context::{
+        self, guard::LocalGuard, CaseContext, Config, Launch, Route, ThreadSettings,
+    },
     CaseIdentity,
 };
 #[derive(Default)]
@@ -104,6 +106,26 @@ impl Subscriber for Capture {
                     Err(_) => c.diagnostics_valid = false,
                 }
             }
+            Some("thread")
+                if fields.valid
+                    && c.route == Route::AppServer
+                    && c.launches.len() == 2
+                    && c.thread_settings.is_none()
+                    && c.turn_accepted.is_none() =>
+            {
+                match serde_json::from_str::<ThreadSettings>(raw) {
+                    Ok(p) => c.thread_settings = Some(p),
+                    Err(_) => c.diagnostics_valid = false,
+                }
+            }
+            Some("turn")
+                if fields.valid && c.thread_settings.is_some() && c.turn_accepted.is_none() =>
+            {
+                match serde_json::from_str::<bool>(raw) {
+                    Ok(accepted) => c.turn_accepted = Some(accepted),
+                    Err(_) => c.diagnostics_valid = false,
+                }
+            }
             Some("requirements") if fields.valid => match serde_json::from_str::<bool>(raw) {
                 Ok(empty) if c.config.is_some() => {
                     c.config.as_mut().unwrap().requirements_empty = empty
@@ -132,6 +154,9 @@ impl Capture {
             local_after: false,
             launches: vec![],
             config: None,
+            thread_settings: None,
+            turn_accepted: None,
+            project_unchanged: None,
             bindings: vec![],
             missing: context::Fact::ALL.to_vec(),
             derived_defaults: vec![],
@@ -159,6 +184,7 @@ impl Capture {
     }
 }
 pub fn route(interactive: bool, step: &str) -> Route {
+    let step = xtask::depth_evidence::native::cases::operation(step);
     if interactive || step.starts_with("fork") {
         Route::AppServer
     } else if step.starts_with("resume") {

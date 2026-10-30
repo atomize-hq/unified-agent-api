@@ -80,3 +80,43 @@ where
 {
     Option::<T>::deserialize(deserializer)
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadOperation {
+    Start,
+    Resume,
+    Fork,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ThreadApproval {
+    Never,
+    OnRequest,
+    Untrusted,
+    OnFailure,
+    Granular {
+        sandbox_approval: bool,
+        rules: bool,
+        mcp_elicitations: bool,
+        request_permissions: bool,
+        skill_approval: bool,
+    },
+}
+/// Partial thread response, not an effective-turn, layer, resolver or loader verdict.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThreadSettings {
+    pub operation: ThreadOperation,
+    pub model_gpt5: bool,
+    pub provider_openai: bool,
+    pub service_tier_default: bool,
+    #[serde(deserialize_with = "required_nullable")]
+    pub approval: Option<ThreadApproval>,
+    pub reviewer_user: bool,
+    #[serde(deserialize_with = "required_nullable")]
+    pub sandbox_mode: Option<Sandbox>,
+    pub cwd_matches: bool,
+    pub runtime_roots_match: bool,
+    pub instructions_empty: bool,
+}

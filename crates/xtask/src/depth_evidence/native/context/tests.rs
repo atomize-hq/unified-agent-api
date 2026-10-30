@@ -43,6 +43,9 @@ fn fixture() -> (
             },
         ],
         config: None,
+        thread_settings: None,
+        turn_accepted: None,
+        project_unchanged: None,
         bindings: bindings.clone(),
         missing: vec![],
         derived_defaults: vec![],
@@ -53,6 +56,9 @@ fn fixture() -> (
             case: case.clone(),
             route: c.route,
             config: None,
+            thread_settings: None,
+            turn_accepted: None,
+            project_unchanged: None,
             bindings,
             derived_defaults: vec![],
         }],
@@ -291,4 +297,25 @@ fn local_guard_binds_effectful_environment_values_and_presence_without_secrets()
     assert!(!retained.contains("xterm"));
     refresh.remove(std::ffi::OsStr::new("OPENAI_API_KEY"));
     assert_eq!(g.recheck(&refresh), Err(guard::Refusal::InputDrift));
+}
+
+#[test]
+fn partial_child_context_is_content_bound_and_all_nullable_members_are_required() {
+    let (obs, expected, cases, results, inputs) = fixture();
+    for field in ["thread_settings", "turn_accepted", "project_unchanged"] {
+        let mut omitted = serde_json::to_value(&obs).unwrap();
+        omitted["cases"][0].as_object_mut().unwrap().remove(field);
+        assert!(Observation::parse(&serde_json::to_vec(&omitted).unwrap()).is_err());
+        let mut changed = obs.clone();
+        if field == "turn_accepted" {
+            changed.cases[0].turn_accepted = Some(true);
+        } else if field == "project_unchanged" {
+            changed.cases[0].project_unchanged = Some(true);
+        } else {
+            continue;
+        }
+        assert!(changed
+            .validate(&expected, &cases, &results, &inputs, &"f".repeat(64))
+            .is_err());
+    }
 }

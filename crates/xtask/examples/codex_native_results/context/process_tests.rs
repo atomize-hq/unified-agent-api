@@ -54,7 +54,17 @@ fn context_process_fixture() {
             ..Default::default()
         });
         let mut reports = vec![];
-        for (step, interactive) in [("initial", false), ("resume-id", false), ("initial", true)] {
+        for (step, interactive) in if mode == "full" {
+            vec![
+                ("initial", true),
+                ("resume-last", true),
+                ("resume-id", true),
+                ("fork-last", false),
+                ("fork-id", false),
+            ]
+        } else {
+            vec![("initial", false), ("resume-id", false), ("initial", true)]
+        } {
             let case = CaseIdentity {
                 name: format!("test/{interactive}/{step}"),
                 executable_sha256: "a".repeat(64),
@@ -70,10 +80,19 @@ fn context_process_fixture() {
                     .extensions
                     .insert("agent_api.exec.non_interactive".into(), json!(false));
             }
-            if step == "resume-id" {
+            if step.starts_with("resume") || step.starts_with("fork") {
                 request.extensions.insert(
-                    "agent_api.session.resume.v1".into(),
-                    json!({"selector":"id","id":"source"}),
+                    if step.starts_with("resume") {
+                        "agent_api.session.resume.v1"
+                    } else {
+                        "agent_api.session.fork.v1"
+                    }
+                    .into(),
+                    if step.ends_with("-last") {
+                        json!({"selector":"last"})
+                    } else {
+                        json!({"selector":"id","id":"source"})
+                    },
                 );
             }
             let run = backend.run(request).await.expect("valid fixture request");
@@ -98,6 +117,7 @@ fn fixture(mode: &str) -> tempfile::TempDir {
         "sk-synthetic-auth-never-read",
     )
     .unwrap();
+    fs::write(tmp.path().join("mode"), mode).unwrap();
     let script = r##"#!/usr/bin/python3
 import sys,json,pathlib
 p=pathlib.Path(__file__).parent
@@ -112,11 +132,18 @@ else:
   method=req['method']
   if method=='initialize': result={'userAgent':'fixture'}
   elif method=='config/read': result={'origins':{},'config':{'model':'sk-sentinel-model','model_provider':'sk-sentinel-provider','approval_policy':'sk-sentinel-policy','sandbox_mode':'sk-sentinel-sandbox','private_secret':'sk-sentinel-layer'}}
+  elif method=='thread/list': result={'data':[{'id':'source','cwd':req['params']['cwd'],'createdAt':1,'updatedAt':2}],'nextCursor':None}
+  elif method in ['thread/start','thread/resume','thread/fork']:
+   result={'thread':{'id':'aaaaaaaa-1111-4111-8111-111111111111'},'model':'gpt-5','modelProvider':'openai','serviceTier':None,'approvalPolicy':'on-request','approvalsReviewer':'user','sandbox':{'type':'workspaceWrite'},'cwd':req['params']['cwd'],'runtimeWorkspaceRoots':req['params'].get('runtimeWorkspaceRoots',[]),'instructionSources':[]}
+   if (p/'mode').read_text()=='foreign': result.update({'model':'sk-native-model','modelProvider':'sk-native-provider','serviceTier':'sk-native-tier','approvalPolicy':'sk-native-policy','approvalsReviewer':'sk-native-reviewer','sandbox':{'type':'sk-native-sandbox'},'cwd':'/sk-native-cwd','runtimeWorkspaceRoots':['/sk-native-root'],'instructionSources':['/sk-native-instruction']})
+   if (p/'mode').read_text()=='missing': result={'thread':result['thread']}
+  elif method=='turn/start': result={'turn':{'id':'native-turn','status':'inProgress','items':[]}}
   elif method=='configRequirements/read': result={'requirements':None}
   else:
    print(json.dumps({'id':req['id'],'error':{'code':-1,'message':'sk-sentinel-error'}}),flush=True)
    continue
   print(json.dumps({'id':req['id'],'result':result}),flush=True)
+  if method=='turn/start': print(json.dumps({'method':'turn/completed','params':{'threadId':'aaaaaaaa-1111-4111-8111-111111111111','turn':{'id':'native-turn','status':'completed','items':[]}}}),flush=True)
 "##;
     fs::write(tmp.path().join("fake"), script).unwrap();
     fs::set_permissions(tmp.path().join("fake"), fs::Permissions::from_mode(0o700)).unwrap();
@@ -188,4 +215,44 @@ fn actual_exec_resume_and_managed_children_emit_only_finite_observations() {
 fn producer_guard_refuses_unknown_ambient_channel_before_version_probe() {
     let tmp = fixture("refuse");
     assert!(!tmp.path().join("invoked").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn actual_managed_and_fork_replies_are_partial_observations_not_complete_context() {
+    let tmp = fixture("full");
+    let raw = fs::read(tmp.path().join("observed.json")).unwrap();
+    let reports: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    assert_eq!(reports.as_array().unwrap().len(), 5);
+    for c in reports.as_array().unwrap() {
+        assert_eq!(c["thread_settings"]["model_gpt5"], true);
+        assert_eq!(c["thread_settings"]["provider_openai"], true);
+        assert_eq!(c["thread_settings"]["instructions_empty"], true);
+        assert_eq!(c["thread_settings"]["cwd_matches"], true);
+        assert_eq!(c["turn_accepted"], true);
+        assert_eq!(c["missing"].as_array().unwrap().len(), 6);
+        assert!(c["bindings"].as_array().unwrap().is_empty());
+    }
+    assert!(!String::from_utf8(raw).unwrap().contains("sk-sentinel"));
+}
+
+#[cfg(unix)]
+#[test]
+fn unknown_or_missing_native_settings_never_become_empty_defaults_or_leak() {
+    for mode in ["foreign", "missing"] {
+        let tmp = fixture(mode);
+        let bytes = fs::read(tmp.path().join("observed.json")).unwrap();
+        let reports: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let thread = &reports[2]["thread_settings"];
+        assert_eq!(thread["model_gpt5"], false);
+        assert_eq!(thread["provider_openai"], false);
+        assert_eq!(thread["service_tier_default"], false);
+        assert!(thread["approval"].is_null() && thread["sandbox_mode"].is_null());
+        assert_eq!(thread["reviewer_user"], false);
+        assert_eq!(thread["cwd_matches"], false);
+        assert_eq!(thread["runtime_roots_match"], false);
+        assert_eq!(thread["instructions_empty"], false);
+        assert_eq!(reports[2]["missing"].as_array().unwrap().len(), 6);
+        assert!(!String::from_utf8(bytes).unwrap().contains("sk-"));
+    }
 }

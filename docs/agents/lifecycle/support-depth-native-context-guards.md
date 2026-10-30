@@ -29,8 +29,22 @@ spawn on the actual streaming exec/resume and app-server paths. The standalone c
 exclusive global subscriber, so observations from Tokio tasks are included. A private per-process
 owner token prevents late or foreign responses from being attributed to another case. No public observer API
 or raw command, argv, environment, config/layer, protocol or error trace is added. Existing native
-config/requirements responses are projected before serialization. Unknown values become finite
+config/requirements responses are projected before serialization. Actual thread/start, resume and
+fork responses now supply partial model/provider, approval (including all granular flags), reviewer,
+sandbox-mode, cwd/root and instruction-source predicates. Actual turn/start responses separately
+record acceptance. Missing fields remain unknown, and neither response establishes full effective
+turn or loader closure. Unknown values become finite
 unknowns; they are never copied or hashed into evidence.
+
+The fixed collector now requests 28 cases, shared with producer registration and journal recovery:
+continuity for the five selectors, owned cancellation for each selector, and no-match controls for
+resume/fork last and id in each existing regime. Empty-project controls own fresh disposable paths
+and fresh UUIDs, never copy sessions, and require the exact native session-not-found result. Generic
+failure is not success. The attempt bound is 900 seconds; no external bypass is enabled.
+
+Bounded project metadata comparison records changes without opening project file contents. The
+original project/config/environment baseline remains checked during empty-project cases. This is
+partial effect observation, not atomic confinement, content equality or complete mutation proof.
 
 Each completed case retains its ordinary outcome journal first, then its finite context journal.
 The parent reads only strict finite fields and preserves earlier outcomes if a later context file
@@ -54,3 +68,17 @@ then existing maintenance consumers and the isolated chain can use independently
 
 Verification uses source-owned fake native children and sentinel credentials only. Required CI has
 no real login, credential fixture, model/provider call, additional job, daemon or scheduler.
+
+The expanded production policy matrix exercises both last/id selectors. Invalid policies/sandboxes
+and unsupported fork overrides are checked across unattended, interactive and external *request*
+regimes with a child-spawn marker; those rejection tests enable no native external execution.
+The acquisition crosscheck explicitly retains 94 identities, 207 operation edges and 53 due tuples,
+including unresolved claim-only `--full-auto`. Passing these tests does not approve the proposed
+classifications or splice their synthetic results into a native attempt.
+
+Remaining implementation work is explicit: native resolver and complete layer/runtime/turn/loader
+correspondence, bounded native allow/deny mutation assertions, external execution in an approved
+isolated environment, per-operation timeout/drop/exit observations, independently bound hermetic
+harness collection and substantive mappings for all due tuples. All six context facts remain
+unresolved until their complete assertions exist. This increment adds observation machinery and
+case controls; it does not finish context/case/mapping closure or install a live profile.
