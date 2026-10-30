@@ -10,7 +10,7 @@ use super::{
     METHOD_THREAD_START, METHOD_TURN_INTERRUPT, METHOD_TURN_START,
 };
 
-use super::jsonrpc::{map_response, JsonRpcTransport};
+use super::jsonrpc::{map_app_response, map_response, JsonRpcTransport};
 
 /// Errors surfaced while managing MCP/app-server transports.
 #[derive(Debug, Error)]
@@ -440,7 +440,7 @@ impl CodexAppServer {
     ) -> Result<AppCallHandle, McpError> {
         let events = self.transport.register_app_listener().await;
         let (request_id, raw_response) = self.transport.request(method, params).await?;
-        let response = map_response::<Value>(raw_response);
+        let response = map_app_response(raw_response, method, self.transport.diagnostic_owner());
 
         Ok(AppCallHandle {
             request_id,

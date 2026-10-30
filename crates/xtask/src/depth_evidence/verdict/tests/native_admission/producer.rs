@@ -53,6 +53,7 @@ fn setup() -> (
         })
         .collect();
     f.p.specs.values_mut().for_each(|v| *v = assertions.clone());
+    f.p.context = form::context::synthetic(&execution::requested(&sha), &f.p.graph.inputs[0]).1;
     let mappings: Vec<_> =
         f.p.specs
             .keys()
@@ -206,7 +207,7 @@ fn registered_failed_run_keeps_all_due_claims_full_population_and_v2_bundle() {
                     }],
                     raw_output: plan.context.clone(),
                 },
-                context: json!({"complete":false}),
+                context: form::context::Observation::incomplete(),
                 observations: json!({"status":"failed","unrun":&plan.requested[1..]}),
                 complete: false,
             })
@@ -239,9 +240,9 @@ fn registered_failed_run_keeps_all_due_claims_full_population_and_v2_bundle() {
 #[test]
 fn committed_producer_bundle_prepares_only_unposted_false_attestation_template() {
     let (mut f, args, mut api) = setup();
-    let context = json!({"complete":true,"fixture_only":true});
-    f.p.context_sha256 =
-        crate::depth_ci::reference("", &serde_json::to_vec(&context).unwrap()).sha256;
+    let cases = execution::requested(&"e".repeat(64));
+    let (context, expected) = form::context::synthetic(&cases, &f.p.graph.inputs[0]);
+    f.p.context = expected;
     producer::collect_with(
         f.f.root.path(),
         args,

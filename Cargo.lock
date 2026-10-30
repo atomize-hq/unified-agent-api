@@ -1845,6 +1845,7 @@ dependencies = [
  "time",
  "tokio",
  "toml_edit",
+ "tracing",
  "unified-agent-api",
  "unified-agent-api-claude-code",
  "unified-agent-api-codex",

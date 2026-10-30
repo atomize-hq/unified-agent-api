@@ -27,6 +27,7 @@ quote = "1"
 proc-macro2 = "1"
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 toml_edit = "0.22"
 wait-timeout = "0.2"

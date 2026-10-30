@@ -85,6 +85,7 @@ mod execpolicy;
 mod home;
 pub mod jsonl;
 pub mod mcp;
+mod native_context;
 mod process;
 pub mod rollout_jsonl;
 pub mod wrapper_coverage_manifest;

@@ -100,10 +100,28 @@ fn fake_collector_uses_foreground_child_and_retains_only_finite_journal_fields()
     )
     .unwrap();
     assert!(!result.complete);
-    assert_eq!(result.context["complete"], false);
+    assert!(!result.context.complete);
     assert_eq!(result.cases.requested.len(), 12);
     assert_eq!(result.cases.executed.len(), 1);
     assert_eq!(result.cases.executed[0].outcome, CaseOutcome::Failed);
     let retained = serde_json::to_string(&result.observations).unwrap();
     assert!(!retained.contains("sk-secret"));
+    let alias = root.join("project-alias");
+    std::os::unix::fs::symlink(project.path(), &alias).unwrap();
+    let mut args = args;
+    for path in [alias, project.path().join(".")] {
+        args.working_dir = path;
+        let error = match run(
+            root,
+            &args,
+            &binary,
+            &built,
+            &plan,
+            &std::sync::atomic::AtomicBool::new(false),
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("aliased project must refuse before spawn"),
+        };
+        assert_eq!(error, "native working directory role refused");
+    }
 }
