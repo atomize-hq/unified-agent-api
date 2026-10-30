@@ -210,3 +210,70 @@ an **unposted template** with all four human attestation booleans false. An auth
 must review and explicitly attest the concrete execution, outcomes, registration ordering and
 completeness before an exact completion statement can be posted. This command never POSTs, creates
 an adoption, signs for the maintainer or turns its content inspection into an admitted verdict.
+
+## Finite native context observations
+
+NC-P1 and NC-P2 were approved on 2026-10-29. The producer-only context preserves the caller's
+selected native home/resolver. It MUST NOT copy, inventory, hash or persist credentials, clear the
+native environment to force eligibility, or change ordinary SDK validation/routing. Unknown or
+foreign context MUST remain unverified; a successful reply does not establish context completeness.
+The original fixed observed-context digest is replaced by source-owned typed expectations and the
+following strict observation payload. Intent and observed references remain separately indexed and
+content-bound. Receipt revision 2 and existing payload/aggregate bounds are unchanged.
+
+`observed_context` is exactly `{schema_version:1, complete:<boolean>, cases:[CaseContext...]}`.
+The case population is bounded to 4096 and MUST equal the plan's exact requested population for
+positive admission; duplicates, unknown fields and unsupported revisions refuse. Missing/unrun
+contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `CaseContext` is exactly:
+
+- `case`: existing actual `CaseIdentity`; `route`: `initial_exec`, `resume_exec` or `app_server`.
+- `local_before`, `local_after`, `diagnostics_valid`: booleans; all MUST be true for qualification.
+- `launches`: exactly two qualifying entries, attempted then spawned, each exactly `{route, spawned,
+  binary_matches, cwd_matches, home_matches, environment_known}`. Both routes MUST match the
+  approved case, the first `spawned` is false, the second true, and all matching/known predicates
+  MUST hold. Missing, extra, malformed or duplicate diagnostics cannot supply positive evidence.
+- `config`: null or exactly `{model_gpt5, provider_openai, approval, sandbox, origins_present,
+  layers_complete, requirements_empty}`. The four named predicates and `layers_complete` are
+  booleans; `approval` is null or `never|on_request|untrusted|on_failure|granular`, `sandbox` null or
+  `read_only|workspace_write|danger_full_access`. The payload MUST equal the case's source-owned
+  expectation. A present config requires known model/provider/approval/sandbox, origins and empty
+  supported requirements. The existing layer-free/pre-turn API is not complete layer or turn proof.
+- `bindings`: one exact source-approved binding for each required fact, no duplicates. Each is
+  exactly `{fact, source:<FileRef>, corroboration:<CaseIdentity>}`. Required facts are `layer_inputs`,
+  `authentication_resolver`, `transitive_runtime`, `effective_turn`, `loader_effects`, `mutation_scope`.
+  `source` MUST belong to the independently approved producer input closure; corroboration MUST
+  name an actually executed plan case. Its independently reviewed assertion must establish the
+  stated observation even if another assertion in that case failed. A binding/hash alone does not
+  prove the predicate. Facts may not be dropped by reducing profile expectations.
+- `missing`: the finite unresolved-fact list (at most six); it MUST be empty for qualification.
+  Missing fact bindings remain unresolved even if this list is forged empty.
+- `derived_defaults`: at most two exact source-approved named derivations. Each is exactly
+  `{id, value, source, upstream_commit, binary_sha256, overrides_absent, precedence_established,
+  corroboration}`. Supported ids are `tool_registry_error_on_collisions` and
+  `tool_registry_turn_metadata`; their pinned absent-input default is false. The source MUST be
+  independently approved; upstream commit is `b412ff32c417f855c2b2d1581b77058eed87c84b`, binary digest
+  MUST match the acquired runtime, input absence and precedence MUST be established, and the named
+  requested native corroborating case MUST pass. Unknown/present overrides, missing corroboration,
+  another source/binary/revision or an unnamed default cannot qualify. These are conditional
+  derivations distinct from direct observations, not blanket acceptance of native defaults.
+
+The private adapter MUST independently validate these predicates and all source/case bindings;
+`complete:true` alone is insufficient. The source-approved collector and independent adequacy still
+establish what an emitted observation means under NE-P1's honest-maintainer trust boundary; JSON
+cannot self-authenticate local execution. Complete synthetic fixtures prove predicates only.
+
+The first guarded collector inspects local non-auth eligibility before its version probe, forwards
+selected home consistently, rechecks before/after each case, and observes actual production paths
+through passive private finite diagnostics. It serializes only known enums/booleans/case identities,
+never raw native strings, env/config frames, credential bytes or their hashes. The full inherited
+environment plus final command overlays is checked; overlay inspection alone is insufficient.
+The fixed guard's protocol/config and bundled-asset inputs are the existing pinned
+`pilot-protocol-facts.json` and `pilot-runtime-context.json` under the version's report directory;
+both MUST be in the independently approved build/source closure before compilation.
+
+This increment does not install positive context bindings or default derivations: unresolved layer,
+resolver, runtime, turn, loader and mutation facts are explicitly retained and completeness remains
+false. A separate config-only process, old offline trace, intent or actual child launch MUST NOT
+clear them. Existing complete-attempt retention, authenticated adoption, private profile installation
+and independently sealed consumer authority remain required. No live model call or background job
+is part of this implementation.

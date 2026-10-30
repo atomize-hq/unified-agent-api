@@ -19,7 +19,7 @@ pub(super) struct Profile {
     pub graph: DependencyGraph,
     pub environment: Environment,
     pub toolchain: FileRef,
-    pub context_sha256: String,
+    pub context: form::context::Expectations,
     pub context_intent_sha256: String,
     pub definition_sha256: String,
     pub specs: BTreeMap<ObligationRef, Vec<AssertionBinding>>,

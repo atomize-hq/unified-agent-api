@@ -100,7 +100,7 @@ fn fake_collector_uses_foreground_child_and_retains_only_finite_journal_fields()
     )
     .unwrap();
     assert!(!result.complete);
-    assert_eq!(result.context["complete"], false);
+    assert!(!result.context.complete);
     assert_eq!(result.cases.requested.len(), 12);
     assert_eq!(result.cases.executed.len(), 1);
     assert_eq!(result.cases.executed[0].outcome, CaseOutcome::Failed);

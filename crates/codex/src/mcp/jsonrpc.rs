@@ -68,9 +68,13 @@ pub(super) struct JsonRpcTransport {
     child: Arc<Mutex<Option<Child>>>,
     startup_timeout: Duration,
     is_app: bool,
+    diagnostic_owner: u64,
 }
 
 impl JsonRpcTransport {
+    pub(super) fn diagnostic_owner(&self) -> u64 {
+        self.diagnostic_owner
+    }
     pub(super) async fn spawn_mcp(config: StdioServerConfig) -> Result<Self, McpError> {
         let hook = NotificationHook::Codex {
             sinks: Arc::new(Mutex::new(Vec::new())),
@@ -126,6 +130,7 @@ impl JsonRpcTransport {
         )>,
         overrides: BTreeMap<String, Value>,
     ) -> Result<Self, McpError> {
+        let diagnostic_owner = crate::native_context::new_owner();
         let mut command = Command::new(&config.binary);
         for (key, value) in overrides {
             let native = toml::Value::try_from(value).map_err(|_| {
@@ -158,6 +163,19 @@ impl JsonRpcTransport {
             command.env(key, value);
         }
 
+        if subcommand == "app-server" {
+            if let Some(cwd) = config.current_dir.as_deref() {
+                crate::native_context::launch(
+                    &command,
+                    &config.binary,
+                    config.code_home.as_deref(),
+                    cwd,
+                    crate::native_context::Route::AppServer,
+                    false,
+                    diagnostic_owner,
+                );
+            }
+        }
         let command_debug = format!("{command:?}");
         let mut backoff = Duration::from_millis(2);
         let mut child = {
@@ -187,6 +205,19 @@ impl JsonRpcTransport {
             child.expect("spawn loop should return or set child")
         };
 
+        if subcommand == "app-server" {
+            if let Some(cwd) = config.current_dir.as_deref() {
+                crate::native_context::launch(
+                    &command,
+                    &config.binary,
+                    config.code_home.as_deref(),
+                    cwd,
+                    crate::native_context::Route::AppServer,
+                    true,
+                    diagnostic_owner,
+                );
+            }
+        }
         let stdout = child
             .stdout
             .take()
@@ -223,6 +254,7 @@ impl JsonRpcTransport {
         }
 
         Ok(Self {
+            diagnostic_owner,
             writer: writer_tx,
             pending,
             notification_hook,
@@ -475,6 +507,32 @@ async fn stderr_task(stderr: ChildStderr, mirror_stdio: bool, is_app: bool) {
             debug!("mcp stderr: {line}");
         }
     }
+}
+
+// Same owned response task as map_response<Value>, with passive finite read diagnostics.
+pub(super) fn map_app_response(
+    rx: oneshot::Receiver<Result<Value, McpError>>,
+    method: &str,
+    owner: u64,
+) -> oneshot::Receiver<Result<Value, McpError>> {
+    let read = match method {
+        "config/read" => 1,
+        "configRequirements/read" => 2,
+        _ => 0,
+    };
+    let (tx, mapped) = oneshot::channel();
+    tokio::spawn(async move {
+        let result = rx.await.unwrap_or(Err(McpError::ChannelClosed));
+        if let Ok(value) = &result {
+            match read {
+                1 => crate::native_context::config_reply(value, owner),
+                2 => crate::native_context::requirements_reply(value, owner),
+                _ => (),
+            }
+        }
+        let _ = tx.send(result);
+    });
+    mapped
 }
 
 pub(super) fn map_response<T: for<'a> Deserialize<'a> + Send + 'static>(

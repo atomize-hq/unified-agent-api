@@ -1,6 +1,7 @@
 //! Untrusted revision-2 native forms. Parsing never establishes host or execution authority.
 use super::*;
 use serde::{Deserialize, Serialize};
+pub mod context;
 mod validate;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -177,6 +178,7 @@ pub enum NativeFailure {
     RequestRefused,
     Cancelled,
     CompletionFailed,
+    ContextRefused,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

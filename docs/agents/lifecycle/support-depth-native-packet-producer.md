@@ -40,6 +40,7 @@ a finish or automatically edits E, closes a packet, promotes a version or activa
 
 Required CI uses fake hosts and finite fake native children. It requires no login or model calls.
 The [context and case-coverage closure plan](support-depth-native-context-coverage.md) proposes
-the remaining observation methods and exact coverage work. Its NC-P1/NC-P2 decisions await approval.
+the remaining observation methods and exact coverage work. NC-P1/NC-P2 are approved; the
+[first context implementation](support-depth-native-context-guards.md) adds guards and finite observations.
 Then connect native verdicts to the existing record-sealed consumer path and prove the isolated
 maintenance chain.

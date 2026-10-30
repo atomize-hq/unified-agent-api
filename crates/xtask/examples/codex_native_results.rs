@@ -1,5 +1,7 @@
 //! Explicitly opt-in native diagnostics using the caller's existing Codex configuration/auth.
 //! The exported Cases are claims, never authenticated evidence or qualification.
+#[path = "codex_native_results/context.rs"]
+mod context;
 #[path = "codex_native_results/io.rs"]
 mod io;
 #[path = "codex_native_results/record.rs"]
@@ -51,6 +53,9 @@ struct Args {
     /// Required acknowledgment: native calls use the caller's authentication and usage allowance.
     #[arg(long, required = true)]
     live: bool,
+    /// Internal packet producer observations; does not install or select trust.
+    #[arg(long)]
+    context_guard: bool,
     /// Explicit Codex executable, without an account- or machine-specific default path.
     #[arg(long)]
     binary: PathBuf,
@@ -231,12 +236,40 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
     }
     let home = args
         .codex_home
+        .as_ref()
         .map(|p| {
             p.canonicalize()
                 .map_err(|_| "configured Codex home is unavailable")
         })
         .transpose()?;
-    let version = io::version(&binary).await?;
+    if args.context_guard && args.model.as_deref().is_some_and(|m| m != "gpt-5") {
+        return Err("native context refused: model_override".into());
+    }
+    let guard = if args.context_guard {
+        Some(context::guard(
+            args.codex_home.as_deref(),
+            &args.working_dir,
+        )?)
+    } else {
+        None
+    };
+    if args.context_guard
+        && !xtask::depth_evidence::native::context::guard::pinned_binary_matches(&io::fingerprint(
+            &binary,
+        )?)
+    {
+        return Err("native context refused: binary".into());
+    }
+    let capture = if args.context_guard {
+        Some(context::Capture::install()?)
+    } else {
+        None
+    };
+    let version = if let Some(guard) = &guard {
+        io::version_with_home(&binary, Some(guard.home())).await?
+    } else {
+        io::version(&binary).await?
+    };
     if args
         .expected_version
         .as_ref()
@@ -279,9 +312,40 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
             if stopped {
                 break;
             }
+            let before = guard
+                .as_ref()
+                .map(|g| g.recheck(&context::environment()).is_ok())
+                .unwrap_or(true);
+            if let Some(capture) = &capture {
+                capture.begin(
+                    identity(*variant, step, &runner_sha),
+                    context::route(matches!(variant, Variant::Interactive), step),
+                    before,
+                );
+            }
             let started = Instant::now();
-            let (observation, failure) = observe(&backend, *variant, step, state.seed()).await;
-            let outcome = state.record(step, &observation);
+            let (observation, mut failure) = if before {
+                observe(&backend, *variant, step, state.seed()).await
+            } else {
+                (
+                    record::Observation::default(),
+                    Some(NativeFailure::ContextRefused),
+                )
+            };
+            let mut outcome = state.record(step, &observation);
+            let mut context_bytes = None;
+            if let Some(capture) = &capture {
+                let after = guard
+                    .as_ref()
+                    .is_some_and(|g| g.recheck(&context::environment()).is_ok());
+                let context = capture.finish(after);
+                if !before || !after || !context.diagnostics_valid {
+                    outcome = CaseOutcome::Failed;
+                    failure = Some(NativeFailure::ContextRefused);
+                }
+                context_bytes =
+                    Some(serde_json::to_vec(&context).map_err(|_| "cannot encode finite context")?);
+            }
             stopped = outcome != CaseOutcome::Passed;
             results.push(StepResult {
                 case: identity(*variant, step, &runner_sha),
@@ -307,6 +371,17 @@ async fn collect(root: &Path, args: Args) -> Result<bool, String> {
                 .write_all(&bytes)
                 .and_then(|()| journal.sync_all())
                 .map_err(|_| "cannot preserve native case journal")?;
+            // Preserve the case outcome first: context I/O failure cannot erase a counterexample.
+            if let Some(bytes) = context_bytes {
+                let mut f = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(output.join(format!("context-{}.json", results.len() - 1)))
+                    .map_err(|_| "cannot retain finite context")?;
+                f.write_all(&bytes)
+                    .and_then(|()| f.sync_all())
+                    .map_err(|_| "cannot retain finite context")?;
+            }
         }
     }
     let unchanged = io::fingerprint(&binary).ok().as_deref() == Some(native_sha.as_str());
@@ -399,6 +474,7 @@ mod tests {
         let args = Args {
             workspace: None,
             live: true,
+            context_guard: false,
             binary,
             working_dir: tmp.path().into(),
             codex_home: Some(home),

@@ -26,7 +26,7 @@ fn pending_and_unauthorized_native_records_do_not_become_success() {
 #[test]
 fn unknown_context_or_tampered_current_proof_refuses_native_admission() {
     let mut f = NativeFixture::new();
-    f.p.context_sha256 = "0".repeat(64);
+    f.p.context.cases[0].bindings.pop();
     assert_ne!(
         f.evaluate().map(|v| v.result).ok(),
         Some(DepthResult::Verified)

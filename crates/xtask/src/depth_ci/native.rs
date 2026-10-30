@@ -42,7 +42,10 @@ pub(crate) fn build(
         return Err("unsupported native wrapper build target/features".into());
     }
     let mut view = GitInputs::new(root)?;
-    for required in ["Cargo.toml", "Cargo.lock", UNITS, ARCHIVE] {
+    for required in ["Cargo.toml", "Cargo.lock", UNITS, ARCHIVE]
+        .into_iter()
+        .chain(crate::depth_evidence::native::context::INPUTS)
+    {
         if !graph.inputs.iter().any(|f| f.path == required) {
             return Err("native build helper/input lacks approved source coverage".into());
         }

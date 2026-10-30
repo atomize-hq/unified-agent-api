@@ -219,12 +219,6 @@ impl NativeFixture {
             f.current.current.obligation.clone();
         seal(&mut rec);
         f.current.record = rec;
-        let context_sha256 = write(
-            root,
-            &format!("{base}/context.txt"),
-            b"finite approved nonsecret context",
-        )
-        .sha256;
         f.receipt.provenance.push(Provenance {
             kind: ProvenanceKind::Binary,
             origin: "pinned native acquisition".into(),
@@ -264,7 +258,7 @@ impl NativeFixture {
             toolchain,
             context_intent_sha256: crate::depth_ci::reference("", b"approved pre-run intent")
                 .sha256,
-            context_sha256,
+            context: form::context::synthetic(&claims.cases.requested, &f.graph.inputs[0]).1,
             definition_sha256: f.current.definition_sha256.clone(),
             specs: crate::depth_record::due(&f.current.record)
                 .unwrap()
@@ -348,10 +342,10 @@ impl NativeFixture {
         claim.mapping.obligation = claim.scope.obligation.clone();
         claim.mapping.executor_identity = format!("native-executor-{id}");
         claim.mapping.reviewer_identity = "independent-review".into();
-        let context = write(
+        let context = canonical(
             root,
-            &format!("{prefix}/context.txt"),
-            b"finite approved nonsecret context",
+            &format!("{prefix}/context.json"),
+            &form::context::synthetic(&claim.cases.requested, &self.p.graph.inputs[0]).0,
         );
         let mut plan = form::Plan {
             schema_version: 1,

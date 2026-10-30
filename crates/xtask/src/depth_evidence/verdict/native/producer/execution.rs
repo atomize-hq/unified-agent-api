@@ -56,7 +56,7 @@ pub(in crate::depth_evidence::verdict) fn requested(sha: &str) -> Vec<CaseIdenti
 }
 pub(in crate::depth_evidence::verdict) struct Execution {
     pub cases: Cases,
-    pub context: Value,
+    pub context: form::context::Observation,
     pub observations: Value,
     pub complete: bool,
 }
@@ -67,7 +67,7 @@ pub(super) fn incomplete(plan: &form::Plan) -> Execution {
             executed: vec![],
             raw_output: crate::depth_ci::reference("unavailable", b""),
         },
-        context: json!({"schema_version":1,"complete":false,"effective_native_configuration":"unresolved","collector":"unavailable_or_interrupted"}),
+        context: form::context::Observation::incomplete(),
         observations: json!({"schema_version":1,"status":"unavailable_or_interrupted","unrun":plan.requested}),
         complete: false,
     }
@@ -175,7 +175,7 @@ pub(super) fn run(
         .to_string_lossy()
         .into_owned();
     let mut c = Command::new(&built.executable);
-    c.args(["--live", "--workspace"])
+    c.args(["--live", "--context-guard", "--workspace"])
         .arg(root)
         .arg("--binary")
         .arg(binary)
@@ -226,10 +226,31 @@ pub(super) fn run(
     let unchanged =
         fingerprint(binary).ok().as_deref() == Some(plan.native.executable_sha256.as_str());
     // The ordinary native context is not closed by an intent or a successful response.
-    let context = json!({"schema_version":1,"complete":false,"effective_native_configuration":"unresolved","runtime_version":plan.native.version,"selected_binary_sha256":plan.native.executable_sha256,"selected_binary_unchanged":unchanged,"credential_source":"caller_owned_not_read_or_copied"});
+    let mut context = form::context::Observation::incomplete();
+    for (i, step) in steps.iter().enumerate() {
+        let c = (|| -> Result<form::context::CaseContext, String> {
+            let raw = bounded(root, &format!("{output}/context-{i}.json"))?;
+            let c: form::context::CaseContext =
+                serde_json::from_slice(&raw).map_err(|_| "invalid finite context journal")?;
+            if c.case != step.case
+                || c.launches.len() > 2
+                || !c.bindings.is_empty()
+                || !c.derived_defaults.is_empty()
+            {
+                return Err("native context journal differs".into());
+            }
+            Ok(c)
+        })();
+        if let Ok(c) = c {
+            context.cases.push(c);
+        }
+    }
+    // Layer/auth/turn/runtime/effect closure and native corroborating cases are still due.
+    // Neither a child-provided complete flag nor successful smoke clears these facts.
     let complete = super::control::check(cancel).is_ok()
         && status.is_some_and(|s| s.success())
         && final_matches
+        && context.complete
         && journal_valid
         && unchanged
         && cases.executed.len() == cases.requested.len()

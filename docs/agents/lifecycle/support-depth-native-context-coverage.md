@@ -1,7 +1,8 @@
 # Native runtime context and case-coverage closure
 
-Status: proposed; NC-P1 and NC-P2 await maintainer approval. This is the implementation plan for
-closing the remaining context and adequacy prerequisites, not a claim that they have been met.
+Status: NC-P1 and NC-P2 approved by the maintainer on 2026-10-29. The
+[first context implementation](support-depth-native-context-guards.md) implements guards and finite
+observations; remaining context facts and case/mapping closure still need evidence.
 Baseline: staging `d43131b6ce1481c371e0848ac277b1d62b7a3d56` (PR #307).
 The [native evidence contract](../../specs/support-depth-native-evidence-v2.md),
 [depth contract](../../specs/support-depth-contract.md) and approved
@@ -37,7 +38,7 @@ says `effective_native_configuration = unresolved`, `complete = false`.
 | NC-P1 — eligible caller-native context | Approve one fixed, producer-only context definition using the caller's existing selected native home and authentication resolver. Validate actual nonsecret context against reviewed typed expectations; refuse unknown or foreign effects. Replace the earlier private-home/all-off fixture premise for this native profile | A normal login can be used without copying it or rewriting the caller's config. Authentication alone does not approve arbitrary host config, plugins, skills or managed policy. A mismatching environment gets a finite refusal, not automatic sanitization. Alternative: retain the private fixture regime and arrange separate native login there; this adds setup and does not prove the caller-native context |
 | NC-P2 — unexposed deterministic defaults | Permit individually named default derivations from the exact pinned upstream source, conditional on measured input/layer/override precedence and native corroboration of the claimed effect. Keep these distinct from direct runtime observations | Allows a finite context to close even when a diagnostic API omits an internal default. A schema omission, source hash or maintainer statement alone cannot establish the effective value. Alternative: require a native diagnostic for each such value; keep the affected evidence unverified until upstream exposes it or a separately reviewed diagnostic exists |
 
-Recommend both. Approval authorizes these observation methods and their implementation; it does
+Both recommendations are approved. This authorizes the observation methods and implementation; it does
 not approve arbitrary runtime values, an auth backend, any classification row, a substantive mapping
 or a concrete completion/adoption statement. The exact finite values and row assignments must be
 reviewed with implementation before profile installation. No exception to unknown-context refusal,

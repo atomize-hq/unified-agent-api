@@ -31,9 +31,20 @@ pub fn fingerprint(path: &Path) -> Result<String, String> {
     Ok(hex::encode(hash.finalize()))
 }
 pub async fn version(binary: &Path) -> Result<String, String> {
-    version_with_timeout(binary, Duration::from_secs(5)).await
+    version_with_home(binary, None).await
 }
+pub async fn version_with_home(binary: &Path, home: Option<&Path>) -> Result<String, String> {
+    version_probe(binary, Duration::from_secs(5), home).await
+}
+#[cfg(test)]
 async fn version_with_timeout(binary: &Path, timeout: Duration) -> Result<String, String> {
+    version_probe(binary, timeout, None).await
+}
+async fn version_probe(
+    binary: &Path,
+    timeout: Duration,
+    home: Option<&Path>,
+) -> Result<String, String> {
     let mut command = Command::new(binary);
     command
         .arg("--version")
@@ -41,6 +52,9 @@ async fn version_with_timeout(binary: &Path, timeout: Duration) -> Result<String
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+    if let Some(home) = home {
+        command.env("CODEX_HOME", home);
+    }
     let mut child = spawn_probe(|| command.spawn()).await?;
     let mut stdout = child
         .stdout

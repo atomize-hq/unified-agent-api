@@ -183,7 +183,34 @@ pub(super) async fn stream_exec_with_overrides_and_env_overrides_control(
         command.env(key, value);
     }
 
+    let context_owner = crate::native_context::new_owner();
+    crate::native_context::launch(
+        &command,
+        client.command_env.binary_path(),
+        client
+            .command_env
+            .codex_home_layout()
+            .as_ref()
+            .map(|h| h.root()),
+        &dir_path,
+        crate::native_context::Route::InitialExec,
+        false,
+        context_owner,
+    );
     let mut child = spawn_with_retry(&mut command, client.command_env.binary_path())?;
+    crate::native_context::launch(
+        &command,
+        client.command_env.binary_path(),
+        client
+            .command_env
+            .codex_home_layout()
+            .as_ref()
+            .map(|h| h.root()),
+        &dir_path,
+        crate::native_context::Route::InitialExec,
+        true,
+        context_owner,
+    );
 
     {
         let mut stdin = child.stdin.take().ok_or(CodexError::StdinUnavailable)?;
@@ -429,7 +456,34 @@ pub(super) async fn stream_resume_with_env_overrides_control(
         command.env(key, value);
     }
 
+    let context_owner = crate::native_context::new_owner();
+    crate::native_context::launch(
+        &command,
+        client.command_env.binary_path(),
+        client
+            .command_env
+            .codex_home_layout()
+            .as_ref()
+            .map(|h| h.root()),
+        &dir_path,
+        crate::native_context::Route::ResumeExec,
+        false,
+        context_owner,
+    );
     let mut child = spawn_with_retry(&mut command, client.command_env.binary_path())?;
+    crate::native_context::launch(
+        &command,
+        client.command_env.binary_path(),
+        client
+            .command_env
+            .codex_home_layout()
+            .as_ref()
+            .map(|h| h.root()),
+        &dir_path,
+        crate::native_context::Route::ResumeExec,
+        true,
+        context_owner,
+    );
 
     if let Some(prompt) = &prompt {
         let mut stdin = child.stdin.take().ok_or(CodexError::StdinUnavailable)?;

@@ -192,7 +192,6 @@ pub(super) fn resolve_content(
         || plan.packet_head != start.packet_head
         || plan.native != p.native
         || plan.context.sha256 != p.context_intent_sha256
-        || index.observed_context.sha256 != p.context_sha256
         || index.observed_context.path == plan.context.path
         || plan.collector != p.collector
     {
@@ -321,6 +320,18 @@ pub(super) fn resolve_content(
     {
         return Err("native aggregate obligations/payload/case population incomplete".into());
     }
+    let observed = form::context::Observation::parse(get(&index.observed_context)?)?;
+    let executed = outcomes
+        .into_iter()
+        .map(|(case, outcome)| CaseResult { case, outcome })
+        .collect::<Vec<_>>();
+    observed.validate(
+        &p.context,
+        &plan.requested,
+        &executed,
+        &p.graph.inputs,
+        &p.native.executable_sha256,
+    )?;
     Ok(Resolved {
         claims,
         graph,
