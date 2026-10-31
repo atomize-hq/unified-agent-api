@@ -493,10 +493,14 @@ for line in sys.stdin:
 }
 
 #[derive(Clone, Default)]
-struct Projections(std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>);
+struct Projections {
+    events: std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>,
+    // An ordinary all-target TRACE subscriber, rather than the producer's exclusive one.
+    broad: bool,
+}
 impl tracing::Subscriber for Projections {
     fn enabled(&self, m: &tracing::Metadata<'_>) -> bool {
-        m.target() == crate::native_context::TARGET
+        self.broad || m.target() == crate::native_context::TARGET
     }
     fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::Id {
         tracing::Id::from_u64(1)
@@ -520,7 +524,7 @@ impl tracing::Subscriber for Projections {
         }
         let mut v = V::default();
         event.record(&mut v);
-        self.0.lock().unwrap().push((v.0, v.1));
+        self.events.lock().unwrap().push((v.0, v.1));
     }
 }
 
@@ -528,24 +532,27 @@ impl tracing::Subscriber for Projections {
 // so the body runs alone in a re-executed process.
 #[test]
 fn private_owner_requests_layers_projects_them_and_returns_the_ordinary_reply() {
-    let status = std::process::Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "mcp::tests_core::native_interactions::private_owner_layer_process",
-            "--nocapture",
-        ])
-        .env("UAA_PRIVATE_OWNER_LAYER_PROCESS", "1")
-        .stdout(std::process::Stdio::null())
-        .status()
-        .unwrap();
-    assert!(status.success());
+    for mode in ["exclusive", "broad"] {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "mcp::tests_core::native_interactions::private_owner_layer_process",
+                "--nocapture",
+            ])
+            .env("UAA_PRIVATE_OWNER_LAYER_PROCESS", mode)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "{mode} subscriber");
+    }
 }
 
 #[tokio::test]
 async fn private_owner_layer_process() {
-    if std::env::var_os("UAA_PRIVATE_OWNER_LAYER_PROCESS").is_none() {
+    let Ok(mode) = std::env::var("UAA_PRIVATE_OWNER_LAYER_PROCESS") else {
         return;
-    }
+    };
+    let broad = mode == "broad";
     let (dir, mut config) = fixture_config(
         r#"
 for line in sys.stdin:
@@ -557,7 +564,10 @@ for line in sys.stdin:
 "#,
     );
     config.code_home = Some(PathBuf::from("/role/home"));
-    let projections = Projections::default();
+    let projections = Projections {
+        broad,
+        ..Default::default()
+    };
     let guard = tracing::subscriber::set_default(projections.clone());
     let (server, _stream) = CodexAppServer::spawn_uninitialized_with_interactions(config)
         .await
@@ -568,11 +578,12 @@ for line in sys.stdin:
         .unwrap();
     let value = call.response.await.unwrap().unwrap();
     drop(guard);
-    // Native saw the layer request; the caller gets the reply native returns without it.
-    assert_eq!(value["echo"], true);
+    // Only the exclusive producer subscriber changes the request. Either way the caller gets
+    // the reply native returns for a layer-free request.
+    assert_eq!(value["echo"], !broad);
     assert!(value.get("layers").is_none());
     assert_eq!(value["config"]["model"], "gpt-5");
-    let events = projections.0.lock().unwrap().clone();
+    let events = projections.events.lock().unwrap().clone();
     let config = events
         .iter()
         .find(|(kind, _)| kind == "config")
@@ -580,6 +591,12 @@ for line in sys.stdin:
         .unwrap();
     assert!(!config.contains("sk-sentinel") && !config.contains("/role"));
     let projected: crate::native_context::Config = serde_json::from_str(&config).unwrap();
+    if broad {
+        // Passive diagnostics still run, but no layer stack is claimed.
+        assert!(projected.layers.is_none());
+        server.shutdown_and_wait().await.unwrap();
+        return;
+    }
     let layers = projected.layers.unwrap();
     assert!(layers.origins_enabled);
     assert!(layers.entries.iter().all(|l| l.role_matches && l.enabled));

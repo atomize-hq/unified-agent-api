@@ -206,9 +206,9 @@ impl CodexAppServer {
 
     /// Read native effective configuration without configuration layer payloads.
     pub async fn config_read(&self, cwd: PathBuf) -> Result<AppCallHandle, McpError> {
-        // A private diagnostic owner also requests layers for its finite projection; they are
-        // removed from the reply, which upstream computes identically either way.
-        let include_layers = self.transport.diagnostic_owner() != 0;
+        // Only the producer's exclusive subscriber also requests layers for its finite
+        // projection; they are removed from the reply, which upstream computes identically.
+        let include_layers = crate::native_context::producer_active();
         self.invoke_app_call(
             "config/read",
             json!({"cwd":cwd,"includeLayers":include_layers}),
@@ -449,12 +449,14 @@ impl CodexAppServer {
             &params,
             self.transport.diagnostic_home(),
         );
+        let strip_layers = method == "config/read" && params["includeLayers"] == true;
         let (request_id, raw_response) = self.transport.request(method, params).await?;
         let response = map_app_response(
             raw_response,
             method,
             self.transport.diagnostic_owner(),
             roles,
+            strip_layers,
         );
 
         Ok(AppCallHandle {

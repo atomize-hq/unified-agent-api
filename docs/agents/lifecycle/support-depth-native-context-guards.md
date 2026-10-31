@@ -48,10 +48,11 @@ roles and existing directory identities are checked before descent; an ancestor 
 directory refuses before traversing a foreign tree. Failed eligibility skips the follow-up sample. This is
 partial effect observation, not atomic confinement, content equality or complete mutation proof.
 
-The managed initial/resume `config/read` now also projects the native layer stack. Only when the
-private diagnostic owner is active, the wrapper requests `includeLayers`, projects each layer to
-class, enabled, empty and role-match booleans, records which classes supplied effective values,
-and removes `layers` before the reply reaches the SDK caller. At pinned upstream
+The managed initial/resume `config/read` now also projects the native layer stack. Only for the
+collector's exclusive subscriber (the private target enabled and a separate control target not),
+the wrapper requests `includeLayers`, projects each layer to class, enabled, empty and role-match
+booleans, records which classes supplied effective values, and removes `layers` before the reply
+reaches the SDK caller. An ordinary all-target TRACE subscriber keeps the layer-free request. At pinned upstream
 `b412ff32c417f855c2b2d1581b77058eed87c84b`, `config_manager_service.rs` computes `config` and
 `origins` identically with or without layers, and the protocol omits the member when it is not
 requested; ordinary callers without that owner still send `includeLayers:false`. Admission now

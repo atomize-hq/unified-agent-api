@@ -526,6 +526,7 @@ pub(super) fn map_app_response(
     method: &str,
     owner: u64,
     roles: Option<crate::native_context::ReplyRoles>,
+    strip_layers: bool,
 ) -> oneshot::Receiver<Result<Value, McpError>> {
     let read = match method {
         "config/read" => 1,
@@ -543,9 +544,9 @@ pub(super) fn map_app_response(
             match read {
                 1 => {
                     crate::native_context::config_reply(value, roles.as_ref(), owner);
-                    // Layers are requested only for an active private owner; pinned native
-                    // omits the member when not requested, so the caller sees the same reply.
-                    if owner != 0 {
+                    // Layers are requested only for the producer; pinned native omits the
+                    // member when not requested, so the caller sees the ordinary reply.
+                    if strip_layers {
                         if let Some(object) = value.as_object_mut() {
                             object.remove("layers");
                         }

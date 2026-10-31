@@ -252,9 +252,11 @@ contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `Cas
   stack: only session-flags, project, user and system classes, in that precedence, exactly one
   user and one system layer, every entry at its role, and every origin class among those four.
   The stack is the managed pre-turn input; it is not turn, loader or exec/fork-route proof.
-  The SDK sets `includeLayers` only for an active private diagnostic owner and removes `layers`
-  from the reply it returns; at the pinned revision native computes `config` and `origins`
-  identically either way and omits the member when it is not requested.
+  The SDK sets `includeLayers` only for the producer's exclusive subscriber (private target
+  enabled, separate control target not), never for tracing interest alone, and removes
+  `layers` from the reply it returns. At the pinned revision native computes `config` and
+  `origins` identically either way and omits the member when it is not requested. A stack that
+  exceeds the transport frame bound fails that producer call; it never reaches ordinary callers.
 - `thread_settings`: explicitly null, or exactly `{operation, model_gpt5, provider_openai,
   service_tier_default, approval, reviewer_user, sandbox_mode, cwd_matches, runtime_roots_match,
   instructions_empty}`. `operation` is `start|resume|fork`; predicates are booleans. `approval` is

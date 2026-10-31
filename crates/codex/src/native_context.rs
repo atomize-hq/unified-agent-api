@@ -69,6 +69,15 @@ fn emit(kind: &'static str, value: &impl Serialize, owner: u64) {
 #[cfg(test)]
 mod tests;
 
+/// Never enabled by the producer's exclusive subscriber; any broad subscriber enables it too.
+pub(crate) const CONTROL: &str = "uaa_native_context_control";
+/// Non-passive diagnostics (the layer request) need the producer's exclusive subscriber:
+/// the private target enabled and the control target not. Tracing interest alone, such as an
+/// all-target TRACE subscriber, keeps ordinary requests unchanged.
+pub(crate) fn producer_active() -> bool {
+    tracing::enabled!(target: TARGET, tracing::Level::TRACE)
+        && !tracing::enabled!(target: CONTROL, tracing::Level::TRACE)
+}
 /// Native home as the pinned resolver selects it from the child's effective environment.
 pub(crate) fn native_home(command: &Command) -> Option<std::path::PathBuf> {
     if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
