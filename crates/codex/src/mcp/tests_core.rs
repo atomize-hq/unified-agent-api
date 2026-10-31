@@ -5,4 +5,5 @@ mod codex_rpc_flows;
 mod config_runtime;
 
 mod native_interactions;
+mod native_layer_diagnostics;
 mod native_validation;
