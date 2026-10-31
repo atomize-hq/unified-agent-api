@@ -252,8 +252,9 @@ contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `Cas
   stack: only session-flags, project, user and system classes, in that precedence, exactly one
   user and one system layer, every entry at its role, and every origin class among those four.
   The stack is the managed pre-turn input; it is not turn, loader or exec/fork-route proof.
-  The SDK sets `includeLayers` only for the producer's exclusive subscriber (private target
-  enabled, separate control target not), never for tracing interest alone, and removes
+  The SDK sets `includeLayers` only on a transport spawned under the producer's exclusive
+  subscriber (private target enabled, separate control target not), captured at spawn, never
+  for tracing interest alone or a subscriber installed later, and removes
   `layers` from the reply it returns. At the pinned revision native computes `config` and
   `origins` identically either way and omits the member when it is not requested. A stack that
   exceeds the transport frame bound fails that producer call; it never reaches ordinary callers.

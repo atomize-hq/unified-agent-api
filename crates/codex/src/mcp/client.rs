@@ -206,9 +206,10 @@ impl CodexAppServer {
 
     /// Read native effective configuration without configuration layer payloads.
     pub async fn config_read(&self, cwd: PathBuf) -> Result<AppCallHandle, McpError> {
-        // Only the producer's exclusive subscriber also requests layers for its finite
-        // projection; they are removed from the reply, which upstream computes identically.
-        let include_layers = crate::native_context::producer_active();
+        // Only a transport spawned for the producer's exclusive subscriber also requests layers
+        // for its finite projection; they are removed from the reply, which upstream computes
+        // identically. A subscriber installed after spawn never changes this connection.
+        let include_layers = self.transport.diagnostic_producer();
         self.invoke_app_call(
             "config/read",
             json!({"cwd":cwd,"includeLayers":include_layers}),

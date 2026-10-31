@@ -52,7 +52,8 @@ The managed initial/resume `config/read` now also projects the native layer stac
 collector's exclusive subscriber (the private target enabled and a separate control target not),
 the wrapper requests `includeLayers`, projects each layer to class, enabled, empty and role-match
 booleans, records which classes supplied effective values, and removes `layers` before the reply
-reaches the SDK caller. An ordinary all-target TRACE subscriber keeps the layer-free request. At pinned upstream
+reaches the SDK caller. Eligibility is captured when the child is spawned. An ordinary
+all-target TRACE subscriber, or a subscriber installed after spawn, keeps the layer-free request. At pinned upstream
 `b412ff32c417f855c2b2d1581b77058eed87c84b`, `config_manager_service.rs` computes `config` and
 `origins` identically with or without layers, and the protocol omits the member when it is not
 requested; ordinary callers without that owner still send `includeLayers:false`. Admission now

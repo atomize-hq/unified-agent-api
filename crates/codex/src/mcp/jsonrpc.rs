@@ -71,6 +71,8 @@ pub(super) struct JsonRpcTransport {
     is_app: bool,
     diagnostic_owner: u64,
     diagnostic_home: Option<PathBuf>,
+    /// Captured at spawn: this transport belongs to the producer's exclusive subscriber.
+    diagnostic_producer: bool,
 }
 
 impl JsonRpcTransport {
@@ -79,6 +81,9 @@ impl JsonRpcTransport {
     }
     pub(super) fn diagnostic_home(&self) -> Option<&Path> {
         self.diagnostic_home.as_deref()
+    }
+    pub(super) fn diagnostic_producer(&self) -> bool {
+        self.diagnostic_producer
     }
     pub(super) async fn spawn_mcp(config: StdioServerConfig) -> Result<Self, McpError> {
         let hook = NotificationHook::Codex {
@@ -168,6 +173,7 @@ impl JsonRpcTransport {
             command.env(key, value);
         }
 
+        let diagnostic_producer = diagnostic_owner != 0 && crate::native_context::producer_active();
         let diagnostic_home = if diagnostic_owner == 0 {
             None
         } else {
@@ -266,6 +272,7 @@ impl JsonRpcTransport {
         Ok(Self {
             diagnostic_owner,
             diagnostic_home,
+            diagnostic_producer,
             writer: writer_tx,
             pending,
             notification_hook,
