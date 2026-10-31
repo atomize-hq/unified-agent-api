@@ -77,6 +77,8 @@ for line in sys.stdin:
 "#,
     );
     config.code_home = Some(PathBuf::from("/role/home"));
+    // Resolve the fixture interpreter directly rather than through a user shim manager.
+    config.env = vec![("PATH".into(), "/usr/bin:/bin".into())];
     let projections = Projections {
         broad,
         ..Default::default()
