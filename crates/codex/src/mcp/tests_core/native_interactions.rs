@@ -492,6 +492,102 @@ for line in sys.stdin:
     server.shutdown_and_wait().await.unwrap();
 }
 
+#[derive(Clone, Default)]
+struct Projections(std::sync::Arc<std::sync::Mutex<Vec<(String, String)>>>);
+impl tracing::Subscriber for Projections {
+    fn enabled(&self, m: &tracing::Metadata<'_>) -> bool {
+        m.target() == crate::native_context::TARGET
+    }
+    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::Id {
+        tracing::Id::from_u64(1)
+    }
+    fn record(&self, _: &tracing::Id, _: &tracing::span::Record<'_>) {}
+    fn record_follows_from(&self, _: &tracing::Id, _: &tracing::Id) {}
+    fn enter(&self, _: &tracing::Id) {}
+    fn exit(&self, _: &tracing::Id) {}
+    fn event(&self, event: &tracing::Event<'_>) {
+        #[derive(Default)]
+        struct V(String, String);
+        impl tracing::field::Visit for V {
+            fn record_str(&mut self, f: &tracing::field::Field, v: &str) {
+                match f.name() {
+                    "kind" => self.0 = v.into(),
+                    "projection" => self.1 = v.into(),
+                    _ => (),
+                }
+            }
+            fn record_debug(&mut self, _: &tracing::field::Field, _: &dyn std::fmt::Debug) {}
+        }
+        let mut v = V::default();
+        event.record(&mut v);
+        self.0.lock().unwrap().push((v.0, v.1));
+    }
+}
+
+// Thread-local subscribers race tracing's global callsite interest under parallel tests,
+// so the body runs alone in a re-executed process.
+#[test]
+fn private_owner_requests_layers_projects_them_and_returns_the_ordinary_reply() {
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "mcp::tests_core::native_interactions::private_owner_layer_process",
+            "--nocapture",
+        ])
+        .env("UAA_PRIVATE_OWNER_LAYER_PROCESS", "1")
+        .stdout(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
+#[tokio::test]
+async fn private_owner_layer_process() {
+    if std::env::var_os("UAA_PRIVATE_OWNER_LAYER_PROCESS").is_none() {
+        return;
+    }
+    let (dir, mut config) = fixture_config(
+        r#"
+for line in sys.stdin:
+ r=json.loads(line)
+ inc=r['params'].get('includeLayers')
+ res={'config':{'model':'gpt-5'},'origins':{'model':{'name':{'type':'user','file':'/role/home/config.toml'},'version':'v'}},'echo':inc}
+ if inc: res['layers']=[{'name':{'type':'user','file':'/role/home/config.toml'},'version':'v','config':{'model':'sk-sentinel-layer'}},{'name':{'type':'system','file':'/etc/codex/config.toml'},'version':'w','config':{}}]
+ send({'id':r['id'],'result':res})
+"#,
+    );
+    config.code_home = Some(PathBuf::from("/role/home"));
+    let projections = Projections::default();
+    let guard = tracing::subscriber::set_default(projections.clone());
+    let (server, _stream) = CodexAppServer::spawn_uninitialized_with_interactions(config)
+        .await
+        .unwrap();
+    let call = server
+        .config_read(PathBuf::from("/role/project"))
+        .await
+        .unwrap();
+    let value = call.response.await.unwrap().unwrap();
+    drop(guard);
+    // Native saw the layer request; the caller gets the reply native returns without it.
+    assert_eq!(value["echo"], true);
+    assert!(value.get("layers").is_none());
+    assert_eq!(value["config"]["model"], "gpt-5");
+    let events = projections.0.lock().unwrap().clone();
+    let config = events
+        .iter()
+        .find(|(kind, _)| kind == "config")
+        .map(|(_, p)| p.clone())
+        .unwrap();
+    assert!(!config.contains("sk-sentinel") && !config.contains("/role"));
+    let projected: crate::native_context::Config = serde_json::from_str(&config).unwrap();
+    let layers = projected.layers.unwrap();
+    assert!(layers.origins_enabled);
+    assert!(layers.entries.iter().all(|l| l.role_matches && l.enabled));
+    assert_eq!(layers.entries.len(), 2);
+    server.shutdown_and_wait().await.unwrap();
+    drop(dir);
+}
+
 #[tokio::test]
 async fn outgoing_native_reply_bound_covers_complete_wire_frame_and_string_id() {
     const LIMIT: usize = 1024 * 1024;

@@ -235,3 +235,13 @@ changes supply concrete assertions for future mappings, not approved classificat
 adequacy. Hermetic and native executable identities must still be bound independently before a
 mixed population can register. Keep the existing native receipts and private profile absent until
 all required observation methods, values, mappings and registered native corroboration are complete.
+
+## Layer-input progress
+
+The managed initial/resume route now retains a finite native layer stack and origin-class set from
+its own `config/read` (see the [guard runbook](support-depth-native-context-guards.md)). Admission
+refuses a present config without an eligible stack. This is the managed route's measured pre-turn
+input. `layer_inputs` stays unresolved for every route, for three reasons:
+- unattended initial/resume exec and fork do not read config, so they have no measured stack;
+- turn overrides are applied after the read;
+- no reviewed source binding or native corroboration names the fact yet.

@@ -234,11 +234,27 @@ contexts MAY be retained in an incomplete attempt, but cannot qualify. Each `Cas
   approved case, the first `spawned` is false, the second true, and all matching/known predicates
   MUST hold. Missing, extra, malformed or duplicate diagnostics cannot supply positive evidence.
 - `config`: null or exactly `{model_gpt5, provider_openai, approval, sandbox, origins_present,
-  layers_complete, requirements_empty}`. The four named predicates and `layers_complete` are
-  booleans; `approval` is null or `never|on_request|untrusted|on_failure|granular`, `sandbox` null or
-  `read_only|workspace_write|danger_full_access`. The payload MUST equal the case's source-owned
-  expectation. A present config requires known model/provider/approval/sandbox, origins and empty
-  supported requirements. The existing layer-free/pre-turn API is not complete layer or turn proof.
+  layers, requirements_empty}`. The four named predicates are booleans; `approval` is null or
+  `never|on_request|untrusted|on_failure|granular`, `sandbox` null or
+  `read_only|workspace_write|danger_full_access`. `layers` is explicitly null or exactly
+  `{entries, origin_classes, origins_enabled}`, projected from the owning child's managed
+  `config/read`. Each of at most 16 `entries`, in native high-to-low order, is exactly
+  `{class, enabled, empty, role_matches}`. `class` is `packaged_defaults|mdm|system|
+  enterprise_managed|user|project|session_flags|legacy_managed_file|legacy_managed_mdm|unknown`;
+  a wire source with any other type or member set is `unknown`. `role_matches` compares the
+  layer's path in memory with its assigned role: system `/etc/codex/config.toml`, user
+  `<selected native home>/config.toml` with no profile, project `<cwd>/.codex`; session flags
+  have no path. `origin_classes` is the sorted distinct class set of effective-value origins;
+  `origins_enabled` requires each origin to name an enabled layer's exact source and version.
+  Paths, versions, disabled reasons and layer values MUST NOT be retained. The payload MUST equal
+  the case's source-owned expectation. A present config requires known
+  model/provider/approval/sandbox, origins, empty supported requirements and an eligible layer
+  stack: only session-flags, project, user and system classes, in that precedence, exactly one
+  user and one system layer, every entry at its role, and every origin class among those four.
+  The stack is the managed pre-turn input; it is not turn, loader or exec/fork-route proof.
+  The SDK sets `includeLayers` only for an active private diagnostic owner and removes `layers`
+  from the reply it returns; at the pinned revision native computes `config` and `origins`
+  identically either way and omits the member when it is not requested.
 - `thread_settings`: explicitly null, or exactly `{operation, model_gpt5, provider_openai,
   service_tier_default, approval, reviewer_user, sandbox_mode, cwd_matches, runtime_roots_match,
   instructions_empty}`. `operation` is `start|resume|fork`; predicates are booleans. `approval` is

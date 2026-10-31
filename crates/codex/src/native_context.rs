@@ -2,6 +2,7 @@
 mod projection;
 mod replies;
 pub(crate) use projection::*;
+use replies::layers;
 pub(crate) use replies::{thread_reply, turn_reply, ReplyRoles};
 use serde::Serialize;
 use std::{collections::BTreeMap, ffi::OsString, path::Path};
@@ -68,7 +69,20 @@ fn emit(kind: &'static str, value: &impl Serialize, owner: u64) {
 #[cfg(test)]
 mod tests;
 
-pub(crate) fn config_reply(value: &serde_json::Value, owner: u64) {
+/// Native home as the pinned resolver selects it from the child's effective environment.
+pub(crate) fn native_home(command: &Command) -> Option<std::path::PathBuf> {
+    if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
+        return None;
+    }
+    let env = effective_environment(command);
+    env.get(std::ffi::OsStr::new("CODEX_HOME"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            env.get(std::ffi::OsStr::new("HOME"))
+                .map(|h| Path::new(h).join(".codex"))
+        })
+}
+pub(crate) fn config_reply(value: &serde_json::Value, roles: Option<&ReplyRoles>, owner: u64) {
     if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
         return;
     }
@@ -90,7 +104,7 @@ pub(crate) fn config_reply(value: &serde_json::Value, owner: u64) {
             _ => None,
         },
         origins_present: value["origins"].is_object(),
-        layers_complete: false,
+        layers: layers(value, roles),
         requirements_empty: false,
     };
     emit("config", &projection, owner);
