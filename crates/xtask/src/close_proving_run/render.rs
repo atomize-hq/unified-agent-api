@@ -42,7 +42,7 @@ pub(super) fn render_readme_body(
         entry.display_name,
         entry.agent_id,
         entry.crate_path,
-        entry.backend_module,
+        entry.backend_module.as_deref().unwrap_or("none"),
         entry.manifest_root,
         closeout_path,
         closeout.approval_source,
@@ -75,7 +75,7 @@ pub(super) fn render_seam_map_body(entry: &AgentRegistryEntry, docs_root_display
         entry.agent_id,
         entry.manifest_root,
         entry.crate_path,
-        entry.backend_module
+        entry.backend_module.as_deref().unwrap_or("none")
     )
 }
 
@@ -84,7 +84,7 @@ pub(super) fn render_threading_body(entry: &AgentRegistryEntry) -> String {
         "# Threading\n\n1. Control-plane onboarding writes for `{}` landed without follow-up packet drift.\n2. Runtime-owned wrapper and backend work landed at `{}` and `{}`.\n3. Manifest evidence and publication artifacts were regenerated from committed runtime outputs.\n4. The proving run closed with `make preflight`.\n",
         entry.agent_id,
         entry.crate_path,
-        entry.backend_module
+        entry.backend_module.as_deref().unwrap_or("none")
     )
 }
 

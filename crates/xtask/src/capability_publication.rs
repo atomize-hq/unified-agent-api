@@ -202,7 +202,7 @@ pub fn validate_registry_approval_alignment(
         &mut mismatches,
         "backend_module",
         &descriptor.backend_module,
-        &entry.backend_module,
+        entry.backend_module_or_empty(),
     );
     push_mismatch(
         &mut mismatches,

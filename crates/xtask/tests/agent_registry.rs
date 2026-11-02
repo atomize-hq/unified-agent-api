@@ -743,5 +743,7 @@ fn invalid_governance_comparison_kind_fails_closed() {
     assert!(text.contains("unknown variant"), "{text}");
 }
 
+#[path = "agent_registry/non_runtime.rs"]
+mod non_runtime;
 #[path = "agent_registry/support_depth.rs"]
 mod support_depth;

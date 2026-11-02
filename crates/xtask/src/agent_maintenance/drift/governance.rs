@@ -282,7 +282,7 @@ fn inspect_approved_agent_descriptor(
         &mut mismatches,
         "backend_module",
         &artifact.descriptor.backend_module,
-        &entry.backend_module,
+        entry.backend_module_or_empty(),
     );
     compare_descriptor_field(
         &mut mismatches,

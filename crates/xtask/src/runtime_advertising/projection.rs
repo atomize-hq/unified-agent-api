@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use super::evaluator::{self, BackendModel, ConfigKey, ConfigValues, Gate, HostFacts};
 use crate::agent_registry::AgentRegistry;
 
-pub const AGENTS: [&str; 5] = ["aider", "claude_code", "codex", "gemini_cli", "opencode"];
+pub use crate::agent_registry::BUILT_IN_AGENTS as AGENTS;
 
 #[derive(Clone, Debug)]
 pub struct Model {
@@ -42,7 +42,9 @@ pub fn project(registry: &AgentRegistry) -> Result<Vec<Model>, String> {
         let entry = registry
             .find(agent)
             .ok_or_else(|| format!("missing built-in {agent}"))?;
-        if entry.backend_module != format!("crates/agent_api/src/backends/{agent}") {
+        if entry.backend_module.as_deref()
+            != Some(&*format!("crates/agent_api/src/backends/{agent}"))
+        {
             return Err(format!("{agent}: unsupported backend module"));
         }
         let declaration = &entry.capability_declaration;
@@ -95,7 +97,14 @@ pub fn project(registry: &AgentRegistry) -> Result<Vec<Model>, String> {
         });
     }
     // A new built-in must add supported identity/module/feature interpretation in the same change.
-    if registry.agents.len() != AGENTS.len() {
+    // Non-runtime entries (no `backend_module`) carry no capability claims and are not built-ins.
+    if registry
+        .agents
+        .iter()
+        .filter(|agent| agent.backend_module.is_some())
+        .count()
+        != AGENTS.len()
+    {
         return Err("unsupported built-in inventory".into());
     }
     Ok(models)
