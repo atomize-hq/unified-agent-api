@@ -12,8 +12,9 @@ no background job.
 The approved [proposal sequence](support-depth-policy-proposal.md) keeps two facts separate:
 
 1. **Path machinery proof.** The complete maintenance chain works end to end in an isolated
-   workspace. The contract says this "does not establish qualification of any real operation". The
-   proposal allows controlled fixtures, provided "synthetic proof certifies no nonexistent API".
+   workspace. The contract lists "qualification of any real operation" as something it does not
+   establish. The proposal allows controlled fixtures, provided "synthetic proof certifies no
+   nonexistent API".
    Maintenance may be enabled without onboarding proof.
 2. **Qualification of a real operation.** For example, Codex `run`, which is ordinary support work
    that comes after the paths are enabled.
