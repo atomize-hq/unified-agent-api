@@ -84,8 +84,8 @@ The critical path is A → B → C → D → E. F and G follow and do not block 
 subject through E1 steps 0–7 and the rejection matrix. The repository and the credential reference
 need separate maintainer authorization before any host write.
 
-**D. Maintenance enablement.** Land the positive and negative evidence, then obtain per-agent
-maintainer authorization (contract "Path enablement").
+**D. Maintenance enablement.** Land the positive and negative evidence. Then per-agent maintainer
+authorization enables the maintenance path for each agent (contract "Path enablement").
 
 **E. Onboarding.**
 1. The charter defines the create-lane P/O freeze point and the committed artifact that records it.
@@ -99,7 +99,8 @@ maintainer authorization (contract "Path enablement").
    evidence does not substitute.
 8. Establish route mediation (item 3) again for the maintenance path, as the contract requires
    when onboarding is enabled.
-9. Enable the onboarding path, then obtain per-agent maintainer authorization.
+9. Per-agent maintainer authorization, given once items 1–8 hold. Each authorization is what
+   enables the onboarding path for that agent.
 
 **F. Real-agent qualification (support work).**
 - Codex: PI-P3 declarations (resume and fork), the 24 unresolved flags, the IR-P2 musl packet, and
