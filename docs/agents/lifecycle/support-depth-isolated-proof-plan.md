@@ -1,6 +1,6 @@
 # Phase E1: isolated maintenance-chain proof plan
 
-> Proposed [MP-P1](support-depth-machinery-proof-rescope.md) replaces E1-P1's proof subject with a
+> Approved [MP-P1](support-depth-machinery-proof-rescope.md) replaces E1-P1's proof subject with a
 > synthetic isolated agent (machinery proof only); E1-P2's threshold and the chain are unchanged.
 
 Status: E1-P1 and E1-P2 approved by the maintainer on 2026-10-25.

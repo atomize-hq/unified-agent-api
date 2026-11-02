@@ -1,6 +1,6 @@
 # Isolated public maintenance routes: binding design
 
-> Under proposed [MP-P2](support-depth-machinery-proof-rescope.md), IR-P2 is a Codex qualification
+> Under approved [MP-P2](support-depth-machinery-proof-rescope.md), IR-P2 is a Codex qualification
 > rule; IR-P1 and IR-P3 stay agent-general and apply to the synthetic machinery proof.
 
 Status: IR-P1, IR-P2 and IR-P3 approved by the maintainer on 2026-10-25.

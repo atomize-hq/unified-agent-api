@@ -1,7 +1,6 @@
 # Support depth: machinery-proof rescope and remaining roadmap
 
-Status: MP-P1 and MP-P2 proposed on 2026-11-02. The maintainer approved the direction on that
-date; the rows below take effect when this document is approved.
+Status: MP-P1 and MP-P2 approved by the maintainer on 2026-11-02.
 Source baseline: staging `0cb08241` (PR #309).
 The [support-depth contract](../../specs/support-depth-contract.md) remains normative and is not
 amended here. This document changes no code, enrollment, host setting or credential, and creates
@@ -28,7 +27,7 @@ E1-P1 picked a real Codex operation as the proof subject, and that joined the tw
 Each step was correct *for qualifying Codex*. None of it is needed to prove that the maintenance
 machinery works. Since 2026-10-25 the isolated chain has been waiting on Codex truth work.
 
-## Proposed decisions
+## Approved decisions
 
 | Id | Recommendation | Reason / boundary |
 | --- | --- | --- |

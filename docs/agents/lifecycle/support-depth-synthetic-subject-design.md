@@ -1,8 +1,8 @@
 # Support depth: synthetic machinery-proof subject design
 
-Status: SA-P1, SA-P2 and SA-P3 proposed on 2026-11-02. This is roadmap items B.1 and B.2 of
-[MP-P1](support-depth-machinery-proof-rescope.md). Nothing is implemented until the maintainer
-approves these decisions.
+Status: SA-P1, SA-P2 and SA-P3 approved by the maintainer on 2026-11-02. This is roadmap items B.1 and B.2 of
+[MP-P1](support-depth-machinery-proof-rescope.md). Implementation proceeds in the
+order below; approval enables no path and installs no profile.
 Source baseline: staging `0cb08241` (PR #309).
 The [depth contract](../../specs/support-depth-contract.md), [registry contract](../../specs/agent-registry-contract.md#support-depth)
 and [evidence contract](../../specs/support-depth-evidence-v1.md) remain normative. This document
@@ -43,7 +43,7 @@ Each step consumes exact repository data:
   fixed `AGENTS` list, and `backend_module` is a required registry field. The onboarding gap memo
   records the same assumption, as the hard-coded backend list.
 
-## Proposed decisions
+## Approved decisions
 
 | Id | Recommendation | Reason / boundary |
 | --- | --- | --- |

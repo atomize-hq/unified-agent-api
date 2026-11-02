@@ -1,6 +1,6 @@
 # Native runtime context and case-coverage closure
 
-> Under proposed [MP-P2](support-depth-machinery-proof-rescope.md), NC-P1/NC-P2 and the six
+> Under approved [MP-P2](support-depth-machinery-proof-rescope.md), NC-P1/NC-P2 and the six
 > context facts are Codex qualification work, not prerequisites of the isolated machinery proof.
 
 Status: NC-P1 and NC-P2 approved by the maintainer on 2026-10-29. The

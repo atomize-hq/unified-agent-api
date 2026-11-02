@@ -1,6 +1,6 @@
 # Isolated packet intake readiness design
 
-> Under proposed [MP-P2](support-depth-machinery-proof-rescope.md), PI-P1–PI-P3 are Codex
+> Under approved [MP-P2](support-depth-machinery-proof-rescope.md), PI-P1–PI-P3 are Codex
 > qualification rules, not prerequisites of the isolated machinery proof.
 
 Status: PI-P1, PI-P2 and PI-P3 approved by the maintainer on 2026-10-25.
