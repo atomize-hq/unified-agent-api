@@ -1,5 +1,8 @@
 # Packet-bound native evidence integration
 
+> Under proposed [MP-P2](support-depth-machinery-proof-rescope.md), NE-P1/NE-P2 are Codex
+> qualification work, not prerequisites of the isolated machinery proof.
+
 Status: NE-P1 and NE-P2 approved by the maintainer on 2026-10-28.
 Admission and the foreground producer are implemented through PR #307. The
 [context and case-coverage closure plan](support-depth-native-context-coverage.md) proposes the
