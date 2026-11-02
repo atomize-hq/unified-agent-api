@@ -161,6 +161,30 @@ fn malformed_projection_is_bounded_after_decoding() {
     }
 }
 
+// Cancel with a full buffer: the reader blocked on it must exit, not leak.
+#[test]
+fn cancel_with_a_full_buffer_releases_the_reader() {
+    let mut run = fixture("burst").run(&request()).unwrap();
+    let pid = run.id();
+    thread::sleep(Duration::from_millis(300));
+    run.cancel();
+    assert!(reaped(pid));
+    let begun = Instant::now();
+    while !run.reader_finished() && begun.elapsed() < Duration::from_secs(5) {
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(run.reader_finished());
+    assert!(matches!(run.next_event(), Some(Err(Error::Cancelled))));
+}
+
+// A timeout too large to represent is rejected before spawn instead of panicking after it.
+#[test]
+fn unrepresentable_timeout_is_rejected_before_spawn() {
+    let mut fx = DepthFixture::new("/nonexistent/depth_fixture");
+    fx.timeout = Duration::MAX;
+    assert!(matches!(fx.run(&request()), Err(Error::InvalidRequest(_))));
+}
+
 fn tempfile_dir() -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "depth-fixture-{}-{}",

@@ -92,6 +92,9 @@ impl DepthFixture {
     /// Validates the request, then spawns the child. Nothing is spawned when validation fails.
     pub fn run(&self, request: &RunRequest) -> Result<Run, Error> {
         validate(self, request)?;
+        let deadline = Instant::now()
+            .checked_add(self.timeout)
+            .ok_or(Error::InvalidRequest("timeout is too large"))?;
         let mut command = Command::new(&self.binary);
         command.arg("run").arg("--json");
         if let Some(model) = &request.model {
@@ -111,16 +114,17 @@ impl DepthFixture {
         let stderr = child.stderr.take().expect("piped stderr");
         let (sender, lines) = mpsc::sync_channel(EVENT_BUFFER_LINES);
         let limit = self.max_line_bytes;
-        thread::spawn(move || read_lines(stdout, limit, &sender));
+        let reader = thread::spawn(move || read_lines(stdout, limit, &sender));
         let (stderr_sender, stderr_tail) = mpsc::sync_channel(1);
         thread::spawn(move || {
             let _ = stderr_sender.send(tail(stderr));
         });
         Ok(Run {
             child,
-            lines,
+            lines: Some(lines),
+            reader,
             stderr: stderr_tail,
-            deadline: Instant::now() + self.timeout,
+            deadline,
             limit,
             completed: false,
             cancelled: false,
@@ -246,7 +250,9 @@ fn parse(line: &[u8]) -> Result<Event, Error> {
 /// A live run. Iterate with [`Run::next_event`]; dropping it kills and reaps the child.
 pub struct Run {
     child: Child,
-    lines: Receiver<Line>,
+    // Dropped on stop, so a reader blocked on a full buffer sees a closed channel and exits.
+    lines: Option<Receiver<Line>>,
+    reader: thread::JoinHandle<()>,
     stderr: Receiver<String>,
     deadline: Instant,
     limit: usize,
@@ -266,7 +272,8 @@ impl Run {
             self.stop();
             return Some(Err(Error::Timeout));
         }
-        let result = match self.lines.recv_timeout(self.deadline - now) {
+        let lines = self.lines.as_ref().expect("receiver lives until stop");
+        let result = match lines.recv_timeout(self.deadline - now) {
             Ok(Line::Text(bytes)) => match parse(&bytes) {
                 Ok(Event::Completed) => {
                     self.completed = true;
@@ -307,8 +314,11 @@ impl Run {
             Ok(None) => return Some(Err(Error::Timeout)),
             Err(error) => Err(error),
         };
-        let wait = self.deadline.saturating_duration_since(Instant::now());
-        let stderr = match self.stderr.recv_timeout(wait) {
+        let now = Instant::now();
+        if now >= self.deadline {
+            return Some(Err(Error::Timeout));
+        }
+        let stderr = match self.stderr.recv_timeout(self.deadline - now) {
             Ok(stderr) => stderr,
             Err(RecvTimeoutError::Timeout) => return Some(Err(Error::Timeout)),
             Err(RecvTimeoutError::Disconnected) => String::new(),
@@ -326,12 +336,13 @@ impl Run {
 
     /// Waits for exit until the deadline; `None` means the deadline passed first.
     fn wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        // The deadline is checked first, so an exit observed here happened before it.
         loop {
-            if let Some(status) = self.child.try_wait()? {
-                return Ok(Some(status));
-            }
             if Instant::now() >= self.deadline {
                 return Ok(None);
+            }
+            if let Some(status) = self.child.try_wait()? {
+                return Ok(Some(status));
             }
             thread::sleep(POLL);
         }
@@ -342,7 +353,14 @@ impl Run {
             self.done = true;
             let _ = self.child.kill();
             let _ = self.child.wait();
+            self.lines = None;
         }
+    }
+
+    /// Whether the stdout reader thread has exited. For shutdown tests.
+    #[doc(hidden)]
+    pub fn reader_finished(&self) -> bool {
+        self.reader.is_finished()
     }
 
     /// The child's process id, for reaping checks.
