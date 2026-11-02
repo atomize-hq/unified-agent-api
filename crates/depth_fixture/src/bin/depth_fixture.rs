@@ -170,6 +170,31 @@ fn run(args: &[String]) -> ExitCode {
             emit(&serde_json::json!({"type": "message", "text": text}).to_string());
             emit(completed);
         }
+        "burst" => {
+            // More output than the pipe plus the wrapper's buffer, for backpressure tests.
+            emit(started);
+            for i in 0..10_000 {
+                emit(&serde_json::json!({"type": "message", "text": format!("line {i:05} {}", "y".repeat(64))}).to_string());
+            }
+            emit(completed);
+        }
+        "malformed_binary" => {
+            emit(started);
+            let _ = stdout
+                .write_all(&[0xFF; 300])
+                .and_then(|()| stdout.write_all(b"\n"));
+        }
+        "stderr_sentinel" => {
+            // Over 64 KiB of stderr, ending with what the child can see of a parent sentinel.
+            emit(started);
+            let mut stderr = io::stderr().lock();
+            for _ in 0..2_000 {
+                let _ = writeln!(stderr, "{}", "z".repeat(63));
+            }
+            let secret = env::var("DEPTH_FIXTURE_SECRET").unwrap_or_else(|_| "<unset>".to_owned());
+            let _ = writeln!(stderr, "secret={secret}");
+            return ExitCode::from(5);
+        }
         other => return usage(&format!("unknown scenario `{other}`")),
     }
     ExitCode::SUCCESS

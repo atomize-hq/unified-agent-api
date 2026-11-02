@@ -7,23 +7,31 @@
 //!   model of 1–64 ASCII alphanumerics, `.`, `_` or `-`; a non-zero timeout.
 //! - Environment: the child gets a cleared environment plus only the caller's explicit variables,
 //!   null stdin, and the caller's working directory if one is set.
+//! - Credentials: the wrapper reads none and passes none implicitly. It does not redact child
+//!   output, so a value the caller passes explicitly and the child echoes can appear in a bounded
+//!   diagnostic; nothing from the parent environment can.
 //! - Output: JSON Lines events; known kinds are typed, unknown kinds are surfaced, malformed or
-//!   oversized lines are errors whose projection is bounded.
+//!   oversized lines are errors. Diagnostics hold at most `DIAGNOSTIC_BYTES` bytes.
 //! - Lifecycle: events stream before completion; end of output is not success without a terminal
-//!   `run.completed` and a zero exit; timeout and cancel kill and reap the child; drop reaps it.
+//!   `run.completed` and a zero exit. At most `EVENT_BUFFER_LINES` lines are buffered; beyond that
+//!   the child blocks on its own output. The deadline covers every poll, including queued events
+//!   and the final exit wait. Timeout, cancel and drop kill and reap the child.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::{Duration, Instant};
 
 pub const MAX_PROMPT_BYTES: usize = 8 * 1024;
 pub const DEFAULT_MAX_LINE_BYTES: usize = 64 * 1024;
 /// Bytes of a rejected line or of stderr kept in an error. Raw output is never returned whole.
 pub const DIAGNOSTIC_BYTES: usize = 256;
+/// Lines read ahead of the consumer. Queued bytes are at most this times the line limit.
+pub const EVENT_BUFFER_LINES: usize = 64;
+const POLL: Duration = Duration::from_millis(10);
 
 #[derive(Debug, Clone)]
 pub struct DepthFixture {
@@ -101,14 +109,17 @@ impl DepthFixture {
         let mut child = command.spawn().map_err(Error::Spawn)?;
         let stdout = child.stdout.take().expect("piped stdout");
         let stderr = child.stderr.take().expect("piped stderr");
-        let (sender, lines) = mpsc::channel();
+        let (sender, lines) = mpsc::sync_channel(EVENT_BUFFER_LINES);
         let limit = self.max_line_bytes;
         thread::spawn(move || read_lines(stdout, limit, &sender));
-        let stderr = thread::spawn(move || tail(stderr));
+        let (stderr_sender, stderr_tail) = mpsc::sync_channel(1);
+        thread::spawn(move || {
+            let _ = stderr_sender.send(tail(stderr));
+        });
         Ok(Run {
             child,
             lines,
-            stderr: Some(stderr),
+            stderr: stderr_tail,
             deadline: Instant::now() + self.timeout,
             limit,
             completed: false,
@@ -151,7 +162,7 @@ enum Line {
     Failed(std::io::Error),
 }
 
-fn read_lines(stdout: impl Read, limit: usize, sender: &mpsc::Sender<Line>) {
+fn read_lines(stdout: impl Read, limit: usize, sender: &mpsc::SyncSender<Line>) {
     let mut reader = BufReader::new(stdout);
     loop {
         let mut buf = Vec::new();
@@ -178,16 +189,33 @@ fn read_lines(stdout: impl Read, limit: usize, sender: &mpsc::Sender<Line>) {
     }
 }
 
-fn tail(stderr: impl Read) -> String {
-    let mut bytes = Vec::new();
-    let _ = stderr.take(64 * 1024).read_to_end(&mut bytes);
-    let start = bytes.len().saturating_sub(DIAGNOSTIC_BYTES);
-    String::from_utf8_lossy(&bytes[start..]).trim().to_owned()
+/// Drains stderr to EOF, so the child never sees a closed pipe, keeping only a bounded tail.
+fn tail(mut stderr: impl Read) -> String {
+    let mut kept = Vec::new();
+    let mut chunk = [0u8; 4096];
+    while let Ok(n) = stderr.read(&mut chunk) {
+        if n == 0 {
+            break;
+        }
+        kept.extend_from_slice(&chunk[..n]);
+        let excess = kept.len().saturating_sub(DIAGNOSTIC_BYTES);
+        kept.drain(..excess);
+    }
+    project(String::from_utf8_lossy(&kept).trim())
 }
 
 fn bounded(bytes: &[u8]) -> String {
     let end = bytes.len().min(DIAGNOSTIC_BYTES);
-    String::from_utf8_lossy(&bytes[..end]).trim_end().to_owned()
+    project(String::from_utf8_lossy(&bytes[..end]).trim_end())
+}
+
+/// Caps a projection at `DIAGNOSTIC_BYTES` bytes after lossy decoding, on a char boundary.
+fn project(text: &str) -> String {
+    let mut end = text.len().min(DIAGNOSTIC_BYTES);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_owned()
 }
 
 fn parse(line: &[u8]) -> Result<Event, Error> {
@@ -219,7 +247,7 @@ fn parse(line: &[u8]) -> Result<Event, Error> {
 pub struct Run {
     child: Child,
     lines: Receiver<Line>,
-    stderr: Option<JoinHandle<String>>,
+    stderr: Receiver<String>,
     deadline: Instant,
     limit: usize,
     completed: bool,
@@ -233,8 +261,12 @@ impl Run {
         if self.done {
             return std::mem::take(&mut self.cancelled).then_some(Err(Error::Cancelled));
         }
-        let wait = self.deadline.saturating_duration_since(Instant::now());
-        let result = match self.lines.recv_timeout(wait) {
+        let now = Instant::now();
+        if now >= self.deadline {
+            self.stop();
+            return Some(Err(Error::Timeout));
+        }
+        let result = match self.lines.recv_timeout(self.deadline - now) {
             Ok(Line::Text(bytes)) => match parse(&bytes) {
                 Ok(Event::Completed) => {
                     self.completed = true;
@@ -270,12 +302,17 @@ impl Run {
     }
 
     fn finish(&mut self) -> Option<Result<Event, Error>> {
-        let status = self.wait();
-        let stderr = self
-            .stderr
-            .take()
-            .and_then(|h| h.join().ok())
-            .unwrap_or_default();
+        let status = match self.wait() {
+            Ok(Some(status)) => Ok(status),
+            Ok(None) => return Some(Err(Error::Timeout)),
+            Err(error) => Err(error),
+        };
+        let wait = self.deadline.saturating_duration_since(Instant::now());
+        let stderr = match self.stderr.recv_timeout(wait) {
+            Ok(stderr) => stderr,
+            Err(RecvTimeoutError::Timeout) => return Some(Err(Error::Timeout)),
+            Err(RecvTimeoutError::Disconnected) => String::new(),
+        };
         match status {
             Err(error) => Some(Err(Error::Io(error))),
             Ok(status) if !status.success() => Some(Err(Error::Exit {
@@ -287,8 +324,17 @@ impl Run {
         }
     }
 
-    fn wait(&mut self) -> std::io::Result<ExitStatus> {
-        self.child.wait()
+    /// Waits for exit until the deadline; `None` means the deadline passed first.
+    fn wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        loop {
+            if let Some(status) = self.child.try_wait()? {
+                return Ok(Some(status));
+            }
+            if Instant::now() >= self.deadline {
+                return Ok(None);
+            }
+            thread::sleep(POLL);
+        }
     }
 
     fn stop(&mut self) {
