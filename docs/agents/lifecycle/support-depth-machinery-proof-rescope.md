@@ -12,7 +12,7 @@ no background job.
 The approved [proposal sequence](support-depth-policy-proposal.md) keeps two facts separate:
 
 1. **Path machinery proof.** The complete maintenance chain works end to end in an isolated
-   workspace. The contract lists "qualification of any real operation" as something it does not
+   workspace. The contract lists "Qualification of any real operation" as something it does not
    establish. The proposal allows controlled fixtures, provided "synthetic proof certifies no
    nonexistent API".
    Maintenance may be enabled without onboarding proof.
