@@ -420,3 +420,7 @@ fn forwarding_follows_the_template_table() {
         assert!(err.contains(expected), "`{to}`: {err}");
     }
 }
+
+// Sibling registry cases, nested here to keep the parent test file under the LOC cap.
+#[path = "non_runtime.rs"]
+mod non_runtime;

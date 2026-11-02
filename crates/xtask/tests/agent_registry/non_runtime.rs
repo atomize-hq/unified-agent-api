@@ -1,3 +1,4 @@
+use super::agent_registry;
 use super::*;
 
 // A wrapper-only agent that is not an agent_api runtime backend: no `backend_module`, no claims.
