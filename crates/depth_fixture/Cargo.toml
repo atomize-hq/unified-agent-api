@@ -1,0 +1,20 @@
+[package]
+name = "unified-agent-api-depth-fixture"
+version.workspace = true
+edition = "2021"
+rust-version = "1.78"
+description = "Synthetic CLI and wrapper for the isolated support-depth machinery proof; qualifies no real agent"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "depth_fixture"
+
+[[bin]]
+name = "depth_fixture"
+path = "src/bin/depth_fixture.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

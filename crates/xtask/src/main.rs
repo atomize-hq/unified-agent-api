@@ -7,6 +7,7 @@ mod claude_wrapper_coverage;
 mod close_proving_run;
 mod codex_snapshot;
 mod codex_wrapper_coverage;
+mod depth_fixture_snapshot;
 mod historical_lifecycle_backfill;
 pub use xtask::manifest_report;
 mod manifest_retain;
@@ -84,6 +85,8 @@ enum Command {
     ClaudeSnapshot(claude_snapshot::Args),
     /// Generate an OpenCode CLI snapshot manifest under `cli_manifests/opencode/`.
     OpencodeSnapshot(opencode_snapshot::Args),
+    /// Snapshot the synthetic `depth_fixture` CLI (isolated support-depth machinery proof only).
+    DepthFixtureSnapshot(depth_fixture_snapshot::Args),
     /// Validate a proving-run closeout artifact and refresh the onboarding packet docs.
     CloseProvingRun(close_proving_run::Args),
     /// Resolve the multi-target acquisition plan for one agent at one upstream version.
@@ -298,6 +301,13 @@ fn main() {
             }
         },
         Command::OpencodeSnapshot(args) => match opencode_snapshot::run(args) {
+            Ok(()) => 0,
+            Err(err) => {
+                eprintln!("{err}");
+                1
+            }
+        },
+        Command::DepthFixtureSnapshot(args) => match depth_fixture_snapshot::run(args) {
             Ok(()) => 0,
             Err(err) => {
                 eprintln!("{err}");
