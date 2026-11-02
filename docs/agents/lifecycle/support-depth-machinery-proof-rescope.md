@@ -32,7 +32,7 @@ machinery works. Since 2026-10-25 the isolated chain has been waiting on Codex t
 | Id | Recommendation | Reason / boundary |
 | --- | --- | --- |
 | MP-P1 — proof subject | Replace E1-P1's proof subject with one **synthetic agent** that exists only in the isolated repository. It has a small fixture CLI with a real tagged release and manifest root, one wrapper-only operation that claims no shared capability, its own RULES and validator spec, and a credential-free CI evidence profile. Run the unchanged E1 chain (steps 0–7 and the rejection matrix) on it. The run is labeled a **machinery proof that qualifies nothing**. | This is the contract's own separation. Nothing in it is fabricated: acquisition, P/O freeze, evidence, adequacy adoption, closeout, promotion and IN1 all run for real on a subject whose whole API is known. No real agent's truth decisions apply. The same subject can serve as the onboarding proof's new agent, which the contract allows. Production registries never contain it. |
-| MP-P2 — Codex rules | Keep PI-P1 to PI-P3, IR-P2, NE-P1/P2 and NC-P1/P2 as approved, and **re-label them as Codex qualification rules**. They are a prerequisite for enrolling real Codex, not for the machinery proof. Park PR #310 (layer inputs) as Codex support work. | This removes no safeguard. A real Codex enrollment must still meet every one of them. E1-P2's threshold applies unchanged to the synthetic subject. IR-P1 (isolated authority) and IR-P3 (producer terminality) are agent-general and stay in force for the proof. |
+| MP-P2 — Codex rules | Keep PI-P1 to PI-P3, IR-P2, NE-P1/P2 and NC-P1/P2 as approved, and **re-label them as Codex qualification rules**. They are prerequisites for accepting depth results for real Codex operations, not for the machinery proof. Depth enrollment itself may still begin with this work outstanding (contract, "Depth enrollment MAY begin with implementation and evidence work outstanding"). Park PR #310 (layer inputs) as Codex support work. | This removes no safeguard. A real Codex enrollment must still meet every one of them. E1-P2's threshold applies unchanged to the synthetic subject. IR-P1 (isolated authority) and IR-P3 (producer terminality) are agent-general and stay in force for the proof. |
 
 Unchanged:
 - Annex A remains the sole route inventory.
@@ -64,8 +64,14 @@ The critical path is A → B → C → D → E. F and G follow and do not block 
 1. **Synthetic subject.** The fixture CLI and release source, the registry entry template for the
    isolated repository, RULES and a validator spec, and a CI evidence profile with obligations and
    case mapping.
-2. **Subject-driven isolated binding.** Replace the fixed Codex constants in `scope.rs` and
-   `depth_ci/profile.rs`. The authority boundary (IR-P1) is unchanged.
+2. **Subject-driven isolated binding.**
+   - First, a bounded amendment to the [evidence contract](../../specs/support-depth-evidence-v1.md).
+     Today it allows only the two compiled profiles, and its isolated binding admits only Codex
+     `0.156.1` `run`/CORE on musl. The amendment adds the synthetic subject as one more compiled
+     profile. Profiles still come only from compiled source, and unsupported selections still
+     refuse.
+   - Then replace the fixed Codex constants in `scope.rs` and `depth_ci/profile.rs`.
+   - The authority boundary (IR-P1) is unchanged.
 3. **Depth intake and acquisition to request freeze** (MA1→MA2), through the public entrypoints.
 4. **Execution on CI evidence** (MA4).
 5. **Closeout only when every due obligation is proven, through IN1** (MA5).
@@ -85,11 +91,15 @@ maintainer authorization (contract "Path enablement").
 1. The charter defines the create-lane P/O freeze point and the committed artifact that records it.
 2. `onboard-agent` writes version metadata, RULES and a validator spec.
 3. The runtime follow-on carries depth identity, and `written-paths.json` integrity is fixed.
-4. Enable ON1–ON5.
-5. Validator specs for `aider` and `gemini_cli`.
-6. Gap-memo items: runtime handoff capability and publication truth, and the hard-coded backend
+4. Validator specs for `aider` and `gemini_cli`.
+5. Gap-memo items: runtime handoff capability and publication truth, and the hard-coded backend
    list in `capability_matrix.rs`.
-7. Independent new-agent proof, reusing the synthetic subject.
+6. Wire ON1–ON5 for depth in the isolated workspace only.
+7. Independent new-agent proof in that workspace, reusing the synthetic subject. Maintenance
+   evidence does not substitute.
+8. Establish route mediation (item 3) again for the maintenance path, as the contract requires
+   when onboarding is enabled.
+9. Enable the onboarding path, then obtain per-agent maintainer authorization.
 
 **F. Real-agent qualification (support work).**
 - Codex: PI-P3 declarations (resume and fork), the 24 unresolved flags, the IR-P2 musl packet, and
