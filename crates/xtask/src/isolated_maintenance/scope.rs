@@ -16,6 +16,8 @@ use std::{fs, path::Path};
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Subject {
     pub agent_id: &'static str,
+    /// An `agent_api` runtime backend (a built-in); otherwise a non-runtime registry entry.
+    pub runtime: bool,
     pub version: &'static str,
     pub target: &'static str,
     pub selector: &'static str,
@@ -28,6 +30,7 @@ pub(super) struct Subject {
 /// Codex qualification subject (MP-P2): unchanged from the IR-P2 binding.
 pub(super) const CODEX: Subject = Subject {
     agent_id: "codex",
+    runtime: true,
     version: "0.156.1",
     target: "x86_64-unknown-linux-musl",
     selector: "run-json",
@@ -39,6 +42,7 @@ pub(super) const CODEX: Subject = Subject {
 /// Synthetic machinery-proof subject (MP-P1, SA-P3). It qualifies no real agent.
 pub(super) const SYNTHETIC: Subject = Subject {
     agent_id: "depth_fixture",
+    runtime: false,
     version: "0.2.0",
     target: "linux-x64",
     selector: "run-json",
@@ -70,6 +74,9 @@ pub(super) fn load(
     let agent = registry
         .find(subject.agent_id)
         .ok_or("missing isolated subject registry entry")?;
+    if agent.backend_module.is_some() != subject.runtime {
+        return Err("isolated subject runtime membership differs from its compiled subject".into());
+    }
     let table = agent
         .support_depth
         .as_ref()

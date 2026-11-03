@@ -104,3 +104,23 @@ fn synthetic_profile_refuses_codex_depth_and_foreign_retained_roots() {
     f.commit();
     assert!(f.resolve().is_err());
 }
+
+#[test]
+fn synthetic_subject_must_stay_non_runtime() {
+    // A backend makes the entry a runtime built-in, which then may carry capability claims.
+    let f = Fixture::new_for(&scope::SYNTHETIC);
+    edit_entry(&f, "depth_fixture", |agent| {
+        agent.insert(
+            "backend_module",
+            toml_edit::value("crates/agent_api/src/backends/depth_fixture"),
+        );
+        agent["capability_declaration"]["always_on"] =
+            toml_edit::value(["agent_api.run"].into_iter().collect::<toml_edit::Array>());
+    });
+    f.commit();
+    assert!(f
+        .resolve()
+        .err()
+        .unwrap()
+        .contains("runtime membership differs"));
+}
