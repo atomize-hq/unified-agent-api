@@ -203,7 +203,9 @@ pub(super) fn apply(
         ));
     }
     // Rebuild through the same pure path. Public fields never authorize output paths or bytes.
-    let current = super::build_with_registry(root, &plan.context.args, registry)?;
+    let mut current = super::build_with_registry(root, &plan.context.args, registry)?;
+    // The caller has already matched the route and its protected tip against this binding.
+    current.isolated_tip = plan.isolated_tip.clone();
     if current != *plan {
         return Err(Error::Validation(
             "stale or modified prepare plan; rebuild before applying".into(),

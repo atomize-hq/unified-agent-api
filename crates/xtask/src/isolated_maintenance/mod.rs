@@ -42,6 +42,40 @@ pub fn check(root: &Path) -> Result<(), String> {
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github)).map(drop)
 }
 
+/// The isolated binding as a supported public route sees it (route design, "Public routes and
+/// delivery"). It wraps a freshly resolved context; it has no public constructor and grants no
+/// write by itself: the route's own owning checks still decide.
+pub struct Route(Context);
+impl Route {
+    /// The scoped registry, after rechecking the workspace, inputs and host identities.
+    pub fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
+        self.0.registry(root)
+    }
+    /// The observed protected tip that a plan built under this route is bound to.
+    pub fn tip(&self) -> &str {
+        &self.0.host.isolated_tip
+    }
+    pub fn recheck(&self, root: &Path) -> Result<(), String> {
+        self.0.recheck(root)
+    }
+}
+
+/// `None` only while no isolated profile is installed, so ordinary routes keep their refusals.
+/// An installed profile resolves positively or fails; it never falls back to ordinary handling.
+pub fn route(root: &Path) -> Result<Option<Route>, String> {
+    route_in(root, LIVE_PROFILE, Arc::new(host::Github))
+}
+fn route_in(
+    root: &Path,
+    profile: Option<Profile>,
+    api: Arc<dyn Api>,
+) -> Result<Option<Route>, String> {
+    match profile {
+        None => Ok(None),
+        profile => Context::resolve(root, profile, api).map(|c| Some(Route(c))),
+    }
+}
+
 /// The authenticated isolated repository and protected tip for the synthetic evidence verdict
 /// (SA-P3, IR-P1). Only a resolved context for the synthetic subject makes one; no receipt,
 /// remote, environment value or flag can. It grants no write or admission authority.

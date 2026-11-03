@@ -84,7 +84,9 @@ fn templates_declare_the_reviewed_synthetic_selection() {
     let production = AgentRegistry::parse(&registry_without_depth()).unwrap();
     let entry = production.find("depth_fixture").unwrap();
     assert!(entry.backend_module.is_none());
-    assert!(!entry.publication.support_matrix_enabled);
+    // Depth records live only in published roots, so the isolated support matrix publishes the
+    // subject; a non-runtime entry never publishes capabilities.
+    assert!(entry.publication.support_matrix_enabled);
     assert!(!entry.publication.capability_matrix_enabled);
     // No release or release-doc drift claim: only the crates-io track is published or checked.
     let packages = xtask::release_doc::registry_release_packages(&production, "crates-io");
