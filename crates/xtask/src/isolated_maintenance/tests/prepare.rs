@@ -206,8 +206,7 @@ fn the_public_prepare_route_freezes_p_then_o_under_the_isolated_context() {
     assert_eq!(frozen.policy, record(&p).policy);
     assert_eq!(frozen.obligations.as_ref().unwrap().targets, [TARGET]);
     // Honest O: no classification is approved in P yet, so every owned `run` surface stays
-    // classification_required, and the waived `run --help` is carried required work. Neither is
-    // cleared to make the chain look ready.
+    // classification_required. `run --help` is a parity exclusion, so no waiver is carried work.
     let o_part = frozen.obligations.as_ref().unwrap();
     let unresolved: Vec<_> = o_part
         .classification_required
@@ -215,17 +214,86 @@ fn the_public_prepare_route_freezes_p_then_o_under_the_isolated_context() {
         .map(|c| c.surface.surface_id.as_str())
         .collect();
     assert_eq!(unresolved, ["--help", "--json", "--model", "PROMPT", "run"]);
-    let work: Vec<_> = o_part
-        .acceptance_work
-        .iter()
-        .map(|w| w.surface.surface_id.as_str())
-        .collect();
-    assert_eq!(work, ["--help"]);
+    assert!(
+        o_part.acceptance_work.is_empty(),
+        "{:?}",
+        o_part.acceptance_work
+    );
     apply_prepare_plan(root, &o).unwrap();
     f.commit();
     let again = build_prepare_plan(root, &args).unwrap();
     assert_eq!(again.files, o.files);
     assert_eq!(apply_prepare_plan(root, &again).unwrap().written, 0);
+
+    // The maintainer reviews the reported basis and approves CORE rows in P. P changes only in a
+    // new generation, so the rows enter under a new Event.
+    let [(operation, basis)] = o.classification_bases.as_slice() else {
+        panic!("one basis: {:?}", o.classification_bases)
+    };
+    assert_eq!(operation, "run");
+    let surfaces: Vec<_> = o_part
+        .classification_required
+        .iter()
+        .map(|c| c.surface.clone())
+        .collect();
+    let next = Args {
+        request_recorded_at: "2026-11-04T00:00:00Z".into(),
+        request_commit: "abcdef1".into(),
+        ..args.clone()
+    };
+    // A stale basis refuses rather than reusing the assignments.
+    classify(&f, &surfaces, &"0".repeat(64));
+    f.commit();
+    let stale = build_prepare_plan(root, &next).err().unwrap().to_string();
+    assert!(stale.contains("stale classification_basis"), "{stale}");
+    classify(&f, &surfaces, basis);
+    f.commit();
+    let classified = build_prepare_plan(root, &next).unwrap();
+    let ready = record(&classified);
+    assert_ne!(ready.policy, frozen.policy);
+    let ready_o = ready.obligations.as_ref().unwrap();
+    assert!(ready_o.classification_required.is_empty());
+    assert!(ready_o.acceptance_work.is_empty());
+    apply_prepare_plan(root, &classified).unwrap();
+}
+
+const RATIONALE: &str =
+    "Part of the wrapper's whole `run --json` surface; CORE covers its complete \
+    value, default and effect regime, and it adds no effect beyond `run`.";
+
+/// The approved synthetic classification (B.3): every owned `run` unit selects only CORE.
+fn classify(
+    f: &Fixture,
+    surfaces: &[crate::agent_maintenance::support_audit::SurfaceIdentity],
+    basis: &str,
+) {
+    f.registry(|doc| {
+        let entry = doc["agents"]
+            .as_array_of_tables_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|a| a["agent_id"].as_str() == Some("depth_fixture"))
+            .unwrap();
+        let operation = &mut entry["support_depth"]["enrollments"][0]["operations"][0];
+        // Inline rows: a fresh array of tables would render after the last `[[agents]]` entry.
+        let mut rows = toml_edit::Array::new();
+        for surface in surfaces {
+            let mut identity = toml_edit::InlineTable::new();
+            identity.insert("surface_kind", surface.surface_kind.as_str().into());
+            identity.insert("command_path", surface.command_path.as_str().into());
+            identity.insert("surface_id", surface.surface_id.as_str().into());
+            let mut row = toml_edit::InlineTable::new();
+            row.insert("surface", identity.into());
+            row.insert(
+                "templates",
+                ["CORE"].into_iter().collect::<toml_edit::Array>().into(),
+            );
+            row.insert("rationale", RATIONALE.into());
+            rows.push(row);
+        }
+        operation["classification_basis"] = toml_edit::value(basis);
+        operation["classifications"] = toml_edit::value(rows);
+    });
 }
 
 #[test]

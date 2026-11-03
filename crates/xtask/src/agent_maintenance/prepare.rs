@@ -110,6 +110,9 @@ impl From<request::MaintenanceRequestError> for Error {
 pub struct PreparePlan {
     pub request: MaintenanceRequest,
     pub files: Vec<PreparedFile>,
+    /// `(operation, sha256)` of each acquired classification basis: the value a maintainer
+    /// reviews and copies into a classified operation's `classification_basis`. Never authority.
+    pub classification_bases: Vec<(String, String)>,
     context: guard::Context,
     /// The isolated route binding this plan was built under; `None` on the ordinary route.
     isolated: Option<crate::isolated_maintenance::RouteBinding>,
@@ -315,9 +318,15 @@ fn build_with_registry(
             "preparation inputs changed during planning".into(),
         ));
     }
+    let classification_bases = freeze
+        .iter()
+        .flat_map(|plan| &plan.classification_bases)
+        .map(|basis| (basis.operation.clone(), basis.sha256.clone()))
+        .collect();
     Ok(PreparePlan {
         request,
         files,
+        classification_bases,
         context,
         isolated: None,
     })
@@ -673,6 +682,13 @@ fn write_preview<W: Write>(writer: &mut W, plan: &PreparePlan, writing: bool) ->
     for path in plan.planned_paths() {
         writeln!(writer, "planned: {path}")
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
+    for (operation, sha256) in &plan.classification_bases {
+        writeln!(
+            writer,
+            "classification_basis: operation={operation} sha256={sha256}"
+        )
+        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     }
     if !writing {
         writeln!(writer, "dry_run: true")

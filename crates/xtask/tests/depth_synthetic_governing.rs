@@ -269,18 +269,21 @@ fn templates_drive_the_real_acquisition_and_manifest_commands() {
     ] {
         assert!(deltas.get(delta).is_none(), "{delta}: {}", deltas[delta]);
     }
-    let waived: Vec<_> = deltas["intentionally_unsupported"]
+    // Nothing is waived: the support audit would carry a waiver as required work.
+    assert!(
+        deltas.get("intentionally_unsupported").is_none(),
+        "{}",
+        deltas["intentionally_unsupported"]
+    );
+    assert_eq!(deltas["excluded_commands"].as_array().unwrap().len(), 1);
+    let excluded: Vec<_> = deltas["excluded_flags"]
         .as_array()
         .unwrap()
         .iter()
         .map(|d| (d["path"].clone(), d["key"].clone()))
         .collect();
-    assert_eq!(
-        waived,
-        [(serde_json::json!(["run"]), serde_json::json!("--help"))]
-    );
-    assert_eq!(deltas["excluded_commands"].as_array().unwrap().len(), 1);
-    assert_eq!(deltas["excluded_flags"].as_array().unwrap().len(), 3);
+    assert_eq!(excluded.len(), 4, "{excluded:?}");
+    assert!(excluded.contains(&(serde_json::json!(["run"]), serde_json::json!("--help"))));
     // A gap is never hidden: an uncovered upstream flag surfaces as missing.
     let coverage_path = root.join("wrapper_coverage.json");
     let covered = fs::read_to_string(&coverage_path).unwrap();

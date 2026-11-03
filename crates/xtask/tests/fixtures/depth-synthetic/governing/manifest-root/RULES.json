@@ -58,6 +58,15 @@
         "key": "--version",
         "category": "dispatch",
         "note": "The root command only dispatches to `run` and prints introspection output; the wrapper drives `run`, so this unit is outside wrapper parity. A subcommand's copy stays in parity."
+      },
+      {
+        "unit": "flag",
+        "path": [
+          "run"
+        ],
+        "key": "--help",
+        "category": "dispatch",
+        "note": "Help output is introspection, not part of the wrapper's `run --json` promise; the wrapper never passes `--help`, so this unit is outside wrapper parity."
       }
     ]
   },
