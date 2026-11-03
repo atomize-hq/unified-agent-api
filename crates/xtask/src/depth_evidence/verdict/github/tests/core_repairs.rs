@@ -176,3 +176,20 @@ fn synthetic_scope_names_its_own_agent_and_trust() {
         assert_eq!(scope.trust_revision, "github-actions-synthetic-wrapper-v1");
     }
 }
+#[test]
+fn core_requires_every_exact_mapping_adoption() {
+    let mut f = Fixture::new_for(Profile::Core);
+    let mut proposal = adoption::proposal_for(
+        f.root.path(),
+        depth_ci::REPOSITORY,
+        &f.w,
+        "independent-review-invocation",
+        Profile::Core,
+    )
+    .unwrap();
+    proposal["mappings"].as_array_mut().unwrap().pop();
+    f.api.page("issues/9/comments",None,vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{}\n```",proposal)})]);
+    assert!(resolve_profile(&f.api, f.root.path(), Profile::Core)
+        .unwrap_err()
+        .contains("missing exact authenticated adequacy adoption"));
+}

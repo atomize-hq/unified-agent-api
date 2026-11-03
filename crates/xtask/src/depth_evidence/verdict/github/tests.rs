@@ -703,24 +703,6 @@ fn core_failed_and_missing_cases_are_not_hidden_by_other_green_obligations() {
         assert_eq!(row("A1")["result"], "verified", "{result}");
     }
 }
-#[test]
-fn core_requires_every_exact_mapping_adoption() {
-    let mut f = Fixture::new_for(Profile::Core);
-    let mut proposal = adoption::proposal_for(
-        f.root.path(),
-        depth_ci::REPOSITORY,
-        &f.w,
-        "independent-review-invocation",
-        Profile::Core,
-    )
-    .unwrap();
-    proposal["mappings"].as_array_mut().unwrap().pop();
-    f.api.page("issues/9/comments",None,vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{}\n```",proposal)})]);
-    assert!(resolve_profile(&f.api, f.root.path(), Profile::Core)
-        .unwrap_err()
-        .contains("missing exact authenticated adequacy adoption"));
-}
-
 #[path = "tests/core_repairs.rs"]
 mod core_repairs;
 #[path = "tests/synthetic.rs"]
