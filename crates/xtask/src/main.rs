@@ -8,6 +8,7 @@ mod close_proving_run;
 mod codex_snapshot;
 mod codex_wrapper_coverage;
 mod depth_fixture_snapshot;
+mod depth_fixture_wrapper_coverage;
 mod historical_lifecycle_backfill;
 pub use xtask::manifest_report;
 mod manifest_retain;
@@ -115,6 +116,8 @@ enum Command {
     CodexWrapperCoverage(codex_wrapper_coverage::CliArgs),
     /// Generate `cli_manifests/claude_code/wrapper_coverage.json` from wrapper source of truth.
     ClaudeWrapperCoverage(claude_wrapper_coverage::CliArgs),
+    /// Generate the synthetic `depth_fixture` wrapper coverage (isolated machinery proof only).
+    DepthFixtureWrapperCoverage(depth_fixture_wrapper_coverage::CliArgs),
     /// Validate committed parity artifacts under any `--root` manifest directory.
     ManifestValidate(manifest_validate::Args),
     /// Back-compat alias for `manifest-validate --root cli_manifests/codex`.
@@ -426,6 +429,15 @@ fn main() {
                 1
             }
         },
+        Command::DepthFixtureWrapperCoverage(args) => {
+            match depth_fixture_wrapper_coverage::run(args) {
+                Ok(()) => 0,
+                Err(err) => {
+                    eprintln!("{err}");
+                    1
+                }
+            }
+        }
         Command::ManifestValidate(args) => manifest_validate::run(args),
         Command::CodexValidate(args) => {
             manifest_validate::run_with_default_root(args, Some(CODEX_MANIFEST_ROOT))

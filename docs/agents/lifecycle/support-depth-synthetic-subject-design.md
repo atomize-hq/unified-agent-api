@@ -68,6 +68,11 @@ Each step is a reviewed PR into `staging`.
 2. **Fixture crate and snapshot command (SA-P1).** Tests run in the existing `rust-tests` job. The
    isolated repository's governing data is kept here only as test-fixture templates. It is
    installed nowhere, and the canonical registry never lists the agent.
+   The templates are in `crates/xtask/tests/fixtures/depth-synthetic/governing/`, and
+   `xtask depth-fixture-wrapper-coverage` generates the wrapper coverage. A test runs the real
+   acquisition-plan, snapshot, union, coverage, report, version-metadata and validate commands
+   over them. Release-watch for `github_releases` supports only `latest_stable_minus_one`, so the
+   isolated repository also publishes `v0.3.0`; only then does watch target the enrolled `0.2.0`.
 3. **Evidence-contract amendment, then the `synthetic-wrapper-v1` profile and subject selection
    (SA-P3).** Ships read-only positive and negative evaluation tests, in the same shape as the CORE
    bridge.

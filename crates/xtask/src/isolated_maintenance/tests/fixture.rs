@@ -65,32 +65,9 @@ pub(super) fn declaration() -> Value {
         "capabilities":[{"id":"agent_api.run","operations":["run"]}]}]})
 }
 /// The synthetic subject's non-runtime registry entry (SA-P2): no backend and no claims.
-const SYNTHETIC_AGENT: &str = r#"[[agents]]
-agent_id = "depth_fixture"
-display_name = "Depth Fixture"
-crate_path = "crates/depth_fixture"
-manifest_root = "cli_manifests/depth_fixture"
-package_name = "unified-agent-api-depth-fixture"
-canonical_targets = ["x86_64-unknown-linux-gnu"]
-
-[agents.wrapper_coverage]
-binding_kind = "generated_from_wrapper_crate"
-source_path = "crates/depth_fixture"
-
-[agents.capability_declaration]
-always_on = []
-backend_extensions = []
-
-[agents.publication]
-support_matrix_enabled = false
-capability_matrix_enabled = false
-
-[agents.release]
-docs_release_track = "crates-io"
-
-[agents.scaffold]
-onboarding_pack_prefix = "depth-fixture-cli-onboarding"
-"#;
+/// The isolated repository's registry-entry template (SA-P1), with its placeholders filled.
+const SYNTHETIC_AGENT: &str =
+    include_str!("../../../tests/fixtures/depth-synthetic/governing/registry-entry.toml");
 pub(super) fn synthetic_declaration() -> Value {
     json!({"enabled_paths":["maintenance"],"enrollments":[{
         "lifecycle_path":"maintenance","version":"0.2.0","targets":["x86_64-unknown-linux-gnu"],
@@ -129,7 +106,9 @@ impl Fixture {
         // The production registry remains unchanged; serialize the fixture with its existing TOML.
         let mut raw = include_str!("../../../data/agent_registry.toml").to_owned();
         if *subject == scope::SYNTHETIC {
-            raw = format!("{raw}\n{SYNTHETIC_AGENT}");
+            raw = format!("{raw}\n{SYNTHETIC_AGENT}")
+                .replace("{{ISOLATED_OWNER}}", "fixture")
+                .replace("{{ISOLATED_REPO}}", "isolated");
         }
         let mut document: toml_edit::DocumentMut = raw.parse().unwrap();
         let agents = document["agents"].as_array_of_tables_mut().unwrap();

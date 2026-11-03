@@ -19,6 +19,8 @@
 //!   the child blocks on its own output. The deadline covers every poll, including queued events
 //!   and the final exit wait. Timeout, cancel and drop kill and reap the child.
 
+pub mod wrapper_coverage_manifest;
+
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
