@@ -48,11 +48,21 @@ pub fn check(root: &Path) -> Result<(), String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EvidenceHost {
     repository: &'static str,
+    // The authenticated GitHub repository and owner ids; a reader rechecks them so a renamed and
+    // replaced repository under the same name is never read as this one.
+    id: u64,
+    owner: u64,
     tip: String,
 }
 impl EvidenceHost {
     pub(crate) fn repository(&self) -> &'static str {
         self.repository
+    }
+    /// Whether a host repository read is exactly the authenticated repository.
+    pub(crate) fn same_repository(&self, identity: &Value) -> bool {
+        identity["id"].as_u64() == Some(self.id)
+            && identity["owner"]["id"].as_u64() == Some(self.owner)
+            && identity["full_name"].as_str() == Some(self.repository)
     }
     pub(crate) fn tip(&self) -> &str {
         &self.tip
@@ -61,6 +71,8 @@ impl EvidenceHost {
     pub(crate) fn for_test(repository: &'static str, tip: &str) -> Self {
         Self {
             repository,
+            id: 10,
+            owner: 20,
             tip: tip.into(),
         }
     }
@@ -136,6 +148,8 @@ impl Context {
         }
         Ok(EvidenceHost {
             repository: self.profile.isolated.name,
+            id: self.profile.isolated.id,
+            owner: self.profile.isolated.owner,
             tip: self.host.isolated_tip.clone(),
         })
     }

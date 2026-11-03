@@ -193,3 +193,31 @@ fn core_requires_every_exact_mapping_adoption() {
         .unwrap_err()
         .contains("missing exact authenticated adequacy adoption"));
 }
+#[test]
+fn core_failed_and_missing_cases_are_not_hidden_by_other_green_obligations() {
+    for missing in [false, true] {
+        let mut f = Fixture::new_for(Profile::Core);
+        let name = "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues";
+        if missing {
+            f.w.cases.executed.retain(|r| r.case.name != name);
+        } else {
+            f.w.cases
+                .executed
+                .iter_mut()
+                .find(|r| r.case.name == name)
+                .unwrap()
+                .outcome = CaseOutcome::Failed;
+        }
+        f.install(1);
+        let raw = prove_profile(f.root.path(), &f.api, Profile::Core).unwrap();
+        let result: Value = serde_json::from_str(&raw).unwrap();
+        let rows = result["obligations"].as_array().unwrap();
+        let row = |id| rows.iter().find(|r| r["obligation"]["id"] == id).unwrap();
+        assert_eq!(
+            row("E1")["result"],
+            if missing { "unverified" } else { "failed" },
+            "{result}"
+        );
+        assert_eq!(row("A1")["result"], "verified", "{result}");
+    }
+}

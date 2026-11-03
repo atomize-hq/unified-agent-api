@@ -96,22 +96,24 @@ fn protected_tip_must_match_the_binding() {
 }
 
 #[test]
-fn nonterminal_or_failed_producer_job_never_verifies() {
-    for edit in 0..3 {
+fn nonterminal_aborted_or_failed_producer_steps_never_verify() {
+    for edit in 0..5 {
         let (mut f, host) = synthetic();
         running(&mut f);
         f.api.change(JOBS, |v| match edit {
             0 => v["jobs"][0]["status"] = json!("in_progress"),
             1 => v["jobs"][0]["steps"][0]["conclusion"] = json!("failure"),
+            2 => v["jobs"][0]["conclusion"] = json!("cancelled"),
+            3 => v["jobs"][0]["conclusion"] = Value::Null,
             _ => {
                 v["jobs"][0]["steps"].as_array_mut().unwrap().remove(2);
             }
         });
         let error = refusal(&f, Profile::Synthetic, Some(&host));
-        let expected = if edit == 0 {
-            "nonterminal/wrong-attempt producer job"
-        } else {
-            "step did not complete"
+        let expected = match edit {
+            0 => "nonterminal/wrong-attempt producer job",
+            2 | 3 => "aborted or unconcluded producer job",
+            _ => "step did not complete",
         };
         assert!(error.contains(expected), "producer edit {edit}: {error}");
     }
@@ -143,4 +145,36 @@ fn uninstalled_isolated_profile_yields_no_evidence_host() {
         .err()
         .unwrap();
     assert!(error.contains("not installed"), "{error}");
+}
+
+#[test]
+fn a_producer_job_that_failed_elsewhere_still_counts() {
+    // IR-P3 keeps faithful witnesses from a job that failed after its evidence steps succeeded.
+    let (mut f, host) = synthetic();
+    running(&mut f);
+    f.api
+        .change(JOBS, |v| v["jobs"][0]["conclusion"] = json!("failure"));
+    let resolved =
+        resolve_profile_in(&f.api, f.root.path(), Profile::Synthetic, Some(&host)).unwrap();
+    assert_eq!(resolved.runs.len(), 11);
+}
+
+#[test]
+fn a_replaced_repository_under_the_same_name_is_refused() {
+    for field in ["id", "owner"] {
+        let (mut f, host) = synthetic();
+        let key = f.api.identity_endpoint();
+        let mut identity: Value = serde_json::from_slice(&f.api.0[&key]).unwrap();
+        if field == "id" {
+            identity["id"] = json!(11);
+        } else {
+            identity["owner"]["id"] = json!(21);
+        }
+        f.api.0.insert(key, serde_json::to_vec(&identity).unwrap());
+        let error = refusal(&f, Profile::Synthetic, Some(&host));
+        assert!(
+            error.contains("id, owner id or name differs"),
+            "{field}: {error}"
+        );
+    }
 }

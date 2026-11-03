@@ -15,6 +15,10 @@ pub(super) trait Api {
     fn endpoint(&self, path: &str) -> String {
         format!("repos/{}/{path}", self.repository())
     }
+    /// The repository object itself, for id and owner corroboration.
+    fn identity_endpoint(&self) -> String {
+        format!("repos/{}", self.repository())
+    }
     fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String>;
     fn json(&self, endpoint: &str) -> Result<Value, String> {
         serde_json::from_slice(&self.bytes(endpoint, 16_777_216)?)
@@ -42,7 +46,8 @@ impl Api for Github {
     }
     fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String> {
         // Fixed host and repository; never accept a URL/credential/host from a receipt.
-        if !endpoint.starts_with(&format!("repos/{}/", self.repository))
+        let own = format!("repos/{}", self.repository);
+        if !(endpoint == own || endpoint.starts_with(&format!("{own}/")))
             || endpoint.contains(['\n', '\r'])
         {
             return Err("unsupported GitHub endpoint".into());

@@ -296,6 +296,11 @@ impl Fixture {
             self.api.1 = Some(ISOLATED);
         }
         let repository = self.api.repository().to_owned();
+        let identity = self.api.identity_endpoint();
+        self.api.0.insert(
+            identity,
+            serde_json::to_vec(&json!({"id":10,"owner":{"id":20},"full_name":repository})).unwrap(),
+        );
         let commit = &self.commit;
         self.api
             .put("git/ref/heads/staging", json!({"object":{"sha":commit}}));
@@ -348,7 +353,7 @@ impl Fixture {
             attempt_run["run_attempt"] = json!(attempt);
             self.api
                 .put(&format!("actions/runs/1/attempts/{attempt}"), attempt_run);
-            self.api.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","steps":([format!("Collect {} witness",p.step_label()),format!("Upload {} witness",p.step_label()),format!("Bind {} artifact",p.step_label())].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
+            self.api.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","conclusion":"success","steps":([format!("Collect {} witness",p.step_label()),format!("Upload {} witness",p.step_label()),format!("Bind {} artifact",p.step_label())].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
             self.api.0.insert(
                 self.api.endpoint(&format!("actions/jobs/{job_id}/logs")),
                 format!(
@@ -675,34 +680,6 @@ fn core_unadopted_mapping_and_wrong_profile_cannot_verify() {
     assert!(resolve_profile(&f.api, f.root.path(), Profile::Channel).is_err());
 }
 
-#[test]
-fn core_failed_and_missing_cases_are_not_hidden_by_other_green_obligations() {
-    for missing in [false, true] {
-        let mut f = Fixture::new_for(Profile::Core);
-        let name = "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues";
-        if missing {
-            f.w.cases.executed.retain(|r| r.case.name != name);
-        } else {
-            f.w.cases
-                .executed
-                .iter_mut()
-                .find(|r| r.case.name == name)
-                .unwrap()
-                .outcome = CaseOutcome::Failed;
-        }
-        f.install(1);
-        let raw = prove_profile(f.root.path(), &f.api, Profile::Core).unwrap();
-        let result: Value = serde_json::from_str(&raw).unwrap();
-        let rows = result["obligations"].as_array().unwrap();
-        let row = |id| rows.iter().find(|r| r["obligation"]["id"] == id).unwrap();
-        assert_eq!(
-            row("E1")["result"],
-            if missing { "unverified" } else { "failed" },
-            "{result}"
-        );
-        assert_eq!(row("A1")["result"], "verified", "{result}");
-    }
-}
 #[path = "tests/core_repairs.rs"]
 mod core_repairs;
 #[path = "tests/synthetic.rs"]

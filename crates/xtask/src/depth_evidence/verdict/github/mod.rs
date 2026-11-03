@@ -56,6 +56,16 @@ fn resolve_profile_in(
         _ => return Err("channel/CORE evidence is bound to the canonical repository".into()),
     };
     let repository = api.repository();
+    // IR-P1 authenticated ids, not the name alone, before and after discovery.
+    let same_host = || -> Result<(), String> {
+        match host {
+            Some(h) if !h.same_repository(&api.json(&api.identity_endpoint())?) => {
+                Err("isolated repository id, owner id or name differs from the binding".into())
+            }
+            _ => Ok(()),
+        }
+    };
+    same_host()?;
     let mut view = GitInputs::new(root)?;
     let original =
         p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;
@@ -257,6 +267,7 @@ fn resolve_profile_in(
     {
         return Err("host population or approved anchor changed during read".into());
     }
+    same_host()?;
     view.verify()?;
     Ok(Resolved {
         profile: p,

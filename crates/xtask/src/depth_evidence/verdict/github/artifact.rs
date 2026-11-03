@@ -57,6 +57,12 @@ pub(super) fn witness(
     if job["run_id"] != id || job["run_attempt"] != attempt || job["status"] != "completed" {
         return Err("nonterminal/wrong-attempt producer job".into());
     }
+    // IR-P3: an aborted producer stays unverified; a job that failed elsewhere still counts.
+    if profile == crate::depth_ci::profile::Profile::Synthetic
+        && !matches!(job["conclusion"].as_str(), Some("success" | "failure"))
+    {
+        return Err("aborted or unconcluded producer job".into());
+    }
     let steps = job["steps"].as_array().ok_or("missing job steps")?;
     let label = profile.step_label();
     let names = [
