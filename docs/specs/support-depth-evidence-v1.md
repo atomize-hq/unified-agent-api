@@ -490,6 +490,11 @@ registry never lists `depth_fixture`. `production_results` stays unverified.
 
 **Staging.** Each step is a reviewed PR into `staging`:
 1. Compiled subject selection in the isolated binding.
-2. The profile definition, its frozen fixtures, the case mapping and collection.
+2. The profile definition, its frozen fixtures under `crates/xtask/tests/fixtures/depth-synthetic/`,
+   the case mapping to the single `depth_ci_synthetic` test target, and the local
+   `depth-synthetic-collect` command. The collector builds the fixture with
+   `DEPTH_FIXTURE_UPSTREAM_VERSION` set to the enrolled version and records that variable. The
+   whole-workflow verdict path refuses this profile.
 3. Subject selection in the packet-bound producer and its read-only verdict, with positive and
-   negative evaluation tests in the shape of the CORE bridge.
+   negative evaluation tests in the shape of the CORE bridge. This step also adds the collection,
+   upload and binding steps to the existing `rust-tests` job.

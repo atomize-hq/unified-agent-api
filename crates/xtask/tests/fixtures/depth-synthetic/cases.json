@@ -1,0 +1,362 @@
+{
+  "R1": [
+    {
+      "name": "run::run_streams_typed_events_in_order",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A dropped or altered prompt or model value fails the echoed message assertion."
+    },
+    {
+      "name": "run::flag_like_prompt_is_passed_as_the_prompt",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A prompt not placed after `--` is parsed as a flag and the echoed prompt differs."
+    }
+  ],
+  "V1": [
+    {
+      "name": "run::invalid_requests_are_rejected_before_spawn",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "Any spawn attempt for an unspawnable binary reports Spawn instead of InvalidRequest."
+    },
+    {
+      "name": "lifecycle::unrepresentable_timeout_is_rejected_before_spawn",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "An unchecked deadline panics or reports Spawn after a spawn attempt."
+    },
+    {
+      "name": "lifecycle::out_of_range_line_limit_is_rejected_before_spawn",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "An unchecked line limit reports Spawn after a spawn attempt."
+    }
+  ],
+  "G1": [
+    {
+      "name": "run::run_streams_typed_events_in_order",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A wrapper that rejects or rewrites a grammar-valid model value fails the typed event assertion."
+    },
+    {
+      "name": "run::invalid_requests_are_rejected_before_spawn",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "Accepting a model outside the stated grammar (a space) spawns and fails the assertion."
+    },
+    {
+      "name": "run::flag_like_prompt_is_passed_as_the_prompt",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Default model and arity differ from the stated grammar and fail the message assertion."
+    }
+  ],
+  "E1": [
+    {
+      "name": "run::spawn_failure_is_reported_as_spawn",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "A missing binary reported as anything but Spawn fails."
+    },
+    {
+      "name": "run::non_zero_exit_is_an_error_after_streamed_events",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A non-zero exit treated as success or a different error fails."
+    },
+    {
+      "name": "run::malformed_line_is_an_error",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A malformed line surfaced as an event or a different error fails."
+    },
+    {
+      "name": "run::timeout_after_streamed_event_kills_the_child",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A timeout not reported as Timeout, or reported late, fails."
+    },
+    {
+      "name": "run::cancel_stops_the_run",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Cancellation not reported exactly once as Cancelled fails."
+    },
+    {
+      "name": "run::eof_without_terminal_event_is_not_success",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "End of output without a terminal event treated as success fails."
+    }
+  ],
+  "A1": [
+    {
+      "name": "run::fixture_reports_its_upstream_version",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A binary built as any version other than the recorded DEPTH_FIXTURE_UPSTREAM_VERSION fails the exact version line."
+    }
+  ],
+  "X1": [
+    {
+      "name": "run::child_sees_only_explicit_environment_and_null_stdin",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A parent-environment sentinel reaching the child appears in the reported event and fails."
+    },
+    {
+      "name": "lifecycle::stderr_is_drained_bounded_and_free_of_parent_sentinels",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A parent sentinel inherited by the child appears in the stderr diagnostic and fails."
+    }
+  ],
+  "X2": [
+    {
+      "name": "run::child_sees_only_explicit_environment_and_null_stdin",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "An inherited environment, a parent HOME taking precedence over the explicit one, or the wrong working directory fails."
+    },
+    {
+      "name": "run::run_writes_nothing_to_home_or_working_directory",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Any config, cache or other file written to the empty home or working directory fails."
+    }
+  ],
+  "X3": [
+    {
+      "name": "run::oversized_line_is_rejected",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "An over-limit line buffered or returned instead of OversizedLine fails."
+    },
+    {
+      "name": "lifecycle::malformed_projection_is_bounded_after_decoding",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A malformed-line projection over DIAGNOSTIC_BYTES after lossy decoding fails."
+    },
+    {
+      "name": "lifecycle::stderr_is_drained_bounded_and_free_of_parent_sentinels",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "An undrained stderr pipe, or a stderr tail over DIAGNOSTIC_BYTES, fails."
+    },
+    {
+      "name": "run::non_zero_exit_is_an_error_after_streamed_events",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "An unbounded or missing stderr projection in the exit error fails."
+    }
+  ],
+  "X4": [
+    {
+      "name": "run::child_sees_only_explicit_environment_and_null_stdin",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Stdin that is inherited, non-empty or a terminal is reported by the child and fails."
+    },
+    {
+      "name": "run::run_writes_nothing_to_home_or_working_directory",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A side effect in the home or working directory fails."
+    }
+  ],
+  "OUT3": [
+    {
+      "name": "run::run_streams_typed_events_in_order",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Wrong order, a missing session attribution or a missing terminal event fails."
+    },
+    {
+      "name": "run::unknown_events_are_surfaced",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "An unknown event kind dropped or treated as fatal fails."
+    },
+    {
+      "name": "run::malformed_line_is_an_error",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A malformed event treated as known or unknown fails."
+    }
+  ],
+  "LC2": [
+    {
+      "name": "run::eof_without_terminal_event_is_not_success",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "EOF treated as completion fails."
+    },
+    {
+      "name": "run::completion_then_failing_exit_is_a_failure",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "A terminal event followed by a failing exit treated as success fails."
+    },
+    {
+      "name": "run::timeout_after_streamed_event_kills_the_child",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "An event not delivered before the deadline, or a child left running, fails."
+    },
+    {
+      "name": "run::drop_reaps_a_live_run",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "Drop that waits for the child to finish on its own fails the time bound."
+    },
+    {
+      "name": "lifecycle::timeout_kills_and_reaps_the_child",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "A child left running or unreaped after timeout fails the /proc check."
+    },
+    {
+      "name": "lifecycle::cancel_kills_and_reaps_the_child",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "A child left running or unreaped after cancel fails the /proc check."
+    },
+    {
+      "name": "lifecycle::drop_kills_and_reaps_the_child",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "A child left running or unreaped after drop fails the /proc check."
+    },
+    {
+      "name": "lifecycle::polling_after_the_deadline_times_out_even_with_queued_events",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Queued events delivered after the deadline turn a timed-out run into success and fail."
+    },
+    {
+      "name": "lifecycle::closed_stdout_with_a_live_child_times_out",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "An exit wait outside the deadline hangs and fails the time bound."
+    },
+    {
+      "name": "lifecycle::paused_consumer_applies_backpressure_without_loss",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Unbounded buffering lets the child finish while paused, and lost or reordered events fail."
+    },
+    {
+      "name": "lifecycle::cancel_with_a_full_buffer_releases_the_reader",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "A reader thread left blocked on a full buffer after cancel fails."
+    }
+  ]
+}

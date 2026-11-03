@@ -124,3 +124,14 @@ fn synthetic_subject_must_stay_non_runtime() {
         .unwrap()
         .contains("runtime membership differs"));
 }
+
+#[test]
+fn frozen_synthetic_profile_record_matches_the_compiled_subject() {
+    // The evidence profile's frozen P selects exactly what the binding admits, and Codex's does not.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let raw = fs::read_to_string(root.join("tests/fixtures/depth-synthetic/record.json")).unwrap();
+    let record = crate::depth_record::DepthRecord::parse(&raw, "depth_fixture", "0.2.0").unwrap();
+    let enrollment = &record.policy.selection.enrollment;
+    scope::selection(enrollment, &scope::SYNTHETIC).unwrap();
+    assert!(scope::selection(enrollment, &scope::CODEX).is_err());
+}

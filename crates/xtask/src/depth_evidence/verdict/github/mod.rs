@@ -30,6 +30,10 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
     resolve_profile(api, root, Profile::Channel)
 }
 fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, String> {
+    // Whole-workflow completion is for channel/CORE only; the synthetic profile is IR-P3 only.
+    if p == Profile::Synthetic {
+        return Err("synthetic-wrapper-v1 has no whole-workflow evidence path".into());
+    }
     let mut view = GitInputs::new(root)?;
     let original =
         p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;

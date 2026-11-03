@@ -72,3 +72,8 @@ pub(crate) fn output(command: &mut Command) -> Result<Vec<u8>, String> {
 pub fn collect_core(workspace: &Path) -> Result<(), String> {
     collector::collect_profile(workspace, profile::Profile::Core)
 }
+
+/// `synthetic-wrapper-v1` collection: machinery proof on `depth_fixture`; qualifies no agent.
+pub fn collect_synthetic(workspace: &Path) -> Result<(), String> {
+    collector::collect_profile(workspace, profile::Profile::Synthetic)
+}

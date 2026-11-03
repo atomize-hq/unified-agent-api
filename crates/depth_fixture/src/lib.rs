@@ -6,7 +6,9 @@
 //! - Validation, before spawn: a non-empty prompt of at most `MAX_PROMPT_BYTES` without NUL; a
 //!   model of 1–64 ASCII alphanumerics, `.`, `_` or `-`; a non-zero timeout.
 //! - Environment: the child gets a cleared environment plus only the caller's explicit variables,
-//!   null stdin, and the caller's working directory if one is set.
+//!   null stdin, and the caller's working directory if one is set. Stdin is never a terminal, so
+//!   nothing can answer a prompt. The fixture CLI reads no configuration or cache, writes no file
+//!   and opens no network connection. The wrapper is not a sandbox and enforces none of this.
 //! - Credentials: the wrapper reads none and passes none implicitly. It does not redact child
 //!   output, so a value the caller passes explicitly and the child echoes can appear in a bounded
 //!   diagnostic; nothing from the parent environment can.

@@ -223,12 +223,37 @@ fn child_sees_only_explicit_environment_and_null_stdin() {
     assert!(text.contains("home=/fixture-home"), "{text}");
     assert!(text.contains("secret=<unset>"), "{text}");
     assert!(text.contains("stdin_bytes=0"), "{text}");
+    assert!(text.contains("stdin_tty=false"), "{text}");
     assert!(
         text.contains(&format!("cwd={}", cwd.display()))
             || text.contains(&format!("cwd={}", dir.display())),
         "{text}"
     );
     assert!(!format!("{events:?}").contains("parent-sentinel"));
+}
+
+// X2: with an empty home and working directory, a run leaves both empty: no config, cache or
+// other write. This shows the fixture's effects only; the wrapper is not a sandbox.
+#[test]
+fn run_writes_nothing_to_home_or_working_directory() {
+    let base = std::env::temp_dir().join(format!("depth-fixture-x2-{}", std::process::id()));
+    let (home, cwd) = (base.join("home"), base.join("cwd"));
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::create_dir_all(&cwd).unwrap();
+    let mut fx = fixture("environment");
+    fx.current_dir = Some(cwd.clone());
+    fx.env.insert("HOME".into(), home.display().to_string());
+    let events = fx.run(&request("x")).unwrap().collect().unwrap();
+    assert!(format!("{events:?}").contains(&format!("home={}", home.display())));
+    for dir in [&home, &cwd] {
+        assert_eq!(
+            std::fs::read_dir(dir).unwrap().count(),
+            0,
+            "{}",
+            dir.display()
+        );
+    }
+    std::fs::remove_dir_all(base).unwrap();
 }
 
 // A1: the fixture reports the upstream version it was built as.
