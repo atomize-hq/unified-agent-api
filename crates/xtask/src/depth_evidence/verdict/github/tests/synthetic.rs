@@ -21,9 +21,7 @@ fn running(f: &mut Fixture) {
         .change(ATTEMPT, |v| v["status"] = json!("in_progress"));
 }
 fn refusal(f: &Fixture, p: Profile, host: Option<&EvidenceHost>) -> String {
-    resolve_profile_in(&f.api, f.root.path(), p, host)
-        .err()
-        .expect("refused")
+    resolve_profile_in(&f.api, f.root.path(), p, host).expect_err("refused")
 }
 
 #[test]
