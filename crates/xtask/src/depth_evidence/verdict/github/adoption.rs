@@ -29,7 +29,7 @@ pub(super) fn resolve(
 ) -> Result<Vec<(AdequacyMapping, Adoption)>, String> {
     let comments = list(api, &format!("issues/{pr}/comments"), None)?;
     let reviews = list(api, &format!("pulls/{pr}/reviews"), None)?;
-    let original = original_for(&source(root, &w.build.source_commit)?, p)?;
+    let original = original_for(&source(root, api.repository(), &w.build.source_commit)?, p)?;
     let obligations = p.obligations(&original);
     let mut adopted = vec![];
     let mut mappings = std::collections::BTreeMap::new();
@@ -54,8 +54,8 @@ pub(super) fn resolve(
             if kind == EndorsementKind::PrReview && value["commit_id"] != body.source_commit {
                 continue;
             }
-            let reviewed = source(root, &body.source_commit)?;
-            let built = source(root, &w.build.source_commit)?;
+            let reviewed = source(root, api.repository(), &body.source_commit)?;
+            let built = source(root, api.repository(), &w.build.source_commit)?;
             if original_for(&reviewed, p)? != original_for(&built, p)? {
                 continue;
             }
@@ -83,7 +83,8 @@ pub(super) fn resolve(
             {
                 return Err("invalid GitHub author".into());
             }
-            let permission = api.json(&endpoint(&format!("collaborators/{author}/permission")))?;
+            let permission =
+                api.json(&api.endpoint(&format!("collaborators/{author}/permission")))?;
             if !matches!(
                 permission["permission"].as_str(),
                 Some("admin" | "write" | "maintain")
@@ -103,7 +104,14 @@ pub(super) fn resolve(
                     let bound = obligations
                         .iter()
                         .map(|obligation| {
-                            mapping_for(root, w, &entry.reviewer_identity, p, obligation)
+                            mapping_for(
+                                root,
+                                api.repository(),
+                                w,
+                                &entry.reviewer_identity,
+                                p,
+                                obligation,
+                            )
                         })
                         .collect::<Result<Vec<_>, String>>()?;
                     mappings.insert(entry.reviewer_identity.clone(), bound);
@@ -114,7 +122,7 @@ pub(super) fn resolve(
                     }
                     let endorsement = Endorsement {
                         kind: kind.clone(),
-                        repository: depth_ci::REPOSITORY.into(),
+                        repository: api.repository().into(),
                         pull_request: pr,
                         id: value["id"].as_u64().ok_or("missing endorsement id")?,
                         author: author.into(),
@@ -173,6 +181,7 @@ pub(super) fn proposal(w: &Witness, reviewer: &str) -> Result<Value, String> {
 
 pub(super) fn proposal_for(
     root: &Path,
+    repository: &str,
     w: &Witness,
     reviewer: &str,
     p: Profile,
@@ -180,9 +189,9 @@ pub(super) fn proposal_for(
     if p == Profile::Channel {
         return proposal(w, reviewer);
     }
-    let original = original_for(&source(root, &w.build.source_commit)?, p)?;
+    let original = original_for(&source(root, repository, &w.build.source_commit)?, p)?;
     let mappings=p.obligations(&original).iter().map(|o|{
-        let m=mapping_for(root,w,reviewer,p,o)?;
+        let m=mapping_for(root,repository,w,reviewer,p,o)?;
         Ok(serde_json::json!({"mapping_sha256":m.sha256()?,"reviewer_identity":reviewer,"executor_identity":p.executor(),"independence_attested":true,"counterfactual_adopted":true}))
     }).collect::<Result<Vec<_>,String>>()?;
     Ok(

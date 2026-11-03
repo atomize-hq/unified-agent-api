@@ -64,13 +64,14 @@ pub(super) fn scope_for(record: &DepthRecord, p: Profile, obligation: Obligation
 /// implementation is reviewed on protected staging. A candidate never approves its own hash.
 pub(super) fn approved(
     root: &Path,
+    repository: &str,
     built: &str,
     workflow: &str,
     anchor: &str,
     p: Profile,
 ) -> Result<(), String> {
     for commit in [built, workflow, anchor] {
-        let source = source(root, commit)?;
+        let source = source(root, repository, commit)?;
         for path in OPTIONAL {
             if source.optional_bytes(path)?.is_some() {
                 return Err(
@@ -113,6 +114,7 @@ pub(super) fn approved(
 }
 pub(super) fn validate_witness(
     root: &Path,
+    repository: &str,
     w: &Witness,
     run: &Value,
     attempt: u64,
@@ -126,7 +128,7 @@ pub(super) fn validate_witness(
         return Err("witness run/attempt mismatch".into());
     }
     let head = sha(required_string(run, "head_sha")?)?;
-    let built = source(root, &w.build.source_commit)?;
+    let built = source(root, repository, &w.build.source_commit)?;
     // PR workflow checkout is GitHub's two-parent test merge, while head_sha names the PR head.
     // Other supported events build their exact host head. No arbitrary descendant qualifies.
     if w.build.source_commit != head {
@@ -152,7 +154,14 @@ pub(super) fn validate_witness(
     if w.workflow_commit != w.build.source_commit || w.build.source_tree != built.tree()? {
         return Err("workflow/build source mismatch".into());
     }
-    approved(root, &w.build.source_commit, &w.workflow_commit, anchor, p)?;
+    approved(
+        root,
+        repository,
+        &w.build.source_commit,
+        &w.workflow_commit,
+        anchor,
+        p,
+    )?;
     let original = original_for(&built, p)?;
     let names = w
         .cases
@@ -235,6 +244,7 @@ pub(super) fn mapping(w: &Witness, reviewer: &str) -> Result<AdequacyMapping, St
 
 pub(super) fn mapping_for(
     root: &Path,
+    repository: &str,
     w: &Witness,
     reviewer: &str,
     p: Profile,
@@ -243,7 +253,7 @@ pub(super) fn mapping_for(
     if p == Profile::Channel {
         return mapping(w, reviewer);
     }
-    let built = source(root, &w.build.source_commit)?;
+    let built = source(root, repository, &w.build.source_commit)?;
     let specs: std::collections::BTreeMap<String, Vec<crate::depth_ci::profile::CaseSpec>> =
         serde_json::from_str(&built.read(&format!("{}/cases.json", p.directory()))?)
             .map_err(|e| e.to_string())?;

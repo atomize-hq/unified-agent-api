@@ -30,17 +30,42 @@ fn resolve(api: &impl Api, root: &Path) -> Result<Resolved, String> {
     resolve_profile(api, root, Profile::Channel)
 }
 fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, String> {
-    // Whole-workflow completion is for channel/CORE only; the synthetic profile is IR-P3 only.
-    if p == Profile::Synthetic {
-        return Err("synthetic-wrapper-v1 has no whole-workflow evidence path".into());
-    }
+    resolve_profile_in(api, root, p, None)
+}
+/// Channel and CORE read the canonical repository and require whole-workflow completion. The
+/// synthetic profile reads only the isolated repository its authenticated IR-P1 binding names,
+/// and admits an attempt once its producer job is terminal (IR-P3).
+fn resolve_profile_in(
+    api: &impl Api,
+    root: &Path,
+    p: Profile,
+    host: Option<&crate::isolated_maintenance::EvidenceHost>,
+) -> Result<Resolved, String> {
+    let ir_p3 = match (p, host) {
+        (Profile::Synthetic, Some(h))
+            if api.repository() == h.repository() && h.repository() != depth_ci::REPOSITORY =>
+        {
+            true
+        }
+        (Profile::Synthetic, _) => {
+            return Err(
+                "synthetic-wrapper-v1 requires an authenticated isolated evidence host".into(),
+            )
+        }
+        (_, None) if api.repository() == depth_ci::REPOSITORY => false,
+        _ => return Err("channel/CORE evidence is bound to the canonical repository".into()),
+    };
+    let repository = api.repository();
     let mut view = GitInputs::new(root)?;
     let original =
         p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;
     let definition = depth_ci::reference("", &view.required(p.contract())?).sha256;
-    let anchor_value = api.json(&endpoint("git/ref/heads/staging"))?;
+    let anchor_value = api.json(&api.endpoint("git/ref/heads/staging"))?;
     let anchor = sha(required_string(&anchor_value["object"], "sha")?)?;
-    let anchor_source = source(root, anchor)?;
+    if host.is_some_and(|h| h.tip() != anchor) {
+        return Err("isolated protected staging differs from the authenticated binding".into());
+    }
+    let anchor_source = source(root, repository, anchor)?;
     // Include all compiled producer code and its dependencies, not only the named collector.
     let mut paths = view.files_under("crates")?;
     let mut anchor_paths = anchor_source.committed_files("crates")?;
@@ -91,9 +116,7 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
     let pulls = list(api, &format!("commits/{request}/pulls"), None)?;
     let pulls = pulls
         .iter()
-        .filter(|p| {
-            p["base"]["repo"]["full_name"] == depth_ci::REPOSITORY && p["base"]["ref"] == "staging"
-        })
+        .filter(|p| p["base"]["repo"]["full_name"] == repository && p["base"]["ref"] == "staging")
         .collect::<Vec<_>>();
     if pulls.len() != 1 {
         return Err("generation has no unique authenticated packet PR".into());
@@ -108,10 +131,10 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
         if run["path"] != profile::WORKFLOW {
             return Err("workflow population path mismatch".into());
         }
-        if run["head_repository"]["full_name"] != depth_ci::REPOSITORY {
+        if run["head_repository"]["full_name"] != repository {
             continue;
         }
-        let head = source(root, sha(required_string(run, "head_sha")?)?)?;
+        let head = source(root, repository, sha(required_string(run, "head_sha")?)?)?;
         // Applicability precedes looking for artifacts or outcomes. Missing witnesses cannot
         // erase an otherwise applicable attempt. Other generations are genuinely out of scope.
         let Some(raw) = head.optional(p.fixture())? else {
@@ -132,7 +155,7 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
         }
         // Approve the API-derived execution head before trusting any witness source claims.
         let head_sha = sha(required_string(run, "head_sha")?)?;
-        profile::approved(root, head_sha, head_sha, anchor, p)?;
+        profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
         let count = run["run_attempt"]
             .as_u64()
@@ -140,18 +163,20 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
             .ok_or("unsupported attempt population")?;
         for attempt in 1..=count {
             let attempt_run =
-                api.json(&endpoint(&format!("actions/runs/{id}/attempts/{attempt}")))?;
+                api.json(&api.endpoint(&format!("actions/runs/{id}/attempts/{attempt}")))?;
             if attempt_run["id"] != id
                 || attempt_run["run_attempt"] != attempt
                 || attempt_run["head_sha"] != run["head_sha"]
                 || attempt_run["path"] != profile::WORKFLOW
-                || attempt_run["status"] != "completed"
+                // IR-P3: the enclosing workflow may still run; the producer job must be terminal,
+                // which the artifact binding checks for every profile.
+                || (!ir_p3 && attempt_run["status"] != "completed")
             {
                 return Err("missing/unstable/nonterminal applicable attempt".into());
             }
             let w = artifact::witness(api, &decoder, &attempt_run, attempt, p)?;
             let built_original =
-                profile::validate_witness(root, &w, &attempt_run, attempt, anchor, p)?;
+                profile::validate_witness(root, repository, &w, &attempt_run, attempt, anchor, p)?;
             if built_original != original {
                 return Err(
                     "actual checkout disagrees with independently applicable generation".into(),
@@ -159,7 +184,7 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
             }
             let adoptions = adoption::resolve(api, root, pr, &w, p)?;
             if adoptions.is_empty() {
-                return Err(format!("missing exact authenticated adequacy adoption on PR #{pr}; proposal: ```depth-adequacy-v1\n{}\n```",serde_json::to_string_pretty(&adoption::proposal_for(root,&w,"REPLACE_WITH_REVIEWER_INVOCATION",p)?).map_err(|e|e.to_string())?));
+                return Err(format!("missing exact authenticated adequacy adoption on PR #{pr}; proposal: ```depth-adequacy-v1\n{}\n```",serde_json::to_string_pretty(&adoption::proposal_for(root,repository,&w,"REPLACE_WITH_REVIEWER_INVOCATION",p)?).map_err(|e|e.to_string())?));
             }
             for (mapping, adoption) in adoptions {
                 let scope = profile::scope_for(&built_original, p, mapping.obligation.clone());
@@ -168,13 +193,13 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
                 let mut cases = w.cases.clone();
                 cases.requested.retain(|c| mapped.contains(c));
                 cases.executed.retain(|c| mapped.contains(&c.case));
-                let built = source(root, &w.build.source_commit)?;
+                let built = source(root, repository, &w.build.source_commit)?;
                 let receipt = EvidenceReceipt {
                     schema_version: 1,
                     scope,
                     producer: Producer {
                         kind: ProducerKind::GithubActions,
-                        repository: depth_ci::REPOSITORY.into(),
+                        repository: repository.into(),
                         workflow_path: profile::WORKFLOW.into(),
                         workflow_commit: w.workflow_commit.clone(),
                         collector: depth_ci::reference(
@@ -207,9 +232,28 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
     if runs.is_empty() {
         return Err("no applicable producer attempts".into());
     }
-    // Do not allow an attempt created during discovery to disappear from the population.
-    if inventory != list(api, &query, Some("workflow_runs"))?
-        || anchor_value != api.json(&endpoint("git/ref/heads/staging"))?
+    // Do not allow an attempt created during discovery to disappear from the population. Under
+    // IR-P3 unrelated workflow progress may continue, so only run identities must hold still.
+    let identities = |rows: &[Value]| -> Vec<Value> {
+        rows.iter()
+            .map(|r| {
+                if ir_p3 {
+                    json!([
+                        r["id"],
+                        r["run_attempt"],
+                        r["head_sha"],
+                        r["path"],
+                        r["head_repository"]["full_name"],
+                        r["event"]
+                    ])
+                } else {
+                    r.clone()
+                }
+            })
+            .collect()
+    };
+    if identities(&inventory) != identities(&list(api, &query, Some("workflow_runs"))?)
+        || anchor_value != api.json(&api.endpoint("git/ref/heads/staging"))?
     {
         return Err("host population or approved anchor changed during read".into());
     }
@@ -223,10 +267,11 @@ fn resolve_profile(api: &impl Api, root: &Path, p: Profile) -> Result<Resolved, 
 }
 
 fn receipt_ref(r: &EvidenceReceipt) -> Result<FileRef, String> {
-    let p = if r.scope.version == "0.0.0" {
-        Profile::Channel
-    } else {
-        Profile::Core
+    let p = match (r.scope.agent_id.as_str(), r.scope.version.as_str()) {
+        ("codex", "0.0.0") => Profile::Channel,
+        ("codex", "0.156.1") => Profile::Core,
+        ("depth_fixture", "0.2.0") => Profile::Synthetic,
+        _ => return Err("receipt names no compiled isolated profile".into()),
     };
     let suffix = if p == Profile::Channel {
         String::new()
@@ -327,18 +372,27 @@ pub(super) struct Adapter<'a> {
 }
 impl Host for Adapter<'_> {
     fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
-        if current.current.enrollment_origin != EnrollmentOrigin::Isolated
-            || current.current.agent_id != "codex"
-        {
+        if current.current.enrollment_origin != EnrollmentOrigin::Isolated {
             return Ok(None);
         }
-        let p = match current.current.version.as_str() {
-            "0.0.0" => Profile::Channel,
-            "0.156.1" => Profile::Core,
+        let (p, host) = match (
+            current.current.agent_id.as_str(),
+            current.current.version.as_str(),
+        ) {
+            ("codex", "0.0.0") => (Profile::Channel, None),
+            ("codex", "0.156.1") => (Profile::Core, None),
+            // Only the installed IR-P1 binding names the isolated repository; uninstalled, none.
+            ("depth_fixture", "0.2.0") => {
+                match crate::isolated_maintenance::evidence_host(self.root) {
+                    Ok(host) => (Profile::Synthetic, Some(host)),
+                    Err(_) => return Ok(None),
+                }
+            }
             _ => return Ok(None),
         };
+        let api = host.as_ref().map_or(CANONICAL, Github::isolated);
         // Read failures are absence of authenticated authority, never successful evidence.
-        match resolve_profile(&Github, self.root, p) {
+        match resolve_profile_in(&api, self.root, p, host.as_ref()) {
             Ok(resolved) => resolved.population(current),
             Err(_) => Ok(None),
         }
@@ -348,17 +402,29 @@ impl Host for Adapter<'_> {
 /// Read-only live proof in a disposable checkout. It materializes no authoritative repository
 /// records, modifies no packet/host policy, and cannot enroll a production version.
 pub fn prove(root: &Path) -> Result<String, String> {
-    prove_profile(root, &Github, Profile::Channel)
+    prove_profile(root, &CANONICAL, Profile::Channel)
 }
 #[cfg(test)]
 fn prove_with(root: &Path, api: &impl Api) -> Result<String, String> {
     prove_profile(root, api, Profile::Channel)
 }
 pub fn prove_core(root: &Path) -> Result<String, String> {
-    prove_profile(root, &Github, Profile::Core)
+    prove_profile(root, &CANONICAL, Profile::Core)
 }
 fn prove_profile(root: &Path, api: &impl Api, p: Profile) -> Result<String, String> {
-    let resolved = resolve_profile(api, root, p)?;
+    prove_profile_in(root, api, p, None)
+}
+fn prove_profile_in(
+    root: &Path,
+    api: &impl Api,
+    p: Profile,
+    host: Option<&crate::isolated_maintenance::EvidenceHost>,
+) -> Result<String, String> {
+    let resolved = resolve_profile_in(api, root, p, host)?;
+    let target = match &resolved.original.obligations {
+        Some(o) if o.targets.len() == 1 => o.targets[0].clone(),
+        _ => return Err("isolated proof requires exactly one frozen target".into()),
+    };
     let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
     let commit = resolved.runs[0].witness.build.source_commit.clone();
     crate::depth_ci::output(
@@ -375,9 +441,14 @@ fn prove_profile(root: &Path, api: &impl Api, p: Profile) -> Result<String, Stri
     )?;
     // All run/endorsement objects used by currentness must exist in the disposable checkout.
     for run in &resolved.runs {
-        source(scratch.path(), &run.receipt.build.source_commit)?;
         source(
             scratch.path(),
+            api.repository(),
+            &run.receipt.build.source_commit,
+        )?;
+        source(
+            scratch.path(),
+            api.repository(),
             &run.receipt.adequacy.endorsement.source_commit,
         )?;
     }
@@ -458,7 +529,7 @@ fn prove_profile(root: &Path, api: &impl Api, p: Profile) -> Result<String, Stri
     let facts = crate::support_matrix::depth::derive_evaluated_depth_facts(
         Some(&record),
         true,
-        depth_ci::TARGET,
+        &target,
         &|path| {
             std::fs::read(scratch.path().join(path))
                 .ok()
@@ -467,9 +538,9 @@ fn prove_profile(root: &Path, api: &impl Api, p: Profile) -> Result<String, Stri
         &results,
     )?;
     let row = crate::support_matrix::SupportRow {
-        agent: "codex".into(),
+        agent: p.agent_id().into(),
         version: p.version().into(),
-        target: depth_ci::TARGET.into(),
+        target: target.clone(),
         manifest_support: crate::support_matrix::ManifestSupportState::Unsupported,
         backend_support: crate::support_matrix::BackendSupportState::Partial,
         uaa_support: crate::support_matrix::UaaSupportState::Partial,
@@ -558,7 +629,7 @@ pub(in crate::depth_evidence) fn isolated_record_results(
     root: &Path,
     record: &DepthRecord,
 ) -> Result<super::super::EvidenceVerdicts, String> {
-    match resolve_profile(&Github, root, Profile::Core) {
+    match resolve_profile(&CANONICAL, root, Profile::Core) {
         Ok(resolved) => resolved.evaluate_record(root, record),
         Err(_) => Ok(super::super::EvidenceVerdicts::default()),
     }

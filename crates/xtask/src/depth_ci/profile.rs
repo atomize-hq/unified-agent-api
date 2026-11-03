@@ -238,7 +238,7 @@ mod tests {
             .into_iter()
             .map(|o| {
                 assert!(o.capability.is_none());
-                assert_eq!(o.target, "linux-x64");
+                assert_eq!(o.target, "x86_64-unknown-linux-gnu");
                 serde_json::to_value(o.id.unwrap())
                     .unwrap()
                     .as_str()

@@ -108,11 +108,17 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
                 .inputs
                 .retain(|i| i.path != "docs/specs/unified-agent-api/run-protocol-spec.md");
         }
-        assert!(
-            profile::validate_witness(f.root.path(), &w, &run, 1, &f.commit, Profile::Core)
-                .unwrap_err()
-                .contains("complete canonical requirement scope")
-        );
+        assert!(profile::validate_witness(
+            f.root.path(),
+            depth_ci::REPOSITORY,
+            &w,
+            &run,
+            1,
+            &f.commit,
+            Profile::Core
+        )
+        .unwrap_err()
+        .contains("complete canonical requirement scope"));
     }
     for path in [
         "docs/specs/unified-agent-api/run-protocol-spec.md",
@@ -132,11 +138,16 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
             }),
             "{error}"
         );
-        assert!(
-            profile::approved(f.root.path(), &changed, &changed, &f.commit, Profile::Core)
-                .unwrap_err()
-                .contains("docs/specs")
-        );
+        assert!(profile::approved(
+            f.root.path(),
+            depth_ci::REPOSITORY,
+            &changed,
+            &changed,
+            &f.commit,
+            Profile::Core
+        )
+        .unwrap_err()
+        .contains("docs/specs"));
         f.api.change("issues/9/comments?per_page=100&page=1", |v| {
             let body = v[0]["body"].as_str().unwrap().replace(&f.commit, &changed);
             v[0]["body"] = json!(body);
@@ -149,16 +160,6 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
         // Restore the old endorsement before testing a distinct reviewed source change.
         f.install(1);
     }
-}
-
-#[test]
-fn synthetic_profile_has_no_whole_workflow_path() {
-    // IR-P3 only: no host read happens, so an empty API proves the refusal comes first.
-    let f = Fixture::new_for(Profile::Core);
-    let error = resolve_profile(&f.api, f.root.path(), Profile::Synthetic)
-        .err()
-        .unwrap();
-    assert!(error.contains("no whole-workflow evidence path"), "{error}");
 }
 
 #[test]

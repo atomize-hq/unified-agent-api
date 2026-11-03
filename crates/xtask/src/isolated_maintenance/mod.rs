@@ -42,6 +42,35 @@ pub fn check(root: &Path) -> Result<(), String> {
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github)).map(drop)
 }
 
+/// The authenticated isolated repository and protected tip for the synthetic evidence verdict
+/// (SA-P3, IR-P1). Only a resolved context for the synthetic subject makes one; no receipt,
+/// remote, environment value or flag can. It grants no write or admission authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EvidenceHost {
+    repository: &'static str,
+    tip: String,
+}
+impl EvidenceHost {
+    pub(crate) fn repository(&self) -> &'static str {
+        self.repository
+    }
+    pub(crate) fn tip(&self) -> &str {
+        &self.tip
+    }
+    #[cfg(test)]
+    pub(crate) fn for_test(repository: &'static str, tip: &str) -> Self {
+        Self {
+            repository,
+            tip: tip.into(),
+        }
+    }
+}
+/// Resolves the installed isolated profile. Uninstalled (`LIVE_PROFILE = None`), it refuses
+/// before any host read.
+pub(crate) fn evidence_host(root: &Path) -> Result<EvidenceHost, String> {
+    Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github))?.evidence_host(root)
+}
+
 pub(crate) struct Context {
     profile: Profile,
     api: Arc<dyn Api>,
@@ -99,6 +128,16 @@ impl Context {
     fn proposal(self, root: &Path) -> Result<Proposal, String> {
         self.recheck(root)?;
         Proposal::capture_isolated(root, self)
+    }
+    pub(crate) fn evidence_host(&self, root: &Path) -> Result<EvidenceHost, String> {
+        self.recheck(root)?;
+        if *self.profile.subject != scope::SYNTHETIC {
+            return Err("only the synthetic subject has an isolated evidence host".into());
+        }
+        Ok(EvidenceHost {
+            repository: self.profile.isolated.name,
+            tip: self.host.isolated_tip.clone(),
+        })
     }
     pub(crate) fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
         self.recheck(root)?;

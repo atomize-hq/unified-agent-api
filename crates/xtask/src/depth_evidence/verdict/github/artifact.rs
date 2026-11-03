@@ -81,7 +81,7 @@ pub(super) fn witness(
     let completed = required_string(binding_step, "completed_at")?;
     let job_id = job["id"].as_u64().ok_or("missing producer job id")?;
     let logs = api.bytes(
-        &endpoint(&format!("actions/jobs/{job_id}/logs")),
+        &api.endpoint(&format!("actions/jobs/{job_id}/logs")),
         16_777_216,
     )?;
     let logs = std::str::from_utf8(&logs).map_err(|_| "non-UTF8 job logs")?;
@@ -114,7 +114,7 @@ pub(super) fn witness(
         return Err("artifact is not bound to the approved job upload".into());
     }
     let zip = api.bytes(
-        &endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
+        &api.endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
         2_097_152,
     )?;
     if zip.len() as u64 != artifact["size_in_bytes"].as_u64().unwrap()
