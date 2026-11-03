@@ -329,7 +329,7 @@ fn templates_drive_the_real_acquisition_and_manifest_commands() {
     let commands = plan["validation_commands"].as_array().unwrap();
     assert_eq!(commands.len(), 1);
     let status = Command::new("bash")
-        .args(["-c", &format!("set -euo pipefail; eval \"$1\""), "validate"])
+        .args(["-c", "set -euo pipefail; eval \"$1\"", "validate"])
         .arg(commands[0].as_str().unwrap())
         .env("DEPTH_FIXTURE_BINARY", &relative)
         .current_dir(&workspace)
