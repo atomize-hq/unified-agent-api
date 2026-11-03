@@ -8,7 +8,7 @@ canonical repository, and the canonical registry never lists the agent.
 | Template | Installed at |
 | --- | --- |
 | `registry-entry.toml` | appended to `crates/xtask/data/agent_registry.toml` |
-| `manifest-root/*` | `cli_manifests/depth_fixture/` |
+| `manifest-root/*` (including `VALIDATOR_SPEC.md`, which adopts Annex B) | `cli_manifests/depth_fixture/` |
 
 Before installing, replace `{{ISOLATED_OWNER}}` and `{{ISOLATED_REPO}}` with the isolated
 repository, which is also the fixture CLI's upstream. That repository must be separately
@@ -26,11 +26,18 @@ selection in the reviewed `../record.json`.
 
 ## Upstream releases
 
+Release validation runs `crates/depth_fixture/tests/acquired_binary.rs` with
+`DEPTH_FIXTURE_BINARY` set to the downloaded executable, so the wrapper is exercised against the
+acquired release, not the locally built CLI.
+
 Release-watch for `github_releases` supports only `latest_stable_minus_one`. Watch therefore
 targets the enrolled `0.2.0` only after a newer stable release exists. The isolated repository
 publishes `v0.1.0` (the baseline), then `v0.2.0` and `v0.3.0`. Each release carries
 `depth_fixture-x86_64-unknown-linux-gnu.tar.gz`, built with `DEPTH_FIXTURE_UPSTREAM_VERSION` set to
 that version.
+
+The registry entry uses the `unpublished` release track, so release docs and release-doc drift
+checks never list the fixture crate.
 
 The production registry still refuses `support_depth` tables (roadmap B.8). Until that lands,
 commands that load the production registry need the entry without its `support_depth` table.

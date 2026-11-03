@@ -22,7 +22,7 @@ support_matrix_enabled = false
 capability_matrix_enabled = false
 
 [agents.release]
-docs_release_track = "crates-io"
+docs_release_track = "unpublished"
 
 [agents.scaffold]
 onboarding_pack_prefix = "depth-fixture-cli-onboarding"

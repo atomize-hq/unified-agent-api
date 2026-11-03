@@ -86,6 +86,27 @@ fn templates_declare_the_reviewed_synthetic_selection() {
     assert!(entry.backend_module.is_none());
     assert!(!entry.publication.support_matrix_enabled);
     assert!(!entry.publication.capability_matrix_enabled);
+    // No release or release-doc drift claim: only the crates-io track is published or checked.
+    let packages = xtask::release_doc::registry_release_packages(&production, "crates-io");
+    assert!(!packages.contains(&entry.package_name), "{packages:?}");
+}
+
+#[test]
+fn the_manifest_root_adopts_annex_b_and_validates_the_acquired_binary() {
+    let spec = template("manifest-root/VALIDATOR_SPEC.md");
+    assert!(spec.contains(
+        "This root adopts the depth record that Annex B of `docs/specs/support-depth-contract.md` defines."
+    ));
+    assert!(spec.contains("cli_manifests/depth_fixture/"));
+    let rules: Value = serde_json::from_str(&template("manifest-root/RULES.json")).unwrap();
+    let validation = &rules["acquisition"]["validation"];
+    assert_eq!(validation["env"]["DEPTH_FIXTURE_BINARY"], "{binary_path}");
+    assert_eq!(
+        validation["commands"],
+        serde_json::json!([
+            "cargo test -p unified-agent-api-depth-fixture --test acquired_binary -- --ignored"
+        ])
+    );
 }
 
 #[test]

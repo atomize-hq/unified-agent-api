@@ -107,8 +107,7 @@
         "DEPTH_FIXTURE_BINARY": "{binary_path}"
       },
       "commands": [
-        "\"$DEPTH_FIXTURE_BINARY\" --version",
-        "cargo test -p unified-agent-api-depth-fixture"
+        "cargo test -p unified-agent-api-depth-fixture --test acquired_binary -- --ignored"
       ]
     }
   },
