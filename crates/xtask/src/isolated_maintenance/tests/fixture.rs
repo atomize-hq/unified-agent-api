@@ -38,6 +38,7 @@ pub(super) struct Fixture {
     pub(super) root: tempfile::TempDir,
     pub(super) api: Arc<Fake>,
     pub(super) baseline: String,
+    pub(super) subject: &'static scope::Subject,
 }
 pub(super) fn git(root: &Path, args: &[&str]) -> String {
     let out = crate::git_inputs::command(root)
@@ -63,8 +64,45 @@ pub(super) fn declaration() -> Value {
         "promise":{"r1":"r","v1":"v","g1":"g","e1":"e","a1":"a","x1":"x","x2":"x","x3":"x","x4":"x"}}],
         "capabilities":[{"id":"agent_api.run","operations":["run"]}]}]})
 }
+/// The synthetic subject's non-runtime registry entry (SA-P2): no backend and no claims.
+const SYNTHETIC_AGENT: &str = r#"[[agents]]
+agent_id = "depth_fixture"
+display_name = "Depth Fixture"
+crate_path = "crates/depth_fixture"
+manifest_root = "cli_manifests/depth_fixture"
+package_name = "unified-agent-api-depth-fixture"
+canonical_targets = ["linux-x64"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/depth_fixture"
+
+[agents.capability_declaration]
+always_on = []
+backend_extensions = []
+
+[agents.publication]
+support_matrix_enabled = false
+capability_matrix_enabled = false
+
+[agents.release]
+docs_release_track = "crates-io"
+
+[agents.scaffold]
+onboarding_pack_prefix = "depth-fixture-cli-onboarding"
+"#;
+pub(super) fn synthetic_declaration() -> Value {
+    json!({"enabled_paths":["maintenance"],"enrollments":[{
+        "lifecycle_path":"maintenance","version":"0.2.0","targets":["linux-x64"],
+        "modes":[{"selector":"run-json","command_path":"depth_fixture run","mode":"headless","predicates":[{"flag":"--json"}]}],
+        "operations":[{"id":"run","serves":["run-json"],"templates":["CORE"],"shared_mapping":"wrapper_only","forwarding":false,
+        "promise":{"r1":"r","v1":"v","g1":"g","e1":"e","a1":"a","x1":"x","x2":"x","x3":"x","x4":"x"}}]}]})
+}
 impl Fixture {
     pub(super) fn new() -> Self {
+        Self::new_for(&scope::CODEX)
+    }
+    pub(super) fn new_for(subject: &'static scope::Subject) -> Self {
         let root = tempfile::tempdir().unwrap();
         git(root.path(), &["init", "-b", "staging"]);
         git(
@@ -81,30 +119,30 @@ impl Fixture {
                 "https://github.com/fixture/isolated.git",
             ],
         );
-        let mut registry =
-            AgentRegistry::parse_unenforced(include_str!("../../../data/agent_registry.toml"))
-                .unwrap();
-        let codex = registry
-            .agents
-            .iter_mut()
-            .find(|a| a.agent_id == "codex")
-            .unwrap();
-        codex.support_depth = Some(serde_json::from_value(declaration()).unwrap());
+        let declaration = if *subject == scope::CODEX {
+            declaration()
+        } else {
+            synthetic_declaration()
+        };
+        let table: crate::agent_registry::support_depth::SupportDepth =
+            serde_json::from_value(declaration).unwrap();
         // The production registry remains unchanged; serialize the fixture with its existing TOML.
-        let mut document: toml_edit::DocumentMut =
-            include_str!("../../../data/agent_registry.toml")
-                .parse()
-                .unwrap();
+        let mut raw = include_str!("../../../data/agent_registry.toml").to_owned();
+        if *subject == scope::SYNTHETIC {
+            raw = format!("{raw}\n{SYNTHETIC_AGENT}");
+        }
+        let mut document: toml_edit::DocumentMut = raw.parse().unwrap();
         let agents = document["agents"].as_array_of_tables_mut().unwrap();
-        let table = agents
+        let entry = agents
             .iter_mut()
-            .find(|a| a["agent_id"].as_str() == Some("codex"))
+            .find(|a| a["agent_id"].as_str() == Some(subject.agent_id))
             .unwrap();
-        let depth = toml_edit::ser::to_document(codex.support_depth.as_ref().unwrap()).unwrap();
-        table.insert(
+        let depth = toml_edit::ser::to_document(&table).unwrap();
+        entry.insert(
             "support_depth",
             toml_edit::Item::Table(depth.as_table().clone()),
         );
+        AgentRegistry::parse_unenforced(&document.to_string()).unwrap();
         write(root.path(), REGISTRY_RELATIVE_PATH, document.to_string());
         write(root.path(), "producer/source.rs", "approved producer\n");
         write(root.path(), "docs/input.txt", "initial\n");
@@ -115,6 +153,7 @@ impl Fixture {
             root,
             api: Arc::new(Fake::default()),
             baseline,
+            subject,
         };
         fixture.host();
         fixture
@@ -134,6 +173,7 @@ impl Fixture {
             baseline: self.baseline.clone(),
             closure: vec![("producer/source.rs", b"approved producer\n", false)],
             scopes: vec!["producer"],
+            subject: self.subject,
         }
     }
     pub(super) fn host(&self) {
@@ -202,9 +242,9 @@ impl Fixture {
         let mut policy = PolicyPart {
             identity: "0".repeat(64),
             selection: Selection {
-                agent_id: "codex".into(),
+                agent_id: self.subject.agent_id.into(),
                 enrollment: registry
-                    .find("codex")
+                    .find(self.subject.agent_id)
                     .unwrap()
                     .support_depth
                     .as_ref()
@@ -228,7 +268,8 @@ impl Fixture {
             .sort_by_key(|id| serde_json::to_string(id).unwrap());
         policy.identity = part_identity(&policy).unwrap();
         let raw = json!({"schema_version":1,"event":{"lifecycle_path":"maintenance","request_commit":"abc","request_recorded_at":"2026-10-25T00:00:00Z","trigger_kind":"upstream_release_detected","opened_from":"fixture.yml"},"policy":policy,"obligations":null,"execution":null,"acceptance_entries":[]}).to_string();
-        crate::depth_record::DepthRecord::parse(&raw, "codex", "0.156.1").unwrap();
+        crate::depth_record::DepthRecord::parse(&raw, self.subject.agent_id, self.subject.version)
+            .unwrap();
         raw
     }
 }
