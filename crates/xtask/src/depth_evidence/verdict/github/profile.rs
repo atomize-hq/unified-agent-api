@@ -48,7 +48,7 @@ pub(super) fn scope(record: &DepthRecord) -> Scope {
 }
 pub(super) fn scope_for(record: &DepthRecord, p: Profile, obligation: ObligationRef) -> Scope {
     Scope {
-        agent_id: "codex".into(),
+        agent_id: p.agent_id().into(),
         version: p.version().into(),
         event: record.event.clone(),
         enrollment_origin: EnrollmentOrigin::Isolated,

@@ -327,7 +327,7 @@ impl Fixture {
             attempt_run["run_attempt"] = json!(attempt);
             self.api
                 .put(&format!("actions/runs/1/attempts/{attempt}"), attempt_run);
-            self.api.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","steps":([format!("Collect {} witness",if p==Profile::Channel {"isolated depth"} else {"isolated CORE depth"}),format!("Upload {} witness",if p==Profile::Channel {"isolated depth"} else {"isolated CORE depth"}),format!("Bind {} artifact",if p==Profile::Channel {"isolated depth"} else {"isolated CORE depth"})].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
+            self.api.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","steps":([format!("Collect {} witness",p.step_label()),format!("Upload {} witness",p.step_label()),format!("Bind {} artifact",p.step_label())].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
             self.api.0.insert(
                 endpoint(&format!("actions/jobs/{job_id}/logs")),
                 format!(

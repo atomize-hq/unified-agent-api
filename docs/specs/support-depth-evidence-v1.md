@@ -495,6 +495,11 @@ registry never lists `depth_fixture`. `production_results` stays unverified.
    `depth-synthetic-collect` command. The collector builds the fixture with
    `DEPTH_FIXTURE_UPSTREAM_VERSION` set to the enrolled version and records that variable. The
    whole-workflow verdict path refuses this profile.
-3. Subject selection in the packet-bound producer and its read-only verdict, with positive and
-   negative evaluation tests in the shape of the CORE bridge. This step also adds the collection,
-   upload and binding steps to the existing `rust-tests` job.
+3. The collection, upload and binding steps in the existing `rust-tests` job, named
+   `<Collect|Upload|Bind> isolated synthetic depth <witness|witness|artifact>`, and the profile's
+   agent id in its evidence scope.
+4. A read-only IR-P3 verdict for this profile: it reuses the CORE evaluation over CI evidence,
+   bound to the isolated repository through the IR-P1 context rather than the canonical one, and
+   admits an attempt once its producer job is terminal. It ships positive and negative evaluation
+   tests in the shape of the CORE bridge. The NE/NC native producer
+   (`depth_evidence/verdict/native*`) is Codex qualification under MP-P2 and is not used.
