@@ -27,6 +27,8 @@ use std::time::{Duration, Instant};
 
 pub const MAX_PROMPT_BYTES: usize = 8 * 1024;
 pub const DEFAULT_MAX_LINE_BYTES: usize = 64 * 1024;
+/// The largest accepted `max_line_bytes`.
+pub const MAX_LINE_BYTES_LIMIT: usize = 16 * 1024 * 1024;
 /// Bytes of a rejected line or of stderr kept in an error. Raw output is never returned whole.
 pub const DIAGNOSTIC_BYTES: usize = 256;
 /// Lines read ahead of the consumer. Queued bytes are at most this times the line limit.
@@ -134,6 +136,11 @@ impl DepthFixture {
 }
 
 fn validate(fixture: &DepthFixture, request: &RunRequest) -> Result<(), Error> {
+    if !(1..=MAX_LINE_BYTES_LIMIT).contains(&fixture.max_line_bytes) {
+        return Err(Error::InvalidRequest(
+            "max_line_bytes must be 1..=MAX_LINE_BYTES_LIMIT",
+        ));
+    }
     if fixture.timeout.is_zero() {
         return Err(Error::InvalidRequest("timeout must be non-zero"));
     }

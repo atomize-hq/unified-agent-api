@@ -97,7 +97,7 @@ fn closed_stdout_with_a_live_child_times_out() {
     let mut fx = DepthFixture::new(&script);
     fx.timeout = Duration::from_millis(500);
     let begun = Instant::now();
-    let mut run = fx.run(&request()).unwrap();
+    let mut run = spawn_retrying_busy(&fx);
     let pid = run.id();
     assert!(matches!(run.next_event(), Some(Err(Error::Timeout))));
     assert!(begun.elapsed() < Duration::from_secs(5));
@@ -183,6 +183,29 @@ fn unrepresentable_timeout_is_rejected_before_spawn() {
     let mut fx = DepthFixture::new("/nonexistent/depth_fixture");
     fx.timeout = Duration::MAX;
     assert!(matches!(fx.run(&request()), Err(Error::InvalidRequest(_))));
+}
+
+/// A script written by this test can be briefly `ETXTBSY` while another test thread forks.
+fn spawn_retrying_busy(fx: &DepthFixture) -> depth_fixture::Run {
+    for _ in 0..50 {
+        match fx.run(&request()) {
+            Err(Error::Spawn(e)) if e.raw_os_error() == Some(26) => {
+                thread::sleep(Duration::from_millis(20))
+            }
+            other => return other.unwrap(),
+        }
+    }
+    panic!("script stayed busy");
+}
+
+// An out-of-range line limit is rejected before spawn.
+#[test]
+fn out_of_range_line_limit_is_rejected_before_spawn() {
+    let mut fx = DepthFixture::new("/nonexistent/depth_fixture");
+    for limit in [0, usize::MAX] {
+        fx.max_line_bytes = limit;
+        assert!(matches!(fx.run(&request()), Err(Error::InvalidRequest(_))));
+    }
 }
 
 fn tempfile_dir() -> std::path::PathBuf {

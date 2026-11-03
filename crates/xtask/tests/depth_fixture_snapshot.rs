@@ -20,15 +20,23 @@ fn fake_binary(dir: &Path, version_line: &str) -> PathBuf {
 }
 
 fn snapshot(binary: &Path, out_file: &Path, extra: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .arg("depth-fixture-snapshot")
-        .arg("--depth-fixture-binary")
-        .arg(binary)
-        .arg("--out-file")
-        .arg(out_file)
-        .args(extra)
-        .output()
-        .unwrap()
+    // A just-written script can be briefly "Text file busy" while another test thread forks.
+    for _ in 0..50 {
+        let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .arg("depth-fixture-snapshot")
+            .arg("--depth-fixture-binary")
+            .arg(binary)
+            .arg("--out-file")
+            .arg(out_file)
+            .args(extra)
+            .output()
+            .unwrap();
+        if !stderr(&output).contains("Text file busy") {
+            return output;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    panic!("script stayed busy");
 }
 
 fn stderr(output: &Output) -> String {
