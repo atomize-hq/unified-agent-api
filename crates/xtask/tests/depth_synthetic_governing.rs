@@ -312,6 +312,34 @@ fn templates_drive_the_real_acquisition_and_manifest_commands() {
             "reported",
         ],
     );
+    // The declared release validation passes, run as parity-promote runs it: `eval` from the
+    // workspace root with `{binary_path}` relative to that root.
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .unwrap();
+    let relative = binary
+        .strip_prefix(&workspace)
+        .map(|p| Path::new(".").join(p))
+        .unwrap_or_else(|_| binary.clone());
+    assert!(
+        rendered.contains("\"./depth_fixture-x86_64-unknown-linux-gnu\""),
+        "{rendered}"
+    );
+    let commands = plan["validation_commands"].as_array().unwrap();
+    assert_eq!(commands.len(), 1);
+    let status = Command::new("bash")
+        .args(["-c", &format!("set -euo pipefail; eval \"$1\""), "validate"])
+        .arg(commands[0].as_str().unwrap())
+        .env("DEPTH_FIXTURE_BINARY", &relative)
+        .current_dir(&workspace)
+        .status()
+        .unwrap();
+    assert!(
+        status.success(),
+        "release validation failed for {relative:?}"
+    );
+
     // The acquired baseline validates. Promoting it regenerates the workspace-wide matrices, so
     // it runs in a full workspace (roadmap B.6), not in this scratch root.
     xtask(ws, &["manifest-validate", "--root", root_arg]);

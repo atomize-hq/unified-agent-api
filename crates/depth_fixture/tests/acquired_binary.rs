@@ -3,12 +3,27 @@
 //! The acquisition descriptor runs this with `-- --ignored` and `DEPTH_FIXTURE_BINARY` set to the
 //! downloaded executable. The crate's other tests exercise the locally built CLI instead.
 
-use std::{process::Command, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
 
 use depth_fixture::{DepthFixture, Error, Event, RunRequest};
 
-fn acquired() -> String {
-    std::env::var("DEPTH_FIXTURE_BINARY").expect("DEPTH_FIXTURE_BINARY names the acquired binary")
+/// The acquired binary. The descriptor's `{binary_path}` is relative to the workspace root, where
+/// the workflow installs the download, while Cargo runs this test from the crate directory.
+fn acquired() -> PathBuf {
+    let path = PathBuf::from(
+        std::env::var_os("DEPTH_FIXTURE_BINARY")
+            .expect("DEPTH_FIXTURE_BINARY names the acquired binary"),
+    );
+    if path.is_absolute() {
+        return path;
+    }
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
 }
 
 fn fixture(scenario: &str) -> DepthFixture {
