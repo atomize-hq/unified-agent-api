@@ -84,6 +84,16 @@ pub fn route(root: &Path) -> Result<Option<Route>, String> {
     }
     route_in(root, LIVE_PROFILE, Arc::new(host::Github))
 }
+/// The registry an MA2 read route uses (acquisition plan, validation, stand-down check, support
+/// matrix, audit status). A resolved isolated route yields its scoped registry, rechecked against
+/// the workspace, inputs and host. Otherwise this is the production load, with every refusal it
+/// keeps, `support_depth` included. A failing installed route errors; it never falls back.
+pub fn registry(root: &Path) -> Result<AgentRegistry, String> {
+    match route(root)? {
+        Some(route) => route.registry(root).cloned(),
+        None => AgentRegistry::load(root).map_err(|err| err.to_string()),
+    }
+}
 fn route_in(
     root: &Path,
     profile: Option<Profile>,

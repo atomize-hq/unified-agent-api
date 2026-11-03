@@ -9,8 +9,6 @@ use clap::Parser;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::agent_registry::AgentRegistry;
-
 use super::{
     request::{self, AuditDriftPolicy, AuditReconciliation, DetectedRelease, MaintenanceRequest},
     support_audit::{self, SupportSurfaceAudit},
@@ -283,7 +281,7 @@ fn derive_audit_status(
         expected_target_version,
     )
     .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
-    let validated = request::load_request_envelope_validated_with_policy(
+    let validated = request::load_request_envelope_routed(
         workspace_root,
         request_path,
         AuditDriftPolicy::Tolerate,
@@ -307,7 +305,7 @@ fn derive_audit_status(
             )))
         })?;
 
-    let registry = AgentRegistry::load(workspace_root)
+    let registry = crate::isolated_maintenance::registry(workspace_root)
         .map_err(|err| Error::Internal(format!("load agent registry: {err}")))
         .map_err(DeriveAuditStatusFailure::before_live_evidence)?;
     let entry = registry.find(&request.agent_id).ok_or_else(|| {

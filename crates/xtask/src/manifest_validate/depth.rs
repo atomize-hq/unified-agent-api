@@ -10,7 +10,6 @@ use std::{collections::BTreeMap, fs, path::Path};
 use xtask::{
     agent_lifecycle::{self, EvidenceId},
     agent_maintenance::closeout,
-    agent_registry::AgentRegistry,
     depth_record::{
         self,
         request::{RequestTable, StandingRequest},
@@ -60,7 +59,7 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         fail("DEPTH_RECORD_PATH_INVALID", &rules, message);
     }
     // A registry that does not load fails the support publication check already.
-    let Ok(registry) = AgentRegistry::load(&workspace) else {
+    let Ok(registry) = xtask::isolated_maintenance::registry(&workspace) else {
         return;
     };
     let Some(entry) = registry

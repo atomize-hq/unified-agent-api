@@ -285,8 +285,22 @@ pub fn load_request_envelope_validated_with_policy(
     )
 }
 
-// Only private isolated tests supply the validating unenforced registry parser. Every exported
-// loader, including drift-tolerant loading, retains the normal production refusal.
+/// The MA2 audit-status read route: the routed registry (`isolated_maintenance::registry`), which
+/// is the production load with all its refusals unless an isolated route resolves.
+pub(crate) fn load_request_envelope_routed(
+    workspace_root: &Path,
+    request_path: &Path,
+    audit_drift_policy: AuditDriftPolicy,
+) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
+    load_request_with_registry(workspace_root, request_path, audit_drift_policy, |root| {
+        // `xtask::` so the integration harnesses that include this file reach the same route.
+        xtask::isolated_maintenance::registry(root)
+            .map_err(crate::agent_registry::AgentRegistryError::Validation)
+    })
+}
+
+// Only private isolated tests and the routed loader above supply another registry loader. Every
+// exported loader, including drift-tolerant loading, retains the normal production refusal.
 fn load_request_with_registry(
     workspace_root: &Path,
     request_path: &Path,
