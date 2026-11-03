@@ -10,6 +10,8 @@ mod prepare;
 mod subject;
 use fixture::{declaration, git, write, Fake, Fixture};
 
+pub(super) use fixture::installed;
+
 #[test]
 fn matching_authenticated_private_scope_resolves_without_admission() {
     let f = Fixture::new();

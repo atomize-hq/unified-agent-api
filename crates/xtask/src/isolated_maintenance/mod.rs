@@ -51,18 +51,37 @@ impl Route {
     pub fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
         self.0.registry(root)
     }
-    /// The observed protected tip that a plan built under this route is bound to.
-    pub fn tip(&self) -> &str {
-        &self.0.host.isolated_tip
+    /// Everything a plan built under this route is bound to: the workspace path, its root and Git
+    /// directory identities, the candidate HEAD and index, and the host observation (repository
+    /// identities, protected tips, approved source and governing registry).
+    pub fn binding(&self) -> RouteBinding {
+        RouteBinding {
+            root: self.0.root.clone(),
+            workspace: self.0.workspace.clone(),
+            host: self.0.host.clone(),
+        }
     }
     pub fn recheck(&self, root: &Path) -> Result<(), String> {
         self.0.recheck(root)
     }
 }
+/// An opaque, comparable copy of a route's binding. It carries no authority of its own: only a
+/// freshly resolved route with an equal binding may act on a plan that recorded it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteBinding {
+    root: PathBuf,
+    workspace: Workspace,
+    host: host::Observation,
+}
 
 /// `None` only while no isolated profile is installed, so ordinary routes keep their refusals.
 /// An installed profile resolves positively or fails; it never falls back to ordinary handling.
 pub fn route(root: &Path) -> Result<Option<Route>, String> {
+    // Unit tests may install a fixture profile for the calling thread; production cannot.
+    #[cfg(test)]
+    if let Some((profile, api)) = tests::installed() {
+        return route_in(root, Some(profile), api);
+    }
     route_in(root, LIVE_PROFILE, Arc::new(host::Github))
 }
 fn route_in(
@@ -193,14 +212,14 @@ impl Context {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Workspace {
     head: String,
     root_identity: FileIdentity,
     git_identity: FileIdentity,
     index: String,
 }
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FileIdentity {
     #[cfg(unix)]
     device: u64,

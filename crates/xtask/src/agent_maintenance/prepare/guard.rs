@@ -195,6 +195,7 @@ pub(super) fn apply(
     root: &Path,
     plan: &PreparePlan,
     registry: &AgentRegistry,
+    route: Option<&crate::isolated_maintenance::Route>,
 ) -> Result<ApplySummary, Error> {
     if fs::canonicalize(root).map_err(|e| Error::Internal(e.to_string()))? != plan.context.workspace
     {
@@ -204,8 +205,8 @@ pub(super) fn apply(
     }
     // Rebuild through the same pure path. Public fields never authorize output paths or bytes.
     let mut current = super::build_with_registry(root, &plan.context.args, registry)?;
-    // The caller has already matched the route and its protected tip against this binding.
-    current.isolated_tip = plan.isolated_tip.clone();
+    // The caller has already matched the route's binding against this plan's.
+    current.isolated = plan.isolated.clone();
     if current != *plan {
         return Err(Error::Validation(
             "stale or modified prepare plan; rebuild before applying".into(),
@@ -227,6 +228,15 @@ pub(super) fn apply(
             ),
         })
         .collect::<Vec<_>>();
+    // Host, source and workspace may move while the plan is rebuilt: recheck right before writing.
+    if let Some(route) = route {
+        route.recheck(root).map_err(Error::Validation)?;
+        if plan.isolated.as_ref() != Some(&route.binding()) {
+            return Err(Error::Validation(
+                "preparation plan was built under a different route binding".into(),
+            ));
+        }
+    }
     apply_mutations(root, &mutations).map_err(Into::into)
 }
 

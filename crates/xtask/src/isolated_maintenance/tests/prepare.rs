@@ -2,7 +2,9 @@
 use super::*;
 use crate::agent_maintenance::{
     contract_policy::{dispatch_kind_str, dispatch_workflow_value, opened_from_path},
-    prepare::{apply_routed, build_routed, Args, PreparePlan},
+    prepare::{
+        apply_prepare_plan, apply_routed, build_prepare_plan, build_routed, Args, PreparePlan,
+    },
 };
 use crate::depth_record::DepthRecord;
 
@@ -185,20 +187,21 @@ fn acquire(root: &Path, version: &str) {
 fn the_public_prepare_route_freezes_p_then_o_under_the_isolated_context() {
     let (f, args) = workspace();
     let root = f.root.path();
-    // The ordinary route keeps its production refusal of the depth-carrying registry.
-    assert!(build_routed(root, &args, None).is_err());
+    // Without an installed profile the exported entrypoints keep their production refusal.
+    assert!(build_prepare_plan(root, &args).is_err());
+    let _installed = f.install();
 
-    // MA1: P only, since nothing is acquired yet.
-    let p = build_routed(root, &args, Some(&route(&f))).unwrap();
+    // MA1 through the exported builder and apply: P only, since nothing is acquired yet.
+    let p = build_prepare_plan(root, &args).unwrap();
     assert!(record(&p).obligations.is_none());
     assert!(apply_routed(root, &p, None).is_err());
-    apply_routed(root, &p, Some(&route(&f))).unwrap();
+    apply_prepare_plan(root, &p).unwrap();
     f.commit();
 
     // MA2: acquisition, then the re-freeze adds O under the same P.
     acquire(root, "0.2.0");
     f.commit();
-    let o = build_routed(root, &args, Some(&route(&f))).unwrap();
+    let o = build_prepare_plan(root, &args).unwrap();
     let frozen = record(&o);
     assert_eq!(frozen.policy, record(&p).policy);
     assert_eq!(frozen.obligations.as_ref().unwrap().targets, [TARGET]);
@@ -218,16 +221,11 @@ fn the_public_prepare_route_freezes_p_then_o_under_the_isolated_context() {
         .map(|w| w.surface.surface_id.as_str())
         .collect();
     assert_eq!(work, ["--help"]);
-    apply_routed(root, &o, Some(&route(&f))).unwrap();
+    apply_prepare_plan(root, &o).unwrap();
     f.commit();
-    let again = build_routed(root, &args, Some(&route(&f))).unwrap();
+    let again = build_prepare_plan(root, &args).unwrap();
     assert_eq!(again.files, o.files);
-    assert_eq!(
-        apply_routed(root, &again, Some(&route(&f)))
-            .unwrap()
-            .written,
-        0
-    );
+    assert_eq!(apply_prepare_plan(root, &again).unwrap().written, 0);
 }
 
 #[test]
@@ -241,10 +239,7 @@ fn a_plan_never_applies_after_the_protected_tip_moves() {
         .err()
         .unwrap()
         .to_string();
-    assert!(
-        error.contains("different route or protected tip"),
-        "{error}"
-    );
+    assert!(error.contains("different route binding"), "{error}");
     assert!(!root
         .join("cli_manifests/depth_fixture/reports/0.2.0/depth-record.json")
         .exists());
@@ -264,4 +259,37 @@ fn only_an_uninstalled_profile_yields_the_ordinary_route() {
         json!({"id":11,"owner":{"id":20},"full_name":"fixture/isolated"}),
     );
     assert!(route_in(root, Some(f.profile()), f.api.clone()).is_err());
+}
+
+#[test]
+fn a_plan_never_applies_to_another_candidate() {
+    let (f, args) = workspace();
+    let root = f.root.path();
+    let plan = build_routed(root, &args, Some(&route(&f))).unwrap();
+    // The candidate HEAD moves with an identical tree; protected staging does not.
+    let tip = git(root, &["rev-parse", "HEAD"]);
+    git(
+        root,
+        &["commit", "-q", "--allow-empty", "-m", "candidate moves"],
+    );
+    let head = git(root, &["rev-parse", "HEAD"]);
+    f.api.put(
+        &format!("repos/fixture/isolated/compare/{tip}...{head}"),
+        json!({"status":"ahead","merge_base_commit":{"sha":tip}}),
+    );
+    f.api.put(
+        &format!("repos/fixture/isolated/compare/{}...{head}", f.baseline),
+        json!({"status":"ahead","merge_base_commit":{"sha":f.baseline}}),
+    );
+    // The moved candidate is published to the isolated repository.
+    f.api.put(
+        &format!("repos/fixture/isolated/commits/{head}"),
+        json!({"sha":head}),
+    );
+    let moved = route(&f);
+    let error = apply_routed(root, &plan, Some(&moved))
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("different route binding"), "{error}");
 }
