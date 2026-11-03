@@ -151,7 +151,7 @@ pub fn plan_for_agent(
     validate_bare_semver(version)?;
 
     let registry = crate::isolated_maintenance::registry(workspace_root)
-        .map_err(AcquisitionError::RoutedRegistry)?;
+        .map_err(|err| AcquisitionError::RoutedRegistry(err.to_string()))?;
     let entry = registry
         .find(agent_id)
         .ok_or_else(|| AcquisitionError::UnknownAgent(agent_id.to_string()))?;

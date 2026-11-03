@@ -88,10 +88,28 @@ pub fn route(root: &Path) -> Result<Option<Route>, String> {
 /// matrix, audit status). A resolved isolated route yields its scoped registry, rechecked against
 /// the workspace, inputs and host. Otherwise this is the production load, with every refusal it
 /// keeps, `support_depth` included. A failing installed route errors; it never falls back.
-pub fn registry(root: &Path) -> Result<AgentRegistry, String> {
-    match route(root)? {
-        Some(route) => route.registry(root).cloned(),
-        None => AgentRegistry::load(root).map_err(|err| err.to_string()),
+pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
+    match route(root).map_err(RegistryError::Isolated)? {
+        Some(route) => route
+            .registry(root)
+            .cloned()
+            .map_err(RegistryError::Isolated),
+        None => AgentRegistry::load(root).map_err(|err| RegistryError::Production(err.to_string())),
+    }
+}
+/// Which load failed. A caller that tolerates a production load failure, because another check
+/// already reports it, must still report a failing isolated route.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryError {
+    Production(String),
+    Isolated(String),
+}
+impl std::fmt::Display for RegistryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Production(error) => f.write_str(error),
+            Self::Isolated(error) => write!(f, "isolated maintenance route: {error}"),
+        }
     }
 }
 fn route_in(

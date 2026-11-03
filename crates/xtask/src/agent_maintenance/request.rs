@@ -295,7 +295,7 @@ pub(crate) fn load_request_envelope_routed(
     load_request_with_registry(workspace_root, request_path, audit_drift_policy, |root| {
         // `xtask::` so the integration harnesses that include this file reach the same route.
         xtask::isolated_maintenance::registry(root)
-            .map_err(crate::agent_registry::AgentRegistryError::Validation)
+            .map_err(|err| crate::agent_registry::AgentRegistryError::Validation(err.to_string()))
     })
 }
 

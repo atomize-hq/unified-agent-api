@@ -20,7 +20,11 @@ fn stand_down(root: &Path) -> Result<StandDownOutcome, String> {
 }
 
 fn validate(root: &Path) -> i32 {
-    crate::manifest_validate::run(crate::manifest_validate::Args {
+    crate::manifest_validate::run(validate_args(root))
+}
+
+fn validate_args(root: &Path) -> crate::manifest_validate::Args {
+    crate::manifest_validate::Args {
         root: Some(root.join("cli_manifests/depth_fixture")),
         rules: None,
         schema: None,
@@ -28,7 +32,7 @@ fn validate(root: &Path) -> i32 {
         mode: crate::manifest_validate::Mode::Check,
         json: false,
         tip: None,
-    })
+    }
 }
 
 fn audit(root: &Path) -> Result<audit_status::AuditStatusOutcome, String> {
@@ -101,5 +105,8 @@ fn a_failing_installed_route_never_falls_back_to_the_ordinary_registry() {
     assert!(crate::isolated_maintenance::registry(root).is_err());
     assert!(crate::manifest_acquisition::plan_for_agent(root, "depth_fixture", "0.2.0").is_err());
     assert!(stand_down(root).is_err());
+    // Validation reports the failing route instead of skipping its depth checks.
+    let codes = crate::manifest_validate::violation_codes(validate_args(root)).unwrap();
+    assert!(codes.contains(&"DEPTH_ROUTE_REFUSED"), "{codes:?}");
     assert!(crate::support_matrix::generate_publication_bundle(root).is_err());
 }

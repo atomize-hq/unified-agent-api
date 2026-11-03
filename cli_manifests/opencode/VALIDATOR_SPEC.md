@@ -87,6 +87,9 @@ Violations:
   (record invariant 1).
 - `DEPTH_RECORD_UNANCHORED`: the root holds a record and no registry entry names its agent,
   because validation runs outside a workspace or no entry has this manifest root.
+- `DEPTH_ROUTE_REFUSED`: an installed isolated maintenance route failed to resolve or recheck,
+  so the registry these checks need is unavailable. They fail instead of being skipped. Without an
+  installed route a registry that does not load is reported by the support publication check.
 - `DEPTH_RECORD_PATH_INVALID`: `RULES.json` names a depth record path other than
   `<root>/reports/<version>/depth-record.json`, where `<root>` is this root's path in the
   workspace. Outside a workspace the root has no such path, so this is not checked there.

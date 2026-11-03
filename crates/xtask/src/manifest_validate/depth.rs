@@ -58,9 +58,17 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         let rules = fs::canonicalize(&ctx.rules_path).unwrap_or_else(|_| ctx.rules_path.clone());
         fail("DEPTH_RECORD_PATH_INVALID", &rules, message);
     }
-    // A registry that does not load fails the support publication check already.
-    let Ok(registry) = xtask::isolated_maintenance::registry(&workspace) else {
-        return;
+    // A production registry that does not load fails the support publication check already. A
+    // failing isolated route is not reported there, so it fails here instead of skipping.
+    let registry = match xtask::isolated_maintenance::registry(&workspace) {
+        Ok(registry) => registry,
+        Err(xtask::isolated_maintenance::RegistryError::Production(_)) => return,
+        Err(error) => {
+            let rules =
+                fs::canonicalize(&ctx.rules_path).unwrap_or_else(|_| ctx.rules_path.clone());
+            fail("DEPTH_ROUTE_REFUSED", &rules, error.to_string());
+            return;
+        }
     };
     let Some(entry) = registry
         .agents
