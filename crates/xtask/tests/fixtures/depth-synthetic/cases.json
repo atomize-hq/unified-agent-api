@@ -43,6 +43,14 @@
         "crates/depth_fixture/src/lib.rs"
       ],
       "counterfactual": "An unchecked line limit reports Spawn after a spawn attempt."
+    },
+    {
+      "name": "run::model_length_bounds_are_enforced",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs"
+      ],
+      "counterfactual": "Dropping the 1..=64 length bound lets an empty or 65-byte model reach a spawn attempt, which reports Spawn and fails."
     }
   ],
   "G1": [
@@ -71,6 +79,15 @@
         "crates/depth_fixture/src/bin/depth_fixture.rs"
       ],
       "counterfactual": "Default model and arity differ from the stated grammar and fail the message assertion."
+    },
+    {
+      "name": "run::model_length_bounds_are_enforced",
+      "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+      "production_inputs": [
+        "crates/depth_fixture/src/lib.rs",
+        "crates/depth_fixture/src/bin/depth_fixture.rs"
+      ],
+      "counterfactual": "Rejecting a 1- or 64-byte model, or rewriting it, fails the accepted-boundary echo."
     }
   ],
   "E1": [
@@ -169,13 +186,13 @@
       "counterfactual": "An inherited environment, a parent HOME taking precedence over the explicit one, or the wrong working directory fails."
     },
     {
-      "name": "run::run_writes_nothing_to_home_or_working_directory",
+      "name": "run::seeded_config_and_cache_neither_apply_nor_change",
       "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
       "production_inputs": [
         "crates/depth_fixture/src/lib.rs",
         "crates/depth_fixture/src/bin/depth_fixture.rs"
       ],
-      "counterfactual": "Any config, cache or other file written to the empty home or working directory fails."
+      "counterfactual": "A run that applies a seeded config or cache value changes the default model, and one that modifies or adds a file changes the tree snapshot; either fails."
     }
   ],
   "X3": [
@@ -217,22 +234,22 @@
   ],
   "X4": [
     {
-      "name": "run::child_sees_only_explicit_environment_and_null_stdin",
+      "name": "run::child_stdin_is_null_when_the_parent_has_input",
       "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
       "production_inputs": [
         "crates/depth_fixture/src/lib.rs",
         "crates/depth_fixture/src/bin/depth_fixture.rs"
       ],
-      "counterfactual": "Stdin that is inherited, non-empty or a terminal is reported by the child and fails."
+      "counterfactual": "Inheriting the re-executed parent's piped stdin reports nonzero stdin bytes and fails."
     },
     {
-      "name": "run::run_writes_nothing_to_home_or_working_directory",
+      "name": "run::seeded_config_and_cache_neither_apply_nor_change",
       "assertion": "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
       "production_inputs": [
         "crates/depth_fixture/src/lib.rs",
         "crates/depth_fixture/src/bin/depth_fixture.rs"
       ],
-      "counterfactual": "A side effect in the home or working directory fails."
+      "counterfactual": "Any side effect in the home, XDG or working directory changes the tree snapshot and fails."
     }
   ],
   "OUT3": [
