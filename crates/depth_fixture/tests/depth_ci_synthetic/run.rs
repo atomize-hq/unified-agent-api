@@ -242,6 +242,8 @@ fn seeded_config_and_cache_neither_apply_nor_change() {
         for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             if path.is_dir() {
+                // Directories count too: an added empty directory is a side effect.
+                out.insert(format!("{}/", path.display()), vec![]);
                 tree(&path, out);
             } else {
                 out.insert(path.display().to_string(), fs::read(&path).unwrap());
