@@ -175,11 +175,14 @@ fn acquire(root: &Path, version: &str) {
         version: version.into(),
     })
     .unwrap();
-    crate::manifest_report::run(crate::manifest_report::Args {
-        root: Some(base),
-        rules: None,
-        version: version.into(),
-    })
+    crate::manifest_report::run_at(
+        crate::manifest_report::Args {
+            root: Some(base),
+            rules: None,
+            version: version.into(),
+        },
+        "2026-11-03T00:00:00Z",
+    )
     .unwrap();
 }
 
