@@ -1,0 +1,120 @@
+{
+  "acceptance_entries": [],
+  "event": {
+    "lifecycle_path": "maintenance",
+    "opened_from": ".github/workflows/ci.yml",
+    "request_commit": "0b1e1f0a478af0cd06d6ba6998ab594f09fbe592",
+    "request_recorded_at": "2026-11-02T00:00:00+00:00",
+    "trigger_kind": "isolated_synthetic_wrapper"
+  },
+  "execution": null,
+  "obligations": {
+    "acceptance_work": [],
+    "acquired_inputs": [
+      {
+        "path": "crates/xtask/tests/fixtures/depth-synthetic/contract.md",
+        "sha256": "5d2df92180a2c60fb2d4ccd61a3248cd5d57cdfa9e05dab29bec2345ae5ec133"
+      }
+    ],
+    "classification_required": [],
+    "identity": "ae237f542193963276daabba2b7c0e2d842c843df637c68e8241813a128db320",
+    "operations": [
+      {
+        "id": "run",
+        "obligations": [
+          "A1",
+          "E1",
+          "G1",
+          "LC2",
+          "OUT3",
+          "R1",
+          "V1",
+          "X1",
+          "X2",
+          "X3",
+          "X4"
+        ],
+        "surfaces": []
+      }
+    ],
+    "policy_identity": "b2778a8c3bf4e8feee56a531debf222a3aab031db4bbb1985c83d617d57b4f7b",
+    "targets": [
+      "linux-x64"
+    ]
+  },
+  "policy": {
+    "base": [
+      "A1",
+      "E1",
+      "G1",
+      "R1",
+      "V1",
+      "X1",
+      "X2",
+      "X3",
+      "X4"
+    ],
+    "debt_baseline": [],
+    "identity": "b2778a8c3bf4e8feee56a531debf222a3aab031db4bbb1985c83d617d57b4f7b",
+    "path_enabled": true,
+    "rules_revision": "1",
+    "selection": {
+      "agent_id": "depth_fixture",
+      "enrollment": {
+        "capabilities": [],
+        "lifecycle_path": "maintenance",
+        "modes": [
+          {
+            "command_path": "depth_fixture run",
+            "mode": "headless",
+            "predicates": [
+              {
+                "flag": "--json"
+              }
+            ],
+            "selector": "run-json"
+          }
+        ],
+        "operations": [
+          {
+            "forwarding": false,
+            "id": "run",
+            "not_applicable_permitted": [],
+            "promise": {
+              "a1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "e1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "g1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "r1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "v1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x2": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x3": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x4": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+            },
+            "serves": [
+              "run-json"
+            ],
+            "shared_mapping": "wrapper_only",
+            "templates": [
+              "CORE"
+            ]
+          }
+        ],
+        "targets": [
+          "linux-x64"
+        ],
+        "version": "0.2.0"
+      }
+    },
+    "templates": [
+      {
+        "obligations": [
+          "LC2",
+          "OUT3"
+        ],
+        "template": "CORE"
+      }
+    ]
+  },
+  "schema_version": 1
+}

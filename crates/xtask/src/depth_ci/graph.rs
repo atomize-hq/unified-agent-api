@@ -21,6 +21,7 @@ pub(super) fn normalize(id: &str) -> String {
                 "unified-agent-api-aider" => "aider",
                 "unified-agent-api-gemini-cli" => "gemini_cli",
                 "unified-agent-api-opencode" => "opencode",
+                "unified-agent-api-depth-fixture" => "depth_fixture",
                 other => other,
             }
         )
@@ -50,7 +51,7 @@ pub(super) fn resolve(
     for path in view.files_under(profile.directory())? {
         result.inputs.push(view.reference(&path)?);
     }
-    if profile == profile::Profile::Core {
+    if profile != profile::Profile::Channel {
         let record = profile.record(
             std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
         )?;
@@ -58,7 +59,7 @@ pub(super) fn resolve(
             view.required(&input.path)?;
             let current = view.reference(&input.path)?;
             if current != input {
-                return Err("acquired CORE provenance differs from frozen O".into());
+                return Err("acquired profile provenance differs from frozen O".into());
             }
             result.inputs.push(current);
         }

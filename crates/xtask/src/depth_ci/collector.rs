@@ -91,6 +91,10 @@ impl BuildEnv {
         if self.profile == profile::Profile::Core {
             c.env("CARGO_BUILD_JOBS", "2");
         }
+        if self.profile == profile::Profile::Synthetic {
+            // The fixture CLI reports the enrolled upstream version it is built as (A1).
+            c.env("DEPTH_FIXTURE_UPSTREAM_VERSION", self.profile.version());
+        }
         c
     }
 }
@@ -325,6 +329,8 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     .to_vec();
     if profile == profile::Profile::Channel {
         absent.push("crates/wrapper_events/build.rs".into());
+    } else if profile == profile::Profile::Synthetic {
+        absent.push("crates/depth_fixture/build.rs".into());
     } else {
         absent.extend(
             [
@@ -614,6 +620,12 @@ pub(super) fn environment(profile: profile::Profile) -> Environment {
             value: "2".into(),
         });
     }
+    if profile == profile::Profile::Synthetic {
+        environment.variables.push(Variable {
+            name: "DEPTH_FIXTURE_UPSTREAM_VERSION".into(),
+            value: profile.version().into(),
+        });
+    }
     environment
 }
 pub(super) fn collect(workspace: &Path) -> Result<(), String> {
@@ -630,10 +642,10 @@ pub(super) fn collect_profile(root: &Path, profile: profile::Profile) -> Result<
     if bytes.len() > 1048576 {
         return Err("witness bounds exceeded".into());
     }
-    let destination = root.join(if profile == profile::Profile::Channel {
-        "target/depth-ci"
-    } else {
-        "target/depth-core"
+    let destination = root.join(match profile {
+        profile::Profile::Channel => "target/depth-ci",
+        profile::Profile::Core => "target/depth-core",
+        profile::Profile::Synthetic => "target/depth-synthetic",
     });
     fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
     fs::write(destination.join("witness.json"), bytes).map_err(|e| e.to_string())?;

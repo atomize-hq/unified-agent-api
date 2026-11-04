@@ -150,3 +150,13 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
         f.install(1);
     }
 }
+
+#[test]
+fn synthetic_profile_has_no_whole_workflow_path() {
+    // IR-P3 only: no host read happens, so an empty API proves the refusal comes first.
+    let f = Fixture::new_for(Profile::Core);
+    let error = resolve_profile(&f.api, f.root.path(), Profile::Synthetic)
+        .err()
+        .unwrap();
+    assert!(error.contains("no whole-workflow evidence path"), "{error}");
+}

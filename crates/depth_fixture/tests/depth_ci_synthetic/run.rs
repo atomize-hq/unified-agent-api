@@ -223,12 +223,139 @@ fn child_sees_only_explicit_environment_and_null_stdin() {
     assert!(text.contains("home=/fixture-home"), "{text}");
     assert!(text.contains("secret=<unset>"), "{text}");
     assert!(text.contains("stdin_bytes=0"), "{text}");
+    assert!(text.contains("stdin_tty=false"), "{text}");
     assert!(
         text.contains(&format!("cwd={}", cwd.display()))
             || text.contains(&format!("cwd={}", dir.display())),
         "{text}"
     );
     assert!(!format!("{events:?}").contains("parent-sentinel"));
+}
+
+// X2: distinguishable config and cache sentinels in the home, the XDG directories and the
+// working directory neither change the run (the default model stays) nor get modified, and nothing
+// is added. This shows the fixture's effects only; the wrapper is not a sandbox.
+#[test]
+fn seeded_config_and_cache_neither_apply_nor_change() {
+    use std::{collections::BTreeMap, fs, path::Path};
+    fn tree(dir: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                // Directories count too: an added empty directory is a side effect.
+                out.insert(format!("{}/", path.display()), vec![]);
+                tree(&path, out);
+            } else {
+                out.insert(path.display().to_string(), fs::read(&path).unwrap());
+            }
+        }
+    }
+    let base = std::env::temp_dir().join(format!("depth-fixture-x2-{}", std::process::id()));
+    let (home, cwd) = (base.join("home"), base.join("cwd"));
+    let config = "model = \"from-config-sentinel\"\n";
+    for file in [
+        home.join(".config/depth_fixture/config.toml"),
+        home.join("xdg-config/depth_fixture/config.toml"),
+        cwd.join("depth_fixture.toml"),
+    ] {
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, config).unwrap();
+    }
+    for dir in [
+        home.join(".cache/depth_fixture"),
+        home.join("xdg-cache/depth_fixture"),
+    ] {
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("last-model"), "from-cache-sentinel\n").unwrap();
+    }
+    let mut before = BTreeMap::new();
+    tree(&base, &mut before);
+    let mut fx = fixture("ok");
+    fx.current_dir = Some(cwd);
+    fx.env.insert("HOME".into(), home.display().to_string());
+    let xdg = |name: &str| home.join(name).display().to_string();
+    fx.env.insert("XDG_CONFIG_HOME".into(), xdg("xdg-config"));
+    fx.env.insert("XDG_CACHE_HOME".into(), xdg("xdg-cache"));
+    let events = fx.run(&request("x")).unwrap().collect().unwrap();
+    assert!(events.contains(&Event::Message {
+        text: "x".into(),
+        model: Some("fixture-default".into())
+    }));
+    assert!(!format!("{events:?}").contains("sentinel"));
+    let mut after = BTreeMap::new();
+    tree(&base, &mut after);
+    assert_eq!(before, after);
+    fs::remove_dir_all(base).unwrap();
+}
+
+// X4: the child's stdin is null even when the parent's stdin carries bytes. The test re-executes
+// itself with piped input, so inheriting the parent's stdin would be observed.
+#[test]
+fn child_stdin_is_null_when_the_parent_has_input() {
+    const CHILD: &str = "DEPTH_FIXTURE_STDIN_PROBE";
+    if std::env::var_os(CHILD).is_some() {
+        let events = fixture("environment")
+            .run(&request("x"))
+            .unwrap()
+            .collect()
+            .unwrap();
+        println!("PROBE {events:?}");
+        return;
+    }
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "run::child_stdin_is_null_when_the_parent_has_input",
+            "--nocapture",
+            "--test-threads",
+            "1",
+        ])
+        .env(CHILD, "1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"parent input the child must not see\n")
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}");
+    // The harness may print the probe on its own `test ... ` line.
+    let probe = stdout
+        .lines()
+        .find_map(|l| l.find("PROBE ").map(|i| &l[i..]))
+        .unwrap_or_else(|| panic!("{stdout}"));
+    assert!(probe.contains("stdin_bytes=0"), "{probe}");
+    assert!(probe.contains("stdin_tty=false"), "{probe}");
+}
+
+// V1 / G1: the model length bounds 1..=64 are enforced before spawn and accepted at the edge.
+#[test]
+fn model_length_bounds_are_enforced() {
+    let unspawnable = DepthFixture::new("/nonexistent/depth_fixture");
+    for model in [String::new(), "m".repeat(65)] {
+        let mut req = request("x");
+        req.model = Some(model);
+        assert!(matches!(
+            unspawnable.run(&req),
+            Err(Error::InvalidRequest(_))
+        ));
+    }
+    for model in ["m".to_owned(), "m".repeat(64)] {
+        let mut req = request("x");
+        req.model = Some(model.clone());
+        let events = fixture("ok").run(&req).unwrap().collect().unwrap();
+        assert!(events.contains(&Event::Message {
+            text: "x".into(),
+            model: Some(model)
+        }));
+    }
 }
 
 // A1: the fixture reports the upstream version it was built as.

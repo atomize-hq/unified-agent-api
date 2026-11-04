@@ -131,7 +131,10 @@ pub(super) fn load(
     }
     Ok(registry)
 }
-fn selection(declaration: &DepthEnrollmentDeclaration, subject: &Subject) -> Result<(), String> {
+pub(super) fn selection(
+    declaration: &DepthEnrollmentDeclaration,
+    subject: &Subject,
+) -> Result<(), String> {
     let modes = &declaration.modes;
     let operations = &declaration.operations;
     let mappings = &declaration.capabilities;

@@ -1,31 +1,42 @@
-//! Two compiled isolated profiles; no receipt or environment value chooses trust.
+//! Three compiled isolated profiles; no receipt or environment value chooses trust.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Profile {
     Channel,
     Core,
+    /// `synthetic-wrapper-v1`: machinery proof on `depth_fixture` (MP-P1); qualifies no agent.
+    Synthetic,
 }
 impl Profile {
+    pub(crate) fn agent_id(self) -> &'static str {
+        match self {
+            Self::Channel | Self::Core => "codex",
+            Self::Synthetic => "depth_fixture",
+        }
+    }
     pub(crate) fn fixture(self) -> &'static str {
         match self {
             Self::Channel => super::FIXTURE,
             Self::Core => "crates/xtask/tests/fixtures/depth-core/record.json",
+            Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic/record.json",
         }
     }
     pub(crate) fn contract(self) -> &'static str {
         match self {
             Self::Channel => super::CONTRACT,
             Self::Core => "crates/xtask/tests/fixtures/depth-core/contract.md",
+            Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic/contract.md",
         }
     }
     pub(crate) fn directory(self) -> &'static str {
         match self {
             Self::Channel => "crates/xtask/tests/fixtures/depth-ci",
             Self::Core => "crates/xtask/tests/fixtures/depth-core",
+            Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic",
         }
     }
     pub(crate) fn requirements(self) -> Option<&'static str> {
         match self {
-            Self::Channel => None,
+            Self::Channel | Self::Synthetic => None,
             Self::Core => Some("docs/specs"),
         }
     }
@@ -36,23 +47,26 @@ impl Profile {
         match self {
             Self::Channel => "0.0.0",
             Self::Core => "0.156.1",
+            Self::Synthetic => "0.2.0",
         }
     }
     pub(crate) fn package(self) -> &'static str {
         match self {
             Self::Channel => "unified-agent-api-wrapper-events",
             Self::Core => "unified-agent-api",
+            Self::Synthetic => "unified-agent-api-depth-fixture",
         }
     }
     pub(crate) fn test(self) -> &'static str {
         match self {
             Self::Channel => "depth_ci_channel",
             Self::Core => "depth_ci_core",
+            Self::Synthetic => "depth_ci_synthetic",
         }
     }
     pub(crate) fn features(self) -> Vec<String> {
         match self {
-            Self::Channel => vec![],
+            Self::Channel | Self::Synthetic => vec![],
             Self::Core => ["aider", "claude_code", "codex", "gemini_cli", "opencode"]
                 .map(str::to_owned)
                 .to_vec(),
@@ -62,27 +76,32 @@ impl Profile {
         match self {
             Self::Channel => "depth-channel-v1",
             Self::Core => "depth-codex-core-v1",
+            Self::Synthetic => "depth-synthetic-wrapper-v1",
         }
     }
     pub(crate) fn executor(self) -> &'static str {
         match self {
             Self::Channel => "github-actions:rust-tests/isolated-channel-v1",
             Self::Core => "github-actions:rust-tests/isolated-codex-core-v1",
+            Self::Synthetic => "github-actions:rust-tests/isolated-synthetic-wrapper-v1",
         }
     }
     pub(crate) fn trust(self) -> &'static str {
         match self {
             Self::Channel => "github-actions-channel-v1",
             Self::Core => "github-actions-codex-core-v1",
+            Self::Synthetic => "github-actions-synthetic-wrapper-v1",
         }
     }
     pub(crate) fn evidence(self) -> String {
         format!(
-            "cli_manifests/codex/reports/{}/evidence/{}",
+            "cli_manifests/{}/reports/{}/evidence/{}",
+            self.agent_id(),
             self.version(),
             match self {
                 Self::Channel => "channel-v1",
                 Self::Core => "core-v1",
+                Self::Synthetic => "synthetic-wrapper-v1",
             }
         )
     }
@@ -90,7 +109,7 @@ impl Profile {
         if self == Self::Channel {
             super::record(raw)
         } else {
-            crate::depth_record::DepthRecord::parse(raw, "codex", self.version())
+            crate::depth_record::DepthRecord::parse(raw, self.agent_id(), self.version())
         }
     }
 }
@@ -109,12 +128,12 @@ impl Profile {
             return Ok(super::CASES.map(str::to_owned).to_vec());
         }
         let specs: std::collections::BTreeMap<String, Vec<CaseSpec>> =
-            serde_json::from_str(raw.ok_or("missing CORE cases")?).map_err(|e| e.to_string())?;
+            serde_json::from_str(raw.ok_or("missing profile cases")?).map_err(|e| e.to_string())?;
         let mut names: Vec<_> = specs.values().flatten().map(|c| c.name.clone()).collect();
         names.sort();
         names.dedup();
         if names.is_empty() {
-            return Err("empty CORE cases".into());
+            return Err("empty profile cases".into());
         }
         Ok(names)
     }
@@ -193,5 +212,65 @@ mod tests {
         assert!(record.policy.selection.enrollment.operations[0]
             .not_applicable_permitted
             .is_empty());
+    }
+
+    #[test]
+    fn synthetic_profile_maps_exactly_the_due_obligations_to_real_cases() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let p = Profile::Synthetic;
+        let record = p
+            .record(&std::fs::read_to_string(root.join(p.fixture())).unwrap())
+            .unwrap();
+        let raw = std::fs::read_to_string(root.join(p.directory()).join("cases.json")).unwrap();
+        let mappings: std::collections::BTreeMap<String, Vec<CaseSpec>> =
+            serde_json::from_str(&raw).unwrap();
+        // Wrapper-only: BASE, OUT3 and LC2 are due; M is not, and no capability is mapped.
+        let due: Vec<_> = crate::depth_record::due(&record)
+            .unwrap()
+            .into_iter()
+            .map(|o| {
+                assert!(o.capability.is_none());
+                assert_eq!(o.target, "linux-x64");
+                serde_json::to_value(o.id.unwrap())
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        let mut keys: Vec<_> = mappings.keys().cloned().collect();
+        let mut due_sorted = due.clone();
+        keys.sort();
+        due_sorted.sort();
+        assert_eq!(keys, due_sorted);
+        assert_eq!(keys.len(), 11);
+        assert_eq!(p.obligations(&record).len(), 11);
+        let enrollment = &record.policy.selection.enrollment;
+        assert!(enrollment.capabilities.is_empty());
+        assert!(enrollment.operations[0].not_applicable_permitted.is_empty());
+        assert!(record.execution.is_none());
+        for (obligation, cases) in &mappings {
+            assert!(!cases.is_empty(), "{obligation}");
+            for case in cases {
+                let leaf = case.name.rsplit("::").next().unwrap();
+                let module = case.name.split("::").next().unwrap();
+                assert!(
+                    case.assertion.ends_with(&format!("/{module}.rs")),
+                    "{}",
+                    case.name
+                );
+                let source = std::fs::read_to_string(root.join(&case.assertion)).unwrap();
+                assert!(source.contains(&format!("fn {leaf}()")), "{}", case.name);
+                assert!(!case.production_inputs.is_empty() && !case.counterfactual.is_empty());
+                for input in &case.production_inputs {
+                    assert!(input.starts_with("crates/depth_fixture/src/"), "{input}");
+                    assert!(root.join(input).is_file(), "{input}");
+                }
+            }
+        }
+        assert_eq!(
+            p.evidence(),
+            "cli_manifests/depth_fixture/reports/0.2.0/evidence/synthetic-wrapper-v1"
+        );
     }
 }

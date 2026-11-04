@@ -69,6 +69,8 @@ enum Command {
     DepthNativePrepareFinish(xtask::depth_evidence::native::PrepareFinishArgs),
     /// Collect the fixed isolated Codex CORE profile, without enrollment or writes to reports.
     DepthCoreCollect,
+    /// Collect the isolated `synthetic-wrapper-v1` machinery-proof witness (qualifies no agent).
+    DepthSyntheticCollect,
     /// Read-only authenticated per-obligation CORE preview in a disposable checkout.
     DepthCoreProve,
     /// Plan or apply a coherent, guarded promotion candidate.
@@ -236,6 +238,14 @@ fn main() {
         Command::DepthCoreCollect => {
             let root = std::env::current_dir().expect("workspace");
             if let Err(e) = xtask::depth_ci::collect_core(&root) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+            0
+        }
+        Command::DepthSyntheticCollect => {
+            let root = std::env::current_dir().expect("workspace");
+            if let Err(e) = xtask::depth_ci::collect_synthetic(&root) {
                 eprintln!("{e}");
                 std::process::exit(1);
             }

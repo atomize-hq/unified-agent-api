@@ -4,7 +4,7 @@
 //! `run [--json] [--model <NAME>] [--] <PROMPT>`. `DEPTH_FIXTURE_SCENARIO` selects a scripted
 //! behavior so wrapper tests can reach every promised path; it is part of this fixture's API.
 
-use std::io::{self, Read, Write};
+use std::io::{self, IsTerminal, Read, Write};
 use std::process::ExitCode;
 use std::{env, thread, time::Duration};
 
@@ -157,14 +157,16 @@ fn run(args: &[String]) -> ExitCode {
             let cwd = env::current_dir()
                 .map(|d| d.display().to_string())
                 .unwrap_or_default();
+            let stdin_tty = io::stdin().is_terminal();
             let mut stdin = String::new();
             let _ = io::stdin().read_to_string(&mut stdin);
             let text = format!(
-                "home={} secret={} cwd={} stdin_bytes={}",
+                "home={} secret={} cwd={} stdin_bytes={} stdin_tty={}",
                 seen("HOME"),
                 seen("DEPTH_FIXTURE_SECRET"),
                 cwd,
-                stdin.len()
+                stdin.len(),
+                stdin_tty
             );
             emit(started);
             emit(&serde_json::json!({"type": "message", "text": text}).to_string());
