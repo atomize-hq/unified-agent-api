@@ -125,6 +125,11 @@ pub(super) struct Context {
     pub(super) rendered_packet: docs::RenderedExecutionPacket,
     pub(super) closeout_command: String,
     pub(super) input_contract: Option<InputContract>,
+    /// The scoped registry of the isolated route resolved when this execution started, or `None`
+    /// for the production load. Every later request reload, in the caller or the independent
+    /// candidate, uses it, and the candidate's in-process checks are bound to it; the relay
+    /// refuses any registry change.
+    pub(super) registry: Option<crate::isolated_maintenance::CapturedRegistry>,
 }
 
 #[derive(Debug, Clone)]

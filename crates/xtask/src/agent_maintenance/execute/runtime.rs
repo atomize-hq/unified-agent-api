@@ -164,6 +164,23 @@ pub(super) fn run_green_gates(
     errors: &mut Vec<String>,
 ) -> Result<Vec<GateEvidence>, Error> {
     let mut results = Vec::new();
+    #[cfg(test)]
+    if gate_stub::active() {
+        for command in commands {
+            checks.push(ValidationCheck {
+                name: format!("green_gate::{command}"),
+                ok: true,
+                message: "gate stubbed by an in-process test".to_string(),
+            });
+            results.push(GateEvidence {
+                command: command.clone(),
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            });
+        }
+        return Ok(results);
+    }
     for command in commands {
         let mut gate = Command::new("sh");
         for (key, _) in std::env::vars_os() {
@@ -210,6 +227,28 @@ pub(super) fn run_green_gates(
         }
     }
     Ok(results)
+}
+
+/// In-process unit tests that drive write mode cannot run the real green gates (`cargo`, `make
+/// preflight`) in a scratch workspace. A test may stub them for its own thread; production cannot.
+#[cfg(test)]
+pub(crate) mod gate_stub {
+    use std::cell::Cell;
+    thread_local!(static STUBBED: Cell<bool> = const { Cell::new(false) });
+    /// Restores the real gates on drop, so a failing test never leaks the stub.
+    pub(crate) struct Stubbed;
+    impl Drop for Stubbed {
+        fn drop(&mut self) {
+            STUBBED.with(|s| s.set(false));
+        }
+    }
+    pub(crate) fn stub() -> Stubbed {
+        STUBBED.with(|s| s.set(true));
+        Stubbed
+    }
+    pub(super) fn active() -> bool {
+        STUBBED.with(Cell::get)
+    }
 }
 
 fn spawn_codex_exec(

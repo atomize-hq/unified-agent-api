@@ -17,6 +17,14 @@ pub(super) fn execute_write_mode<W: Write>(
     let (prepared, prompt) = load_prepared_packet(context)?;
     validate_prepared_packet(context, &prepared, &prompt)?;
     let candidate = Candidate::prepare(caller, context)?;
+    // The candidate cannot resolve the isolated route; bind the registry this execution captured
+    // to its exact root for every in-process check below. Nothing has executed yet.
+    let _bound = context
+        .registry
+        .as_ref()
+        .map(|captured| captured.bind_candidate(&candidate.root))
+        .transpose()
+        .map_err(Error::Validation)?;
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
     let execution =

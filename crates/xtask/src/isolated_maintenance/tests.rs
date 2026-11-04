@@ -7,6 +7,7 @@ mod fixture;
 #[cfg(unix)]
 mod git_metadata;
 mod ma2_routes;
+mod ma4_route;
 mod prepare;
 mod subject;
 use fixture::{declaration, git, write, Fake, Fixture};
