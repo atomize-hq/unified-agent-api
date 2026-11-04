@@ -59,6 +59,24 @@ pub fn run(args: Args) -> Result<(), ReportError> {
 /// The neutral `manifest-*` subcommand passes `None` (root is mandatory); the per-agent
 /// back-compat aliases pass their historical default so existing callers keep working.
 pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(), ReportError> {
+    generate(args, default_root, || {
+        util::require_source_date_epoch_if_ci()?;
+        Ok(util::deterministic_rfc3339_now())
+    })
+}
+
+/// Run the engine with a fixed `generated_at`, so in-process tests stay deterministic
+/// without reading or mutating the process environment (`CI`, `SOURCE_DATE_EPOCH`).
+#[cfg(test)]
+pub(crate) fn run_at(args: Args, generated_at: &str) -> Result<(), ReportError> {
+    generate(args, None, || Ok(generated_at.to_string()))
+}
+
+fn generate(
+    args: Args,
+    default_root: Option<&str>,
+    generated_at: impl FnOnce() -> Result<String, ReportError>,
+) -> Result<(), ReportError> {
     let requested_root = args
         .root
         .clone()
@@ -120,8 +138,7 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
     let reports_dir = root.join("reports").join(&args.version);
     fs::create_dir_all(&reports_dir)?;
 
-    util::require_source_date_epoch_if_ci()?;
-    let generated_at = util::deterministic_rfc3339_now();
+    let generated_at = generated_at()?;
 
     // coverage.any.json (always)
     {
