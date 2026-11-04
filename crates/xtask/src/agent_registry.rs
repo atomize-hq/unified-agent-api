@@ -30,6 +30,8 @@ const WRAPPER_COVERAGE_BINDING_KIND_GENERATED_FROM_WRAPPER_CRATE: &str =
 const BACKEND_MODULE_PREFIX: &str = "crates/agent_api/src/backends/";
 const CRATE_PATH_PREFIX: &str = "crates/";
 const MANIFEST_ROOT_PREFIX: &str = "cli_manifests/";
+/// The compiled `agent_api` built-in backend inventory. Membership is fixed here, never by an entry.
+pub const BUILT_IN_AGENTS: [&str; 5] = ["aider", "claude_code", "codex", "gemini_cli", "opencode"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -116,12 +118,14 @@ impl AgentRegistry {
                 &agent.agent_id,
                 &mut seen_crate_paths,
             )?;
-            record_unique(
-                "backend_module",
-                &agent.backend_module,
-                &agent.agent_id,
-                &mut seen_backend_modules,
-            )?;
+            if let Some(backend_module) = &agent.backend_module {
+                record_unique(
+                    "backend_module",
+                    backend_module,
+                    &agent.agent_id,
+                    &mut seen_backend_modules,
+                )?;
+            }
             record_unique(
                 "manifest_root",
                 &agent.manifest_root,
@@ -146,7 +150,10 @@ pub struct AgentRegistryEntry {
     pub agent_id: String,
     pub display_name: String,
     pub crate_path: String,
-    pub backend_module: String,
+    /// Present exactly for an `agent_api` runtime backend. An entry without it is a non-runtime
+    /// agent and MUST NOT carry any capability claim (see `validate_non_runtime`).
+    #[serde(default)]
+    pub backend_module: Option<String>,
     pub manifest_root: String,
     pub package_name: String,
     pub canonical_targets: Vec<String>,
@@ -166,21 +173,76 @@ impl AgentRegistryEntry {
         scaffold_lib_name_from_crate_path(&self.crate_path)
     }
 
+    /// The runtime backend module, or `""` for a non-runtime agent, so that comparisons with an
+    /// onboarding descriptor (which always names one) report a mismatch.
+    pub fn backend_module_or_empty(&self) -> &str {
+        self.backend_module.as_deref().unwrap_or("")
+    }
+
+    fn validate_non_runtime(&self) -> Result<(), AgentRegistryError> {
+        let invalid = |what: &str| {
+            Err(AgentRegistryError::Validation(format!(
+                "agent `{}` declares no `backend_module`, so it is not an agent_api runtime \
+                 backend and must not {what}",
+                self.agent_id
+            )))
+        };
+        if BUILT_IN_AGENTS.contains(&self.agent_id.as_str()) {
+            return invalid("be a compiled built-in backend");
+        }
+        let declaration = &self.capability_declaration;
+        if !declaration.always_on.is_empty()
+            || !declaration.target_gated.is_empty()
+            || !declaration.config_gated.is_empty()
+            || !declaration.backend_extensions.is_empty()
+        {
+            return invalid("declare capabilities");
+        }
+        if self.publication.capability_matrix_enabled
+            || self.publication.capability_matrix_target.is_some()
+        {
+            return invalid("enable capability publication");
+        }
+        let enrollments = self
+            .support_depth
+            .as_ref()
+            .and_then(|depth| depth.enrollments.as_deref())
+            .unwrap_or_default();
+        for enrollment in enrollments {
+            if !enrollment.capabilities.is_empty() {
+                return invalid("map support-depth capabilities");
+            }
+            if enrollment.operations.iter().any(|op| {
+                matches!(
+                    op.shared_mapping,
+                    Some(
+                        support_depth::SharedMapping::Mapped
+                            | support_depth::SharedMapping::ProposedExtension
+                    )
+                )
+            }) {
+                return invalid("declare a `mapped` or `proposed_extension` operation");
+            }
+        }
+        Ok(())
+    }
+
     fn validate(&self) -> Result<(), AgentRegistryError> {
         validate_non_empty_scalar("agent_id", &self.agent_id)?;
         validate_non_empty_scalar("display_name", &self.display_name)?;
         validate_non_empty_scalar("package_name", &self.package_name)?;
 
         validate_repo_relative_path("crate_path", &self.crate_path)?;
-        validate_repo_relative_path("backend_module", &self.backend_module)?;
+        match &self.backend_module {
+            Some(backend_module) => {
+                validate_repo_relative_path("backend_module", backend_module)?;
+                ensure_has_prefix("backend_module", backend_module, BACKEND_MODULE_PREFIX)?;
+            }
+            None => self.validate_non_runtime()?,
+        }
         validate_repo_relative_path("manifest_root", &self.manifest_root)?;
 
         ensure_has_prefix("crate_path", &self.crate_path, CRATE_PATH_PREFIX)?;
-        ensure_has_prefix(
-            "backend_module",
-            &self.backend_module,
-            BACKEND_MODULE_PREFIX,
-        )?;
         ensure_has_prefix("manifest_root", &self.manifest_root, MANIFEST_ROOT_PREFIX)?;
         self.scaffold_lib_name()?;
 

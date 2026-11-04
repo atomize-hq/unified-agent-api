@@ -41,7 +41,7 @@ pub(super) fn validate_registry_conflicts(
                 draft.crate_path, entry.agent_id
             )));
         }
-        if entry.backend_module == draft.backend_module {
+        if entry.backend_module.as_deref() == Some(draft.backend_module.as_str()) {
             return Err(Error::Validation(format!(
                 "backend_module `{}` is already owned by agent `{}`",
                 draft.backend_module, entry.agent_id
@@ -148,7 +148,7 @@ pub(super) fn desired_registry_text(
 fn registry_entry_matches_draft(entry: &AgentRegistryEntry, draft: &DraftEntry) -> bool {
     entry.display_name == draft.display_name
         && entry.crate_path == draft.crate_path
-        && entry.backend_module == draft.backend_module
+        && entry.backend_module.as_deref() == Some(draft.backend_module.as_str())
         && entry.manifest_root == draft.manifest_root
         && entry.package_name == draft.package_name
         && entry.canonical_targets == draft.canonical_targets

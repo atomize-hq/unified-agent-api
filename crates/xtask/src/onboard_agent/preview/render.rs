@@ -47,7 +47,7 @@ impl CloseoutPacketRenderInput {
             agent_id: entry.agent_id.clone(),
             display_name: entry.display_name.clone(),
             crate_path: entry.crate_path.clone(),
-            backend_module: entry.backend_module.clone(),
+            backend_module: entry.backend_module_or_empty().to_owned(),
             manifest_root: entry.manifest_root.clone(),
             package_name: entry.package_name.clone(),
             docs_release_track: entry.release.docs_release_track.clone(),

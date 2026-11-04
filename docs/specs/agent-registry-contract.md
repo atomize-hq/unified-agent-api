@@ -31,7 +31,25 @@ schema.
 ## Entry shape
 
 Each `[[agents]]` entry MUST continue to declare the existing identity, capability, publication,
-release, and scaffold fields enforced by `xtask`.
+release, and scaffold fields enforced by `xtask`, except `backend_module` as stated below.
+
+### Runtime and non-runtime entries
+
+`backend_module` is present exactly when the entry is an `agent_api` runtime backend. Its built-in
+membership is the compiled inventory `BUILT_IN_AGENTS` in `xtask`, never a field of the entry:
+
+- an entry whose `agent_id` is in the compiled inventory MUST declare `backend_module`
+- runtime advertising projects exactly the entries that declare `backend_module`, and that set MUST
+  equal the compiled inventory
+- an entry without `backend_module` is a **non-runtime** entry, reachable only through its wrapper
+  crate. Its `capability_declaration` MUST be empty (`always_on`, `target_gated`, `config_gated`
+  and `backend_extensions`). Its `publication.capability_matrix_enabled` MUST be `false` and
+  `publication.capability_matrix_target` MUST be absent. Every `support_depth` enrollment it
+  declares MUST have no `capabilities` mapping and no `mapped` or `proposed_extension` operation.
+
+A non-runtime entry therefore cannot claim a shared capability. Wrapper coverage, acquisition,
+maintenance and support depth apply to it unchanged. Commands that compare an onboarding
+descriptor's `backend_module` with the registry MUST treat a non-runtime entry as a mismatch.
 
 Downstream `xtask` commands that materialize wrapper-crate files MUST use the entry's `crate_path`
 directly. They MUST NOT derive a second crate-location contract from `agent_id`.

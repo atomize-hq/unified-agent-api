@@ -202,7 +202,7 @@ pub(super) fn validate_registry_alignment(
         (
             "backend_module",
             descriptor.backend_module.as_str(),
-            registry_entry.backend_module.as_str(),
+            registry_entry.backend_module_or_empty(),
         ),
         (
             "manifest_root",
