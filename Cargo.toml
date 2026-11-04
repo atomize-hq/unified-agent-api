@@ -5,6 +5,7 @@ members = [
     "crates/claude_code",
     "crates/opencode", "crates/gemini_cli", "crates/aider",
     "crates/wrapper_events",
+    "crates/depth_fixture",
     "crates/xtask",
 ]
 resolver = "2"

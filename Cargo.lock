@@ -1578,6 +1578,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "unified-agent-api-depth-fixture"
+version = "0.3.7"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "unified-agent-api-gemini-cli"
 version = "0.3.7"
 dependencies = [
