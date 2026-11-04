@@ -164,7 +164,7 @@ pub(super) fn run_green_gates(
     errors: &mut Vec<String>,
 ) -> Result<Vec<GateEvidence>, Error> {
     let mut results = Vec::new();
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     if gate_stub::active() {
         gate_stub::during();
         for command in commands {
@@ -232,7 +232,7 @@ pub(super) fn run_green_gates(
 
 /// In-process unit tests that drive write mode cannot run the real green gates (`cargo`, `make
 /// preflight`) in a scratch workspace. A test may stub them for its own thread; production cannot.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(crate) mod gate_stub {
     use std::cell::RefCell;
     type Hook = Box<dyn Fn()>;

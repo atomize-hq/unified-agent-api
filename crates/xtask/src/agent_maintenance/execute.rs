@@ -10,7 +10,7 @@ mod guarded;
 mod packet;
 #[path = "execute/runtime.rs"]
 mod runtime;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(crate) use runtime::gate_stub;
 #[path = "execute/tree.rs"]
 mod tree;
