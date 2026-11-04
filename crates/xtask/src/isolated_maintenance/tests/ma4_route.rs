@@ -28,10 +28,16 @@ fn executor(dir: &Path) -> String {
 }
 
 fn dry_run(root: &Path, binary: &str) -> Result<String, String> {
-    run(root, binary, false)
+    run(root, binary, false, "ma4-route")
 }
 
-fn run(root: &Path, binary: &str, write: bool) -> Result<String, String> {
+/// A dry run and then a write run under one run id.
+fn run_as(root: &Path, binary: &str, run_id: &str) -> Result<String, String> {
+    run(root, binary, false, run_id)?;
+    run(root, binary, true, run_id)
+}
+
+fn run(root: &Path, binary: &str, write: bool, run_id: &str) -> Result<String, String> {
     let mut out = Vec::new();
     execute::run_in_workspace(
         root,
@@ -39,7 +45,7 @@ fn run(root: &Path, binary: &str, write: bool) -> Result<String, String> {
             request: root.join(maintenance_request_path("depth_fixture")),
             dry_run: !write,
             write,
-            run_id: Some("ma4-route".into()),
+            run_id: Some(run_id.into()),
             codex_binary: Some(binary.into()),
         },
         &mut out,
@@ -82,11 +88,30 @@ fn ma4_captures_the_scoped_registry_only_under_an_installed_route() {
     // route itself, so it uses the captured registry. Gates are stubbed: they would run `cargo`.
     {
         let _gates = execute::gate_stub::stub();
-        let written = run(root, &binary, true).unwrap();
+        let written = run(root, &binary, true, "ma4-route").unwrap();
         assert!(written.contains("depth_fixture"), "{written}");
         // Only the checked candidate output reached the caller.
         let log = std::fs::read_to_string(root.join(LOG)).unwrap();
         assert!(log.ends_with("- executor note\n"), "{log}");
+    }
+    f.commit();
+
+    // A host change while the executor runs refuses delivery: the caller is rechecked first.
+    {
+        let api = f.api.clone();
+        let _gates = execute::gate_stub::stub_with(move || {
+            api.put(
+                "repos/fixture/isolated",
+                json!({"id":11,"owner":{"id":20},"full_name":"fixture/isolated"}),
+            )
+        });
+        let before = std::fs::read_to_string(root.join(LOG)).unwrap();
+        let refused = run_as(root, &binary, "ma4-route-moved").unwrap_err();
+        assert!(
+            refused.contains("isolated maintenance route changed"),
+            "{refused}"
+        );
+        assert_eq!(std::fs::read_to_string(root.join(LOG)).unwrap(), before);
     }
 
     // A failing installed route errors instead of falling back to the ordinary registry.
@@ -99,7 +124,7 @@ fn ma4_captures_the_scoped_registry_only_under_an_installed_route() {
 }
 
 #[test]
-fn a_captured_registry_binds_only_its_exact_candidate_root() {
+fn a_captured_registry_binds_only_an_independent_checkout_of_its_caller() {
     use crate::isolated_maintenance::{registry, RegistryError};
     let (f, _) = workspace();
     let root = f.root.path();
@@ -111,22 +136,34 @@ fn a_captured_registry_binds_only_its_exact_candidate_root() {
             .capture(root)
             .unwrap()
     };
-    let (candidate, other) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let scratch = tempfile::tempdir().unwrap();
+    let candidate = scratch.path().join("candidate");
+    let status = std::process::Command::new("git")
+        .args(["clone", "--quiet", "--no-hardlinks"])
+        .arg(root)
+        .arg(&candidate)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    // Neither the caller itself nor an unrelated directory can be bound.
+    let unrelated = tempfile::tempdir().unwrap();
+    assert!(captured.bind_candidate(root).is_err());
+    assert!(captured.bind_candidate(unrelated.path()).is_err());
     {
-        let _bound = captured.bind_candidate(candidate.path()).unwrap();
-        assert!(registry(candidate.path())
+        let _bound = captured.bind_candidate(&candidate).unwrap();
+        assert!(registry(&candidate)
             .unwrap()
             .find("depth_fixture")
             .is_some());
         // Any other root keeps the ordinary load, and one thread binds one candidate at a time.
         assert!(matches!(
-            registry(other.path()),
+            registry(unrelated.path()),
             Err(RegistryError::Production(_))
         ));
-        assert!(captured.bind_candidate(other.path()).is_err());
+        assert!(captured.bind_candidate(&candidate).is_err());
     }
     assert!(matches!(
-        registry(candidate.path()),
+        registry(&candidate),
         Err(RegistryError::Production(_))
     ));
 }

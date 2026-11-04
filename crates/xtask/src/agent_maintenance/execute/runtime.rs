@@ -166,6 +166,7 @@ pub(super) fn run_green_gates(
     let mut results = Vec::new();
     #[cfg(test)]
     if gate_stub::active() {
+        gate_stub::during();
         for command in commands {
             checks.push(ValidationCheck {
                 name: format!("green_gate::{command}"),
@@ -233,21 +234,34 @@ pub(super) fn run_green_gates(
 /// preflight`) in a scratch workspace. A test may stub them for its own thread; production cannot.
 #[cfg(test)]
 pub(crate) mod gate_stub {
-    use std::cell::Cell;
-    thread_local!(static STUBBED: Cell<bool> = const { Cell::new(false) });
+    use std::cell::RefCell;
+    type Hook = Box<dyn Fn()>;
+    thread_local!(static STUBBED: RefCell<Option<Option<Hook>>> = const { RefCell::new(None) });
     /// Restores the real gates on drop, so a failing test never leaks the stub.
     pub(crate) struct Stubbed;
     impl Drop for Stubbed {
         fn drop(&mut self) {
-            STUBBED.with(|s| s.set(false));
+            STUBBED.with(|s| *s.borrow_mut() = None);
         }
     }
     pub(crate) fn stub() -> Stubbed {
-        STUBBED.with(|s| s.set(true));
+        STUBBED.with(|s| *s.borrow_mut() = Some(None));
+        Stubbed
+    }
+    /// Stub the gates and run `hook` while they would run, after the executor has finished.
+    pub(crate) fn stub_with(hook: impl Fn() + 'static) -> Stubbed {
+        STUBBED.with(|s| *s.borrow_mut() = Some(Some(Box::new(hook))));
         Stubbed
     }
     pub(super) fn active() -> bool {
-        STUBBED.with(Cell::get)
+        STUBBED.with(|s| s.borrow().is_some())
+    }
+    pub(super) fn during() {
+        STUBBED.with(|s| {
+            if let Some(Some(hook)) = s.borrow().as_ref() {
+                hook();
+            }
+        });
     }
 }
 

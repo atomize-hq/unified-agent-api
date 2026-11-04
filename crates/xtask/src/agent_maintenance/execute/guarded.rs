@@ -102,7 +102,17 @@ pub(super) fn execute_write_mode<W: Write>(
         candidate.before.clone()
     };
     delivery.extend(diagnostics);
-    let copied = candidate.deliver(caller, &delivery, passed);
+    // Re-authenticate the captured isolated route before anything reaches the caller.
+    let copied = match context
+        .registry
+        .as_ref()
+        .map(|captured| captured.recheck(caller))
+    {
+        Some(Err(e)) if passed => Err(Error::Validation(format!(
+            "isolated maintenance route changed during execution: {e}"
+        ))),
+        _ => candidate.deliver(caller, &delivery, passed),
+    };
     if let Err(e) = copied {
         report.status = "fail".into();
         report.errors.push(format!("delivery refused: {e}"));

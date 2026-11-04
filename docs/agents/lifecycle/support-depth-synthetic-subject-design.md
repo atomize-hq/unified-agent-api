@@ -126,9 +126,12 @@ Each step is a reviewed PR into `staging`.
      route once, in the caller workspace, and keeps a `CapturedRegistry` that only
      `Route::capture` mints. Every later request reload uses it. The independent candidate cannot
      resolve the route, so while the guarded run checks the candidate, the captured registry is
-     bound to that candidate's exact root for in-process checks; the relay still refuses any
-     registry change. Capability publication now loads through `isolated_maintenance::registry`
-     too. Without a route, every load keeps the production `support_depth` refusal.
+     bound to that candidate's exact root for in-process checks. Binding requires an independent
+     clone whose HEAD descends from the caller's captured HEAD and whose registry equals the
+     captured one; the guard is thread-bound. The relay still refuses any registry change, and the
+     captured route is rechecked against the caller before delivery. Capability publication now
+     loads through `isolated_maintenance::registry` too. Without a route, every load keeps the
+     production `support_depth` refusal.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the
