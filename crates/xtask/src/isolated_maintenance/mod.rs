@@ -32,6 +32,8 @@ struct Profile {
     // Exact compiled bytes and executable modes for the independently approved producer closure.
     closure: Vec<(&'static str, &'static [u8], bool)>,
     scopes: Vec<&'static str>,
+    // Exactly one compiled subject; no declaration, receipt or flag chooses it.
+    subject: &'static scope::Subject,
 }
 const LIVE_PROFILE: Option<Profile> = None;
 
@@ -63,6 +65,7 @@ impl Context {
             &mut inputs,
             &Source::tip(&root, &host.isolated_tip)?,
             &host.registry,
+            profile.subject,
         )?;
         let result = Self {
             profile,

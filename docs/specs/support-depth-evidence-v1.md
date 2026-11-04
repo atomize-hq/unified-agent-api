@@ -409,9 +409,11 @@ declaration, receipt or serialized diagnostic MUST NOT install or authorize one.
 
 Binding uses one private, non-deserializable context. It independently checks the fixed repository
 id, owner id, expected name, protected staging tip, approved source closure, installation baseline
-and actual workspace/Git ownership. It binds only Codex0.156.1 maintenance `run`/CORE and
-`agent_api.run` on the acquired `x86_64-unknown-linux-musl` tuple. The GNU Rust wrapper build host
-is distinct evidence metadata. Registry declarations remain necessary and every registered retained
+and actual workspace/Git ownership. Each profile names exactly one compiled subject. The Codex
+subject binds Codex0.156.1 maintenance `run`/CORE and `agent_api.run` on the acquired
+`x86_64-unknown-linux-musl` tuple; the synthetic subject is defined in
+[Synthetic wrapper machinery-proof profile](#synthetic-wrapper-machinery-proof-profile). The GNU Rust
+wrapper build host is distinct evidence metadata. Registry declarations remain necessary and every registered retained
 root is mediated; unsupported or extra selections MUST refuse. Neither this context nor its
 read-only diagnostic is an acceptance verdict or proof of OS isolation.
 The isolated registry is separately checked governing data, with coherent bytes, exact scope and
@@ -432,3 +434,62 @@ unfavorable witnesses and missing/unfinished-producer refusals retained. Consume
 producer without producer self-admission. The complete CI result policy and terminal gate still
 govern MERGE. Existing channel/CORE fixture profiles retain whole-workflow completion; this
 foundation does not implement packet evidence, change their behavior or enable production results.
+
+## Synthetic wrapper machinery-proof profile
+
+The maintainer approved MP-P1 in the
+[machinery-proof rescope](../agents/lifecycle/support-depth-machinery-proof-rescope.md) and SA-P3 in
+the [synthetic subject design](../agents/lifecycle/support-depth-synthetic-subject-design.md) on
+2026-11-02. This amendment adds one more compiled isolated profile, `synthetic-wrapper-v1`. It
+proves the maintenance machinery on a synthetic subject. It is a machinery proof only: its
+results qualify no real agent, are never reused for Codex or any other agent, and are labeled
+machinery proof wherever they are reported.
+
+**Subject.** The agent is `depth_fixture`, a non-runtime registry entry under the
+[registry contract](agent-registry-contract.md#runtime-and-non-runtime-entries). Its one maintenance
+enrollment is upstream version `0.2.0` (the baseline release is `0.1.0`) on target `linux-x64`. It
+has one headless mode, selector `run-json` with command path `depth_fixture run` and the presence
+predicate `--json`, and one operation, `run`. That operation selects template `CORE` with
+`shared_mapping = wrapper_only` and `forwarding = false`. It permits no not-applicable outcome and
+maps no capability. The due obligations are BASE (R1, V1, G1, E1, A1, X1-X4), OUT3 and LC2. A
+wrapper-only operation creates no adapter obligation, so M is not due and no `agent_api` source is
+in scope.
+
+**Evidence.** Each due obligation maps to substantive cases in `crates/depth_fixture`. These are the
+wrapper tests against the fixture CLI's scripted scenarios. The cases run the fixture binary built
+from reviewed source at the enrolled version. The digest of the acquired release asset is provenance,
+as the upstream snapshot is for CORE. The frozen contract, P/O, case mapping and resolved build
+profile live in one fixture directory owned by this profile. The profile's names are distinct from
+CORE's:
+- trust revision `github-actions-synthetic-wrapper-v1`;
+- executor `github-actions:rust-tests/isolated-synthetic-wrapper-v1`;
+- artifact `depth-synthetic-wrapper-v1-<run_id>-<attempt>`;
+- receipts under
+  `cli_manifests/depth_fixture/reports/0.2.0/evidence/synthetic-wrapper-v1/<run>-<attempt>/<obligation>/`.
+
+`maintainer-mapping-v1` stays the adoption revision, and the same `depth-adequacy-v1` body format
+applies. Each of the eleven due obligations has its own content-bound mapping that needs
+independent adoption. Partial adoption cannot qualify the profile.
+
+**Producer.** IR-P3 producer terminality applies: authenticated evidence may be evaluated once the
+existing `rust-tests` producer job is terminal and its collection, upload and binding steps and
+immutable artifacts are authenticated. Every applicable attempt counts, and the complete pre-MERGE
+workflow gate still governs. Collection reuses the existing `rust-tests` job. No new job, required
+status check or service is added.
+
+**Native context.** Under MP-P2, NE-P1/P2 and NC-P1/P2 are Codex qualification rules and are not part
+of this profile. The fixture CLI reads no instruction file, configuration, cache or credential. X2
+is shown by cases that pass a cleared environment, an explicit working directory and null stdin.
+
+**Selection.** A subject is chosen only by a compiled profile, never by a registry declaration,
+receipt, remote, environment value or flag. A Codex declaration does not satisfy the synthetic
+subject, nor the reverse. Extra declarations, versions, targets, modes, mappings, retained roots or
+not-applicable permissions refuse. The live isolated profile stays uninstalled until roadmap C
+authorizes the disposable repository, its baseline and credential references. The canonical
+registry never lists `depth_fixture`. `production_results` stays unverified.
+
+**Staging.** Each step is a reviewed PR into `staging`:
+1. Compiled subject selection in the isolated binding.
+2. The profile definition, its frozen fixtures, the case mapping and collection.
+3. Subject selection in the packet-bound producer and its read-only verdict, with positive and
+   negative evaluation tests in the shape of the CORE bridge.
