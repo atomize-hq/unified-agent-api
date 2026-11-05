@@ -16,6 +16,7 @@ struct Input {
 
 pub(crate) struct GitInputs {
     root: PathBuf,
+    borrowed: Option<(PathBuf, String)>,
     files: BTreeMap<String, Input>,
     directories: BTreeMap<String, Vec<String>>,
 }
@@ -29,13 +30,37 @@ impl GitInputs {
         }
         Ok(Self {
             root,
+            borrowed: None,
             files: BTreeMap::new(),
             directories: BTreeMap::new(),
         })
     }
 
+    /// Bound evidence keeps the scratch working-file checks, borrowing only immutable objects.
+    pub(crate) fn for_bound_evidence(root: &Path) -> Result<Self, String> {
+        let Some(borrowed) = crate::isolated_maintenance::view_git_inputs(root)? else {
+            return Self::new(root);
+        };
+        Ok(Self {
+            root: fs::canonicalize(root).map_err(|e| e.to_string())?,
+            borrowed: Some(borrowed),
+            files: BTreeMap::new(),
+            directories: BTreeMap::new(),
+        })
+    }
+
+    fn recheck_borrowed(&self) -> Result<(), String> {
+        if self.borrowed.is_some()
+            && crate::isolated_maintenance::view_git_inputs(&self.root)? != self.borrowed
+        {
+            return Err("scratch Git inputs are no longer bound on this thread".into());
+        }
+        Ok(())
+    }
+
     pub(crate) fn optional(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
-        let input = read(&self.root, path)?;
+        self.recheck_borrowed()?;
+        let input = read(&self.root, path, self.borrowed.as_ref())?;
         if self
             .files
             .get(path)
@@ -106,8 +131,9 @@ impl GitInputs {
     }
 
     pub(crate) fn verify(&self) -> Result<(), String> {
+        self.recheck_borrowed()?;
         for (path, expected) in &self.files {
-            if read(&self.root, path)? != *expected {
+            if read(&self.root, path, self.borrowed.as_ref())? != *expected {
                 return Err(format!("bound input changed during freeze: {path}"));
             }
         }
@@ -118,6 +144,7 @@ impl GitInputs {
                 ));
             }
         }
+        self.recheck_borrowed()?;
         Ok(())
     }
 }
@@ -146,19 +173,35 @@ fn safe_path(root: &Path, path: &str) -> Result<PathBuf, String> {
     Ok(full)
 }
 
-fn read(root: &Path, path: &str) -> Result<Input, String> {
+fn read(root: &Path, path: &str, borrowed: Option<&(PathBuf, String)>) -> Result<Input, String> {
     let full = safe_path(root, path)?;
-    let index = git(
-        root,
-        &[
-            "--literal-pathspecs",
-            "ls-files",
-            "--stage",
-            "-z",
-            "--",
-            path,
-        ],
-    )?;
+    let object_root = borrowed.map_or(root, |(caller, _)| caller.as_path());
+    let index = if let Some((caller, commit)) = borrowed {
+        git(
+            caller,
+            &[
+                "--literal-pathspecs",
+                "ls-tree",
+                "-z",
+                "--full-tree",
+                commit,
+                "--",
+                path,
+            ],
+        )?
+    } else {
+        git(
+            root,
+            &[
+                "--literal-pathspecs",
+                "ls-files",
+                "--stage",
+                "-z",
+                "--",
+                path,
+            ],
+        )?
+    };
     if index.is_empty() {
         if fs::symlink_metadata(&full).is_ok() {
             return Err(format!("untracked bound input: {path}"));
@@ -174,7 +217,11 @@ fn read(root: &Path, path: &str) -> Result<Input, String> {
     let meta: Vec<_> = meta.split(' ').collect();
     if meta.len() != 3
         || !matches!(meta[0], "100644" | "100755")
-        || meta[2] != "0"
+        || if borrowed.is_some() {
+            meta[1] != "blob"
+        } else {
+            meta[2] != "0"
+        }
         || indexed_path != path
     {
         return Err(format!("input must be a regular stage-0 file: {path}"));
@@ -201,7 +248,8 @@ fn read(root: &Path, path: &str) -> Result<Input, String> {
         }
     }
     let bytes = fs::read(full).map_err(|e| format!("{path}: {e}"))?;
-    let staged = git(root, &["cat-file", "blob", meta[1]])?;
+    let object = if borrowed.is_some() { meta[2] } else { meta[1] };
+    let staged = git(object_root, &["cat-file", "blob", object])?;
     if bytes != staged {
         return Err(format!("working bytes disagree with index: {path}"));
     }

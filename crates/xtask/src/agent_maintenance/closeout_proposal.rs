@@ -285,8 +285,12 @@ pub(crate) struct IsolatedView<'a> {
 }
 impl IsolatedView<'_> {
     /// Attest this view against the captured registry's caller, returning its root and the
-    /// proposal's original registry bytes. These observations grant no evidence authority.
-    pub(crate) fn registry_binding(&self, caller: &Path) -> Result<(&Path, Vec<u8>), String> {
+    /// attested identity and proposal's original registry bytes. These observations grant no
+    /// evidence authority.
+    pub(crate) fn registry_binding(
+        &self,
+        caller: &Path,
+    ) -> Result<(&Path, crate::isolated_maintenance::FileIdentity, Vec<u8>), String> {
         if caller != self.caller {
             return Err("isolated scratch belongs to another caller".into());
         }
@@ -294,7 +298,7 @@ impl IsolatedView<'_> {
             .source()?
             .optional_bytes(crate::agent_registry::REGISTRY_RELATIVE_PATH)?
             .ok_or("isolated proposal has no captured registry bytes")?;
-        Ok((&self.destination, bytes))
+        Ok((&self.destination, self.destination_identity.clone(), bytes))
     }
 
     pub(crate) fn source(&self) -> Result<Source, String> {
