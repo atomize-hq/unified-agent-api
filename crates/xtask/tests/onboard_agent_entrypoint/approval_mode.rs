@@ -235,7 +235,7 @@ fn onboard_agent_approval_write_applies_plan_and_replays_identically() {
     assert!(first.stdout.contains("## Approval provenance"));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
+        .contains("Mutation summary: 0 written, 24 identical, 24 total planned."));
 
     let readme =
         fs::read_to_string(fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/README.md"))

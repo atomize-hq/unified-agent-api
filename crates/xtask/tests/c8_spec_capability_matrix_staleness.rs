@@ -45,11 +45,14 @@ fn seed_fixture_workspace(fixture_root: &Path) {
         "[workspace]\nmembers = []\n",
     );
     copy_repo_file(fixture_root, "crates/xtask/data/agent_registry.toml");
-    copy_repo_file(fixture_root, "cli_manifests/codex/current.json");
-    copy_repo_file(fixture_root, "cli_manifests/claude_code/current.json");
-    copy_repo_file(fixture_root, "cli_manifests/opencode/current.json");
-    copy_repo_file(fixture_root, "cli_manifests/gemini_cli/current.json");
-    copy_repo_file(fixture_root, "cli_manifests/aider/current.json");
+    let registry = xtask::agent_registry::AgentRegistry::load(&repo_root())
+        .expect("load the committed agent registry");
+    for entry in &registry.agents {
+        copy_repo_file(
+            fixture_root,
+            &format!("{}/current.json", entry.manifest_root),
+        );
+    }
 }
 
 #[test]
