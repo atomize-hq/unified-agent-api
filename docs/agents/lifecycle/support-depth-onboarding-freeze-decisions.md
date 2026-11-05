@@ -319,7 +319,8 @@ only.
    - Write scope: `agent_lifecycle.rs`, `agent_lifecycle/storage.rs`,
      `depth_record.rs`/`depth_record/`, and the `manifest_validate/depth/` check.
 3. **Neutral candidate execution and the create-lane boundary (OF-P9, and OF-P4's `snapshots/**`
-   drop).**
+   drop).** Slice 3 implemented: shared candidate boundary, isolated create-lane adapter,
+   snapshots refusal, and lifecycle-bound written-paths publication check; production stays disabled.
    - Extract the candidate, tree, finalization and delivery pieces from
      `agent_maintenance/execute/` into a neutral module that both MA4 and the create lane call. MA4
      must stay byte-identical in behavior and keep its tests.

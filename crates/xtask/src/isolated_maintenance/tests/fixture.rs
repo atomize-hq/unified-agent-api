@@ -285,3 +285,7 @@ pub(super) fn install(make: Installer) -> Installed {
     INSTALLED.with(|i| *i.borrow_mut() = Some(make));
     Installed
 }
+
+#[cfg(unix)]
+#[path = "create_candidate.rs"]
+mod create_candidate;
