@@ -55,7 +55,7 @@ fn c4_spec_reusable_acquisition_routes_maintenance_audit_gate_by_numeric_exit_co
 
     assert_text_order(
         &yml,
-        "Union → wrapper coverage → report → version metadata → validate",
+        "- name: Validate the acquired manifest root against the published support outputs",
         "- name: Maintenance audit gate",
         workflow,
     );
