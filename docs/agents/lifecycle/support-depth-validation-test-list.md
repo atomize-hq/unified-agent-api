@@ -225,6 +225,68 @@ Must fail:
 - **Reader of another revision.** A reader written for revision 1 is given an artifact of the next
   revision and reports that no row is depth-enrolled.
 
+## Closeout-published qualification cases (B.7b)
+
+The support-depth contract's Annex A.1, "Closeout-published qualification", states CP-P3
+option A: a closeout publishes the qualification its entry makes, through one MA5 batch, and IN1
+attributes that qualification to the closeout. Slice B.7b of the
+[closeout and promotion design](support-depth-closeout-promotion-design.md) adds these tests. They
+run in process under the cfg(test) isolated route with the fake host, are credential-free and live
+under `crates/xtask/src/isolated_maintenance/tests/` (new `publication.rs`, plus the chain files of
+B.5b, B.5c and B.6b). Every chain test of those slices reruns with option A on; the proofs made
+before B.7 do not carry over.
+
+Must pass:
+
+- **Qualified row through the batch, each writer.** For `close-agent-maintenance` and for
+  `prepare-agent-closeout --write`, the delivered candidate holds the closeout, exactly one new
+  current `MaintenanceCloseout` entry, and the closeout's own agent and version rows published as
+  qualified. The rows equal what the delivered post-entry record derives, and every other path of
+  the batch is one the closeout already owned.
+- **Fresh post-entry evaluation.** The verdicts the rendered rows rest on were evaluated for the
+  post-entry record. A fake host that counts evaluations shows one evaluation after the entry was
+  appended; verdicts from before the append are not reused.
+- **Other rows untouched.** Another agent's rows, other versions of the same agent, the
+  runtime-support projection and capability publication are byte-identical before and after the
+  batch.
+- **IN1 closeout attribution.** IN1 admission (P = T) admits the MA5 candidate and attributes the
+  qualification to closeout; post-push observation passes for the same transition.
+- **MA6 order.** From the admitted MA5 checkpoint, MA6 appends its `Promotion` entry before it
+  renders. Its rendered rows equal what IN1 derives from the delivered post-entry record: the row is
+  already qualified and stays so. IN1 admits the promotion candidate before merge and after the push.
+- **A.5 replay with option A.** The replay forked from the admitted MA5 checkpoint before any MA6
+  still creates the first `Promotion` entry, and its rendered rows equal the derived ones.
+- **Scratch publication.** A verified row is rendered in an MA6 scratch view by the view-aware
+  evaluator (B.7a) and matches the caller-side derivation.
+
+Must fail, each one leaving caller state byte for byte unchanged:
+
+- **Qualification without a closeout entry.** A candidate publishes a newly qualified row and adds
+  no new `MaintenanceCloseout` entry. IN1 attributes it to promotion and refuses.
+- **Entry for another tuple.** The new entry names another agent or another version than the newly
+  qualified row. IN1 refuses.
+- **Closeout and promotion together.** The candidate adds a closeout entry and has a promotion
+  effect. The qualification is attributed to promotion; without promotion authority, IN1 refuses.
+- **Rows outside the closeout.** The MA5 render would change another agent's row, another version's
+  row, the runtime-support projection or capability publication, including by an honest reporting
+  downgrade. MA5 refuses the whole batch.
+- **Changed rendered rows.** The batch's rows are changed between plan and apply, so they differ
+  from what the post-entry record derives. MA5 refuses at apply; the same candidate assembled by
+  hand fails IN1 publication consistency.
+- **Disagreement with admission.** The post-entry evaluation leaves a result the admission relied
+  on unverified (for example, the fake host changes the attempt between admission and evaluation).
+  MA5 refuses; it does not deliver the closeout with downgraded rows.
+- **Pre-entry verdicts.** A batch rendered from verdicts sealed to the pre-entry record is refused.
+- **MA6 rendered before its entry.** Under option A the retained closeout entry already
+  qualifies the row, so rows rendered before and after the `Promotion` entry can be identical; the
+  test does not rely on a row mismatch. It checks the order and the verdict binding directly: the
+  fake host records that the evaluation MA6 renders from observed the record with its `Promotion`
+  entry appended, and an MA6 proposal that offers verdicts sealed to the pre-entry record is
+  refused, whatever the rows say.
+- **Production control.** With no route installed, both MA5 writers and MA6 keep their current
+  refusal on a depth workspace and their ordinary behavior otherwise; production publication still
+  uses `production_results` and stays `unverified`.
+
 ## Open questions for the validator design
 
 - A hand-listed acceptance entry that no closeout, publication or promotion made passes every check
@@ -415,8 +477,10 @@ Must fail:
 - `support-matrix` regenerates every agent's rows. A run made for one agent can find that another
   agent's row would rise because that agent's record now supports it. The support-depth contract
   refuses that acceptance effect for a route without authority and leaves every output unchanged.
-  The closeout routes do not write support rows, so a raise is ordinarily first written by a later
-  regeneration. Decide which route publishes the raise under the owning path's authority, and how a
+  CP-P3 option A (Annex A.1, "Closeout-published qualification") answers this for the closeout's
+  own agent and version: the MA5 batch publishes that raise. A raise of another agent's row that
+  its record now supports still has no publishing route, and MA5 refuses a batch that would write
+  one. Decide which route publishes such a raise under the owning path's authority, and how a
   refused run names the row that blocked it.
 - The support-depth contract's Publication table has an outcome for a qualified forwarding promise
   and none for a qualified promise of another kind. The registry declaration states `forwarding`
