@@ -181,16 +181,22 @@ Each step is a reviewed PR into `staging`.
        process can change the index between the comparison and the installation, and an
        existing lock refuses with the index unchanged. This byte binding is the authority over
        the channel, and it binds by path class, whether or not any depth record changed. The
-       class is every file under any evidence destination (`.../reports/<version>/evidence/`)
-       and every path any E binds before or after the run, with every payload a bound file
-       references by `{path, sha256}` (toolchain, environment, graph, raw output), transitively.
+       class is every file under any evidence destination (`.../reports/<version>/evidence/`),
+       every receipt any E binds, and every payload those receipts reference (toolchain,
+       environment, dependency graph, raw output), wherever it lies. Each snapshot, before and
+       after the run, is traversed on its own and the results are unioned; every receipt is
+       read, including those found in an evidence destination. A receipt's source inputs
+       (covered inputs, provenance, assertion sources) are product files the run may change, so
+       they are not in the class.
        Every file the candidate adds, changes or removes in that class must be byte-identical to
        the host-staged bundle file at that path; anything else refuses the whole delivery,
        before publication and again at copy-back, with caller files and index unchanged. In
        production nothing is staged, so any change in the class refuses. Matching new files,
        payloads included, are what gain index identities. E from a forged channel, a payload
        substituted behind unchanged receipts (also on a rerun over committed evidence), a
-       removed payload or an added unreferenced file are therefore refused. Production stages nothing, so no new E-bound
+       removed payload, an added unreferenced file, a substituted payload outside `evidence/`
+       or a receipt newly referencing another file are therefore refused. A completely unchanged
+       MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,

@@ -477,4 +477,67 @@ fn evidence_changes_after_committed_genuine_e_refuse_delivery() {
         );
         git(root, &["clean", "-fdxq", "docs"]);
     }
+    // A committed receipt whose payload lies outside any evidence destination binds it all the
+    // same: (a) substituting that payload behind the unchanged receipt, or (b) the receipt newly
+    // referencing another external file, refuses.
+    let reports = "cli_manifests/depth_fixture/reports/0.2.0";
+    let (receipt, external, extra) = (
+        format!("{EVIDENCE}/extra/receipt.json"),
+        format!("{reports}/raw.txt"),
+        format!("{reports}/extra.txt"),
+    );
+    let receipt_for = |toolchain: Option<&str>| {
+        let mut value =
+            json!({"cases": {"raw_output": {"path": external, "sha256": "0".repeat(64)}}});
+        if let Some(path) = toolchain {
+            value["build"] = json!({"toolchain": {"path": path, "sha256": "0".repeat(64)}});
+        }
+        serde_json::to_vec_pretty(&value).unwrap()
+    };
+    write(root, &receipt, receipt_for(None));
+    write(root, &external, b"raw");
+    f.commit();
+    host.staging(&git(root, &["rev-parse", "HEAD"]));
+    std::fs::write(bin.path().join("extended.json"), receipt_for(Some(&extra))).unwrap();
+    for (run, edit) in [
+        (
+            "ma4-evidence-external-substituted",
+            format!("printf substituted > {external}"),
+        ),
+        (
+            "ma4-evidence-external-referenced",
+            format!(
+                "cp {} {receipt}\nprintf x > {extra}",
+                bin.path().join("extended.json").display()
+            ),
+        ),
+    ] {
+        let binary = executor(bin.path(), &edit);
+        let (receipt_before, external_before) = (
+            std::fs::read(root.join(&receipt)).unwrap(),
+            std::fs::read(root.join(&external)).unwrap(),
+        );
+        let index_before = git(root, &["ls-files", "--stage"]);
+        {
+            let _gates = execute::gate_stub::stub();
+            let refused = run_as(root, &binary, run).unwrap_err();
+            assert!(
+                refused.contains("not the bytes the host staged"),
+                "{run}: {refused}"
+            );
+        }
+        assert_eq!(std::fs::read(root.join(&receipt)).unwrap(), receipt_before);
+        assert_eq!(
+            std::fs::read(root.join(&external)).unwrap(),
+            external_before
+        );
+        assert!(!root.join(&extra).exists());
+        assert_eq!(git(root, &["ls-files", "--stage"]), index_before, "{run}");
+        assert_eq!(
+            git(root, &["status", "--porcelain", "--", "cli_manifests"]),
+            "",
+            "{run}"
+        );
+        git(root, &["clean", "-fdxq", "docs"]);
+    }
 }

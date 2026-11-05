@@ -3,6 +3,8 @@ use super::*;
 use crate::maintenance_harness as mh;
 const NOTE: &str = "docs/agents/lifecycle/codex-maintenance/runtime-note.md";
 const EVIDENCE: &str = "cli_manifests/codex/reports/0.61.0/evidence.json";
+/// A raw-output payload outside any `evidence/` destination, referenced only by the receipt.
+const PAYLOAD: &str = "cli_manifests/codex/reports/0.61.0/results.txt";
 
 fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf, Value) {
     let rec = record_with_obligations();
@@ -38,7 +40,19 @@ fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf
             &report,
         );
     }
-    let receipt = include_str!("../../../fixtures/depth-evidence-v1.json");
+    let mut receipt = include_str!("../../../fixtures/depth-evidence-v1.json").to_owned();
+    if evidence == "committed" {
+        let mut value: Value = serde_json::from_str(&receipt).unwrap();
+        value["cases"]["raw_output"] = json!({"path": PAYLOAD, "sha256": sha("raw")});
+        receipt = serde_json::to_string_pretty(&value).unwrap();
+        value["build"]["toolchain"] =
+            json!({"path": "cli_manifests/codex/reports/0.61.0/extra.txt", "sha256": sha("x")});
+        write_text(
+            &temp.path().join("extended-receipt.json"),
+            &serde_json::to_string_pretty(&value).unwrap(),
+        );
+    }
+    let receipt = receipt.as_str();
     xtask::depth_evidence::EvidenceReceipt::parse(receipt).unwrap();
     write_text(&temp.path().join("receipt-input.json"), receipt);
     let mut next = rec;
@@ -62,6 +76,11 @@ fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf
         &root.join(format!("pointers/latest_supported/{REQUIRED_TARGET}.txt")),
         "none\n",
     );
+    if evidence == "committed" {
+        write_json(&temp.path().join(record_path()), &next);
+        write_text(&temp.path().join(EVIDENCE), receipt);
+        write_text(&temp.path().join(PAYLOAD), "raw");
+    }
     republish(&root);
     commit_all(temp.path());
     if evidence == "staged" {
@@ -285,4 +304,38 @@ fn inherited_alternate_index_cannot_supply_missing_caller_evidence_binding() {
     );
     assert_eq!(fs::read(index).unwrap(), alternate_index);
     assert!(!temp.path().join(NOTE).exists());
+}
+
+/// Production stages no evidence: with genuine E, its receipt and an external payload committed,
+/// substituting the payload behind the unchanged receipt, or the receipt newly referencing
+/// another external file, refuses the whole delivery with caller files and index unchanged.
+#[test]
+fn committed_evidence_payloads_outside_evidence_destinations_cannot_change() {
+    for action in [
+        format!("printf substituted > '{PAYLOAD}'"),
+        format!(
+            "cp extended-receipt.json '{EVIDENCE}'; printf x > 'cli_manifests/codex/reports/0.61.0/extra.txt'"
+        ),
+    ] {
+        let (temp, _root, binary, _) = fixture(&action, "committed");
+        let files = [EVIDENCE, PAYLOAD, NOTE].map(|p| fs::read(temp.path().join(p)).ok());
+        let index = fs::read(temp.path().join(".git/index")).unwrap();
+        let out = mh::run_execute_cli(mh::execute_args("--write", Some(&binary)), temp.path());
+        assert_ne!(out.exit_code, 0, "{action}");
+        assert!(
+            out.stderr.contains("not the bytes the host staged"),
+            "{action}: {}",
+            out.stderr
+        );
+        assert_eq!(
+            [EVIDENCE, PAYLOAD, NOTE].map(|p| fs::read(temp.path().join(p)).ok()),
+            files,
+            "{action}"
+        );
+        assert!(!temp
+            .path()
+            .join("cli_manifests/codex/reports/0.61.0/extra.txt")
+            .exists());
+        assert_eq!(fs::read(temp.path().join(".git/index")).unwrap(), index);
+    }
 }

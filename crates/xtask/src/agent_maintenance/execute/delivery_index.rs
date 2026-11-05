@@ -36,24 +36,29 @@ fn evidence_destination(path: &str) -> bool {
         .any(|w| w[0] == "reports" && w[2] == "evidence")
 }
 
-/// Every path an E in `tree` binds (in any depth record, changed or not) and every payload a
-/// bound file references by `{path, sha256}` anywhere in its JSON, transitively.
-fn bound_closure(tree: &Tree, out: &mut BTreeSet<String>) {
-    fn references(value: &serde_json::Value, out: &mut Vec<String>) {
-        match value {
-            serde_json::Value::Object(map) => {
-                if let (Some(serde_json::Value::String(path)), Some(serde_json::Value::String(_))) =
-                    (map.get("path"), map.get("sha256"))
-                {
-                    out.push(path.clone());
-                }
-                map.values().for_each(|v| references(v, out));
-            }
-            serde_json::Value::Array(items) => items.iter().for_each(|v| references(v, out)),
-            _ => {}
-        }
-    }
-    let mut queue = Vec::new();
+/// The payloads a receipt references: its toolchain, environment, dependency graph and raw
+/// output. Its source inputs (covered inputs, provenance, assertion sources) are product files
+/// the maintenance run may legitimately change, so they are not evidence.
+fn payload_references(receipt: &serde_json::Value) -> impl Iterator<Item = &str> {
+    [
+        &receipt["build"]["toolchain"],
+        &receipt["build"]["environment"],
+        &receipt["build"]["dependency_graph"],
+        &receipt["cases"]["raw_output"],
+    ]
+    .into_iter()
+    .filter_map(|reference| reference["path"].as_str())
+}
+
+/// The evidence bound in one snapshot, traversed on its own: every receipt any E binds, every
+/// file in an evidence destination (each read as a possible receipt), and every payload those
+/// receipts reference. Every receipt is read, whether or not it was also found another way.
+fn bound_closure(tree: &Tree) -> BTreeSet<String> {
+    let mut receipts: BTreeSet<String> = tree
+        .iter()
+        .filter(|(p, node)| matches!(node, Node::File(..)) && evidence_destination(p))
+        .map(|(p, _)| p.clone())
+        .collect();
     for (path, node) in tree {
         let Node::File(bytes, _) = node else {
             continue;
@@ -71,36 +76,27 @@ fn bound_closure(tree: &Tree, out: &mut BTreeSet<String>) {
         {
             for file in result["evidence"].as_array().into_iter().flatten() {
                 if let Some(path) = file["path"].as_str() {
-                    queue.push(path.to_owned());
+                    receipts.insert(path.to_owned());
                 }
             }
         }
     }
-    let mut seen = 0usize;
-    while let Some(path) = queue.pop() {
-        seen += 1;
-        if seen > 100_000 || !out.insert(path.clone()) {
-            continue;
-        }
-        if let Some(Node::File(bytes, _)) = tree.get(&path) {
+    let mut bound = receipts.clone();
+    for receipt in &receipts {
+        if let Some(Node::File(bytes, _)) = tree.get(receipt) {
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
-                references(&value, &mut queue);
+                bound.extend(payload_references(&value).map(str::to_owned));
             }
         }
     }
+    bound
 }
 
-/// The evidence path class: every file in an evidence destination before or after, and every
-/// path an E binds before or after, with its transitive payload references.
+/// The evidence path class: every file in an evidence destination before or after, and the
+/// bound closure of each snapshot, each traversed independently, in union.
 fn evidence_paths(before: &Tree, after: &Tree, run_dir_rel: &str) -> BTreeSet<String> {
-    let mut paths: BTreeSet<String> = before
-        .keys()
-        .chain(after.keys())
-        .filter(|p| evidence_destination(p))
-        .cloned()
-        .collect();
-    bound_closure(before, &mut paths);
-    bound_closure(after, &mut paths);
+    let mut paths = bound_closure(before);
+    paths.extend(bound_closure(after));
     paths.retain(|p| !p.starts_with(&format!("{run_dir_rel}/")));
     paths
 }

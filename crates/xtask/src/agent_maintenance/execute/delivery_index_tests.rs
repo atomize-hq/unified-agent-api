@@ -203,7 +203,7 @@ fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
     let receipt = "cli/reports/1/evidence/r.json";
     let payload = "cli/reports/1/evidence/raw.txt";
     let receipt_bytes = serde_json::to_vec(&serde_json::json!({
-        "raw_output": {"path": payload, "sha256": sha256(b"raw")}
+        "cases": {"raw_output": {"path": payload, "sha256": sha256(b"raw")}}
     }))
     .unwrap();
     let tree = |payload_bytes: &[u8]| {
@@ -269,4 +269,54 @@ fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
     check_staged_closure(&genuine, &genuine, "runs/x", None).unwrap();
     // A changed evidence file in production always refuses.
     assert!(check_staged_closure(&Tree::new(), &genuine, "runs/x", None).is_err());
+}
+
+/// A payload outside any evidence destination, referenced by an unchanged committed receipt, is
+/// still evidence: substituting it, or a receipt newly referencing another external file,
+/// refuses in production and under a route. A receipt's source inputs are not evidence.
+#[test]
+fn payloads_outside_evidence_destinations_are_bound_through_their_receipts() {
+    let receipt = "cli/reports/1/evidence/run/receipt.json";
+    let external = "cli/reports/1/raw.txt";
+    let source = "crates/cli/src/lib.rs";
+    let receipt_for = |payloads: &[&str]| {
+        let mut value = serde_json::json!({
+            "build": {"covered_inputs": [{"path": source, "sha256": sha256(b"src")}]},
+            "cases": {"raw_output": {"path": payloads[0], "sha256": sha256(b"raw")}}
+        });
+        if let Some(extra) = payloads.get(1) {
+            value["build"]["toolchain"] = serde_json::json!({"path": extra, "sha256": "0"});
+        }
+        serde_json::to_vec(&value).unwrap()
+    };
+    let mut committed = Tree::new();
+    committed.insert(receipt.into(), Node::File(receipt_for(&[external]), 0o644));
+    committed.insert(external.into(), Node::File(b"raw".to_vec(), 0o644));
+    committed.insert(source.into(), Node::File(b"src".to_vec(), 0o644));
+    let host: Staged = Staged::new();
+    // (a) substitute the external payload behind the unchanged receipt
+    let mut substituted = committed.clone();
+    substituted.insert(external.into(), Node::File(b"substituted".to_vec(), 0o644));
+    // (b) the receipt newly references another external file
+    let mut extended = committed.clone();
+    extended.insert(
+        receipt.into(),
+        Node::File(receipt_for(&[external, "cli/reports/1/extra.txt"]), 0o644),
+    );
+    extended.insert(
+        "cli/reports/1/extra.txt".into(),
+        Node::File(b"x".to_vec(), 0o644),
+    );
+    for after in [&substituted, &extended] {
+        for staged in [None, Some(&host)] {
+            let error = check_staged_closure(&committed, after, "runs/x", staged)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("not the bytes the host staged"), "{error}");
+        }
+    }
+    // A product source file the receipt names as an input may change freely.
+    let mut edited = committed.clone();
+    edited.insert(source.into(), Node::File(b"edited".to_vec(), 0o644));
+    check_staged_closure(&committed, &edited, "runs/x", None).unwrap();
 }
