@@ -3,7 +3,8 @@ use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use serde_json::json;
 use std::{collections::BTreeMap, fs};
 
-mod fixture;
+mod authority;
+pub(super) mod fixture;
 #[cfg(unix)]
 mod git_metadata;
 mod ma2_routes;
@@ -19,8 +20,6 @@ mod subject;
 #[cfg(unix)]
 mod unsupported_routes;
 use fixture::{declaration, git, write, Fake, Fixture};
-
-pub(super) use fixture::installed;
 
 #[test]
 fn matching_authenticated_private_scope_resolves_without_admission() {

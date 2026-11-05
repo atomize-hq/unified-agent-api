@@ -90,6 +90,11 @@ impl Route {
     pub fn recheck(&self, root: &Path) -> Result<(), String> {
         self.0.recheck(root)
     }
+    /// MA5 captures its closeout proposal under this route (CP-P1, G2). The proposal borrows the
+    /// context as its owning authority; copying the route's files or binding supplies none.
+    pub fn proposal(self, root: &Path) -> Result<Proposal, String> {
+        self.0.proposal(root)
+    }
 }
 /// An opaque, comparable copy of a route's binding. It carries no authority of its own: only a
 /// freshly resolved route with an equal binding may act on a plan that recorded it.
@@ -105,7 +110,7 @@ pub struct RouteBinding {
 pub fn route(root: &Path) -> Result<Option<Route>, String> {
     // Unit tests may install a fixture profile for the calling thread; production cannot.
     #[cfg(test)]
-    if let Some((profile, api)) = tests::installed() {
+    if let Some((profile, api)) = tests::fixture::installed() {
         return route_in(root, Some(profile), api);
     }
     route_in(root, LIVE_PROFILE, Arc::new(host::Github))
@@ -271,7 +276,7 @@ impl EvidenceHost {
 pub(crate) fn evidence_host(root: &Path) -> Result<EvidenceHost, String> {
     // Unit tests may install a fixture profile for the calling thread; production cannot.
     #[cfg(test)]
-    if let Some((profile, api)) = tests::installed() {
+    if let Some((profile, api)) = tests::fixture::installed() {
         return Context::resolve(root, Some(profile), api)?.evidence_host(root);
     }
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github))?.evidence_host(root)
@@ -350,6 +355,23 @@ impl Context {
     pub(crate) fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
         self.recheck(root)?;
         Ok(&self.registry)
+    }
+    /// The authenticated protected tip T (CP-P1), after rechecking the caller. The owning
+    /// predicates bind the local integration ref to it; it is not itself an admission.
+    pub(crate) fn protected_tip(&self, root: &Path) -> Result<&str, String> {
+        self.recheck(root)?;
+        Ok(&self.host.isolated_tip)
+    }
+    /// Whether `raw` registry bytes parse, under this profile's depth admission, to exactly the
+    /// scoped registry, after rechecking the caller.
+    pub(crate) fn require_registry(&self, root: &Path, raw: &str) -> Result<(), String> {
+        self.recheck(root)?;
+        let tables = self.profile.depth_tables();
+        if AgentRegistry::parse_isolated(raw, &tables).map_err(|e| e.to_string())? != self.registry
+        {
+            return Err("owning bindings read a registry other than the isolated scope".into());
+        }
+        Ok(())
     }
 }
 

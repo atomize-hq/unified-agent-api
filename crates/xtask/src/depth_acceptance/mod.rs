@@ -2,6 +2,9 @@
 mod artifacts;
 mod input;
 mod integration;
+mod isolated;
+#[cfg(test)]
+pub(crate) use isolated::Host as IsolatedHost;
 mod manifest;
 mod manual;
 mod promotion;
@@ -157,14 +160,33 @@ pub(crate) fn check_captured_relay(
     relay::check(before, after, workspace)
 }
 
+/// The host that owns an admission (CP-P1). `Isolated` borrows a resolved isolated context, and
+/// only `isolated_maintenance::Context::resolve` makes one: no flag, label, receipt or E selects
+/// it. Either variant runs the same predicates; only bindings, evidence and the tip differ.
+#[derive(Clone, Copy)]
+pub(crate) enum Authority<'a> {
+    Production,
+    Isolated(&'a crate::isolated_maintenance::Context),
+}
+
 /// Owning manual-closeout adapter; returned bytes are a proposal, not integration authority.
 pub(crate) fn plan_manual_closeout(
+    authority: Authority<'_>,
     workspace: &Path,
     before: Source,
     after: Source,
     written: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, Vec<u8>>, String> {
-    manual::plan(workspace, before, after, written)
+    match authority {
+        Authority::Production => manual::plan(workspace, before, after, written),
+        Authority::Isolated(context) => manual::plan_with(
+            workspace,
+            before,
+            after,
+            written,
+            &isolated::Host::closeout(context),
+        ),
+    }
 }
 
 /// Owning promotion adapter, never a reusable authority receipt.
@@ -174,11 +196,49 @@ pub(crate) fn plan_promotion(
     after: Source,
     written: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, Vec<u8>>, String> {
-    promotion::plan(workspace, before, after, written)
+    plan_promotion_as(Authority::Production, workspace, before, after, written)
+}
+
+/// [`plan_promotion`] under an explicit owning authority.
+pub(crate) fn plan_promotion_as(
+    authority: Authority<'_>,
+    workspace: &Path,
+    before: Source,
+    after: Source,
+    written: &BTreeSet<String>,
+) -> Result<BTreeMap<String, Vec<u8>>, String> {
+    match authority {
+        Authority::Production => promotion::plan(workspace, before, after, written),
+        Authority::Isolated(context) => promotion::plan_with(
+            workspace,
+            before,
+            after,
+            written,
+            &isolated::Host::promotion(context),
+        ),
+    }
 }
 
 /// Re-establish full admission against the supplied integration parent for every registered agent.
 /// This read-only check is not a reusable receipt or a substitute for the queue's conditional update.
 pub fn check_integration(workspace: &Path, revision: &str) -> Result<(), String> {
-    integration::check(workspace, revision)
+    check_integration_as(Authority::Production, workspace, revision)
+}
+
+/// [`check_integration`] under an explicit owning authority. Selecting the authority from a
+/// resolved route, and the admission/observation binding (CP-P1, G8), are slice B.5c.
+pub(crate) fn check_integration_as(
+    authority: Authority<'_>,
+    workspace: &Path,
+    revision: &str,
+) -> Result<(), String> {
+    match authority {
+        Authority::Production => integration::check(workspace, revision),
+        Authority::Isolated(context) => integration::check_with(
+            workspace,
+            revision,
+            &isolated::Host::closeout(context),
+            &isolated::Host::promotion(context),
+        ),
+    }
 }
