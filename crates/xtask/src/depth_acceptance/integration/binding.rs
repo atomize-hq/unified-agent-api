@@ -2,23 +2,57 @@
 use crate::{git_inputs, isolated_maintenance::Context};
 use std::path::Path;
 
-pub(super) fn check(root: &Path, revision: &str, context: &Context) -> Result<(), String> {
-    check_inner(root, revision, context).map_err(|e| format!("isolated IN1 binding: {e}"))
+pub(super) struct Binding {
+    pub(super) parent: String,
+    head: String,
+    tip: String,
 }
 
-fn check_inner(root: &Path, revision: &str, context: &Context) -> Result<(), String> {
-    let tip = context.protected_tip(root)?;
-    if super::resolve(root, "origin/staging")? != tip {
-        return Err("local integration ref differs from the authenticated protected tip".into());
+fn error(message: impl std::fmt::Display) -> String {
+    format!("isolated IN1 binding: {message}")
+}
+
+impl Binding {
+    pub(super) fn recheck(&self, root: &Path, context: &Context) -> Result<(), String> {
+        // Re-authenticate captured T, then check local refs after the potentially slow host
+        // reads. P remains the captured object id even if the caller's ref moves and returns.
+        if context.protected_tip(root).map_err(error)? != self.tip
+            || super::resolve(root, "HEAD").map_err(error)? != self.head
+        {
+            return Err(error(
+                "integration HEAD or authenticated protected tip moved",
+            ));
+        }
+        self.check_local_tip(root).map_err(error)
     }
+
+    fn check_local_tip(&self, root: &Path) -> Result<(), String> {
+        if super::resolve(root, "refs/remotes/origin/staging")? != self.tip {
+            return Err(
+                "local integration ref differs from the authenticated protected tip".into(),
+            );
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn capture(root: &Path, revision: &str, context: &Context) -> Result<Binding, String> {
+    capture_inner(root, revision, context).map_err(error)
+}
+
+fn capture_inner(root: &Path, revision: &str, context: &Context) -> Result<Binding, String> {
+    let tip = context.protected_tip(root)?.to_owned();
     let parent = super::resolve(root, revision)?;
     let head = super::resolve(root, "HEAD")?;
+    let binding = Binding { parent, head, tip };
+    binding.check_local_tip(root)?;
+    let Binding { parent, head, tip } = &binding;
     if head == parent {
         return Err("HEAD equals the supplied parent".into());
     }
     if parent == tip && head != tip {
         let status = git_inputs::command(root)
-            .args(["merge-base", "--is-ancestor", &parent, &head])
+            .args(["merge-base", "--is-ancestor", parent, head])
             .status()
             .map_err(|e| e.to_string())?;
         if !status.success() {
@@ -34,16 +68,17 @@ fn check_inner(root: &Path, revision: &str, context: &Context) -> Result<(), Str
         if !output.status.success() {
             return Err("authenticated tip commit is unreadable".into());
         }
-        let object = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
-        let first = object
-            .lines()
+        let first = output
+            .stdout
+            .split(|b| *b == b'\n')
             .take_while(|line| !line.is_empty())
-            .find_map(|line| line.strip_prefix("parent "));
-        if first != Some(parent.as_str()) {
+            .find_map(|line| line.strip_prefix(b"parent "));
+        if first != Some(parent.as_bytes()) {
             return Err("observation parent is not the authenticated tip's first parent".into());
         }
     } else {
         return Err("neither admission nor single-first-parent observation is bound".into());
     }
-    context.recheck(root)
+    context.recheck(root)?;
+    Ok(binding)
 }

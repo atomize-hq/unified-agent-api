@@ -2,6 +2,8 @@
 use super::*;
 use crate::depth_acceptance::check_integration;
 
+mod regressions;
+
 // Moved from tests.rs to keep its module declarations within the code-line cap.
 #[test]
 fn matching_authenticated_private_scope_resolves_without_admission() {
@@ -59,11 +61,12 @@ fn candidate(f: &Fixture, tip: &str) -> String {
     );
     head
 }
-fn refused(f: &Fixture, parent: &str) {
+fn refused(f: &Fixture, parent: &str) -> String {
     let before = snapshot(f.root.path());
     let err = check_integration(f.root.path(), parent).unwrap_err();
     assert!(err.contains("isolated IN1 binding"), "{err}");
     assert_eq!(before, snapshot(f.root.path()));
+    err
 }
 #[test]
 fn in1_refuses_equal_head_and_parent_even_at_authenticated_tip() {
@@ -117,8 +120,14 @@ fn in1_refuses_forged_parent_and_non_descendant_despite_host_ancestry_claim() {
     local(&f, &tip);
     // A sibling commit does not descend from T. The fake host's assertion is insufficient.
     git(f.root.path(), &["reset", "--hard", &base]);
+    write(f.root.path(), "sibling.txt", "unrelated candidate\n");
     let sibling = candidate(&f, &tip);
-    refused(&f, &tip);
+    assert_ne!(sibling, tip);
+    let err = refused(&f, &tip);
+    assert!(
+        err.contains("does not descend from the authenticated tip"),
+        "{err}"
+    );
     git(f.root.path(), &["reset", "--hard", &tip]);
     refused(&f, &sibling);
     refused(&f, &"f".repeat(40));

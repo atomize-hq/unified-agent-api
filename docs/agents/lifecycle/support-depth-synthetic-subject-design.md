@@ -247,16 +247,20 @@ Each step is a reviewed PR into `staging`.
      production semantics; a failed installed route refuses. Per-root `manifest-validate --tip`
      uses the routed registry and route-bound baseline/comparison readers, retaining the existing
      distinction between a production registry failure and an isolated route refusal.
-     - The local integration ref must equal authenticated protected tip T. With H the checkout
+     - The fully qualified local `refs/remotes/origin/staging` must equal authenticated protected
+       tip T; similarly named tags or local branches supply no authority. With H the checkout
        HEAD and P the supplied parent, admission requires P = T, H != T and local Git ancestry
        from P to H. Observation requires H = T and P equal to H's immediate first parent, read
-       from T's commit object with replacement objects disabled. Both run full all-root
-       generation, closeout and promotion admission for P → H and recheck the captured context.
+       from T's raw commit headers with replacement objects disabled; message encoding is
+       irrelevant. P, H and T are pinned to object IDs once. Both run full all-root generation,
+       closeout and promotion admission for that exact P → H, then recheck the captured context,
+       HEAD and fully qualified local tip. A moving caller parent ref cannot change the comparison.
        Caller labels, flags and event payloads confer no authority. Equal H/P, stacked bases,
        unsupported parentage and observation across several first-parent commits refuse.
      - `isolated_maintenance/tests/in1_integration.rs` covers binding decisions without sockets,
        including distinct merge parents, a multi-commit first-parent chain, forged or unrelated
-       parents, local-tip mismatch, authenticated-tip drift and unchanged ordinary production
+       parents, shadow tags/branches, non-UTF-8 commit messages, a parent-ref race with a forged
+       closeout entry, local-tip mismatch, authenticated-tip drift and unchanged ordinary production
        behavior, plus per-root `--tip` validation of a frozen P through the routed readers.
        The connected Linux tests take each B.5b MA5 writer's output through admission,
        post-push observation and per-root `--tip` validation, and refuse forged entries and an

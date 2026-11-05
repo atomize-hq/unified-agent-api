@@ -22,9 +22,14 @@ pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     let super::Authority::Isolated(context) = authority else {
         return Err("isolated IN1 binding lost its captured authority".into());
     };
-    binding::check(root, revision, context)?;
-    super::check_integration_as(authority, root, revision)?;
-    binding::check(root, revision, context)
+    let binding = binding::capture(root, revision, context)?;
+    admit_all(
+        root,
+        &binding.parent,
+        &super::isolated::Host::closeout(context),
+        &super::isolated::Host::promotion(context),
+    )?;
+    binding.recheck(root, context)
 }
 
 // Per-root IN1 readers borrow the same routed scope instead of re-entering production-only
@@ -73,7 +78,22 @@ pub(super) fn check_with(
 ) -> Result<(), String> {
     let tip = resolve(root, revision)?;
     let head = resolve(root, "HEAD")?;
-    let before = Source::tip(root, &tip)?;
+    admit_all(root, &tip, closeout_host, promotion_host)?;
+    if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
+        return Err("integration revision moved during admission".into());
+    }
+    Ok(())
+}
+
+/// Admission consumes the already pinned parent. In particular it must never resolve a
+/// caller's mutable parent ref again after the isolated binding has authenticated P -> H.
+fn admit_all(
+    root: &Path,
+    parent: &str,
+    closeout_host: &impl manual::Host,
+    promotion_host: &impl manual::Host,
+) -> Result<(), String> {
+    let before = Source::tip(root, parent)?;
     let after = Source::workspace(root)?;
     let old_registry = AgentRegistry::parse_unenforced(&before.read(REGISTRY_RELATIVE_PATH)?)
         .map_err(|e| e.to_string())?;
@@ -132,9 +152,6 @@ pub(super) fn check_with(
     }
     if let Some(view) = publication {
         super::publication::validate_current(root, &view)?;
-    }
-    if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
-        return Err("integration revision moved during admission".into());
     }
     Ok(())
 }
