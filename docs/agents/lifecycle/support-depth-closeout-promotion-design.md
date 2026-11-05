@@ -271,10 +271,25 @@ current text, and each needs a normative amendment. This document does not choos
 | | **A — closeout publishes qualification** | **B — qualification waits for promotion** |
 | --- | --- | --- |
 | Rule | Keep the spec rule: any current entry qualifies. The MA5 proposal becomes one coherent batch: admit the entry, freshly evaluate the post-entry record, render support JSON, Markdown and runtime data. | Amend the support-matrix spec (`:360-363`) and record invariant 4 so that only a current `Promotion` entry qualifies. MA5 publication stays unchanged and unqualified. |
-| Code changes | `manual.rs` admits publication outputs for the closeout's own agent and version only. IN1 attribution (`integration.rs:181-195`) counts a qualification effect as closeout when the candidate adds a matching `MaintenanceCloseout` entry and no promotion effect; otherwise it stays promotion. Both MA5 writers render publication through that proposal. | `support_matrix/depth.rs` derivation; no MA5 or IN1 attribution change. |
+| Code changes | `manual.rs` admits publication outputs for the closeout's own agent and version only. IN1 attribution (`integration.rs:181-195`) counts a qualification effect as closeout when the candidate adds a matching `MaintenanceCloseout` entry and no promotion effect; otherwise it stays promotion. Both MA5 writers render publication through that proposal. | `support_matrix/depth.rs` derivation, plus a reordered MA6 (below); no MA5 or IN1 attribution change. |
 | Normative change | Annex A.1 (MA5 outputs) and A.2 (publication writers) gain MA5. | Support-matrix spec and record invariant 4. |
 | Evaluation in scratch | Needed for MA6 and for any MA5 rendering in a view. Add the private view-aware evaluator described below. | Same, for MA6. |
 | Risk | Widens MA5's write envelope to aggregate publication, which touches every agent's rows. | Changes a published meaning for every depth-enrolled agent, not just this proof. |
+
+**MA6 ordering (required under B, adopted under A too).** Today MA6 renders publication first
+(`manifest_promotion.rs:226-240`), then plans admission (`:269`), and admission appends the
+`Promotion` entry (`promotion.rs:95-98`). Under B, the rendered row would stay unqualified, while
+IN1 derives qualification from the delivered post-entry record and rejects the mismatch. So under
+CP-P3, MA6 runs in this order:
+1. admit and append its own entry;
+2. build the proposed post-entry view;
+3. evaluate that exact record freshly, with the view-aware evaluator;
+4. render support, runtime and capability publication from that view;
+5. admit the rendered outputs again, and deliver everything as one batch.
+
+Under A the promotion entry does not change qualification. The same order still keeps verdicts
+sealed to the delivered record (`results.rs:6-28`), so it applies there too. The owning files are
+`manifest_promotion.rs` and `depth_acceptance/promotion.rs`.
 
 **View-aware evaluator (needed under A or B).** This is a private evaluation path that:
 - borrows the caller's authenticated `Context` and `EvidenceHost`, never resolving one from the
@@ -355,7 +370,12 @@ each delivered by a **reviewed change to the existing canonical workflows**:
 Workflow source belongs to the independently approved protected source (route design,
 `:112-118`). So the isolated repository runs the canonical bytes, and these become canonical
 changes, not isolated-only edits. For example, the root loops derive from the registry instead of
-a fixed list. Each such change is a no-op where no depth record exists. Letting the isolated
+a fixed list. These changes must keep ordinary admission semantics where no depth record exists:
+the same checks still decide, under the same result policy and terminal gate. They are not free,
+though. New `needs` edges serialize ordinary jobs behind `rust-tests`, and full-history checkouts
+cost time in every run, depth or not. So each change needs a scheduling and latency review of
+ordinary CI before it lands. Claiming no latency impact is ruled out (route design `:159-160`).
+Letting the isolated
 workflows diverge from canonical would be an exception to that source boundary, and it would need
 an explicit contract amendment. This design does not propose one.
 
@@ -382,7 +402,7 @@ result depends on, and MA6 must refuse there.
 | --- | --- | --- |
 | CP-P1 — isolated owning host and IN1 binding | MA5, MA6 and IN1 admit through one private `Authority::Isolated(&Context)`. Evidence is re-authenticated for the exact record state through a host-taking entry that borrows the caller's `EvidenceHost`. The local integration tip must equal the authenticated protected tip T. IN1 picks its binding from authenticated facts only: **admission** (P = T, H descends from P, H ≠ T) or **observation** (H = T, P is H's single first parent read from Git); anything else refuses. | Applies the approved IR-P1 threading to the owning cores without a second predicate, and keeps D7's post-push readback (proof plan step 7). Admission serializes depth candidates in the queue, which is conservative. Widening observation to a multi-commit first-parent chain needs separate approval. Production stays `Production`. Revised after review: the unconditional parent-equals-tip rule is withdrawn. |
 | CP-P2 — promotion scratch registry binding | MA6's scratch view inherits the caller's captured scoped registry through an `IsolatedView`-attested, thread-bound guard. It never resolves itself and gives no evidence authority. | Enough for MA6 while CP-P3 is not adopted, since publication evaluation then reads no Git input; B.6a's scratch test must show this. Extends the MA4 candidate binding to a non-Git view, an authority-boundary change. Scratch evidence evaluation is CP-P3's view-aware evaluator, not this row. Revised after review. |
-| CP-P3 — qualified publication (package) | Choose one semantics. **A:** a closeout publishes qualification, through one MA5 batch (entry, fresh post-entry evaluation, rendering) and closeout attribution at IN1, with Annex A.1/A.2 amended. **B:** only a current `Promotion` entry qualifies, with the support-matrix spec and record invariant 4 amended. Either one also needs the private view-aware evaluator (borrowed context, proposed bytes, caller Git objects, post-entry record, no writes). | The two options are compared side by side in G7. An evaluator-only switch breaks the closeout chain at IN1 (`publication.rs:196-211`, `integration.rs:181-195`). Until approved: production verdicts and `unverified`, recorded as not exercised. Once adopted, every chain test runs again with it on. Revised after review. |
+| CP-P3 — qualified publication (package) | Choose one semantics. **A:** a closeout publishes qualification, through one MA5 batch (entry, fresh post-entry evaluation, rendering) and closeout attribution at IN1, with Annex A.1/A.2 amended. **B:** only a current `Promotion` entry qualifies, with the support-matrix spec and record invariant 4 amended. Either one also needs the private view-aware evaluator (borrowed context, proposed bytes, caller Git objects, post-entry record, no writes), and MA6 reordered to entry → post-entry view → fresh evaluation → rendering. | The two options are compared side by side in G7. An evaluator-only switch breaks the closeout chain at IN1 (`publication.rs:196-211`, `integration.rs:181-195`). Until approved: production verdicts and `unverified`, recorded as not exercised. Once adopted, every chain test runs again with it on. Revised after review. |
 | CP-P4 — closeout preflight repository | Under a route, `prepare-agent-closeout` reads preflight from the authenticated isolated repository (from the context, never `origin` or a flag). The existing run selection and whole-workflow terminality rules stay. | The packet's CI runs live there. Both reviewers agree. Until approved, `prepare-agent-closeout` refuses under a route. |
 | CP-P5 — CI prerequisites (phase C) | The B.5 and B.6 PRs change no workflow. Phase C delivers reviewed changes to the **canonical** workflows: route consumers ordered after the terminal `rust-tests` producer with failure-preserving `needs` edges; registry-derived per-root `--tip` loops; full history in every routed checkout; an accepted `origin`; a least-privilege read credential reference. The 17-job result policy and the terminal gate are unchanged. | Workflow source is part of the independently approved protected source (route design `:112-118`, `:154-161`). Isolated-only divergence would need an explicit contract amendment; none is proposed. Revised after review. |
 | CP-P6 — A.5 replay shape | Replay with an ordinary (non-depth) later-version generation, forked from the admitted MA5 state **before the first MA6**. MA6 must then create its first `Promotion` entry from retained closeout authority. A sibling fork with dependency-invalidating changes must refuse. | `scope.rs:112-119` admits only the subject's version. Both reviewers agree; forking before the first MA6 is per their notes. |
@@ -453,6 +473,8 @@ holds unchanged. A CP-P3 slice reruns steps 3 to 7 with it on, and adds:
 - a qualified row appears only through the chosen owning route (option A: the MA5 batch; option
   B: the first promotion);
 - IN1 attributes it to that route;
+- the first promotion's rendered rows equal what IN1 derives from the delivered post-entry record
+  (under B, the row becomes qualified in that same promotion);
 - a positive scratch-publication test with the view-aware evaluator.
 
 **Refusals** (each one preserves caller state byte for byte):
@@ -506,7 +528,7 @@ owner.
 | B.6a — scratch registry binding (CP-P2) | `CapturedRegistry::bind_view` over `IsolatedView`; removes the `dead_code` allowances that this slice now uses. Binding positive and refusal tests, plus a positive scratch render and `manifest_validate::run` with CP-P3 off. | new `isolated_maintenance/view.rs`, `isolated_maintenance/mod.rs` (module line), `agent_maintenance/closeout_proposal.rs`, new `isolated_maintenance/tests/view.rs` |
 | B.6b — MA6 through the route (G5, G6, G10) | Captured route, isolated proposal and scratch binding in `build_plan`, plus the tip and apply rechecks. Positive promotion with IN1 admission and observation, the A.5 replay forked before the first MA6 (CP-P6), MA6 refusals. | `manifest_promotion.rs`, new `isolated_maintenance/tests/ma6_promotion.rs`, the B.6 notes in `support-depth-synthetic-subject-design.md` |
 | B.7a — view-aware evaluator (CP-P3; only if approved) | Private evaluation over an `IsolatedView`: borrowed context and host, proposed bytes, caller Git objects, dependency currentness against the view, post-entry record, no writes. Positive scratch-publication test, plus refusals for a scratch `.git`, a moved caller and self-resolution. | **`depth_evidence/{verdict.rs,verdict/github/mod.rs,currentness.rs}` (coordinated)**, `git_inputs.rs`, `isolated_maintenance/view.rs`, new `isolated_maintenance/tests/view_evidence.rs` |
-| B.7b — owning qualified publication (CP-P3 option A or B; only if approved) | The normative amendment first, as its own docs PR: A amends contract Annex A.1/A.2, B amends the support-matrix spec and record invariant 4. Then, for A: MA5's coherent batch (entry → fresh post-entry evaluation → rendering) in both writers, `manual.rs` admitting the closeout's own publication rows, closeout attribution in `integration.rs`. For B: `support_matrix/depth.rs` derivation. Either way: the isolated evaluator in `support_matrix/derive.rs` inside a route, and every chain test of B.5b, B.5c and B.6b rerun with CP-P3 on. | A: `depth_acceptance/{manual,integration,publication}.rs`, `agent_maintenance/closeout/write.rs`, `agent_maintenance/prepare_closeout.rs`, `support_matrix/derive.rs`. B: `support_matrix/{depth,derive}.rs`. Both: new `isolated_maintenance/tests/publication.rs` and the chain test files above. |
+| B.7b — owning qualified publication (CP-P3 option A or B; only if approved) | The normative amendment first, as its own docs PR: A amends contract Annex A.1/A.2, B amends the support-matrix spec and record invariant 4. Then, for A: MA5's coherent batch (entry → fresh post-entry evaluation → rendering) in both writers, `manual.rs` admitting the closeout's own publication rows, closeout attribution in `integration.rs`. For B: `support_matrix/depth.rs` derivation. Either way: MA6 reordered to entry → post-entry view → fresh evaluation → rendering (G7, "MA6 ordering"), the isolated evaluator in `support_matrix/derive.rs` inside a route, and every chain test of B.5b, B.5c and B.6b rerun with CP-P3 on. | A: `depth_acceptance/{manual,integration,publication}.rs`, `agent_maintenance/closeout/write.rs`, `agent_maintenance/prepare_closeout.rs`, `support_matrix/derive.rs`. B: `support_matrix/{depth,derive}.rs`. Both: `manifest_promotion.rs`, `depth_acceptance/promotion.rs`, new `isolated_maintenance/tests/publication.rs` and the chain test files above. |
 
 Phase C (CP-P5) carries the workflow and host prerequisites and the real native-queue run. Every
 slice runs the required gates. Approving this design enables no path and installs no profile.
