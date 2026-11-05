@@ -94,9 +94,11 @@ authorization enables the maintenance path for each agent (contract "Path enable
 1. The charter defines the create-lane P/O freeze point and the committed artifact that records it.
 2. `onboard-agent` writes version metadata, RULES and a validator spec.
 3. The runtime follow-on carries depth identity, and `written-paths.json` integrity is fixed.
-4. Validator specs for `aider` and `gemini_cli`.
+4. Validator specs for `aider` and `gemini_cli`. Written: each states the shared depth checks
+   and lists the truth decisions its root still needs. Neither root has a `RULES.json`, so neither
+   adopts Annex B yet.
 5. Gap-memo items: runtime handoff capability and publication truth, and the hard-coded backend
-   list in `capability_matrix.rs`.
+   list in `capability_matrix.rs`. The backend list is closed: the generator reads the registry.
 6. Wire ON1–ON5 for depth in the isolated workspace only.
 7. Independent new-agent proof in that workspace, reusing the synthetic subject. Maintenance
    evidence does not substitute.
