@@ -146,6 +146,11 @@ impl CapturedRegistry {
     pub(crate) fn registry(&self) -> &AgentRegistry {
         &self.registry
     }
+    /// The authenticated evidence host of the captured route, after rechecking the caller. It
+    /// stays in the controller: the candidate and its executor never receive it.
+    pub(crate) fn evidence_host(&self, caller: &Path) -> Result<EvidenceHost, String> {
+        self.route.0.evidence_host(caller)
+    }
     /// Recheck the captured route against the caller workspace, inputs and host.
     pub(crate) fn recheck(&self, caller: &Path) -> Result<(), String> {
         self.route.recheck(caller)
@@ -264,6 +269,11 @@ impl EvidenceHost {
 /// Resolves the installed isolated profile. Uninstalled (`LIVE_PROFILE = None`), it refuses
 /// before any host read.
 pub(crate) fn evidence_host(root: &Path) -> Result<EvidenceHost, String> {
+    // Unit tests may install a fixture profile for the calling thread; production cannot.
+    #[cfg(test)]
+    if let Some((profile, api)) = tests::installed() {
+        return Context::resolve(root, Some(profile), api)?.evidence_host(root);
+    }
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github))?.evidence_host(root)
 }
 

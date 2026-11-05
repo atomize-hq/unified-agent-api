@@ -32,12 +32,12 @@ fn dry_run(root: &Path, binary: &str) -> Result<String, String> {
 }
 
 /// A dry run and then a write run under one run id.
-fn run_as(root: &Path, binary: &str, run_id: &str) -> Result<String, String> {
+pub(super) fn run_as(root: &Path, binary: &str, run_id: &str) -> Result<String, String> {
     run(root, binary, false, run_id)?;
     run(root, binary, true, run_id)
 }
 
-fn run(root: &Path, binary: &str, write: bool, run_id: &str) -> Result<String, String> {
+pub(super) fn run(root: &Path, binary: &str, write: bool, run_id: &str) -> Result<String, String> {
     let mut out = Vec::new();
     execute::run_in_workspace(
         root,

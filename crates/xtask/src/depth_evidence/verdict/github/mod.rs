@@ -8,6 +8,7 @@ use crate::{
 use serde_json::{json, Value};
 pub(super) mod adoption;
 mod artifact;
+pub(super) mod assembly;
 mod profile;
 pub(super) mod transport;
 use transport::*;
@@ -401,9 +402,12 @@ impl Host for Adapter<'_> {
             }
             _ => return Ok(None),
         };
-        let api = host.as_ref().map_or(CANONICAL, Github::isolated);
+        let resolved = match &host {
+            Some(h) => resolve_profile_in(&Isolated::new(h), self.root, p, Some(h)),
+            None => resolve_profile_in(&CANONICAL, self.root, p, None),
+        };
         // Read failures are absence of authenticated authority, never successful evidence.
-        match resolve_profile_in(&api, self.root, p, host.as_ref()) {
+        match resolved {
             Ok(resolved) => resolved.population(current),
             Err(_) => Ok(None),
         }
@@ -465,29 +469,17 @@ fn prove_profile_in(
     }
     let jail = crate::workspace_mutation::WorkspacePathJail::new(scratch.path())
         .map_err(|e| e.to_string())?;
-    let mut selected = std::collections::BTreeMap::new();
-    for run in &resolved.runs {
-        let r = receipt_ref(&run.receipt)?;
-        selected
-            .entry(run.receipt.scope.obligation.clone())
-            .or_insert(r.clone());
-        let mut files = profile::payloads(&run.witness)?;
-        files.push((
-            r,
-            serde_json::to_vec(&run.receipt).map_err(|e| e.to_string())?,
-        ));
-        for (reference, bytes) in files {
-            super::super::validate::file(&reference)?;
-            let path = jail
-                .resolve(Path::new(&reference.path))
-                .map_err(|e| e.to_string())?;
-            std::fs::create_dir_all(path.parent().ok_or("missing proof parent")?)
-                .map_err(|e| e.to_string())?;
-            if path.exists() && std::fs::read(&path).map_err(|e| e.to_string())? != bytes {
-                return Err("conflicting hosted payload path".into());
-            }
-            std::fs::write(path, bytes).map_err(|e| e.to_string())?;
+    let assembly = assembly::assemble(&resolved)?;
+    for (reference, bytes) in &assembly.files {
+        let path = jail
+            .resolve(Path::new(&reference.path))
+            .map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(path.parent().ok_or("missing proof parent")?)
+            .map_err(|e| e.to_string())?;
+        if path.exists() && std::fs::read(&path).map_err(|e| e.to_string())? != *bytes {
+            return Err("conflicting hosted payload path".into());
         }
+        std::fs::write(path, bytes).map_err(|e| e.to_string())?;
     }
     crate::depth_ci::output(
         std::process::Command::new("git")
@@ -495,32 +487,9 @@ fn prove_profile_in(
             .arg(scratch.path())
             .args(["add", "--", &p.evidence()]),
     )?;
+    let selected = assembly.selected;
     let mut record = resolved.original.clone();
-    let scope = profile::scope_for(&record, p, p.obligations(&record).remove(0));
-    let mut e = crate::depth_record::ExecutionPart {
-        identity: String::new(),
-        policy_identity: scope.policy_identity.clone(),
-        obligations_identity: scope.obligations_identity.clone(),
-        results: selected
-            .iter()
-            .map(
-                |(obligation, evidence)| crate::depth_record::ObligationResult {
-                    obligation: obligation.clone(),
-                    result: DepthResult::Verified,
-                    rationale: None,
-                    evidence: vec![evidence.clone()],
-                },
-            )
-            .collect(),
-        reuse_bindings: vec![],
-        debt_grants: vec![],
-        debt_retired: vec![],
-    };
-    // Annex B derived arrays sort by canonical serialized entries, not Rust enum order.
-    e.results
-        .sort_by_key(|r| serde_json::to_vec(&serde_json::to_value(r).unwrap()).unwrap());
-    e.identity = crate::depth_record::part_identity(&e)?;
-    record.execution = Some(e);
+    record.execution = Some(assembly.execution);
     let (results, decisions) = resolved.decisions(scratch.path(), &record)?;
     let verdicts=selected.keys().map(|obligation|json!({"obligation":obligation,"result":results.result(&record,obligation)})).collect::<Vec<_>>();
     let verdict = Verdict {
@@ -567,6 +536,8 @@ fn prove_profile_in(
 
 #[cfg(test)]
 mod tests;
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) use tests::host::{synthetic_host, SyntheticHost};
 
 impl Host for Resolved {
     fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
@@ -635,13 +606,37 @@ impl Resolved {
         ))
     }
 }
-/// Read-only bridge for the fixed isolated CORE profile. Production consumers never call this.
+/// Read-only bridge for the fixed isolated profiles: CORE from the canonical repository, and the
+/// synthetic profile only through the installed IR-P1 binding. Production consumers never call it.
+/// It always re-authenticates the complete population, whatever E or a staged bundle claims.
 pub(in crate::depth_evidence) fn isolated_record_results(
     root: &Path,
     record: &DepthRecord,
 ) -> Result<super::super::EvidenceVerdicts, String> {
-    match resolve_profile(&CANONICAL, root, Profile::Core) {
+    let selection = &record.policy.selection;
+    let resolved = match (
+        selection.agent_id.as_str(),
+        selection.enrollment.version.as_str(),
+    ) {
+        ("depth_fixture", "0.2.0") => {
+            crate::isolated_maintenance::evidence_host(root).and_then(|host| {
+                resolve_profile_in(&Isolated::new(&host), root, Profile::Synthetic, Some(&host))
+            })
+        }
+        _ => resolve_profile(&CANONICAL, root, Profile::Core),
+    };
+    match resolved {
         Ok(resolved) => resolved.evaluate_record(root, record),
         Err(_) => Ok(super::super::EvidenceVerdicts::default()),
     }
+}
+/// MA4 host side (B.4 part 2): authenticate the complete applicable population through the
+/// binding, then assemble reporting E and its referenced files. Only the synthetic profile has an
+/// isolated evidence host. The result is staged for the executor; it grants nothing.
+pub(crate) fn isolated_assembly(
+    root: &Path,
+    host: &crate::isolated_maintenance::EvidenceHost,
+) -> Result<assembly::Assembly, String> {
+    let resolved = resolve_profile_in(&Isolated::new(host), root, Profile::Synthetic, Some(host))?;
+    assembly::assemble(&resolved)
 }
