@@ -240,7 +240,30 @@ Each step is a reviewed PR into `staging`.
        preview/readers with a missing-E refusal. Full connected chains require Unix sockets and
        must run outside the restricted sandbox; the MA4 green gates remain stubbed.
      - Publication is unchanged. **Qualified publication not exercised**: CP-P3 option A belongs
-       to B.7b, which must rerun the complete chains. MA6 and IN1 wiring belong to later slices.
+       to B.7b, which must rerun the complete chains. MA6 wiring belongs to B.6.
+   - B.5c connects IN1 to route-selected owning authority (G8, CP-P1 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). The repository-wide
+     `check_integration` resolves the route before enumerating roots. An absent route retains
+     production semantics; a failed installed route refuses. Per-root `manifest-validate --tip`
+     uses the routed registry and route-bound baseline/comparison readers, retaining the existing
+     distinction between a production registry failure and an isolated route refusal.
+     - The local integration ref must equal authenticated protected tip T. With H the checkout
+       HEAD and P the supplied parent, admission requires P = T, H != T and local Git ancestry
+       from P to H. Observation requires H = T and P equal to H's immediate first parent, read
+       from T's commit object with replacement objects disabled. Both run full all-root
+       generation, closeout and promotion admission for P → H and recheck the captured context.
+       Caller labels, flags and event payloads confer no authority. Equal H/P, stacked bases,
+       unsupported parentage and observation across several first-parent commits refuse.
+     - `isolated_maintenance/tests/in1_integration.rs` covers binding decisions without sockets,
+       including distinct merge parents, a multi-commit first-parent chain, forged or unrelated
+       parents, local-tip mismatch, authenticated-tip drift and unchanged ordinary production
+       behavior, plus per-root `--tip` validation of a frozen P through the routed readers.
+       The connected Linux tests take each B.5b MA5 writer's output through admission,
+       post-push observation and per-root `--tip` validation, and refuse forged entries and an
+       unverified population despite verified E labels. They also retain the production depth
+       refusal and check that validation preserves caller files and index. These full chains
+       require Unix sockets and must run outside the restricted sandbox; publication remains
+       unchanged pending B.7b. No workflow is changed (CP-P5).
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

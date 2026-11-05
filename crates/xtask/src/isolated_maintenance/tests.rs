@@ -7,6 +7,7 @@ mod authority;
 pub(super) mod fixture;
 #[cfg(unix)]
 mod git_metadata;
+mod in1_integration;
 mod ma2_routes;
 // The connected evidence chain needs the Linux channel peer anchor; other platforms refuse it
 // (see `depth_evidence::staged::non_linux_tests`).
@@ -22,11 +23,6 @@ mod subject;
 mod unsupported_routes;
 use fixture::{declaration, git, write, Fake, Fixture};
 
-#[test]
-fn matching_authenticated_private_scope_resolves_without_admission() {
-    let f = Fixture::new();
-    f.resolve().unwrap().recheck(f.root.path()).unwrap();
-}
 #[test]
 fn absent_profile_never_reads_host() {
     let root = tempfile::tempdir().unwrap();
