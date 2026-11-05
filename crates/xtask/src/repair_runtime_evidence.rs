@@ -20,6 +20,7 @@ use crate::{
         self, repair_run_id, write_runtime_evidence_bundle_at, RuntimeEvidenceBundleSpec,
     },
     runtime_evidence_run::RUNTIME_RUNS_ROOT,
+    runtime_follow_on::{SupportDepthContract, WORKFLOW_VERSION},
 };
 
 const HOST_SURFACE: &str = "xtask repair-runtime-evidence";
@@ -80,6 +81,7 @@ struct RepairContext {
     approval: ApprovalArtifact,
     lifecycle_state_path: String,
     lifecycle_state: LifecycleState,
+    support_depth: Option<SupportDepthContract>,
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
@@ -150,6 +152,7 @@ pub fn run_in_workspace<W: Write>(
         },
     )
     .map_err(map_bundle_error)?;
+    copy_depth_contract(&temp_run_root, context.support_depth.as_ref())?;
     let lifecycle_state_path = workspace_root.join(&context.lifecycle_state_path);
     let prior_lifecycle_bytes = fs::read(&lifecycle_state_path).map_err(|err| {
         Error::Internal(format!("read {}: {err}", lifecycle_state_path.display()))
@@ -255,6 +258,7 @@ fn run_check_mode(
             },
         )
         .map_err(map_bundle_error)?;
+        copy_depth_contract(&temp_run_root, context.support_depth.as_ref())?;
         maybe_mutate_staged_bundle(&temp_run_root)?;
         validate_runtime_evidence_directory_for_approval(
             workspace_root,
@@ -273,6 +277,33 @@ fn run_check_mode(
         (Ok(_), Err(cleanup_err)) => Err(cleanup_err),
         (Err(err), Err(_cleanup_err)) => Err(err),
     }
+}
+
+fn copy_depth_contract(run_root: &Path, depth: Option<&SupportDepthContract>) -> Result<(), Error> {
+    let Some(depth) = depth else {
+        return Ok(());
+    };
+    // The shared bundle writer also serves historical runs. Complete only this repair's
+    // staged bundle, before either validation or promotion, without deriving any identities.
+    for name in [
+        "input-contract.json",
+        "run-status.json",
+        "validation-report.json",
+    ] {
+        let path = run_root.join(name);
+        let contents = fs::read(&path).map_err(|e| Error::Internal(format!("read {name}: {e}")))?;
+        let mut value: serde_json::Value = serde_json::from_slice(&contents)
+            .map_err(|e| Error::Internal(format!("parse {name}: {e}")))?;
+        value["workflow_version"] = WORKFLOW_VERSION.into();
+        if name == "input-contract.json" {
+            value["support_depth"] = serde_json::to_value(depth)
+                .map_err(|e| Error::Internal(format!("serialize support_depth: {e}")))?;
+        }
+        let contents = serde_json::to_vec_pretty(&value)
+            .map_err(|e| Error::Internal(format!("serialize {name}: {e}")))?;
+        fs::write(&path, contents).map_err(|e| Error::Internal(format!("write {name}: {e}")))?;
+    }
+    Ok(())
 }
 
 fn promote_repair_bundle(
@@ -427,6 +458,8 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RepairContext, Er
     }
 
     Ok(RepairContext {
+        support_depth: SupportDepthContract::copy_from(&approval, &lifecycle_state)
+            .map_err(Error::Validation)?,
         approval,
         lifecycle_state_path,
         lifecycle_state,

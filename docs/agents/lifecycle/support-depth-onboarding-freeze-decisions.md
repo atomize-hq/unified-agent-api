@@ -332,7 +332,9 @@ only.
      (coordinated with that module's current owner), `runtime_follow_on.rs`,
      `runtime_follow_on/{codex_exec,lifecycle}.rs`, and `prepare_publication/runtime_evidence.rs`.
    - Depends on slice 2 for the protected lifecycle object.
-4. **Input contract identity (OF-P8).**
+4. **Input contract identity (OF-P8).** Slice 4 implemented: optional version/P/O identity,
+   workflow v2, pre-execution and candidate-observation cross-checks, and repair identity copying;
+   historical non-depth contracts remain readable and production depth stays disabled.
    - Add the optional field, bump `workflow_version`, add the pre- and post-execution checks, and
      make `repair-runtime-evidence` copy the identities.
    - Write scope: `runtime_follow_on/models.rs`, `runtime_follow_on.rs` and

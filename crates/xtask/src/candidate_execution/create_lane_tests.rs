@@ -90,10 +90,15 @@ fn setup(depth: bool) -> (tempfile::TempDir, RuntimeContext) {
         state.validate().unwrap();
         write(root.path(), STATE, bytes(&state).unwrap());
         context.lifecycle_state = state;
+        context.input_contract.support_depth =
+            SupportDepthContract::copy_from(&context.approval, &context.lifecycle_state).unwrap();
     }
     persist_dry_run_artifacts(&context).unwrap();
     (root, context)
 }
+
+#[path = "create_lane_identity_tests.rs"]
+mod identity;
 
 fn prepared_prompt(context: &RuntimeContext) -> String {
     read_string(&context.run_dir.join(PROMPT_FILE_NAME)).unwrap()

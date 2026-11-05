@@ -121,7 +121,47 @@ fn depth_create_refuses_maintenance_binding_before_attempt_or_executor() {
 }
 
 #[test]
-fn depth_create_refuses_caller_absolute_prompt_before_attempt_or_executor() {
+fn depth_create_refuses_input_identity_mismatch_before_attempt_or_executor() {
+    for field in [
+        "missing",
+        "version",
+        "policy_identity",
+        "obligations_identity",
+        "workflow_version",
+    ] {
+        let f = setup();
+        let _installed = f.install();
+        let host = tempfile::tempdir().unwrap();
+        let binary = executor(host.path(), "touch executor-started");
+        prepare(&f, &binary);
+        let path = format!("{RUN}/input-contract.json");
+        let mut contract = json_file(f.root.path(), &path);
+        match field {
+            "missing" => {
+                contract.as_object_mut().unwrap().remove("support_depth");
+            }
+            "workflow_version" => contract[field] = json!("runtime_follow_on_v1"),
+            "version" => contract["support_depth"][field] = json!("9.9.9"),
+            _ => contract["support_depth"][field] = json!("a".repeat(64)),
+        }
+        write(
+            f.root.path(),
+            &path,
+            serde_json::to_vec_pretty(&contract).unwrap(),
+        );
+        let before = tree(f.root.path());
+        let error = run(&f, &binary).unwrap_err().to_string();
+        assert!(error.contains("support_depth"), "{field}: {error}");
+        // This fails before the deliberately stale record's Event check, and before an attempt.
+        assert!(!error.contains("Event"), "{field}: {error}");
+        assert_eq!(tree(f.root.path()), before);
+        assert!(!f.root.path().join("executor-started").exists());
+    }
+}
+
+#[test]
+fn depth_create_refuses_invalid_binding_even_with_caller_absolute_prompt_before_attempt_or_executor(
+) {
     let f = setup();
     let _installed = f.install();
     let host = tempfile::tempdir().unwrap();
@@ -134,7 +174,12 @@ fn depth_create_refuses_caller_absolute_prompt_before_attempt_or_executor() {
     fs::write(path, prompt).unwrap();
     let before = tree(f.root.path());
     let error = run(&f, &binary).unwrap_err().to_string();
-    assert!(error.contains("prepared depth packet"), "{error}");
+    // OF-P8 now rejects this fixture's maintenance Event before candidate preparation
+    // inspects the prompt. The adapter unit test separately proves the prompt refusal.
+    assert!(
+        error.contains("input contract support_depth") && error.contains("Event"),
+        "{error}"
+    );
     assert_eq!(tree(f.root.path()), before);
 }
 
