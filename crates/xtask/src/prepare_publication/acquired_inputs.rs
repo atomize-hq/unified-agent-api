@@ -163,12 +163,13 @@ mod strict_discovery_tests {
         fs::write(reports.join("0.2.0/depth-record.json"), "{}").unwrap();
         assert_eq!(strict_record_files(tmp.path()).unwrap().len(), 1);
         fs::set_permissions(&reports, fs::Permissions::from_mode(0o000)).unwrap();
+        // Probe enforcement while restricted: root reads through mode 0, so only assert where
+        // the permission actually applies.
+        let enforced = fs::read_dir(&reports).is_err();
         let unreadable = strict_record_files(tmp.path());
         fs::set_permissions(&reports, fs::Permissions::from_mode(0o755)).unwrap();
-        // Root can read through mode 0; only assert where the permission actually applies.
-        if fs::read_dir(tmp.path().join("reports")).is_ok() && unreadable.is_ok() {
-            return;
+        if enforced {
+            assert!(unreadable.is_err(), "{unreadable:?}");
         }
-        assert!(unreadable.is_err(), "{unreadable:?}");
     }
 }
