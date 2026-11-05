@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use super::{validation, LifecycleError, LifecycleState, PublicationReadyPacket};
+use super::{support_depth, validation, LifecycleError, LifecycleState, PublicationReadyPacket};
 
 pub(super) fn now_rfc3339() -> Result<String, LifecycleError> {
     OffsetDateTime::now_utc()
@@ -56,6 +56,17 @@ pub fn write_lifecycle_state(
     relative_path: &str,
     state: &LifecycleState,
 ) -> Result<(), LifecycleError> {
+    check_lifecycle_state_write(workspace_root, relative_path, state)?;
+    write_json_file(workspace_root, relative_path, state)
+}
+
+/// Every check `write_lifecycle_state` makes, without writing. A command that writes other files
+/// first runs this before its first write, so a refusal leaves nothing half written.
+pub fn check_lifecycle_state_write(
+    workspace_root: &Path,
+    relative_path: &str,
+    state: &LifecycleState,
+) -> Result<(), LifecycleError> {
     xtask::depth_routes::refuse_workspace(workspace_root, "lifecycle writer")
         .map_err(LifecycleError::Validation)?;
     state.validate()?;
@@ -66,10 +77,20 @@ pub fn write_lifecycle_state(
         "lifecycle writer",
     )
     .map_err(LifecycleError::Validation)?;
-    write_json_file(workspace_root, relative_path, state)
+    check_depth_preserved(workspace_root, relative_path, state)
 }
 
 pub fn write_publication_ready_packet(
+    workspace_root: &Path,
+    relative_path: &str,
+    packet: &PublicationReadyPacket,
+) -> Result<(), LifecycleError> {
+    check_publication_ready_packet_write(workspace_root, relative_path, packet)?;
+    write_json_file(workspace_root, relative_path, packet)
+}
+
+/// Every check `write_publication_ready_packet` makes, without writing.
+pub fn check_publication_ready_packet_write(
     workspace_root: &Path,
     relative_path: &str,
     packet: &PublicationReadyPacket,
@@ -83,6 +104,28 @@ pub fn write_publication_ready_packet(
         &serde_json::to_vec(packet).map_err(|e| LifecycleError::Internal(e.to_string()))?,
         "publication packet writer",
     )
-    .map_err(LifecycleError::Validation)?;
-    write_json_file(workspace_root, relative_path, packet)
+    .map_err(LifecycleError::Validation)
+}
+
+/// Whether writing `state` at `relative_path` would keep the depth fields of the state already
+/// there byte for byte, without writing anything. A writer that makes other changes first calls
+/// this before its first change, so a refusal leaves nothing half written.
+pub fn check_depth_preserved(
+    workspace_root: &Path,
+    relative_path: &str,
+    state: &LifecycleState,
+) -> Result<(), LifecycleError> {
+    let destination =
+        validation::resolve_repo_relative_path_for_write(workspace_root, relative_path)?;
+    let previous = match fs::read(&destination) {
+        Ok(bytes) => Some(bytes),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
+            return Err(LifecycleError::Internal(format!(
+                "read {}: {err}",
+                destination.display()
+            )))
+        }
+    };
+    support_depth::require_preserved(previous.as_deref(), state)
 }

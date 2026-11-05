@@ -21,7 +21,9 @@ use crate::agent_registry::support_depth::{
     DepthEnrollmentDeclaration, LifecyclePath, ObligationId, ObligationTemplate,
 };
 
+pub mod acquisition;
 mod obligations;
+pub mod onboarding;
 pub mod request;
 pub(crate) use obligations::due;
 

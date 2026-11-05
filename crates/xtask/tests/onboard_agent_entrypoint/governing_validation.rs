@@ -7,7 +7,7 @@ use std::{
     process::Command,
 };
 
-use serde_json::Value;
+use serde_json::{json as value, Value};
 
 use super::{
     governing_data::{depth_fixture_args, json, GNU},
@@ -67,7 +67,71 @@ fn scaffolded_manifest_root_passes_manifest_validate_as_written() {
     let output = run_cli(write_args("cursor"), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
 
+    let root = fixture.join("cli_manifests/cursor");
+    let rules = json(&root.join("RULES.json"));
+    assert_eq!(
+        json(&root.join("current.json")),
+        value!({"expected_targets": rules["union"]["expected_targets"], "inputs": []})
+    );
+    assert_eq!(
+        rules["versioning"]["pointers"]["root_pointers_allow_none"],
+        true
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("latest_validated.txt")).unwrap(),
+        "none\n"
+    );
+    let governance = fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance");
+    assert!(json(&governance.join("lifecycle-state.json"))
+        .get("support_depth")
+        .is_none());
+    assert!(!governance.join("approved-agent.toml").exists());
+
     validate_ok(&fixture, "cli_manifests/cursor");
+}
+
+#[test]
+fn bootstrap_current_exception_requires_the_exact_pointer_and_bootstrap_rules() {
+    let fixture = fixture_root("onboard-agent-bootstrap-guards");
+    seed_release_touchpoints(&fixture);
+    seed_published_roots(&fixture);
+    let output = run_cli(write_args("cursor"), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let root = fixture.join("cli_manifests/cursor");
+    let current = json(&root.join("current.json"));
+    let rules = json(&root.join("RULES.json"));
+    let mut extra = current.clone();
+    extra["mode"] = value!("union");
+    let mut wrong_targets = current.clone();
+    wrong_targets["expected_targets"] = value!(["other-target"]);
+    let mut inputs = current.clone();
+    inputs["inputs"] = value!([{}]);
+
+    for (pointer, allow_none, latest) in [
+        (extra, true, "none\n"),
+        (wrong_targets, true, "none\n"),
+        (inputs, true, "none\n"),
+        (current.clone(), false, "none\n"),
+        (current, true, "1.2.3\n"),
+    ] {
+        let mut rules = rules.clone();
+        rules["versioning"]["pointers"]["root_pointers_allow_none"] = value!(allow_none);
+        fs::write(root.join("RULES.json"), rules.to_string()).unwrap();
+        fs::write(root.join("current.json"), pointer.to_string()).unwrap();
+        fs::write(root.join("latest_validated.txt"), latest).unwrap();
+        let output = run_xtask(
+            &fixture,
+            ["manifest-validate", "--root", "cli_manifests/cursor"],
+        );
+        assert_eq!(output.exit_code, 2, "{}", output.stderr);
+        for code in ["CURRENT_WRONG_KIND", "CURRENT_SCHEMA_INVALID"] {
+            assert!(
+                output.stderr.contains(code),
+                "expected {code}:\n{}",
+                output.stderr
+            );
+        }
+    }
 }
 
 /// The schemas are the committed ones and RULES is the synthetic subject's, without what

@@ -10,6 +10,8 @@ use xtask::{agent_lifecycle, agent_registry::AgentRegistry, prepare_publication}
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 use harness::{
     fixture_root, seed_gemini_approval_artifact, sha256_hex, snapshot_files, write_text,
@@ -630,4 +632,16 @@ fn prepare_publication_rejects_capability_continuity_drift() {
         Some("runtime_integrated")
     );
     assert!(!publication_packet_path(&fixture).exists());
+}
+
+/// ON3: `prepare-publication --write` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn prepare_publication_write_preserves_the_lifecycle_depth_object() {
+    let (fixture, approval_path) = prepare_fixture("prepare-publication-depth-object");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
+    let output = run_cli(publication_args("--write", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(state["lifecycle_stage"], "publication_ready");
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
 }
