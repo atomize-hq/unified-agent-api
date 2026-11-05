@@ -361,6 +361,10 @@ only.
      `support_depth/` call sites only.
    - Depends on slices 0, 2, 3 and 4.
 6. **Acquired-input refusal in ON3 to ON5 (OF-P6).**
+   - Slice 6 implemented: ON3–ON5 compare the acquired paths and SHA-256 identities recorded
+     by the shared O derivation, with OF-P2 record/object binding checks, before any write.
+     Installed synthetic-route tests cover each acquired input, deletion, unchanged/P-only
+     freezes and orphaned bindings with byte-identical refusal. Public depth guards remain.
    - Mirror the relay's frozen-input check in `prepare-publication`, `refresh-publication` and
      `close-proving-run` for depth-enrolled generations.
    - Write scope: `prepare_publication/`, `publication_refresh.rs` and `close_proving_run.rs`.

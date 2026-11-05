@@ -1,3 +1,8 @@
+#[cfg(test)]
+#[allow(clippy::duplicate_mod)]
+#[path = "prepare_publication/isolated_entrypoint.rs"]
+pub(crate) mod isolated;
+
 use std::{
     fs,
     io::{self, Write},
@@ -193,6 +198,10 @@ pub fn run_in_workspace<W: Write>(
         xtask::depth_routes::refuse_workspace(workspace_root, "publication_refresh")
             .map_err(Error::Validation)?;
     }
+    run_body(workspace_root, args, writer)
+}
+
+fn run_body<W: Write>(workspace_root: &Path, args: Args, writer: &mut W) -> Result<(), Error> {
     let context = build_context(workspace_root, &args)?;
     let planned_outputs = validate_publication_contract(workspace_root, &context)?;
     write_header(writer, &context, args.write)?;
@@ -290,6 +299,8 @@ pub fn set_test_gate_runner(runner: Option<TestGateRunner>) {
 }
 
 fn build_context(workspace_root: &Path, args: &Args) -> Result<RefreshContext, Error> {
+    crate::prepare_publication::acquired_inputs::check(workspace_root, &args.approval)
+        .map_err(Error::Validation)?;
     let approval =
         load_approval_artifact(workspace_root, &args.approval).map_err(map_approval_error)?;
     let registry =

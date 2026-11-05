@@ -6,6 +6,9 @@ use sha2::{Digest, Sha256};
 #[path = "runtime_follow_on/authority.rs"]
 mod authority;
 
+#[path = "../../prepare_publication/acquired_inputs_tests.rs"]
+mod acquired_inputs_tests;
+
 const PACK: &str = "depth-fixture-cli-onboarding";
 const APPROVAL: &str =
     "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml";
