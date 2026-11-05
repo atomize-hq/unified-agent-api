@@ -609,10 +609,15 @@ impl Resolved {
 /// Read-only bridge for the fixed isolated profiles: CORE from the canonical repository, and the
 /// synthetic profile only through the installed IR-P1 binding. Production consumers never call it.
 /// It always re-authenticates the complete population, whatever E or a staged bundle claims.
+/// With `borrowed`, it evaluates through the caller's host and never resolves one from `root`.
 pub(in crate::depth_evidence) fn isolated_record_results(
     root: &Path,
     record: &DepthRecord,
+    borrowed: Option<&crate::isolated_maintenance::EvidenceHost>,
 ) -> Result<super::super::EvidenceVerdicts, String> {
+    if let Some(host) = borrowed {
+        return borrowed_record_results(root, record, host);
+    }
     let selection = &record.policy.selection;
     let resolved = match (
         selection.agent_id.as_str(),
@@ -629,6 +634,23 @@ pub(in crate::depth_evidence) fn isolated_record_results(
         Ok(resolved) => resolved.evaluate_record(root, record),
         Err(_) => Ok(super::super::EvidenceVerdicts::default()),
     }
+}
+/// Owning-predicate side (CP-P1): only the compiled synthetic profile has an isolated evidence
+/// host, so only its record is evaluated. Failures to authenticate refuse; they never read as
+/// evidence and never fall back to a binding resolved from `root`.
+fn borrowed_record_results(
+    root: &Path,
+    record: &DepthRecord,
+    host: &crate::isolated_maintenance::EvidenceHost,
+) -> Result<super::super::EvidenceVerdicts, String> {
+    let profile = Profile::Synthetic;
+    let selection = &record.policy.selection;
+    if selection.agent_id != profile.agent_id() || selection.enrollment.version != profile.version()
+    {
+        return Err("a borrowed isolated evidence host evaluates only its compiled profile".into());
+    }
+    resolve_profile_in(&Isolated::new(host), root, profile, Some(host))?
+        .evaluate_record(root, record)
 }
 /// MA4 host side (B.4 part 2): authenticate the complete applicable population through the
 /// binding, then assemble reporting E and its referenced files. Only the synthetic profile has an

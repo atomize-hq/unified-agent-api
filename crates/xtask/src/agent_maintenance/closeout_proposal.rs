@@ -103,12 +103,29 @@ impl Proposal {
         self.plan(root, files.to_vec()).map(drop)
     }
 
+    /// The owning authority this proposal admits under (CP-P1): the isolated context it was
+    /// captured with, else production. Only [`Proposal::capture_isolated`] binds a context.
+    pub(crate) fn authority(&self) -> crate::depth_acceptance::Authority<'_> {
+        match &self.isolated {
+            Some(context) => crate::depth_acceptance::Authority::Isolated(context),
+            None => crate::depth_acceptance::Authority::Production,
+        }
+    }
+
     pub(crate) fn plan(
         &self,
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,
     ) -> Result<Vec<PlannedMutation>, String> {
-        self.plan_with(root, files, crate::depth_acceptance::plan_manual_closeout)
+        self.plan_with(root, files, |root, before, after, written| {
+            crate::depth_acceptance::plan_manual_closeout(
+                self.authority(),
+                root,
+                before,
+                after,
+                written,
+            )
+        })
     }
 
     pub(crate) fn plan_with(
@@ -222,7 +239,15 @@ impl Proposal {
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,
     ) -> Result<ApplySummary, String> {
-        self.apply_with(root, files, crate::depth_acceptance::plan_manual_closeout)
+        self.apply_with(root, files, |root, before, after, written| {
+            crate::depth_acceptance::plan_manual_closeout(
+                self.authority(),
+                root,
+                before,
+                after,
+                written,
+            )
+        })
     }
 
     pub(crate) fn apply_with(

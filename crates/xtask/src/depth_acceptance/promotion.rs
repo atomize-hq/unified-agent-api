@@ -48,7 +48,7 @@ pub(super) fn plan_with(
     }
     let registry = AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?;
     let mut outputs = BTreeMap::new();
-    let tip = integration_tip(root)?;
+    let tip = host.integration_tip(root, integration_tip)?;
     for entry in &registry.agents {
         let old = View::with_registry(before.clone(), &registry, &entry.agent_id)?;
         let new = View::with_registry(after.clone(), &registry, &entry.agent_id)?;
@@ -107,7 +107,7 @@ pub(super) fn plan_with(
             );
         }
     }
-    if integration_tip(root)? != tip {
+    if host.integration_tip(root, integration_tip)? != tip {
         return Err("integration tip moved during promotion admission".into());
     }
     Ok(outputs)
