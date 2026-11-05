@@ -48,6 +48,10 @@ pub(super) struct TextMutationPlan {
     pub(super) desired_after: String,
 }
 
+pub(super) fn refuse_unscaffoldable_manifest_root(draft: &DraftEntry) -> Result<(), Error> {
+    governing::refuse_unscaffoldable(draft)
+}
+
 pub(super) fn build_release_preview(
     workspace_root: &Path,
     draft: &DraftEntry,
@@ -297,20 +301,6 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
         (
             Path::new(&draft.manifest_root)
                 .join("versions/.gitkeep")
-                .display()
-                .to_string(),
-            None,
-        ),
-        (
-            Path::new(&draft.manifest_root)
-                .join("pointers/latest_supported/.gitkeep")
-                .display()
-                .to_string(),
-            None,
-        ),
-        (
-            Path::new(&draft.manifest_root)
-                .join("pointers/latest_validated/.gitkeep")
                 .display()
                 .to_string(),
             None,

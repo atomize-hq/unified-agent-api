@@ -236,10 +236,14 @@ fn write_scaffold_preview<W: Write>(
         writeln!(writer, "Path: {path}")
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
         if let Some(contents) = contents {
-            let language = if path.ends_with(".md") {
-                "md"
-            } else {
-                language
+            let language = match std::path::Path::new(path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+            {
+                Some("md") => "md",
+                Some("json") => "json",
+                Some("txt") => "text",
+                _ => language,
             };
             write_code_block(writer, language, contents)?;
         } else {

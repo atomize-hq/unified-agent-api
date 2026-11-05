@@ -20,14 +20,17 @@ Git and cannot be combined with `--mode fix` (exit 3 before any write).
 
 ## Current committed expectations
 
-- The expected targets are the registry entry's canonical targets, in registry order:
-{{TARGET_LIST}}
-- The required target is `{{REQUIRED_TARGET}}`.
+- The expected target is the registry entry's one canonical target, `{{REQUIRED_TARGET}}`
+  (platform `{{REQUIRED_PLATFORM}}`), which is also the required target. Onboarding refuses a
+  root with more than one canonical target until a required-target policy exists.
 - Snapshots declare `"tool": "{{TOOL_NAME}}"`, which `SCHEMA.json` requires.
-- Onboarding writes no version metadata, snapshots, reports or pointer values. The bootstrap
-  `current.json` lists the expected targets only, so the root does not pass this validator until
-  the runtime lane has acquired and promoted a first version; per-version metadata
-  (`versions/<version>.json`) is written by `xtask manifest-version-metadata` at that point.
+- Onboarding installs the bootstrap state: `min_supported.txt`, `latest_validated.txt` and both
+  per-target pointer files set to `none`, a `wrapper_coverage.json` that claims no coverage, and a
+  bootstrap `current.json` that lists the expected target and no inputs. While
+  `latest_validated.txt` is `none`, the validator accepts that bootstrap `current.json`; promotion
+  replaces it with the promoted union snapshot. The root validates as onboarding writes it.
+- Per-version metadata (`versions/<version>.json`) is written by `xtask manifest-version-metadata`
+  once a version is acquired. Onboarding writes none: no version has been acquired.
 - `RULES.json` declares no `parity_exclusions` and no `acquisition` block. Both are reviewed
   follow-up edits once the upstream surface and release source are known.
 

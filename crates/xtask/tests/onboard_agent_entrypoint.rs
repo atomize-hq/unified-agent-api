@@ -10,6 +10,8 @@ mod harness;
 mod approval_mode;
 #[path = "onboard_agent_entrypoint/governing_data.rs"]
 mod governing_data;
+#[path = "onboard_agent_entrypoint/governing_validation.rs"]
+mod governing_validation;
 #[path = "onboard_agent_entrypoint/help_and_preview.rs"]
 mod help_and_preview;
 #[path = "onboard_agent_entrypoint/write_mode.rs"]

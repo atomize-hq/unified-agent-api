@@ -17,6 +17,15 @@ pub(super) fn validate_current_json(
         "CURRENT_INVALID_JSON",
     ) {
         Some(v) => {
+            if latest_validated.is_none()
+                && ctx.root_pointers_allow_none
+                && is_bootstrap_pointer(&v, &ctx.expected_targets)
+            {
+                // Bootstrap mode: the pointer `onboard-agent` writes before any version is
+                // promoted names the expected targets and no inputs. The support matrix reads it
+                // as a root with no current version. Promotion replaces it with a union snapshot.
+                return;
+            }
             schema::schema_validate(
                 ctx,
                 violations,
@@ -145,5 +154,52 @@ pub(super) fn validate_current_json(
             target_triple: Some(required_target),
             details: None,
         });
+    }
+}
+
+/// `{"expected_targets": [...], "inputs": []}` with exactly RULES' expected targets, in order.
+fn is_bootstrap_pointer(value: &Value, expected_targets: &[String]) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    object.len() == 2
+        && object
+            .get("inputs")
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty)
+        && object
+            .get("expected_targets")
+            .and_then(Value::as_array)
+            .is_some_and(|targets| {
+                targets.len() == expected_targets.len()
+                    && targets
+                        .iter()
+                        .zip(expected_targets)
+                        .all(|(target, expected)| target.as_str() == Some(expected.as_str()))
+            })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_bootstrap_pointer;
+    use serde_json::json;
+
+    #[test]
+    fn only_the_exact_onboarding_pointer_is_a_bootstrap_pointer() {
+        let targets = vec!["linux-x64".to_string()];
+        assert!(is_bootstrap_pointer(
+            &json!({"expected_targets": ["linux-x64"], "inputs": []}),
+            &targets
+        ));
+        for value in [
+            json!({"expected_targets": ["darwin-arm64"], "inputs": []}),
+            json!({"expected_targets": [], "inputs": []}),
+            json!({"expected_targets": ["linux-x64"], "inputs": [{}]}),
+            json!({"expected_targets": ["linux-x64"], "inputs": [], "mode": "union"}),
+            json!({"expected_targets": ["linux-x64"]}),
+            json!(["linux-x64"]),
+        ] {
+            assert!(!is_bootstrap_pointer(&value, &targets), "{value}");
+        }
     }
 }

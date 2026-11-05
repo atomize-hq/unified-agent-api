@@ -1,26 +1,64 @@
 //! Governing data that `onboard-agent` scaffolds in a new manifest root: `RULES.json`,
-//! `SCHEMA.json`, `VERSION_METADATA_SCHEMA.json` and `VALIDATOR_SPEC.md`.
+//! `SCHEMA.json`, `VERSION_METADATA_SCHEMA.json`, `VALIDATOR_SPEC.md`, the root version pointers
+//! (`min_supported.txt`, `latest_validated.txt` and each target's pointer files, all `none`) and a
+//! `wrapper_coverage.json` that claims no coverage.
 //!
 //! The templates follow the shape of the committed roots (the synthetic subject's governing
 //! templates in `crates/xtask/tests/fixtures/depth-synthetic/governing/`). Only agent identity,
-//! the manifest root and the canonical targets vary. The scaffold declares no parity exclusions,
+//! the manifest root and the canonical target vary. The scaffold declares no parity exclusions,
 //! no acquisition block and no depth-record path, so the root does not adopt Annex B of the
 //! support-depth contract and cannot hold a depth record.
 
 use std::path::Path;
 
-use super::super::DraftEntry;
+use super::super::{DraftEntry, Error};
 
 const RULES_TEMPLATE: &str = include_str!("templates/RULES.json");
 const SCHEMA_TEMPLATE: &str = include_str!("templates/SCHEMA.json");
 const VERSION_METADATA_SCHEMA_TEMPLATE: &str =
     include_str!("templates/VERSION_METADATA_SCHEMA.json");
 const VALIDATOR_SPEC_TEMPLATE: &str = include_str!("templates/VALIDATOR_SPEC.md");
+/// The value of a version pointer before any version is known (`root_pointers_allow_none`).
+const NO_VERSION: &str = "none\n";
+/// Coverage before the wrapper's generator has run: a schema-valid file that claims nothing.
+const EMPTY_WRAPPER_COVERAGE: &str = "{\n  \"schema_version\": 1,\n  \"coverage\": []\n}\n";
+
+/// Refuse a manifest root the scaffold cannot write truthfully, before any preview or write.
+///
+/// - A root with more than one canonical target needs a required target. `manifest-promote`
+///   advances `current.json` only once that target passes, and the registry declares targets as
+///   an ordered list with no required-target field, so order would silently decide it. Which
+///   target is required is an undecided policy, so the scaffold refuses rather than choose.
+/// - An approval whose `[support_depth]` table states an exact upstream version asks for version
+///   metadata for that version. The version-metadata schema has no status for a version whose
+///   surface was never acquired, and onboarding depth enablement is not wired (roadmap E.6), so
+///   the scaffold refuses rather than write metadata that claims a snapshot.
+pub(crate) fn refuse_unscaffoldable(draft: &DraftEntry) -> Result<(), Error> {
+    if draft.canonical_targets.len() != 1 {
+        return Err(Error::Validation(format!(
+            "onboard-agent scaffolds a manifest root for exactly one canonical target; `{}` declares {} ({}). \
+             No required-target policy decides which target must pass before promotion, so a \
+             multi-target root is refused rather than chosen by target order",
+            draft.agent_id,
+            draft.canonical_targets.len(),
+            draft.canonical_targets.join(", ")
+        )));
+    }
+    if let Some(version) = draft.approval_support_depth_version.as_deref() {
+        return Err(Error::Validation(format!(
+            "approval states `[support_depth].version = \"{version}\"`: onboard-agent cannot write \
+             version metadata for `{version}` before its surface is acquired, and onboarding depth \
+             enablement is not available; refusing"
+        )));
+    }
+    Ok(())
+}
 
 /// The governing files, as `(repo-relative path, contents)` in a fixed order.
 pub(super) fn governing_files(draft: &DraftEntry) -> Vec<(String, String)> {
     let values = TemplateValues::from_draft(draft);
-    [
+    let root = Path::new(&draft.manifest_root);
+    let mut files = [
         ("RULES.json", RULES_TEMPLATE),
         ("SCHEMA.json", SCHEMA_TEMPLATE),
         ("VALIDATOR_SPEC.md", VALIDATOR_SPEC_TEMPLATE),
@@ -31,18 +69,33 @@ pub(super) fn governing_files(draft: &DraftEntry) -> Vec<(String, String)> {
     ]
     .into_iter()
     .map(|(name, template)| {
-        let path = Path::new(&draft.manifest_root)
-            .join(name)
-            .display()
-            .to_string();
         let contents = if name.ends_with(".md") {
             values.render_markdown(template)
         } else {
             values.render_json(template)
         };
-        (path, contents)
+        (root.join(name).display().to_string(), contents)
     })
-    .collect()
+    .collect::<Vec<_>>();
+    files.push((
+        root.join("wrapper_coverage.json").display().to_string(),
+        EMPTY_WRAPPER_COVERAGE.to_string(),
+    ));
+    let mut pointers = vec![
+        "min_supported.txt".to_string(),
+        "latest_validated.txt".to_string(),
+    ];
+    for target in &draft.canonical_targets {
+        pointers.push(format!("pointers/latest_supported/{target}.txt"));
+        pointers.push(format!("pointers/latest_validated/{target}.txt"));
+    }
+    files.extend(pointers.into_iter().map(|pointer| {
+        (
+            root.join(pointer).display().to_string(),
+            NO_VERSION.to_string(),
+        )
+    }));
+    files
 }
 
 /// The `union.tool_name` a root declares and its snapshots must carry: the agent id with `_`
@@ -111,14 +164,11 @@ impl TemplateValues {
     }
 
     fn render_markdown(&self, template: &str) -> String {
-        let target_list = self
-            .targets
-            .iter()
-            .map(|target| format!("  - `{target}` (platform `{}`)", platform_label(target)))
-            .collect::<Vec<_>>()
-            .join("\n");
         template
-            .replace("{{TARGET_LIST}}", &target_list)
+            .replace(
+                "{{REQUIRED_PLATFORM}}",
+                &platform_label(self.required_target()),
+            )
             .replace("{{REQUIRED_TARGET}}", self.required_target())
             .replace("{{MANIFEST_ROOT}}", &self.manifest_root)
             .replace("{{TOOL_NAME}}", &self.tool_name)
