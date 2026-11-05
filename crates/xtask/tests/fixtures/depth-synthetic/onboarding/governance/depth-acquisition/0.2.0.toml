@@ -1,0 +1,51 @@
+# Acquisition statement template (OF-P4 B) for the synthetic depth_fixture onboarding proof.
+# Installed only in the isolated workspace, at
+# docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/depth-acquisition/0.2.0.toml,
+# by a maintainer's change to the integration branch; it takes effect only from there. Replace each
+# {{SHA256}} with the SHA-256 of that path's bytes at the integration tip.
+#
+# Non-normative until the charter revision (slice 1) defines the statement's fields, and no reader
+# exists until slice 2. The inputs are exactly the set the shared O derivation binds (OF-P6) for a
+# complete single-target acquisition (OF-P7). A statement grants nothing by itself.
+agent = "depth_fixture"
+version = "0.2.0"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/RULES.json"
+sha256 = "{{SHA256}}"
+command = "maintainer: install governing template manifest-root/RULES.json"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/SCHEMA.json"
+sha256 = "{{SHA256}}"
+command = "maintainer: install governing template manifest-root/SCHEMA.json"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json"
+sha256 = "{{SHA256}}"
+command = "xtask depth-fixture-snapshot --raw-help-target x86_64-unknown-linux-gnu"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/snapshots/0.2.0/union.json"
+sha256 = "{{SHA256}}"
+command = "xtask manifest-union --version 0.2.0"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/wrapper_coverage.json"
+sha256 = "{{SHA256}}"
+command = "xtask depth-fixture-wrapper-coverage"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json"
+sha256 = "{{SHA256}}"
+command = "xtask manifest-report --version 0.2.0"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json"
+sha256 = "{{SHA256}}"
+command = "xtask manifest-report --version 0.2.0"
+
+[[inputs]]
+path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json"
+sha256 = "{{SHA256}}"
+command = "xtask manifest-report --version 0.2.0"
