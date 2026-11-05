@@ -130,6 +130,22 @@ pub(super) struct Context {
     /// candidate, uses it, and the candidate's in-process checks are bound to it; the relay
     /// refuses any registry change.
     pub(super) registry: Option<crate::isolated_maintenance::CapturedRegistry>,
+    /// The live channel serving evidence this host staged for its candidate, set only under a
+    /// captured isolated route. Its locator grants nothing; the write-phase executor spawn admits
+    /// the executor's process and revokes the channel when it exits.
+    pub(super) evidence_channel: Option<crate::depth_evidence::StagedChannel>,
+    /// What the host itself captured in memory from the write-phase executor, shared by every
+    /// clone of this context. Failure diagnostics are serialized from this, never read back from
+    /// the candidate.
+    pub(super) host_capture: std::sync::Arc<std::sync::Mutex<Option<HostCapture>>>,
+}
+
+/// The executor's output and execution record, as the host received them.
+#[derive(Debug, Clone)]
+pub(super) struct HostCapture {
+    pub(super) execution: CodexExecutionEvidence,
+    pub(super) stdout: Vec<u8>,
+    pub(super) stderr: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]

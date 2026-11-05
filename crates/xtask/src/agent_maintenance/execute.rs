@@ -6,6 +6,8 @@ mod candidate_git;
 mod delivery_index;
 #[path = "execute/guarded.rs"]
 mod guarded;
+#[path = "execute/index_lock.rs"]
+mod index_lock;
 #[path = "execute/packet.rs"]
 mod packet;
 #[path = "execute/runtime.rs"]
