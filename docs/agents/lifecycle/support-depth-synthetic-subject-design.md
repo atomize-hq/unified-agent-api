@@ -268,6 +268,35 @@ Each step is a reviewed PR into `staging`.
        refusal and check that validation preserves caller files and index. These full chains
        require Unix sockets and must run outside the restricted sandbox; publication remains
        unchanged pending B.7b. No workflow is changed (CP-P5).
+   - B.6b connects MA6 to the caller's captured route (G5, G6, G10 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). `build_plan`
+     resolves once and captures the registry; its proposal shares that same `Arc<Route>`.
+     `Proposal::isolated_view` and B.6a's `CapturedRegistry::bind_view` give scratch renderers
+     and canonical validation the captured registry and pinned, read-only caller Git inputs.
+     Scratch never resolves authority. The ordinary, absent-route path retains its production
+     registry and proposal.
+     - Under a route, validation must name HEAD, the local integration tip and the authenticated
+       protected tip. Planning and apply use `Proposal::authority` to run the existing promotion
+       predicate through B.5a's isolated host. Apply rechecks the captured route immediately before
+       delivery. No context is serialized and no new public authority is introduced.
+     - `isolated_maintenance/tests/ma6_promotion.rs` covers both MA5 alternatives through IN1
+       admission and observation, then MA6's pointers, metadata, publication outputs, first
+       `Promotion` entry and marker retirement, followed by IN1 admission and observation.
+       The A.5 replay forks from the committed, IN1-admitted MA5 checkpoint before any MA6;
+       an ordinary non-depth `0.3.0` request and its own closeout replace the working files.
+       MA6 for `0.2.0` then relies on the retained closeout entry alone. A sibling fork changes
+       the wrapper's prompt limit, invalidating the earlier evidence, and must refuse at the
+       producer-closure approval check (`crates` differs from the retained producer build).
+       Each replay advance asserts a clean committed tree, local integration ref and
+       authenticated protected tip; ordinary generation replacement preserves the producer tree.
+       Refusals also cover production/no route, local/authenticated-tip mismatch, route drift
+       before apply and unbound or forged scratch. The production predicate refusal proposes the
+       pointer advance directly: a refused apply leaves new version metadata absent in the caller.
+       Socket-free tests count one route resolution
+       and exercise the ordinary replay generation separately; the full MA4-connected chains
+       require the lead's run outside the socket sandbox.
+     - Publication remains on production verdicts and unqualified throughout this slice. The
+       option A ordering and qualified publication belong to B.7b; no workflow changes here.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

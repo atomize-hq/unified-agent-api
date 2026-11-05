@@ -78,6 +78,9 @@ impl Route {
             registry,
         })
     }
+    pub(crate) fn context(&self) -> &Context {
+        &self.0
+    }
     /// Everything a plan built under this route is bound to: the workspace path, its root and Git
     /// directory identities, the candidate HEAD and index, and the host observation (repository
     /// identities, protected tips, approved source and governing registry).
@@ -94,7 +97,8 @@ impl Route {
     /// MA5 captures its closeout proposal under this route (CP-P1, G2). The proposal borrows the
     /// context as its owning authority; copying the route's files or binding supplies none.
     pub fn proposal(self, root: &Path) -> Result<Proposal, String> {
-        self.0.proposal(root)
+        self.recheck(root)?;
+        Proposal::capture_isolated(root, Arc::new(self))
     }
 }
 /// An opaque, comparable copy of a route's binding. It carries no authority of its own: only a
@@ -149,6 +153,10 @@ impl std::fmt::Debug for CapturedRegistry {
     }
 }
 impl CapturedRegistry {
+    /// MA6's proposal shares the resolved caller route; scratch never resolves another context.
+    pub(crate) fn proposal(&self, root: &Path) -> Result<Proposal, String> {
+        Proposal::capture_isolated(root, self.route.clone())
+    }
     pub(crate) fn registry(&self) -> &AgentRegistry {
         &self.registry
     }
@@ -355,8 +363,7 @@ impl Context {
         Ok(())
     }
     fn proposal(self, root: &Path) -> Result<Proposal, String> {
-        self.recheck(root)?;
-        Proposal::capture_isolated(root, self)
+        Route(self).proposal(root)
     }
     pub(crate) fn evidence_host(&self, root: &Path) -> Result<EvidenceHost, String> {
         self.recheck(root)?;
