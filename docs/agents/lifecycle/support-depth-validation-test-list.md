@@ -312,6 +312,68 @@ Must fail:
 - **Reader of another revision.** A reader written for revision 1 is given an artifact of the next
   revision and reports that no row is depth-enrolled.
 
+## Closeout-published qualification cases (B.7b)
+
+The support-depth contract's Annex A.1, "Closeout-published qualification", states CP-P3
+option A: a closeout publishes the qualification its entry makes, through one MA5 batch, and IN1
+attributes that qualification to the closeout. Slice B.7b of the
+[closeout and promotion design](support-depth-closeout-promotion-design.md) adds these tests. They
+run in process under the cfg(test) isolated route with the fake host, are credential-free and live
+under `crates/xtask/src/isolated_maintenance/tests/` (new `publication.rs`, plus the chain files of
+B.5b, B.5c and B.6b). Every chain test of those slices reruns with option A on; the proofs made
+before B.7 do not carry over.
+
+Must pass:
+
+- **Qualified row through the batch, each writer.** For `close-agent-maintenance` and for
+  `prepare-agent-closeout --write`, the delivered candidate holds the closeout, exactly one new
+  current `MaintenanceCloseout` entry, and the closeout's own agent and version rows published as
+  qualified. The rows equal what the delivered post-entry record derives, and every other path of
+  the batch is one the closeout already owned.
+- **Fresh post-entry evaluation.** The verdicts the rendered rows rest on were evaluated for the
+  post-entry record. A fake host that counts evaluations shows one evaluation after the entry was
+  appended; verdicts from before the append are not reused.
+- **Other rows untouched.** Another agent's rows, other versions of the same agent, the
+  runtime-support projection and capability publication are byte-identical before and after the
+  batch.
+- **IN1 closeout attribution.** IN1 admission (P = T) admits the MA5 candidate and attributes the
+  qualification to closeout; post-push observation passes for the same transition.
+- **MA6 order.** From the admitted MA5 checkpoint, MA6 appends its `Promotion` entry before it
+  renders. Its rendered rows equal what IN1 derives from the delivered post-entry record: the row is
+  already qualified and stays so. IN1 admits the promotion candidate before merge and after the push.
+- **A.5 replay with option A.** The replay forked from the admitted MA5 checkpoint before any MA6
+  still creates the first `Promotion` entry, and its rendered rows equal the derived ones.
+- **Scratch publication.** A verified row is rendered in an MA6 scratch view by the view-aware
+  evaluator (B.7a) and matches the caller-side derivation.
+
+Must fail, each one leaving caller state byte for byte unchanged:
+
+- **Qualification without a closeout entry.** A candidate publishes a newly qualified row and adds
+  no new `MaintenanceCloseout` entry. IN1 attributes it to promotion and refuses.
+- **Entry for another tuple.** The new entry names another agent or another version than the newly
+  qualified row. IN1 refuses.
+- **Closeout and promotion together.** The candidate adds a closeout entry and has a promotion
+  effect. The qualification is attributed to promotion; without promotion authority, IN1 refuses.
+- **Rows outside the closeout.** The MA5 render would change another agent's row, another version's
+  row, the runtime-support projection or capability publication, including by an honest reporting
+  downgrade. MA5 refuses the whole batch.
+- **Changed rendered rows.** The batch's rows are changed between plan and apply, so they differ
+  from what the post-entry record derives. MA5 refuses at apply; the same candidate assembled by
+  hand fails IN1 publication consistency.
+- **Disagreement with admission.** The post-entry evaluation leaves a result the admission relied
+  on unverified (for example, the fake host changes the attempt between admission and evaluation).
+  MA5 refuses; it does not deliver the closeout with downgraded rows.
+- **Pre-entry verdicts.** A batch rendered from verdicts sealed to the pre-entry record is refused.
+- **MA6 rendered before its entry.** Under option A the retained closeout entry already
+  qualifies the row, so rows rendered before and after the `Promotion` entry can be identical; the
+  test does not rely on a row mismatch. It checks the order and the verdict binding directly: the
+  fake host records that the evaluation MA6 renders from observed the record with its `Promotion`
+  entry appended, and an MA6 proposal that offers verdicts sealed to the pre-entry record is
+  refused, whatever the rows say.
+- **Production control.** With no route installed, both MA5 writers and MA6 keep their current
+  refusal on a depth workspace and their ordinary behavior otherwise; production publication still
+  uses `production_results` and stays `unverified`.
+
 ## Open questions for the validator design
 
 - A hand-listed acceptance entry that no closeout, publication or promotion made passes every check
@@ -502,8 +564,10 @@ Must fail:
 - `support-matrix` regenerates every agent's rows. A run made for one agent can find that another
   agent's row would rise because that agent's record now supports it. The support-depth contract
   refuses that acceptance effect for a route without authority and leaves every output unchanged.
-  The closeout routes do not write support rows, so a raise is ordinarily first written by a later
-  regeneration. Decide which route publishes the raise under the owning path's authority, and how a
+  CP-P3 option A (Annex A.1, "Closeout-published qualification") answers this for the closeout's
+  own agent and version: the MA5 batch publishes that raise. A raise of another agent's row that
+  its record now supports still has no publishing route, and MA5 refuses a batch that would write
+  one. Decide which route publishes such a raise under the owning path's authority, and how a
   refused run names the row that blocked it.
 - The support-depth contract's Publication table has an outcome for a qualified forwarding promise
   and none for a qualified promise of another kind. The registry declaration states `forwarding`
@@ -568,3 +632,56 @@ They distinguish reporting changes from acceptance, require current entries and 
 entry-listing exception. D5 tests separately exercise the complete model domain and unsupported
 source/default/feature inputs. No native execution on unavailable hosts or route admission is
 inferred from structural comparisons.
+
+## Executed depth-refusal coverage (Annex A ON1–ON5, NE1–NE8, LW1)
+
+Roadmap B.7 of the
+[machinery-proof rescope](support-depth-machinery-proof-rescope.md). Each route's public
+entrypoint is executed against a workspace that carries the synthetic `depth_fixture` subject
+(`crates/xtask/tests/fixtures/depth-synthetic`) and must fail with its depth refusal and leave
+the tree byte-, type- and mode-identical, with nothing written to its private `TMPDIR`.
+
+`crates/xtask/tests/depth_refusal_routes.rs` copies every tracked file and runs the real `xtask`
+binary from the copy's root with an empty `PATH`, so a route that failed to refuse could not
+reach `git`, `cargo` or an upstream CLI. Each case runs against three depth carriers:
+
+- **Declared:** the registry carries the synthetic entry with its `support_depth` table and the
+  governing manifest root; no record exists yet.
+- **Retained:** the entry stays without its table and the reviewed synthetic record is retained at
+  `cli_manifests/depth_fixture/reports/0.2.0/depth-record.json`.
+- **Orphaned:** the whole entry is gone; the manifest root and record remain.
+
+`isolated_maintenance/tests/unsupported_routes.rs` (in-crate) installs the authenticated
+synthetic isolated route, prepares the subject through MA1/MA2 (declared table, retained record,
+a depth-bearing support bundle) and drives the library entrypoints: the route is MA authority only
+and grants these writers none. A workspace-wide guard reports the declaration first and a
+manifest-scoped guard the record first.
+
+| Route | Entrypoint(s) executed | Executed tests | Earlier coverage reused |
+| --- | --- | --- | --- |
+| ON1 | `onboard-agent --write` | `onboarding::on1_onboard_agent_write_refuses_depth_workspace`; installed route (library) | — |
+| ON2 | `runtime-follow-on --write`, `repair-runtime-evidence --write` | `onboarding::on2_runtime_follow_on_and_repair_runtime_evidence_writes_refuse_depth_workspace`; installed route | — |
+| ON3 | `prepare-publication --write` | `onboarding::on3_prepare_publication_write_refuses_depth_workspace`; installed route | — |
+| ON4 | `refresh-publication --write` | `onboarding::on4_refresh_publication_write_refuses_depth_workspace`; installed route | — |
+| ON5 | `close-proving-run`, `prepare-proving-run-closeout --write` | `onboarding::on5_proving_run_closeout_entrypoints_refuse_depth_workspace`; installed route (`prepare-proving-run-closeout` only: `close_proving_run` is binary-only) | — |
+| NE1 | `support-matrix` (write) → `support_matrix/publication.rs::write_publication_artifacts` | `neutral::ne1_support_matrix_write_refuses_depth_workspace` (declared, orphaned); installed route delivers a route-generated bundle | — |
+| NE2 | `capability-matrix`, `capability-matrix --out` | `neutral::ne2_capability_matrix_write_refuses_depth_workspace` | — |
+| NE3 | `manifest-version-metadata --root`, alias `codex-version-metadata` | `neutral::ne3_version_metadata_and_its_alias_refuse_depth_manifest`; installed route | `depth_promotion.rs::neutral_lower_batch_cannot_write_retained_depth_even_without_a_declaration` (library `run`) |
+| NE4 | `manifest-validate --mode fix`, alias `codex-validate --mode fix` | `neutral::ne4_manifest_validate_fix_mode_and_its_alias_refuse_depth_manifest`; installed route (`violation_codes`) | — |
+| NE5 | `manifest-retain --apply`, alias `codex-retain --apply` | `neutral::ne5_retention_apply_and_its_alias_refuse_depth_manifest` | — |
+| NE6 | `codex-snapshot`, `claude-snapshot`, `opencode-snapshot` with legacy `--out-dir`, including the subject's root and a not-yet-created destination | `neutral::ne6_legacy_snapshot_out_dir_refuses_depth_destination` | — |
+| NE7 | `historical-lifecycle-backfill --all`, `--agent` | `neutral::ne7_historical_lifecycle_backfill_refuses_depth_workspace` | — |
+| NE8 | `runtime-advertising-model` (write) | `neutral::ne8_runtime_advertising_model_write_refuses_depth_workspace` | — |
+| LW1 | `workspace_mutation::apply_mutations`; `agent_lifecycle::{write_lifecycle_state, write_publication_ready_packet}` | `lower::lw1_apply_mutations_refuses_depth_workspace`, `lower::lw1_apply_mutations_refuses_proposed_record_and_enrollment_destinations`, `lower::lw1_lifecycle_and_packet_storage_writers_refuse_depth_workspace`, `lower::lw1_lifecycle_and_packet_storage_writers_refuse_a_record_destination`; installed route | `depth_promotion.rs`: `neutral_lower_batch_cannot_write_retained_depth_even_without_a_declaration`, `nested_root_cannot_hide_retained_depth_from_public_delivery`, `neutral_batch_cannot_introduce_a_record_or_declaration_before_accepting_outputs`, `publication_packet_lower_writer_cannot_overwrite_a_retained_record`, `nested_standalone_manifest_root_cannot_hide_retained_reports`, `empty_inner_anchor_cannot_hide_an_outer_retained_record` |
+
+`copied_workspace_without_synthetic_depth_is_not_refused` is the control: the copied tree without
+the synthetic depth passes the guard, so each refusal above is caused by the depth it carries.
+
+Two refusals come from the registry loader rather than the route guard. With a declared table,
+`support-matrix` and `historical-lifecycle-backfill` load the registry before their writer guard
+and stop at `AgentRegistry::parse`'s `support_depth` refusal (Annex A "Public refusal"); with
+retained or orphaned depth they reach the guard. The **Retained** carrier is not run for NE1:
+with the subject still registered for support publication, the generator first fails on the
+synthetic root's absent `current.json`, which is not a depth refusal.
+
+Every listed entrypoint refuses today; none needed a production change or an ignored test.

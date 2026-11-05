@@ -142,6 +142,15 @@ promote the new backend into the capability generator's runtime inventory.
 
 This is the largest hidden gap found in this review.
 
+Status (2026-11-05): closed. `capability_matrix.rs` no longer holds a backend inventory. The
+generator takes its backend set from the registry's `capability_matrix_enabled` entries, through
+`capability_publication::collect_capability_publication_inventory`, and reads each entry's
+lifecycle state and `current.json`. `tests/c8_spec_capability_matrix_registry_driven.rs` shows
+that those inputs alone reproduce the checked-in matrix, and that an enrolled agent outside the
+compiled built-in list gets its own column with no code change. Runtime advertising still checks
+the registry against the compiled built-in list (`agent_registry::BUILT_IN_AGENTS`); that is the
+SA-P2 built-in boundary, not a capability-matrix inventory.
+
 ### 4. Publication refresh is deterministic, but it is not yet a first-class create-lane consumer
 
 The repo already has deterministic publication surfaces and checks:
