@@ -61,8 +61,9 @@ pub(super) fn load(
     inputs: &mut GitInputs,
     protected: &Source,
     protected_registry: &str,
-    subject: &Subject,
+    tables: &super::DepthTables,
 ) -> Result<AgentRegistry, String> {
+    let subject = tables.subject;
     let bytes = inputs.required(REGISTRY_RELATIVE_PATH)?;
     // Isolated governing data may differ from the ordinary canonical registry. It must already
     // be protected in the fixed isolated repository, and still satisfy this finite scope.
@@ -73,9 +74,9 @@ pub(super) fn load(
     {
         return Err("isolated governing registry differs from protected staging".into());
     }
-    let registry =
-        AgentRegistry::parse_unenforced(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+    // The one accepting parse: full validation, with only the compiled subject's table admitted.
+    let raw = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+    let registry = AgentRegistry::parse_isolated(raw, tables).map_err(|e| e.to_string())?;
     let agent = registry
         .find(subject.agent_id)
         .ok_or("missing isolated subject registry entry")?;
@@ -97,11 +98,6 @@ pub(super) fn load(
         return Err("extra isolated depth enrollment".into());
     }
     selection(&declarations[0], subject)?;
-    for entry in &registry.agents {
-        if entry.agent_id != subject.agent_id && entry.support_depth.is_some() {
-            return Err("extra registered isolated depth scope".into());
-        }
-    }
     let mut records = Vec::new();
     let mut count = 0;
     // Bind inventories including every registered root and orphan/secondary roots. Unlike record_files,

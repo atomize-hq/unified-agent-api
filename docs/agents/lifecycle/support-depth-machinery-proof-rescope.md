@@ -79,6 +79,9 @@ The critical path is A → B → C → D → E. F and G follow and do not block 
 7. **Executed depth-refusal tests** at every ON1–ON5, NE1–NE8 and LW1 entrypoint.
 8. **Registry acceptance of `support_depth` tables** for the isolated profile only. Production
    parsing still refuses them until D.
+   Status: implemented. `AgentRegistry::parse_isolated` is the one accepting parse; only the
+   installed profile mints its admission, for its compiled subject. `AgentRegistry::parse` still
+   refuses every table.
 
 **C. Isolated end-to-end run.** A disposable repository and a temporary runner carry the synthetic
 subject through E1 steps 0–7 and the rejection matrix. The repository and the credential reference
@@ -91,9 +94,11 @@ authorization enables the maintenance path for each agent (contract "Path enable
 1. The charter defines the create-lane P/O freeze point and the committed artifact that records it.
 2. `onboard-agent` writes version metadata, RULES and a validator spec.
 3. The runtime follow-on carries depth identity, and `written-paths.json` integrity is fixed.
-4. Validator specs for `aider` and `gemini_cli`.
+4. Validator specs for `aider` and `gemini_cli`. Written: each states the shared depth checks
+   and lists the truth decisions its root still needs. Neither root has a `RULES.json`, so neither
+   adopts Annex B yet.
 5. Gap-memo items: runtime handoff capability and publication truth, and the hard-coded backend
-   list in `capability_matrix.rs`.
+   list in `capability_matrix.rs`. The backend list is closed: the generator reads the registry.
 6. Wire ON1–ON5 for depth in the isolated workspace only.
 7. Independent new-agent proof in that workspace, reusing the synthetic subject. Maintenance
    evidence does not substitute.
