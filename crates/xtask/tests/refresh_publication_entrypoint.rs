@@ -15,6 +15,8 @@ use xtask::{
 mod drift_harness;
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 use drift_harness::{
     seed_gemini_runtime_integrated_state, seed_publication_inputs, seed_runtime_evidence_run,
@@ -649,4 +651,36 @@ fn refresh_publication_rejects_rerun_after_published_handoff_is_set() {
             "output drifted on rerun: {path}"
         );
     }
+}
+
+/// ON4: `refresh-publication --write` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn refresh_publication_write_preserves_the_lifecycle_depth_object() {
+    let fixture = prepare_publication_ready_fixture(
+        "refresh-publication-depth-object",
+        SUPPORT_AND_CAPABILITY,
+    );
+    seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
+    write_preflight_makefile(&fixture, true);
+    let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
+    // The packet binds the lifecycle state's digest, so it is bound again after the injection.
+    let mut packet = read_json(&publication_packet_path(&fixture));
+    packet["lifecycle_state_sha256"] = Value::String(sha256_hex(&lifecycle_state_path(&fixture)));
+    fs::write(
+        publication_packet_path(&fixture),
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&packet).expect("packet")
+        ),
+    )
+    .expect("write packet");
+
+    let output = run_cli(refresh_args("--write"), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(state["lifecycle_stage"], "published");
+    assert_eq!(
+        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
+        object
+    );
 }

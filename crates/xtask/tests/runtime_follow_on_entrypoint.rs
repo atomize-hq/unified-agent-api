@@ -5,6 +5,8 @@ use serde_json::Value;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 #[path = "support/runtime_follow_on_harness.rs"]
 mod runtime_harness;
 
@@ -521,4 +523,41 @@ fn runtime_follow_on_write_marks_blocked_when_handoff_reports_exact_blockers() {
         .expect("blocking_issues array")
         .iter()
         .any(|value| value.as_str() == Some("Upstream runtime dependency is not yet available.")));
+}
+
+/// ON2: the write run keeps the lifecycle state's `support_depth` object byte for byte (OF-P2).
+#[test]
+fn runtime_follow_on_write_preserves_the_lifecycle_depth_object() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-depth-object");
+    let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    assert_eq!(
+        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
+        object
+    );
+    write_fake_codex_scenario(&fixture, "success");
+    let binary = fake_codex_binary_with_exact_commands(&fixture);
+    let output = run_cli(
+        runtime_args_with_binary("--write", &approval_path, &binary),
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(state["lifecycle_stage"], "runtime_integrated");
+    assert_eq!(
+        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
+        object
+    );
 }

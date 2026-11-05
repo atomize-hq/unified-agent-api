@@ -4,6 +4,7 @@
 //! With `--tip`, the merge child adds checks 2, 4 and 9; parsing both records also decides check 11.
 
 pub(super) mod merge;
+mod onboarding;
 
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -96,8 +97,8 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         }
     }
 
-    // Checks 1 and 3, against the standing request. The onboarding path has no second statement
-    // of P and O yet, so these checks are decided on the maintenance path only.
+    // Checks 1 and 3, against the standing request on the maintenance path, and against the
+    // lifecycle state's `support_depth` object on the onboarding path (below).
     let request_path = workspace.join(agent_lifecycle::maintenance_request_path(&entry.agent_id));
     // A request that is absent is no request. One that is there and cannot be read fails, as a
     // record that cannot be read does; a dangling symlink is there.
@@ -153,6 +154,8 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
             }
         }
     }
+
+    onboarding::validate_onboarding_binding(&workspace, entry, &records, &mut fail);
 
     // Check 10: a lifecycle stage or closeout evidence id reports a file the revision holds.
     if files.is_empty() {

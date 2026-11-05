@@ -9,6 +9,8 @@ mod close_proving_run;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 #[path = "onboard_agent_closeout_preview/approval_artifact_validation.rs"]
 mod approval_artifact_validation;

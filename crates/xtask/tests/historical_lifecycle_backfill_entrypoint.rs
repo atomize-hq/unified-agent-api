@@ -19,6 +19,8 @@ use xtask::{
 #[allow(dead_code)]
 #[path = "../src/historical_lifecycle_backfill.rs"]
 mod historical_lifecycle_backfill;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
@@ -369,4 +371,24 @@ fn sha256_pretty_json<T: serde::Serialize>(value: &T) -> String {
     let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
     bytes.push(b'\n');
     hex::encode(Sha256::digest(bytes))
+}
+
+/// NE7: `historical-lifecycle-backfill` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn historical_lifecycle_backfill_preserves_the_lifecycle_depth_object() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-object");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(lifecycle_depth::depth_object_bytes(&lifecycle_path), object);
 }

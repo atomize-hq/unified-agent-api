@@ -297,3 +297,26 @@ fn onboard_agent_write_rejects_symlink_escape_paths() {
         .stderr
         .contains("docs/agents/lifecycle/linked/escape-pack"));
 }
+
+/// ON1: `onboard-agent --write` only creates the lifecycle state. A replay over a state that
+/// carries a `support_depth` object is refused as divergent and leaves it byte for byte (OF-P2).
+#[test]
+fn onboard_agent_write_never_rewrites_a_lifecycle_depth_object() {
+    let fixture = fixture_root("onboard-agent-depth-object");
+    seed_release_touchpoints(&fixture);
+    let first = run_cli(write_args("cursor"), &fixture);
+    assert_eq!(first.exit_code, 0, "stderr:\n{}", first.stderr);
+
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/cursor-cli-onboarding/governance/lifecycle-state.json");
+    let object = super::lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let before = snapshot_files(&fixture);
+    let second = run_cli(write_args("cursor"), &fixture);
+    assert_eq!(second.exit_code, 2, "stderr:\n{}", second.stderr);
+    assert!(second.stderr.contains("divergent"), "{}", second.stderr);
+    assert_eq!(before, snapshot_files(&fixture));
+    assert_eq!(
+        super::lifecycle_depth::depth_object_bytes(&lifecycle_path),
+        object
+    );
+}

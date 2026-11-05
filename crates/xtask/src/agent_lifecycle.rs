@@ -1,5 +1,6 @@
 mod maintenance_adoption;
 mod storage;
+mod support_depth;
 mod validation;
 
 use std::path::Path;
@@ -17,6 +18,7 @@ use self::validation::{
     validate_subset, validate_template_lineage, validate_unique_copy,
 };
 use crate::agent_registry::AgentRegistryEntry;
+pub use crate::depth_record::onboarding::LifecycleDepth;
 
 pub const LIFECYCLE_SCHEMA_VERSION: &str = "1";
 pub const LIFECYCLE_DOCS_ROOT: &str = "docs/agents/lifecycle";
@@ -282,12 +284,14 @@ const CLOSED_BASELINE_MINIMUM_EVIDENCE: [EvidenceId; 12] = [
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DeferredSurface {
     pub surface: LandedSurface,
     pub reason: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ImplementationSummary {
     pub requested_runtime_profile: RuntimeProfile,
     pub achieved_runtime_profile: RuntimeProfile,
@@ -298,7 +302,9 @@ pub struct ImplementationSummary {
     pub minimal_profile_justification: Option<String>,
 }
 
+/// Unknown keys are refused, so no writer can drop a field it does not know (OF-P2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LifecycleState {
     pub schema_version: String,
     pub agent_id: String,
@@ -325,6 +331,12 @@ pub struct LifecycleState {
     pub maintenance_readiness_adoption_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maintenance_readiness_adoption_sha256: Option<String>,
+    /// OF-P2: the second statement of the depth record's P and O identities.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub support_depth: Option<LifecycleDepth>,
+    /// OF-P9 check (i): SHA-256 of a passing depth-enrolled write run's `written-paths.json`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written_paths_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -411,6 +423,7 @@ impl LifecycleState {
             &self.closeout_baseline_path,
         )?;
         maintenance_adoption::validate_state_fields(self)?;
+        support_depth::validate_state_fields(self)?;
         validate_stage_field_presence(
             self.lifecycle_stage,
             "publication_packet_path",

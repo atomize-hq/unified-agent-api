@@ -12,6 +12,8 @@ use xtask::{
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 use harness::{fixture_root, seed_gemini_approval_artifact, sha256_hex, write_text, HarnessOutput};
 
@@ -507,4 +509,16 @@ fn write_json(path: &Path, value: &Value) {
     let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
     bytes.push(b'\n');
     fs::write(path, bytes).expect("write json");
+}
+
+/// ON2: `repair-runtime-evidence --write` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn repair_runtime_evidence_write_preserves_the_lifecycle_depth_object() {
+    let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-depth-object");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let output = run_cli(repair_args("--write", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(lifecycle_depth::depth_object_bytes(&lifecycle_path), object);
 }

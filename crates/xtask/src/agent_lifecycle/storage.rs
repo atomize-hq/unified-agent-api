@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use super::{validation, LifecycleError, LifecycleState, PublicationReadyPacket};
+use super::{support_depth, validation, LifecycleError, LifecycleState, PublicationReadyPacket};
 
 pub(super) fn now_rfc3339() -> Result<String, LifecycleError> {
     OffsetDateTime::now_utc()
@@ -66,6 +66,19 @@ pub fn write_lifecycle_state(
         "lifecycle writer",
     )
     .map_err(LifecycleError::Validation)?;
+    let destination =
+        validation::resolve_repo_relative_path_for_write(workspace_root, relative_path)?;
+    let previous = match fs::read(&destination) {
+        Ok(bytes) => Some(bytes),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
+            return Err(LifecycleError::Internal(format!(
+                "read {}: {err}",
+                destination.display()
+            )))
+        }
+    };
+    support_depth::require_preserved(previous.as_deref(), state)?;
     write_json_file(workspace_root, relative_path, state)
 }
 
