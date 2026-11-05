@@ -29,6 +29,9 @@ pub(super) struct Subject {
     /// Whether maintainer-approved per-unit classification rows are in scope. Rows may select only
     /// `CORE`, so the scope's obligation set never widens; the basis is checked at acquisition.
     pub classified: bool,
+    /// Whether the onboarding proof selection (evidence contract, "Synthetic onboarding proof
+    /// selection") is in scope. It is a proof workspace only and enables no onboarding path.
+    pub onboarding: bool,
 }
 /// Codex qualification subject (MP-P2): unchanged from the IR-P2 binding.
 pub(super) const CODEX: Subject = Subject {
@@ -42,6 +45,7 @@ pub(super) const CODEX: Subject = Subject {
     shared_mapping: SharedMapping::Mapped,
     capability: Some("agent_api.run"),
     classified: false,
+    onboarding: false,
 };
 /// Synthetic machinery-proof subject (MP-P1, SA-P3). It qualifies no real agent.
 pub(super) const SYNTHETIC: Subject = Subject {
@@ -55,6 +59,7 @@ pub(super) const SYNTHETIC: Subject = Subject {
     shared_mapping: SharedMapping::WrapperOnly,
     capability: None,
     classified: true,
+    onboarding: true,
 };
 pub(super) fn load(
     root: &Path,
@@ -87,15 +92,20 @@ pub(super) fn load(
         .support_depth
         .as_ref()
         .ok_or("missing isolated depth declaration")?;
-    if table.enabled_paths.as_deref() != Some(&[LifecyclePath::Maintenance]) {
-        return Err("isolated scope supports maintenance only".into());
-    }
+    // One lifecycle path per isolated workspace: its one enrollment is on exactly that path.
+    let enabled = match table.enabled_paths.as_deref() {
+        Some([path]) => *path,
+        _ => return Err("isolated scope supports exactly one lifecycle path".into()),
+    };
     let declarations = table
         .enrollments
         .as_deref()
         .ok_or("missing isolated enrollment")?;
     if declarations.len() != 1 {
         return Err("extra isolated depth enrollment".into());
+    }
+    if declarations[0].lifecycle_path != enabled {
+        return Err("isolated enrollment is not on the enabled lifecycle path".into());
     }
     selection(&declarations[0], subject)?;
     let mut records = Vec::new();
@@ -119,7 +129,11 @@ pub(super) fn load(
             subject.agent_id,
             subject.version,
         )?;
-        if !matches!(record.event, Event::Maintenance { .. })
+        let event_path = match record.event {
+            Event::Maintenance { .. } => LifecyclePath::Maintenance,
+            Event::Onboarding { .. } => LifecyclePath::Onboarding,
+        };
+        if event_path != enabled
             || !record.policy.path_enabled
             || !same_selection(
                 &record.policy.selection.enrollment,
@@ -143,14 +157,18 @@ pub(super) fn selection(
     let modes = &declaration.modes;
     let operations = &declaration.operations;
     let mappings = &declaration.capabilities;
-    if declaration.lifecycle_path != LifecyclePath::Maintenance
+    let path_in_scope = match declaration.lifecycle_path {
+        LifecyclePath::Maintenance => true,
+        LifecyclePath::Onboarding => subject.onboarding,
+    };
+    if !path_in_scope
         || declaration.version != subject.version
         || declaration.targets != [subject.target]
         || modes.len() != 1
         || operations.len() != 1
         || mappings.len() != usize::from(subject.capability.is_some())
     {
-        return Err("unsupported isolated maintenance selection".into());
+        return Err("unsupported isolated selection".into());
     }
     let mode = &modes[0];
     if mode.selector != subject.selector
