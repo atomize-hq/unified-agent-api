@@ -10,6 +10,8 @@ mod guarded;
 mod packet;
 #[path = "execute/runtime.rs"]
 mod runtime;
+#[cfg(all(test, unix))]
+pub(crate) use runtime::gate_stub;
 #[path = "execute/tree.rs"]
 mod tree;
 #[path = "execute/types.rs"]
@@ -44,7 +46,7 @@ pub(super) const CODEX_STDOUT_FILE_NAME: &str = "codex-stdout.log";
 pub(super) const CODEX_STDERR_FILE_NAME: &str = "codex-stderr.log";
 pub(super) const WORKFLOW_VERSION: &str = "agent_maintenance_execute_v1";
 pub(super) const CODEX_BINARY_ENV: &str = "XTASK_AGENT_MAINTENANCE_CODEX_BINARY";
-pub(super) const PREFLIGHT_SENTINEL: &str = "UAA_AGENT_MAINTENANCE_PREFLIGHT_OK";
+pub(crate) const PREFLIGHT_SENTINEL: &str = "UAA_AGENT_MAINTENANCE_PREFLIGHT_OK";
 
 #[derive(Debug, Parser, Clone)]
 #[command(group(

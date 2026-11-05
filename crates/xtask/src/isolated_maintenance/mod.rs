@@ -51,6 +51,14 @@ impl Route {
     pub fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
         self.0.registry(root)
     }
+    /// MA4 captures the route once, in the caller workspace, after the same recheck.
+    pub(crate) fn capture(self, root: &Path) -> Result<CapturedRegistry, String> {
+        let registry = self.0.registry(root)?.clone();
+        Ok(CapturedRegistry {
+            route: Arc::new(self),
+            registry,
+        })
+    }
     /// Everything a plan built under this route is bound to: the workspace path, its root and Git
     /// directory identities, the candidate HEAD and index, and the host observation (repository
     /// identities, protected tips, approved source and governing registry).
@@ -85,10 +93,14 @@ pub fn route(root: &Path) -> Result<Option<Route>, String> {
     route_in(root, LIVE_PROFILE, Arc::new(host::Github))
 }
 /// The registry an MA2 read route uses (acquisition plan, validation, stand-down check, support
-/// matrix, audit status). A resolved isolated route yields its scoped registry, rechecked against
-/// the workspace, inputs and host. Otherwise this is the production load, with every refusal it
+/// matrix, audit status), plus capability publication. A resolved isolated route yields its scoped
+/// registry, rechecked against the workspace, inputs and host; inside a bound MA4 candidate, the
+/// registry its execution captured. Otherwise this is the production load, with every refusal it
 /// keeps, `support_depth` included. A failing installed route errors; it never falls back.
 pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
+    if let Some(registry) = candidate_registry(root) {
+        return Ok(registry);
+    }
     match route(root).map_err(RegistryError::Isolated)? {
         Some(route) => route
             .registry(root)
@@ -96,6 +108,77 @@ pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
             .map_err(RegistryError::Isolated),
         None => AgentRegistry::load(root).map_err(|err| RegistryError::Production(err.to_string())),
     }
+}
+/// A resolved route and its scoped registry, captured when an MA4 execution started. Only
+/// [`Route::capture`] mints one. MA4's independent candidate cannot resolve the route itself, so
+/// its in-process checks use this registry for that candidate's exact root while a
+/// [`CandidateRegistry`] guard is held; the relay separately refuses any registry change, and
+/// [`CapturedRegistry::recheck`] re-authenticates the caller before delivery.
+#[derive(Clone)]
+pub(crate) struct CapturedRegistry {
+    route: Arc<Route>,
+    registry: AgentRegistry,
+}
+impl std::fmt::Debug for CapturedRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CapturedRegistry(..)")
+    }
+}
+impl CapturedRegistry {
+    pub(crate) fn registry(&self) -> &AgentRegistry {
+        &self.registry
+    }
+    /// Recheck the captured route against the caller workspace, inputs and host.
+    pub(crate) fn recheck(&self, caller: &Path) -> Result<(), String> {
+        self.route.recheck(caller)
+    }
+    /// Make this registry the routed registry of `candidate` on this thread until the guard drops.
+    /// The candidate must be an independent clone of the captured caller: its HEAD descends from
+    /// the caller's captured HEAD, and its registry equals the captured registry.
+    pub(crate) fn bind_candidate(&self, candidate: &Path) -> Result<CandidateRegistry, String> {
+        let root = fs::canonicalize(candidate).map_err(|e| e.to_string())?;
+        if root == self.route.0.root {
+            return Err("an MA4 candidate must be independent of the caller workspace".into());
+        }
+        let not_checkout = || "MA4 candidate is not a checkout of the captured caller".to_string();
+        let caller_head = &self.route.0.workspace.head;
+        git(&root, &["merge-base", "--is-ancestor", caller_head, "HEAD"])
+            .map_err(|_| not_checkout())?;
+        let raw = fs::read_to_string(root.join(crate::agent_registry::REGISTRY_RELATIVE_PATH))
+            .map_err(|_| not_checkout())?;
+        if AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())? != self.registry {
+            return Err(not_checkout());
+        }
+        CANDIDATE.with(|bound| {
+            let mut bound = bound.borrow_mut();
+            if bound.is_some() {
+                return Err("an MA4 candidate registry is already bound on this thread".to_string());
+            }
+            *bound = Some((root, self.registry.clone()));
+            Ok(CandidateRegistry(std::marker::PhantomData))
+        })
+    }
+}
+std::thread_local! {
+    static CANDIDATE: std::cell::RefCell<Option<(PathBuf, AgentRegistry)>> =
+        const { std::cell::RefCell::new(None) };
+}
+/// Unbinds the candidate registry on drop. Not `Send`: it must drop on the thread that bound it.
+pub(crate) struct CandidateRegistry(std::marker::PhantomData<*const ()>);
+impl Drop for CandidateRegistry {
+    fn drop(&mut self) {
+        CANDIDATE.with(|bound| *bound.borrow_mut() = None);
+    }
+}
+fn candidate_registry(root: &Path) -> Option<AgentRegistry> {
+    let root = fs::canonicalize(root).ok()?;
+    CANDIDATE.with(|bound| {
+        bound
+            .borrow()
+            .as_ref()
+            .filter(|(candidate, _)| *candidate == root)
+            .map(|(_, registry)| registry.clone())
+    })
 }
 /// Which load failed. A caller that tolerates a production load failure, because another check
 /// already reports it, must still report a failing isolated route.

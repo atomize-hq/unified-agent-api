@@ -15,8 +15,8 @@ use super::{
 };
 
 pub(super) fn build_context(workspace_root: &Path, args: &Args) -> Result<Context, Error> {
-    let validated_envelope =
-        request::load_request_envelope_validated(workspace_root, &args.request)?;
+    let registry = captured_registry(workspace_root)?;
+    let validated_envelope = load_request(workspace_root, &args.request, registry.as_ref())?;
     let envelope = validated_envelope.envelope;
     if !envelope.request.is_automated_watch_request() {
         return Err(Error::Validation(format!(
@@ -30,9 +30,29 @@ pub(super) fn build_context(workspace_root: &Path, args: &Args) -> Result<Contex
         .require_execution_contract_for_relay()
         .map_err(Error::from)?
         .clone();
-    let rendered_packet =
-        docs::render_execution_packet(workspace_root, &envelope.request, &execution_contract)
-            .map_err(Error::Validation)?;
+    let rendered_packet = match &registry {
+        Some(registry) => {
+            let entry = registry
+                .registry()
+                .find(&envelope.request.agent_id)
+                .ok_or_else(|| {
+                    Error::Validation(format!(
+                        "unknown agent_id `{}` in the isolated maintenance route",
+                        envelope.request.agent_id
+                    ))
+                })?;
+            docs::render_execution_packet_for_entry(
+                workspace_root,
+                &envelope.request,
+                &execution_contract,
+                entry,
+            )
+        }
+        None => {
+            docs::render_execution_packet(workspace_root, &envelope.request, &execution_contract)
+        }
+    }
+    .map_err(Error::Validation)?;
     let detected_release = envelope.request.detected_release.as_ref().ok_or_else(|| {
         Error::Validation(format!(
             "maintenance request `{}` is missing detected_release metadata",
@@ -90,7 +110,35 @@ pub(super) fn build_context(workspace_root: &Path, args: &Args) -> Result<Contex
         rendered_packet,
         closeout_command,
         input_contract,
+        registry,
     })
+}
+
+/// MA4 resolves the isolated route once, in the caller workspace. Without one this is `None` and
+/// every load stays the production load with all its refusals; a failing installed route errors.
+fn captured_registry(
+    workspace_root: &Path,
+) -> Result<Option<crate::isolated_maintenance::CapturedRegistry>, Error> {
+    let isolated = |err: String| Error::Validation(format!("isolated maintenance route: {err}"));
+    match crate::isolated_maintenance::route(workspace_root).map_err(isolated)? {
+        Some(route) => Ok(Some(route.capture(workspace_root).map_err(isolated)?)),
+        None => Ok(None),
+    }
+}
+
+fn load_request(
+    workspace_root: &Path,
+    request_path: &Path,
+    registry: Option<&crate::isolated_maintenance::CapturedRegistry>,
+) -> Result<request::ValidatedMaintenanceRequestEnvelope, request::MaintenanceRequestError> {
+    match registry {
+        Some(captured) => request::load_request_envelope_captured(
+            workspace_root,
+            request_path,
+            captured.registry(),
+        ),
+        None => request::load_request_envelope_validated(workspace_root, request_path),
+    }
 }
 
 pub(super) fn execute_dry_run<W: Write>(
@@ -329,7 +377,7 @@ fn revalidate_request_after_write(
     errors: &mut Vec<String>,
 ) -> Result<Option<request::AuditReconciliation>, Error> {
     let request_path = Path::new(&context.envelope.request.relative_path);
-    match request::load_request_envelope_validated(workspace_root, request_path) {
+    match load_request(workspace_root, request_path, context.registry.as_ref()) {
         Ok(validated_envelope) => {
             let reconciliation = validated_envelope
                 .support_surface_audit_reconciliation
@@ -363,7 +411,7 @@ fn load_current_support_surface_reconciliation(
     context: &Context,
 ) -> Result<Option<request::AuditReconciliation>, Error> {
     let request_path = Path::new(&context.envelope.request.relative_path);
-    let validated_envelope = request::load_request_envelope_validated(workspace_root, request_path)
+    let validated_envelope = load_request(workspace_root, request_path, context.registry.as_ref())
         .map_err(Error::from)?;
     Ok(validated_envelope.support_surface_audit_reconciliation)
 }

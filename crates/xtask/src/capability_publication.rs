@@ -12,7 +12,7 @@ use crate::{
         self, approval_artifact_path_for_entry, lifecycle_state_path_for_entry,
         load_lifecycle_state, LifecycleStage,
     },
-    agent_registry::{AgentRegistry, AgentRegistryEntry},
+    agent_registry::AgentRegistryEntry,
     approval_artifact::load_approval_artifact,
     capability_projection::{
         project_advertised_capabilities, resolve_capability_publication_target,
@@ -64,7 +64,8 @@ struct PublicationContext {
 pub fn collect_capability_publication_inventory(
     workspace_root: &Path,
 ) -> Result<CapabilityPublicationInventory, String> {
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| err.to_string())?;
+    let registry =
+        crate::isolated_maintenance::registry(workspace_root).map_err(|err| err.to_string())?;
     let mut backends = BTreeMap::<String, AgentWrapperCapabilities>::new();
     let mut eligible_entries = Vec::<&AgentRegistryEntry>::new();
 
@@ -125,7 +126,8 @@ pub fn collect_agent_capabilities(
     workspace_root: &Path,
     agent_id: &str,
 ) -> Result<AgentWrapperCapabilities, String> {
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| err.to_string())?;
+    let registry =
+        crate::isolated_maintenance::registry(workspace_root).map_err(|err| err.to_string())?;
     let entry = registry.find(agent_id).ok_or_else(|| {
         format!(
             "capability publication registry entry `{agent_id}` is not present in {}",

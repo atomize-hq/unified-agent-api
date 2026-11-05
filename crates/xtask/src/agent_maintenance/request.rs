@@ -299,7 +299,23 @@ pub(crate) fn load_request_envelope_routed(
     })
 }
 
-// Only private isolated tests and the routed loader above supply another registry loader. Every
+/// MA4 reload under the registry its execution captured when it started (a resolved isolated
+/// route's scoped registry). The independent candidate cannot resolve that route itself, and the
+/// relay refuses any registry change, so the captured registry is the candidate's registry.
+pub(crate) fn load_request_envelope_captured(
+    workspace_root: &Path,
+    request_path: &Path,
+    registry: &AgentRegistry,
+) -> Result<ValidatedMaintenanceRequestEnvelope, MaintenanceRequestError> {
+    load_request_with_registry(
+        workspace_root,
+        request_path,
+        AuditDriftPolicy::Reject,
+        |_| Ok(registry.clone()),
+    )
+}
+
+// Only private isolated tests and the routed and captured loaders above supply another registry loader. Every
 // exported loader, including drift-tolerant loading, retains the normal production refusal.
 fn load_request_with_registry(
     workspace_root: &Path,

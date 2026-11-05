@@ -206,6 +206,16 @@ pub fn render_execution_packet(
     render_execution_packet_with_entry(workspace_root, request, execution_contract, &entry)
 }
 
+/// MA4 renders with the registry entry its execution captured from a resolved isolated route.
+pub(crate) fn render_execution_packet_for_entry(
+    workspace_root: &Path,
+    request: &MaintenanceRequest,
+    execution_contract: &ExecutionContract,
+    entry: &AgentRegistryEntry,
+) -> Result<RenderedExecutionPacket, String> {
+    render_execution_packet_with_entry(workspace_root, request, execution_contract, entry)
+}
+
 fn render_execution_packet_with_entry(
     workspace_root: &Path,
     request: &MaintenanceRequest,

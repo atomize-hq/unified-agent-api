@@ -17,6 +17,14 @@ pub(super) fn execute_write_mode<W: Write>(
     let (prepared, prompt) = load_prepared_packet(context)?;
     validate_prepared_packet(context, &prepared, &prompt)?;
     let candidate = Candidate::prepare(caller, context)?;
+    // The candidate cannot resolve the isolated route; bind the registry this execution captured
+    // to its exact root for every in-process check below. Nothing has executed yet.
+    let _bound = context
+        .registry
+        .as_ref()
+        .map(|captured| captured.bind_candidate(&candidate.root))
+        .transpose()
+        .map_err(Error::Validation)?;
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
     let execution =
@@ -94,7 +102,17 @@ pub(super) fn execute_write_mode<W: Write>(
         candidate.before.clone()
     };
     delivery.extend(diagnostics);
-    let copied = candidate.deliver(caller, &delivery, passed);
+    // Re-authenticate the captured isolated route before anything reaches the caller.
+    let copied = match context
+        .registry
+        .as_ref()
+        .map(|captured| captured.recheck(caller))
+    {
+        Some(Err(e)) if passed => Err(Error::Validation(format!(
+            "isolated maintenance route changed during execution: {e}"
+        ))),
+        _ => candidate.deliver(caller, &delivery, passed),
+    };
     if let Err(e) = copied {
         report.status = "fail".into();
         report.errors.push(format!("delivery refused: {e}"));

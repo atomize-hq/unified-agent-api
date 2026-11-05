@@ -115,6 +115,29 @@ Each step is a reviewed PR into `staging`.
      MA1 had published one. Validation now runs in its own step after publication and before
      delivery; the isolated proof asserts the pre-publication refusal.
 
+   - B.4 (MA4) decisions, approved by the maintainer on 2026-11-03:
+     - E is written by a new xtask command that the MA4 executor runs inside the candidate. It
+       works only under an installed isolated route, and production keeps refusing it. The relay
+       delivers only that reporting E, and the audit re-evaluates it independently.
+     - The green gates keep `codex-validate --root <manifest_root>`. It is the agent-general
+       validator under its old name, and the request loader requires every frozen gate list to
+       equal the current contract, so a rename would invalidate the committed Codex, Claude Code
+       and OpenCode requests. The rename is later cleanup.
+   - B.4 part 1 routes `execute-agent-maintenance` through the isolated context. It resolves the
+     route once, in the caller workspace, and keeps a `CapturedRegistry` that only
+     `Route::capture` mints. Every later request reload uses it. The independent candidate cannot
+     resolve the route, so while the guarded run checks the candidate, the captured registry is
+     bound to that candidate's exact root for in-process checks. Binding requires an independent
+     clone whose HEAD descends from the caller's captured HEAD and whose registry equals the
+     captured one; the guard is thread-bound. The relay still refuses any registry change, and the
+     captured route is rechecked against the caller before delivery. Capability publication now
+     loads through `isolated_maintenance::registry` too. Without a route, every load keeps the
+     production `support_depth` refusal.
+   - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
+     see neither the route nor the bound registry. `capability-matrix --check` and
+     `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the
+     gates; the real run needs a decided gate route.
+
 ## Open risk
 
 The fixture CLI's surface must be big enough for every resolved CORE obligation (R/V/G/E/A/X,
