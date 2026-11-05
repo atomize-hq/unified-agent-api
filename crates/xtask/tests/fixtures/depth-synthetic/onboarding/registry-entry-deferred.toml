@@ -1,0 +1,65 @@
+# Isolated-repository registry entry for the synthetic depth_fixture subject's onboarding proof
+# (onboarding freeze decisions, slice 0). A template for the isolated workspace only: the
+# canonical registry never lists this agent. It is the maintenance template
+# (`../governing/registry-entry.toml`) with two differences:
+# - no `[agents.maintenance]` table, so no `maintenance.release_watch`, matching an approval that
+#   states `explicitly_deferred` (OF-P3 A);
+# - the one enrollment is on the onboarding path, which is the workspace's only enabled path.
+# It has no placeholders.
+[[agents]]
+agent_id = "depth_fixture"
+display_name = "Depth Fixture"
+crate_path = "crates/depth_fixture"
+manifest_root = "cli_manifests/depth_fixture"
+package_name = "unified-agent-api-depth-fixture"
+canonical_targets = ["x86_64-unknown-linux-gnu"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/depth_fixture"
+
+[agents.capability_declaration]
+always_on = []
+backend_extensions = []
+
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = false
+
+[agents.release]
+docs_release_track = "unpublished"
+
+[agents.scaffold]
+onboarding_pack_prefix = "depth-fixture-cli-onboarding"
+
+[agents.support_depth]
+enabled_paths = ["onboarding"]
+
+[[agents.support_depth.enrollments]]
+lifecycle_path = "onboarding"
+version = "0.2.0"
+targets = ["x86_64-unknown-linux-gnu"]
+
+[[agents.support_depth.enrollments.modes]]
+selector = "run-json"
+command_path = "depth_fixture run"
+mode = "headless"
+predicates = [{ flag = "--json" }]
+
+[[agents.support_depth.enrollments.operations]]
+id = "run"
+serves = ["run-json"]
+templates = ["CORE"]
+shared_mapping = "wrapper_only"
+forwarding = false
+
+[agents.support_depth.enrollments.operations.promise]
+r1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+v1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+g1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+e1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+a1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+x1 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+x2 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+x3 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+x4 = "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
