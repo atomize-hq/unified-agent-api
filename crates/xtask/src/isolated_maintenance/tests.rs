@@ -16,6 +16,7 @@ mod ma4_evidence;
 #[cfg(unix)]
 mod ma4_route;
 mod ma5_closeout;
+mod ma6_promotion;
 mod prepare;
 mod registry_tables;
 mod subject;
