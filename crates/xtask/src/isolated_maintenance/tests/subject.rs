@@ -39,7 +39,7 @@ fn compiled_subjects_never_cross() {
 
 #[test]
 fn synthetic_selection_rejects_scope_expansion() {
-    for edit in 0..10 {
+    for edit in 0..11 {
         let f = Fixture::new_for(&scope::SYNTHETIC);
         edit_entry(&f, "depth_fixture", |agent| {
             let d = &mut agent["support_depth"]["enrollments"][0];
@@ -62,12 +62,50 @@ fn synthetic_selection_rejects_scope_expansion() {
                     d["operations"][0]["not_applicable_permitted"] =
                         toml_edit::value(["X4"].into_iter().collect::<toml_edit::Array>())
                 }
+                // A classification row may select only CORE: ADMIN would widen the obligations.
+                10 => classify(&mut d["operations"][0], &["CORE", "ADMIN"]),
                 _ => d["modes"][0]["predicates"][0]["value"] = toml_edit::value("true"),
             }
         });
         f.commit();
         assert!(f.resolve().is_err(), "accepted synthetic expansion {edit}");
     }
+}
+
+/// A CORE-only classification row is the approved synthetic P change (B.3); its basis is checked
+/// against acquisition at freeze, not here.
+#[test]
+fn synthetic_selection_admits_core_classification_rows() {
+    let f = Fixture::new_for(&scope::SYNTHETIC);
+    edit_entry(&f, "depth_fixture", |agent| {
+        classify(
+            &mut agent["support_depth"]["enrollments"][0]["operations"][0],
+            &["CORE"],
+        )
+    });
+    f.commit();
+    f.resolve().unwrap();
+}
+
+fn classify(operation: &mut toml_edit::Item, templates: &[&str]) {
+    let mut surface = toml_edit::InlineTable::new();
+    surface.insert("surface_kind", "flags".into());
+    surface.insert("command_path", "depth_fixture run".into());
+    surface.insert("surface_id", "--json".into());
+    let mut row = toml_edit::InlineTable::new();
+    row.insert("surface", surface.into());
+    row.insert(
+        "templates",
+        templates
+            .iter()
+            .copied()
+            .collect::<toml_edit::Array>()
+            .into(),
+    );
+    row.insert("rationale", "fixture".into());
+    operation["classification_basis"] = toml_edit::value("a".repeat(64));
+    operation["classifications"] =
+        toml_edit::value([row].into_iter().collect::<toml_edit::Array>());
 }
 
 #[test]

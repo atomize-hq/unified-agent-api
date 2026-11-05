@@ -2,8 +2,9 @@
 //!
 //! `xtask depth-fixture-wrapper-coverage` turns this into `wrapper_coverage.json` for the isolated
 //! manifest root. The wrapper drives exactly `run --json [--model <NAME>] -- <PROMPT>`. The root
-//! command and its flags are parity exclusions in RULES, not waivers here: an intentionally
-//! unsupported command waives its whole subtree, which would hide new upstream surface.
+//! command, its flags and `run --help` are per-unit parity exclusions in RULES, not waivers here:
+//! an intentionally unsupported command waives its whole subtree, which would hide new upstream
+//! surface, and the support audit carries any waived unit as required work.
 
 use serde::{Deserialize, Serialize};
 
@@ -73,20 +74,18 @@ pub fn wrapper_crate_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-const ONLY_RUN: &str = "Help output is not part of the wrapper's `run --json` promise.";
-
-fn flag(key: &str, level: CoverageLevel, note: Option<&str>) -> WrapperFlagCoverageV1 {
+fn flag(key: &str) -> WrapperFlagCoverageV1 {
     WrapperFlagCoverageV1 {
         key: key.to_owned(),
-        level,
-        note: note.map(str::to_owned),
+        level: CoverageLevel::Explicit,
+        note: None,
         scope: None,
     }
 }
 
 /// The single source of truth for the wrapper's coverage declarations.
 pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
-    use CoverageLevel::{Explicit, IntentionallyUnsupported};
+    use CoverageLevel::Explicit;
     WrapperCoverageManifestV1 {
         schema_version: 1,
         generated_at: None,
@@ -96,11 +95,7 @@ pub fn wrapper_coverage_manifest() -> WrapperCoverageManifestV1 {
             level: Explicit,
             note: None,
             scope: None,
-            flags: Some(vec![
-                flag("--help", IntentionallyUnsupported, Some(ONLY_RUN)),
-                flag("--json", Explicit, None),
-                flag("--model", Explicit, None),
-            ]),
+            flags: Some(vec![flag("--json"), flag("--model")]),
             args: Some(vec![WrapperArgCoverageV1 {
                 name: "PROMPT".to_owned(),
                 level: Explicit,

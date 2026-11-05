@@ -42,9 +42,10 @@ Git and cannot be combined with `--mode fix` (exit 3 before any write).
 
 ## Coverage posture
 
-- The root command and its flags are parity exclusions (`dispatch`), each unit separately. They
-  are not intentionally-unsupported waivers, because a waived command waives its whole subtree and
-  would hide new upstream surface.
+- The root command, its flags and `run --help` are parity exclusions (`dispatch`), each unit
+  separately. They are not intentionally-unsupported waivers: a waived command waives its whole
+  subtree and would hide new upstream surface, and the support audit carries any waived unit as
+  required work.
 - Missing reports are acceptable while a version remains `snapshotted`.
 - Reports become required only when version metadata advances into reported, validated, or
   supported states.

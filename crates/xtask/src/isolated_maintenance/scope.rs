@@ -26,6 +26,9 @@ pub(super) struct Subject {
     pub shared_mapping: SharedMapping,
     /// The mapped `agent_api` capability; `None` for a wrapper-only operation, which has none.
     pub capability: Option<&'static str>,
+    /// Whether maintainer-approved per-unit classification rows are in scope. Rows may select only
+    /// `CORE`, so the scope's obligation set never widens; the basis is checked at acquisition.
+    pub classified: bool,
 }
 /// Codex qualification subject (MP-P2): unchanged from the IR-P2 binding.
 pub(super) const CODEX: Subject = Subject {
@@ -38,6 +41,7 @@ pub(super) const CODEX: Subject = Subject {
     flag: "--json",
     shared_mapping: SharedMapping::Mapped,
     capability: Some("agent_api.run"),
+    classified: false,
 };
 /// Synthetic machinery-proof subject (MP-P1, SA-P3). It qualifies no real agent.
 pub(super) const SYNTHETIC: Subject = Subject {
@@ -50,6 +54,7 @@ pub(super) const SYNTHETIC: Subject = Subject {
     flag: "--json",
     shared_mapping: SharedMapping::WrapperOnly,
     capability: None,
+    classified: true,
 };
 pub(super) fn load(
     root: &Path,
@@ -120,7 +125,11 @@ pub(super) fn load(
         )?;
         if !matches!(record.event, Event::Maintenance { .. })
             || !record.policy.path_enabled
-            || record.policy.selection.enrollment != declarations[0]
+            || !same_selection(
+                &record.policy.selection.enrollment,
+                &declarations[0],
+                subject,
+            )
             || record
                 .obligations
                 .as_ref()
@@ -165,8 +174,13 @@ pub(super) fn selection(
     if operation.id != "run"
         || operation.serves != [subject.selector]
         || operation.templates != [ObligationTemplate::Core]
-        || operation.classification_basis.is_some()
-        || operation.classifications.is_some()
+        || (operation.classifications.is_some() || operation.classification_basis.is_some())
+            && !(subject.classified
+                && operation
+                    .classifications
+                    .iter()
+                    .flatten()
+                    .all(|row| row.templates == [ObligationTemplate::Core]))
         || operation.shared_mapping != Some(subject.shared_mapping)
         || operation.forwarding != Some(false)
         || !operation.not_applicable_permitted.is_empty()
@@ -177,6 +191,28 @@ pub(super) fn selection(
         return Err("unsupported isolated operation/capability/forwarding/NA scope".into());
     }
     Ok(())
+}
+/// A retained generation may differ from the declaration only where a later generation's P may
+/// legitimately change in scope: its approved CORE classification rows and their basis.
+fn same_selection(
+    retained: &DepthEnrollmentDeclaration,
+    declared: &DepthEnrollmentDeclaration,
+    subject: &Subject,
+) -> bool {
+    if retained == declared {
+        return true;
+    }
+    let unclassified = |declaration: &DepthEnrollmentDeclaration| {
+        let mut declaration = declaration.clone();
+        for operation in declaration.operations.iter_mut() {
+            operation.classification_basis = None;
+            operation.classifications = None;
+        }
+        declaration
+    };
+    subject.classified
+        && selection(retained, subject).is_ok()
+        && unclassified(retained) == unclassified(declared)
 }
 fn walk(
     root: &Path,

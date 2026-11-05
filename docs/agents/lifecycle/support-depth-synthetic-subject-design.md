@@ -85,9 +85,22 @@ Each step is a reviewed PR into `staging`.
      subject. The capability matrix never does.
    - Promotion still loads the production registry (B.6). The isolated baseline therefore promotes
      `0.1.0` before the depth table is installed in a later protected commit.
-   - The first real O keeps every owned `run` surface `classification_required`, and carries the
-     waived `run --help` as required work. Resolving both is a maintainer change to P (contract,
-     classification rule 6). It is not cleared to make the chain look ready.
+   - The first real O keeps every owned `run` surface `classification_required`. It is not
+     cleared to make the chain look ready: resolving it is a maintainer change to P (contract,
+     classification rule 6).
+   - Maintainer-approved 2026-11-03:
+     - `run --help` is a per-unit parity exclusion (`dispatch`), like the root's help and version
+       flags, and not an intentionally-unsupported waiver. The support audit carries any waived
+       unit as required work, and that work survives into every later generation. So the
+       exclusion is in the templates before any O freezes.
+     - Each of the five `run` surfaces (`run`, `--help`, `--json`, `--model`, `PROMPT`) gets a
+       classification row that selects only `CORE`, with the acquired `classification_basis`.
+       Preparation prints that basis (`classification_basis: operation=… sha256=…`) for the
+       maintainer to review. P changes only in a new generation, so the rows enter under a new
+       Event. A stale basis refuses.
+     - The isolated scope admits classification rows only for the synthetic subject, and only
+       when every row selects `CORE` alone. A retained earlier generation may differ from the
+       declaration only in those rows and their basis.
 
 ## Open risk
 
