@@ -446,8 +446,19 @@ fn ma5_writers_reauthenticate_unverified_population_despite_verified_e_labels() 
         edit(&changed, &runs);
         let _changed = changed.install();
         for writer in [close, prepare] {
+            // A changed population fails closed despite the verified E labels: the new attempt
+            // or the revoked adoption cannot be re-authenticated. Nothing closes out or writes.
             let err = writer(root).unwrap_err();
-            assert!(err.contains("not independently satisfied"), "{err}");
+            assert!(
+                [
+                    "not independently satisfied",
+                    "missing/ambiguous attempt witness artifact",
+                    "missing exact authenticated adequacy adoption",
+                ]
+                .iter()
+                .any(|refusal| err.contains(refusal)),
+                "{err}"
+            );
             assert_eq!(snapshot(root), before);
         }
     }
