@@ -44,7 +44,7 @@ pub(super) const SYNTHETIC: Subject = Subject {
     agent_id: "depth_fixture",
     runtime: false,
     version: "0.2.0",
-    target: "linux-x64",
+    target: "x86_64-unknown-linux-gnu",
     selector: "run-json",
     command_path: "depth_fixture run",
     flag: "--json",

@@ -13,11 +13,11 @@
     "acquired_inputs": [
       {
         "path": "crates/xtask/tests/fixtures/depth-synthetic/contract.md",
-        "sha256": "5d2df92180a2c60fb2d4ccd61a3248cd5d57cdfa9e05dab29bec2345ae5ec133"
+        "sha256": "bf45a7b829d3f84c76bc6db97bf4bc2d336c3def0146fdffa7576a7c199c1dc8"
       }
     ],
     "classification_required": [],
-    "identity": "ae237f542193963276daabba2b7c0e2d842c843df637c68e8241813a128db320",
+    "identity": "6e8001c87c56b9564c6c47f55ea2c8b489770d006ca497b85226732bc663cc0c",
     "operations": [
       {
         "id": "run",
@@ -37,9 +37,9 @@
         "surfaces": []
       }
     ],
-    "policy_identity": "b2778a8c3bf4e8feee56a531debf222a3aab031db4bbb1985c83d617d57b4f7b",
+    "policy_identity": "b077efd48b4512d74ae249650d0daab1fe0581a0d34c850fa90c0be06df97732",
     "targets": [
-      "linux-x64"
+      "x86_64-unknown-linux-gnu"
     ]
   },
   "policy": {
@@ -55,7 +55,7 @@
       "X4"
     ],
     "debt_baseline": [],
-    "identity": "b2778a8c3bf4e8feee56a531debf222a3aab031db4bbb1985c83d617d57b4f7b",
+    "identity": "b077efd48b4512d74ae249650d0daab1fe0581a0d34c850fa90c0be06df97732",
     "path_enabled": true,
     "rules_revision": "1",
     "selection": {
@@ -101,7 +101,7 @@
           }
         ],
         "targets": [
-          "linux-x64"
+          "x86_64-unknown-linux-gnu"
         ],
         "version": "0.2.0"
       }

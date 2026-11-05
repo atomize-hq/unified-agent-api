@@ -3,11 +3,11 @@
 This is a machinery proof on the synthetic `depth_fixture` subject. It qualifies no real agent,
 and its results are never reused for Codex or any other agent.
 
-The subject is upstream `depth_fixture` 0.2.0 on target `linux-x64`: one `depth_fixture run --json`
+The subject is upstream `depth_fixture` 0.2.0 on target `x86_64-unknown-linux-gnu`: one `depth_fixture run --json`
 headless selector and one wrapper-only `run` operation with template CORE. No capability is mapped,
 so M is not due and no `agent_api` source is in scope. The fixture CLI and its wrapper both live in
 `crates/depth_fixture`. The cases run the fixture binary built from reviewed source with
-`DEPTH_FIXTURE_UPSTREAM_VERSION=0.2.0`, on the Linux `x86_64-unknown-linux-gnu` wrapper build host.
+`DEPTH_FIXTURE_UPSTREAM_VERSION=0.2.0` on that same tuple, so evidence is never cross-target.
 In the isolated repository the digest of the acquired 0.2.0 release asset is provenance.
 
 The promise is the wrapper's streaming execution contract as its crate documentation states it:

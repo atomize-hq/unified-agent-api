@@ -71,7 +71,7 @@ display_name = "Depth Fixture"
 crate_path = "crates/depth_fixture"
 manifest_root = "cli_manifests/depth_fixture"
 package_name = "unified-agent-api-depth-fixture"
-canonical_targets = ["linux-x64"]
+canonical_targets = ["x86_64-unknown-linux-gnu"]
 
 [agents.wrapper_coverage]
 binding_kind = "generated_from_wrapper_crate"
@@ -93,7 +93,7 @@ onboarding_pack_prefix = "depth-fixture-cli-onboarding"
 "#;
 pub(super) fn synthetic_declaration() -> Value {
     json!({"enabled_paths":["maintenance"],"enrollments":[{
-        "lifecycle_path":"maintenance","version":"0.2.0","targets":["linux-x64"],
+        "lifecycle_path":"maintenance","version":"0.2.0","targets":["x86_64-unknown-linux-gnu"],
         "modes":[{"selector":"run-json","command_path":"depth_fixture run","mode":"headless","predicates":[{"flag":"--json"}]}],
         "operations":[{"id":"run","serves":["run-json"],"templates":["CORE"],"shared_mapping":"wrapper_only","forwarding":false,
         "promise":{"r1":"r","v1":"v","g1":"g","e1":"e","a1":"a","x1":"x","x2":"x","x3":"x","x4":"x"}}]}]})

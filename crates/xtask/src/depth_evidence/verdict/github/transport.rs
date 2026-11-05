@@ -8,17 +8,47 @@ use std::{
 };
 
 pub(super) trait Api {
+    /// The one GitHub repository this reader is bound to: compiled source, never a receipt claim.
+    fn repository(&self) -> &str {
+        REPOSITORY
+    }
+    fn endpoint(&self, path: &str) -> String {
+        format!("repos/{}/{path}", self.repository())
+    }
+    /// The repository object itself, for id and owner corroboration.
+    fn identity_endpoint(&self) -> String {
+        format!("repos/{}", self.repository())
+    }
     fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String>;
     fn json(&self, endpoint: &str) -> Result<Value, String> {
         serde_json::from_slice(&self.bytes(endpoint, 16_777_216)?)
             .map_err(|_| "invalid GitHub response".into())
     }
 }
-pub(super) struct Github;
+pub(super) struct Github {
+    repository: &'static str,
+}
+/// The canonical repository reader for the channel and CORE profiles.
+pub(super) const CANONICAL: Github = Github {
+    repository: REPOSITORY,
+};
+impl Github {
+    /// The isolated repository, only as an authenticated IR-P1 binding names it.
+    pub(super) fn isolated(host: &crate::isolated_maintenance::EvidenceHost) -> Self {
+        Self {
+            repository: host.repository(),
+        }
+    }
+}
 impl Api for Github {
+    fn repository(&self) -> &str {
+        self.repository
+    }
     fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String> {
         // Fixed host and repository; never accept a URL/credential/host from a receipt.
-        if !endpoint.starts_with(&format!("repos/{REPOSITORY}/")) || endpoint.contains(['\n', '\r'])
+        let own = format!("repos/{}", self.repository);
+        if !(endpoint == own || endpoint.starts_with(&format!("{own}/")))
+            || endpoint.contains(['\n', '\r'])
         {
             return Err("unsupported GitHub endpoint".into());
         }
@@ -70,9 +100,6 @@ pub(in crate::depth_evidence::verdict) fn capture(
     }
     Ok(raw)
 }
-pub(super) fn endpoint(path: &str) -> String {
-    format!("repos/{REPOSITORY}/{path}")
-}
 
 /// Exhaust the endpoint; refuse truncation, changing totals and duplicate identities.
 pub(super) fn list(api: &impl Api, path: &str, member: Option<&str>) -> Result<Vec<Value>, String> {
@@ -81,7 +108,7 @@ pub(super) fn list(api: &impl Api, path: &str, member: Option<&str>) -> Result<V
     let mut total = None;
     for page in 1..=10 {
         let join = if path.contains('?') { '&' } else { '?' };
-        let value = api.json(&endpoint(&format!("{path}{join}per_page=100&page={page}")))?;
+        let value = api.json(&api.endpoint(&format!("{path}{join}per_page=100&page={page}")))?;
         let batch = if let Some(key) = member {
             let n = value["total_count"]
                 .as_u64()
@@ -126,7 +153,7 @@ pub(super) fn sha(raw: &str) -> Result<&str, String> {
         Err("invalid host commit identity".into())
     }
 }
-pub(super) fn source(root: &Path, commit: &str) -> Result<Source, String> {
+pub(super) fn source(root: &Path, repository: &str, commit: &str) -> Result<Source, String> {
     sha(commit)?;
     if let Ok(source) = Source::tip(root, commit) {
         return Ok(source);
@@ -141,7 +168,7 @@ pub(super) fn source(root: &Path, commit: &str) -> Result<Source, String> {
                 "--no-tags",
                 "--no-write-fetch-head",
                 "--no-recurse-submodules",
-                &format!("https://github.com/{REPOSITORY}.git"),
+                &format!("https://github.com/{repository}.git"),
                 commit,
             ]),
         1_048_576,

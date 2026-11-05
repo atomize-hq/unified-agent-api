@@ -135,3 +135,19 @@ fn frozen_synthetic_profile_record_matches_the_compiled_subject() {
     scope::selection(enrollment, &scope::SYNTHETIC).unwrap();
     assert!(scope::selection(enrollment, &scope::CODEX).is_err());
 }
+
+#[test]
+fn only_the_synthetic_context_names_an_evidence_host() {
+    let f = Fixture::new_for(&scope::SYNTHETIC);
+    let host = f.resolve().unwrap().evidence_host(f.root.path()).unwrap();
+    assert_eq!(host.repository(), "fixture/isolated");
+    assert_eq!(host.tip(), git(f.root.path(), &["rev-parse", "HEAD"]));
+    let f = Fixture::new();
+    let error = f
+        .resolve()
+        .unwrap()
+        .evidence_host(f.root.path())
+        .err()
+        .unwrap();
+    assert!(error.contains("only the synthetic subject"), "{error}");
+}

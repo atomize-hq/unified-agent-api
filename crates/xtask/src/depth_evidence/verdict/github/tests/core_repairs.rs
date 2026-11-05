@@ -108,11 +108,17 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
                 .inputs
                 .retain(|i| i.path != "docs/specs/unified-agent-api/run-protocol-spec.md");
         }
-        assert!(
-            profile::validate_witness(f.root.path(), &w, &run, 1, &f.commit, Profile::Core)
-                .unwrap_err()
-                .contains("complete canonical requirement scope")
-        );
+        assert!(profile::validate_witness(
+            f.root.path(),
+            depth_ci::REPOSITORY,
+            &w,
+            &run,
+            1,
+            &f.commit,
+            Profile::Core
+        )
+        .unwrap_err()
+        .contains("complete canonical requirement scope"));
     }
     for path in [
         "docs/specs/unified-agent-api/run-protocol-spec.md",
@@ -132,11 +138,16 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
             }),
             "{error}"
         );
-        assert!(
-            profile::approved(f.root.path(), &changed, &changed, &f.commit, Profile::Core)
-                .unwrap_err()
-                .contains("docs/specs")
-        );
+        assert!(profile::approved(
+            f.root.path(),
+            depth_ci::REPOSITORY,
+            &changed,
+            &changed,
+            &f.commit,
+            Profile::Core
+        )
+        .unwrap_err()
+        .contains("docs/specs"));
         f.api.change("issues/9/comments?per_page=100&page=1", |v| {
             let body = v[0]["body"].as_str().unwrap().replace(&f.commit, &changed);
             v[0]["body"] = json!(body);
@@ -152,16 +163,6 @@ fn core_requires_complete_built_and_reviewed_canonical_requirements() {
 }
 
 #[test]
-fn synthetic_profile_has_no_whole_workflow_path() {
-    // IR-P3 only: no host read happens, so an empty API proves the refusal comes first.
-    let f = Fixture::new_for(Profile::Core);
-    let error = resolve_profile(&f.api, f.root.path(), Profile::Synthetic)
-        .err()
-        .unwrap();
-    assert!(error.contains("no whole-workflow evidence path"), "{error}");
-}
-
-#[test]
 fn synthetic_scope_names_its_own_agent_and_trust() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let p = Profile::Synthetic;
@@ -173,5 +174,50 @@ fn synthetic_scope_names_its_own_agent_and_trust() {
         assert_eq!(scope.agent_id, "depth_fixture");
         assert_eq!(scope.version, "0.2.0");
         assert_eq!(scope.trust_revision, "github-actions-synthetic-wrapper-v1");
+    }
+}
+#[test]
+fn core_requires_every_exact_mapping_adoption() {
+    let mut f = Fixture::new_for(Profile::Core);
+    let mut proposal = adoption::proposal_for(
+        f.root.path(),
+        depth_ci::REPOSITORY,
+        &f.w,
+        "independent-review-invocation",
+        Profile::Core,
+    )
+    .unwrap();
+    proposal["mappings"].as_array_mut().unwrap().pop();
+    f.api.page("issues/9/comments",None,vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{}\n```",proposal)})]);
+    assert!(resolve_profile(&f.api, f.root.path(), Profile::Core)
+        .unwrap_err()
+        .contains("missing exact authenticated adequacy adoption"));
+}
+#[test]
+fn core_failed_and_missing_cases_are_not_hidden_by_other_green_obligations() {
+    for missing in [false, true] {
+        let mut f = Fixture::new_for(Profile::Core);
+        let name = "adapter::parse_errors_do_not_leak_raw_lines_and_stream_continues";
+        if missing {
+            f.w.cases.executed.retain(|r| r.case.name != name);
+        } else {
+            f.w.cases
+                .executed
+                .iter_mut()
+                .find(|r| r.case.name == name)
+                .unwrap()
+                .outcome = CaseOutcome::Failed;
+        }
+        f.install(1);
+        let raw = prove_profile(f.root.path(), &f.api, Profile::Core).unwrap();
+        let result: Value = serde_json::from_str(&raw).unwrap();
+        let rows = result["obligations"].as_array().unwrap();
+        let row = |id| rows.iter().find(|r| r["obligation"]["id"] == id).unwrap();
+        assert_eq!(
+            row("E1")["result"],
+            if missing { "unverified" } else { "failed" },
+            "{result}"
+        );
+        assert_eq!(row("A1")["result"], "verified", "{result}");
     }
 }

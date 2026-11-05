@@ -447,7 +447,9 @@ machinery proof wherever they are reported.
 
 **Subject.** The agent is `depth_fixture`, a non-runtime registry entry under the
 [registry contract](agent-registry-contract.md#runtime-and-non-runtime-entries). Its one maintenance
-enrollment is upstream version `0.2.0` (the baseline release is `0.1.0`) on target `linux-x64`. It
+enrollment is upstream version `0.2.0` (the baseline release is `0.1.0`) on target
+`x86_64-unknown-linux-gnu`. That is both the release asset's tuple and the wrapper build host, so no
+cross-target evidence arises and no IR-P2-style mapping is needed. It
 has one headless mode, selector `run-json` with command path `depth_fixture run` and the presence
 predicate `--json`, and one operation, `run`. That operation selects template `CORE` with
 `shared_mapping = wrapper_only` and `forwarding = false`. It permits no not-applicable outcome and
@@ -498,8 +500,17 @@ registry never lists `depth_fixture`. `production_results` stays unverified.
 3. The collection, upload and binding steps in the existing `rust-tests` job, named
    `<Collect|Upload|Bind> isolated synthetic depth <witness|witness|artifact>`, and the profile's
    agent id in its evidence scope.
-4. A read-only IR-P3 verdict for this profile: it reuses the CORE evaluation over CI evidence,
-   bound to the isolated repository through the IR-P1 context rather than the canonical one, and
-   admits an attempt once its producer job is terminal. It ships positive and negative evaluation
-   tests in the shape of the CORE bridge. The NE/NC native producer
-   (`depth_evidence/verdict/native*`) is Codex qualification under MP-P2 and is not used.
+4. A read-only IR-P3 verdict for this profile. It reuses the CORE evaluation over CI evidence. It
+   reads only the repository named by an evidence host, which only a resolved IR-P1 context for
+   the synthetic subject can mint; with the live profile uninstalled, there is none. The host
+   keeps the authenticated repository and owner ids, rechecked before and after discovery, so a
+   renamed and replaced repository is refused. The repository's protected staging tip must equal
+   the binding's. PR, run, producer and endorsement
+   repositories are that repository. An attempt is admitted once its `rust-tests` producer job and
+   its collection, upload and binding steps are terminal and successful, even while the workflow
+   runs. A cancelled or unconcluded producer job stays unverified; a job that failed after its
+   evidence steps succeeded still counts. The population recheck compares run identities (id, attempt, head, path, repository,
+   event), not unrelated progress. Channel and CORE keep the canonical repository and whole-workflow
+   completion. It ships positive and negative evaluation tests in the shape of the CORE bridge. The
+   NE/NC native producer (`depth_evidence/verdict/native*`) is Codex qualification under MP-P2 and
+   is not used.
