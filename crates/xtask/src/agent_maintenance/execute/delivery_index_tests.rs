@@ -320,3 +320,37 @@ fn payloads_outside_evidence_destinations_are_bound_through_their_receipts() {
     edited.insert(source.into(), Node::File(b"edited".to_vec(), 0o644));
     check_staged_closure(&committed, &edited, "runs/x", None).unwrap();
 }
+
+/// Bound evidence may never live in an MA4 run directory, whose diagnostics are copied back even
+/// on failure: a receipt referencing one refuses even when nothing changed, in production too.
+#[test]
+fn bound_evidence_in_a_run_directory_refuses() {
+    let receipt = "cli/reports/1/evidence/run/receipt.json";
+    for payload in [
+        "runs/x/raw.txt".to_owned(),
+        format!("{}/other/raw.txt", super::super::EXECUTION_RUNS_ROOT),
+    ] {
+        let mut committed = Tree::new();
+        committed.insert(
+            receipt.into(),
+            Node::File(
+                serde_json::to_vec(&serde_json::json!({
+                    "cases": {"raw_output": {"path": payload, "sha256": sha256(b"raw")}}
+                }))
+                .unwrap(),
+                0o644,
+            ),
+        );
+        committed.insert(payload.clone(), Node::File(b"raw".to_vec(), 0o644));
+        for staged in [None, Some(&Staged::new())] {
+            let error = check_staged_closure(&committed, &committed, "runs/x", staged)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.contains("may not live in an MA4 run directory"),
+                "{error}"
+            );
+        }
+        assert!(evidence_paths(&committed, &committed).contains(&payload));
+    }
+}

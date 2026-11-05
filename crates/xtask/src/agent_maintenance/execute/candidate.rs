@@ -205,11 +205,20 @@ impl Candidate {
                 self.staged_evidence.as_ref(),
             )?;
         }
+        // Copy-back never delivers a bound evidence path as a diagnostic: not one bound in the
+        // caller, in the tree being delivered, or in the candidate as the executor left it.
+        let mut bound = super::delivery_index::evidence_paths(&self.before, after);
+        if let Ok(current) = tree::capture(&self.root, &Default::default()) {
+            bound.extend(super::delivery_index::evidence_paths(&current, &current));
+        }
         let mut mutations = Vec::new();
         let mut paths = Vec::new();
         for path in tree::changed(&self.before, after) {
             let diagnostic = path.starts_with(&format!("{}/", self.context.run_dir_rel));
             if !passed && !diagnostic {
+                continue;
+            }
+            if diagnostic && bound.contains(&path) {
                 continue;
             }
             if path == format!("{}/{INPUT_CONTRACT_FILE_NAME}", self.context.run_dir_rel)

@@ -541,3 +541,48 @@ fn evidence_changes_after_committed_genuine_e_refuse_delivery() {
         git(root, &["clean", "-fdxq", "docs"]);
     }
 }
+
+#[test]
+fn a_committed_receipt_bound_into_the_run_directory_refuses_and_is_not_copied_back() {
+    let (f, host) = chain();
+    let root = f.root.path();
+    let bin = tempfile::tempdir().unwrap();
+    let _installed = f.install();
+    let _reader = host.install();
+    // A committed receipt binds a payload in the run's own diagnostics directory. The run's
+    // genuine assembly would deliver E; the executor also substitutes that payload.
+    let run = "ma4-evidence-rundir";
+    let payload = format!("docs/agents/.uaa-temp/agent-maintenance/runs/{run}/raw.txt");
+    let receipt = format!("{EVIDENCE}/rundir/receipt.json");
+    write(
+        root,
+        &receipt,
+        serde_json::to_vec(
+            &json!({"cases": {"raw_output": {"path": payload, "sha256": "0".repeat(64)}}}),
+        )
+        .unwrap(),
+    );
+    f.commit();
+    host.staging(&git(root, &["rev-parse", "HEAD"]));
+    write(root, &payload, b"raw");
+    let index_before = git(root, &["ls-files", "--stage"]);
+    let record_before = std::fs::read(root.join(RECORD)).unwrap();
+    let binary = executor(bin.path(), &format!("printf substituted > {payload}"));
+    {
+        let _gates = execute::gate_stub::stub();
+        let refused = run_as(root, &binary, run).unwrap_err();
+        assert!(
+            refused.contains("may not live in an MA4 run directory"),
+            "{refused}"
+        );
+    }
+    // The substituted bytes were not copied back as a diagnostic.
+    assert_eq!(std::fs::read(root.join(&payload)).unwrap(), b"raw");
+    assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
+    assert!(record(root).execution.is_none(), "E was delivered");
+    assert_eq!(git(root, &["ls-files", "--stage"]), index_before);
+    assert_eq!(
+        git(root, &["status", "--porcelain", "--", "cli_manifests"]),
+        ""
+    );
+}

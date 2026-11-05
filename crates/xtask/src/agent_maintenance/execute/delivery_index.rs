@@ -93,11 +93,11 @@ fn bound_closure(tree: &Tree) -> BTreeSet<String> {
 }
 
 /// The evidence path class: every file in an evidence destination before or after, and the
-/// bound closure of each snapshot, each traversed independently, in union.
-fn evidence_paths(before: &Tree, after: &Tree, run_dir_rel: &str) -> BTreeSet<String> {
+/// bound closure of each snapshot, each traversed independently, in union. Nothing is excluded:
+/// bound evidence inside a run directory is refused by [`check_staged_closure`].
+pub(super) fn evidence_paths(before: &Tree, after: &Tree) -> BTreeSet<String> {
     let mut paths = bound_closure(before);
     paths.extend(bound_closure(after));
-    paths.retain(|p| !p.starts_with(&format!("{run_dir_rel}/")));
     paths
 }
 
@@ -111,7 +111,17 @@ pub(super) fn check_staged_closure(
     run_dir_rel: &str,
     staged: Option<&Staged>,
 ) -> Result<(), Error> {
-    for path in evidence_paths(before, after, run_dir_rel) {
+    let paths = evidence_paths(before, after);
+    // Bound evidence never lives among run diagnostics, which copy-back delivers on failure too.
+    if let Some(path) = paths.iter().find(|p| {
+        p.starts_with(&format!("{run_dir_rel}/"))
+            || p.starts_with(&format!("{}/", super::EXECUTION_RUNS_ROOT))
+    }) {
+        return Err(Error::Validation(format!(
+            "bound evidence may not live in an MA4 run directory: {path}"
+        )));
+    }
+    for path in paths {
         let delivered = match (before.get(&path), after.get(&path)) {
             (Some(Node::File(old, _)), Some(Node::File(new, _))) if old == new => continue,
             (None | Some(Node::Directory(_)), None | Some(Node::Directory(_))) => continue,
@@ -147,9 +157,9 @@ pub(super) fn bound_new_evidence(
     let Some(staged) = staged else {
         return vec![];
     };
-    evidence_paths(before, after, run_dir_rel)
+    evidence_paths(before, after)
         .into_iter()
-        .filter(|p| before.get(p).is_none())
+        .filter(|p| before.get(p).is_none() && !p.starts_with(&format!("{run_dir_rel}/")))
         .filter_map(|path| match after.get(&path) {
             Some(Node::File(bytes, mode)) if staged.get(&path) == Some(&sha256(bytes)) => {
                 Some(Bound {

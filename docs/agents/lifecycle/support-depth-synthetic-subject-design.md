@@ -195,7 +195,11 @@ Each step is a reviewed PR into `staging`.
        payloads included, are what gain index identities. E from a forged channel, a payload
        substituted behind unchanged receipts (also on a rerun over committed evidence), a
        removed payload, an added unreferenced file, a substituted payload outside `evidence/`
-       or a receipt newly referencing another file are therefore refused. A completely unchanged
+       or a receipt newly referencing another file are therefore refused. Bound evidence may
+       never live in an MA4 run directory (`docs/agents/.uaa-temp/agent-maintenance/runs/`),
+       whose diagnostics are copied back even when a run fails: any E or receipt reference
+       there refuses the whole delivery, and diagnostic copy-back never delivers a path bound
+       in the caller, in the delivered tree or in the candidate as the executor left it. A completely unchanged
        MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the

@@ -41,9 +41,14 @@ fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf
         );
     }
     let mut receipt = include_str!("../../../fixtures/depth-evidence-v1.json").to_owned();
-    if evidence == "committed" {
+    let payload = if evidence == "rundir" {
+        run_dir_payload()
+    } else {
+        PAYLOAD.to_owned()
+    };
+    if evidence == "committed" || evidence == "rundir" {
         let mut value: Value = serde_json::from_str(&receipt).unwrap();
-        value["cases"]["raw_output"] = json!({"path": PAYLOAD, "sha256": sha("raw")});
+        value["cases"]["raw_output"] = json!({"path": payload, "sha256": sha("raw")});
         receipt = serde_json::to_string_pretty(&value).unwrap();
         value["build"]["toolchain"] =
             json!({"path": "cli_manifests/codex/reports/0.61.0/extra.txt", "sha256": sha("x")});
@@ -76,10 +81,10 @@ fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf
         &root.join(format!("pointers/latest_supported/{REQUIRED_TARGET}.txt")),
         "none\n",
     );
-    if evidence == "committed" {
+    if evidence == "committed" || evidence == "rundir" {
         write_json(&temp.path().join(record_path()), &next);
         write_text(&temp.path().join(EVIDENCE), receipt);
-        write_text(&temp.path().join(PAYLOAD), "raw");
+        write_text(&temp.path().join(&payload), "raw");
     }
     republish(&root);
     commit_all(temp.path());
@@ -338,4 +343,35 @@ fn committed_evidence_payloads_outside_evidence_destinations_cannot_change() {
             .exists());
         assert_eq!(fs::read(temp.path().join(".git/index")).unwrap(), index);
     }
+}
+
+/// The payload's path inside this run's own diagnostics directory.
+fn run_dir_payload() -> String {
+    format!(
+        "docs/agents/.uaa-temp/agent-maintenance/runs/{}/raw.txt",
+        mh::EXECUTE_WRITE_RUN_ID
+    )
+}
+
+/// Production: a committed receipt binding a payload inside the run directory refuses the whole
+/// delivery, and the substituted payload is not copied back as a diagnostic.
+#[test]
+fn committed_evidence_bound_into_the_run_directory_refuses_without_copy_back() {
+    let payload = run_dir_payload();
+    let (temp, _root, binary, _) = fixture(&format!("printf substituted > '{payload}'"), "rundir");
+    let index = fs::read(temp.path().join(".git/index")).unwrap();
+    let files = [EVIDENCE, NOTE].map(|p| fs::read(temp.path().join(p)).ok());
+    let out = mh::run_execute_cli(mh::execute_args("--write", Some(&binary)), temp.path());
+    assert_ne!(out.exit_code, 0);
+    assert!(
+        out.stderr.contains("may not live in an MA4 run directory"),
+        "{}",
+        out.stderr
+    );
+    assert_eq!(fs::read(temp.path().join(&payload)).unwrap(), b"raw");
+    assert_eq!(
+        [EVIDENCE, NOTE].map(|p| fs::read(temp.path().join(p)).ok()),
+        files
+    );
+    assert_eq!(fs::read(temp.path().join(".git/index")).unwrap(), index);
 }
