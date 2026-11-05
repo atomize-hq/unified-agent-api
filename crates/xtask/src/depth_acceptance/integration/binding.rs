@@ -27,7 +27,21 @@ impl Binding {
     }
 
     fn check_local_tip(&self, root: &Path) -> Result<(), String> {
-        if super::resolve(root, "refs/remotes/origin/staging")? != self.tip {
+        // Exact lookup: `rev-parse` would fall back to a nested tag or branch spelled
+        // `refs/remotes/origin/staging` when the tracking ref itself is absent.
+        let output = git_inputs::command(root)
+            .args([
+                "show-ref",
+                "--verify",
+                "--hash",
+                "refs/remotes/origin/staging",
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err("local integration ref refs/remotes/origin/staging is absent".into());
+        }
+        if String::from_utf8_lossy(&output.stdout).trim() != self.tip {
             return Err(
                 "local integration ref differs from the authenticated protected tip".into(),
             );

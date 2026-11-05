@@ -23,6 +23,25 @@ fn in1_local_tip_ignores_shadow_tags_and_branches() {
 }
 
 #[test]
+fn in1_missing_tracking_ref_is_not_replaced_by_a_nested_shadow() {
+    for namespace in ["tags", "heads"] {
+        let f = Fixture::new_for(&scope::SYNTHETIC);
+        let _installed = f.install();
+        let tip = head(&f);
+        // The tracking ref is absent; a ref spelled `refs/remotes/origin/staging` under another
+        // namespace points at authenticated T and must not stand in for it.
+        git(
+            f.root.path(),
+            &["update-ref", "-d", "refs/remotes/origin/staging"],
+        );
+        let shadow = format!("refs/{namespace}/refs/remotes/origin/staging");
+        git(f.root.path(), &["update-ref", &shadow, &tip]);
+        let err = refused(&f, &tip);
+        assert!(err.contains("is absent"), "{err}");
+    }
+}
+
+#[test]
 fn in1_admission_and_observation_accept_non_utf8_commit_message() {
     use std::{io::Write, process::Stdio};
     let f = Fixture::new_for(&scope::SYNTHETIC);
