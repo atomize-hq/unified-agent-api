@@ -5,7 +5,7 @@ use crate::agent_registry::support_depth::ObligationId;
 use crate::depth_record::{DepthResult, ObligationRef, ObligationResult};
 use std::os::unix::fs::PermissionsExt;
 
-const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json";
+pub(super) const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json";
 const RECEIPT: &str =
     "cli_manifests/depth_fixture/reports/0.2.0/evidence/synthetic-wrapper-v1/1-1/R1/receipt.json";
 
@@ -31,7 +31,11 @@ pub(super) fn crafted() -> Bundle {
     crafted_with(b"{\"claimed\":true}")
 }
 fn crafted_with(receipt: &[u8]) -> Bundle {
-    let record = frozen();
+    crafted_for(&frozen(), receipt)
+}
+/// A self-consistent bundle for `record`'s generation and P/O whose single receipt is `receipt`:
+/// what a forged server could serve.
+pub(super) fn crafted_for(record: &DepthRecord, receipt: &[u8]) -> Bundle {
     let receipt = receipt.to_vec();
     let reference = crate::depth_ci::reference(RECEIPT, &receipt);
     let mut execution = ExecutionPart {
@@ -71,15 +75,14 @@ fn crafted_with(receipt: &[u8]) -> Bundle {
         }],
     }
 }
-/// A host serving `bundle`, with this test's own process as both the host the assembler trusts
-/// and the executor the host admits: in-process tests run both sides in one process.
+/// A host serving `bundle` that admits this test's own process as its executor: in-process tests
+/// run both sides in one process.
 pub(super) fn staged(candidate: &Path, bundle: &Bundle) -> Staged {
     let dir = private_dir().unwrap();
     let answer = publish(dir.path(), bundle);
     in_process(serve(dir, candidate, answer).unwrap())
 }
 pub(super) fn in_process(staged: Staged) -> Staged {
-    peer::trust_own_process();
     staged.channel().admission.admit(std::process::id());
     staged
 }
@@ -103,7 +106,8 @@ pub(super) fn snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 fn refused(root: &Path, bundle: &Bundle) -> String {
     let before = snapshot(root);
     let staged = staged(root, bundle);
-    let error = assemble(root, Some(staged.locator().to_owned())).expect_err("refused");
+    let error =
+        assemble(root, Some(staged.locator().to_owned()), &staged.nonce()).expect_err("refused");
     assert_eq!(snapshot(root), before, "a refusal wrote: {error}");
     error
 }
@@ -113,7 +117,12 @@ fn writes_only_e_and_its_files_through_the_live_channel() {
     let root = candidate();
     let bundle = crafted();
     let staged = staged(root.path(), &bundle);
-    let summary = assemble(root.path(), Some(staged.locator().to_owned())).unwrap();
+    let summary = assemble(
+        root.path(),
+        Some(staged.locator().to_owned()),
+        &staged.nonce(),
+    )
+    .unwrap();
     assert!(summary.contains("1 obligations"), "{summary}");
     let record = DepthRecord::parse(
         &fs::read_to_string(root.path().join(RECORD)).unwrap(),
@@ -139,7 +148,12 @@ fn writes_only_e_and_its_files_through_the_live_channel() {
             .collect::<Vec<_>>()
     );
     // Running again under the same invocation is idempotent.
-    assemble(root.path(), Some(staged.locator().to_owned())).unwrap();
+    assemble(
+        root.path(),
+        Some(staged.locator().to_owned()),
+        &staged.nonce(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -147,27 +161,28 @@ fn only_the_live_invocation_for_this_candidate_counts_as_a_route() {
     let root = candidate();
     let before = snapshot(root.path());
     // Production and a standalone run in the candidate have no channel.
-    let error = assemble(root.path(), None).unwrap_err();
+    let error = assemble(root.path(), None, "").unwrap_err();
     assert!(error.contains("no invocation channel"), "{error}");
     let staged = staged(root.path(), &crafted());
-    let locator = staged.locator().to_owned();
-    let offer = channel::request(&locator, &fs::canonicalize(root.path()).unwrap()).unwrap();
+    let (locator, nonce) = (staged.locator().to_owned(), staged.nonce());
+    let offer =
+        channel::request(&locator, &fs::canonicalize(root.path()).unwrap(), &nonce).unwrap();
     // Another root, even a copy of the candidate, is not the candidate this invocation serves.
     let other = candidate();
-    let error = assemble(other.path(), Some(locator.clone())).unwrap_err();
+    let error = assemble(other.path(), Some(locator.clone()), &nonce).unwrap_err();
     assert!(error.contains("no evidence for that root"), "{error}");
     // A copied bundle or any other file named as the channel is not a live invocation.
     let copy = other.path().join("bundle.json");
     fs::copy(&offer.bundle, &copy).unwrap();
     for path in [copy.clone(), other.path().join("absent")] {
-        let error = assemble(root.path(), Some(path)).unwrap_err();
+        let error = assemble(root.path(), Some(path), &nonce).unwrap_err();
         assert!(error.contains("not live"), "{error}");
     }
     // Once the invocation ends, its channel and bundle are gone and nothing replays it.
     drop(staged);
     assert!(!offer.bundle.exists());
     assert!(!locator.parent().unwrap().exists());
-    let error = assemble(root.path(), Some(locator)).unwrap_err();
+    let error = assemble(root.path(), Some(locator), &nonce).unwrap_err();
     assert!(error.contains("not live"), "{error}");
     assert_eq!(snapshot(root.path()), before);
 }
@@ -179,9 +194,9 @@ fn substituted_or_replayed_bundles_refuse() {
     // The earlier invocation staged other (still self-consistent) evidence.
     let earlier = staged(root.path(), &crafted_with(b"{\"earlier\":true}"));
     let canonical = fs::canonicalize(root.path()).unwrap();
-    let old = channel::request(earlier.locator(), &canonical).unwrap();
+    let old = channel::request(earlier.locator(), &canonical, &earlier.nonce()).unwrap();
     let current = staged(root.path(), &crafted());
-    let offer = channel::request(current.locator(), &canonical).unwrap();
+    let offer = channel::request(current.locator(), &canonical, &current.nonce()).unwrap();
     let dir = offer.bundle.parent().unwrap();
     fs::set_permissions(&offer.bundle, fs::Permissions::from_mode(0o600)).unwrap();
     // An earlier invocation's bundle, a re-signed copy of it, and a symlink to it all refuse.
@@ -198,12 +213,22 @@ fn substituted_or_replayed_bundles_refuse() {
         ),
     ] {
         fs::write(&offer.bundle, substitute).unwrap();
-        let error = assemble(root.path(), Some(current.locator().to_owned())).unwrap_err();
+        let error = assemble(
+            root.path(),
+            Some(current.locator().to_owned()),
+            &current.nonce(),
+        )
+        .unwrap_err();
         assert!(error.contains(expected), "{error}");
     }
     fs::remove_file(&offer.bundle).unwrap();
     std::os::unix::fs::symlink(&old.bundle, dir.join("bundle.json")).unwrap();
-    let error = assemble(root.path(), Some(current.locator().to_owned())).unwrap_err();
+    let error = assemble(
+        root.path(),
+        Some(current.locator().to_owned()),
+        &current.nonce(),
+    )
+    .unwrap_err();
     assert!(error.contains("not a bounded regular file"), "{error}");
     assert_eq!(snapshot(root.path()), before);
 }
@@ -299,7 +324,12 @@ fn another_generation_p_o_or_target_refuses() {
     };
     let staged =
         in_process(stage_answer(root.path(), Err("missing adoption".into()), &target).unwrap());
-    let error = assemble(root.path(), Some(staged.locator().to_owned())).unwrap_err();
+    let error = assemble(
+        root.path(),
+        Some(staged.locator().to_owned()),
+        &staged.nonce(),
+    )
+    .unwrap_err();
     assert!(
         error.contains("no authenticated evidence was staged")
             && error.contains("missing adoption"),

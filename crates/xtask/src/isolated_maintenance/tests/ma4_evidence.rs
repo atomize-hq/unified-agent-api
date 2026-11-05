@@ -35,13 +35,21 @@ fn executor_entry() {
 /// A stand-in executor outside the workspace. It answers the preflight; otherwise it records the
 /// channel locator it was given, runs the offline command, then runs `extra`.
 fn executor(dir: &Path, extra: &str) -> String {
+    executor_via(dir, "", extra)
+}
+/// As [`executor`], with `env` (shell assignments) applied to the offline command only. The
+/// command runs as its own, separately located binary: not the host's executable file.
+fn executor_via(dir: &Path, env: &str, extra: &str) -> String {
     use std::os::unix::fs::PermissionsExt;
-    let path = dir.join(format!("executor-{}.sh", extra.len()));
-    let exe = std::env::current_exe().unwrap();
+    let path = dir.join(format!("executor-{}-{}.sh", env.len(), extra.len()));
+    let exe = dir.join("assembler");
+    if !exe.exists() {
+        std::fs::copy(std::env::current_exe().unwrap(), &exe).unwrap();
+    }
     std::fs::write(
         &path,
         format!(
-            "#!/bin/sh\nprompt=$(cat)\ncase \"$prompt\" in\n*'Repository preflight'*) echo {} ;;\n*) echo \"$XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL\" > {}\n\"{}\" --exact {ENTRY} --ignored --quiet || exit 1\n{extra}\n;;\nesac\n",
+            "#!/bin/sh\nprompt=$(cat)\ncase \"$prompt\" in\n*'Repository preflight'*) echo {} ;;\n*) echo \"$XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL\" > {}\n{env} \"{}\" --exact {ENTRY} --ignored --quiet || exit 1\n{extra}\n;;\nesac\n",
             execute::PREFLIGHT_SENTINEL,
             dir.join("locator").display(),
             exe.display(),
@@ -179,7 +187,7 @@ fn ma4_writes_authenticated_reporting_e_that_the_audit_reevaluates() {
         ],
     );
     for locator in [None, Some(locator)] {
-        let error = crate::depth_evidence::staged_assemble(&clone, locator).unwrap_err();
+        let error = crate::depth_evidence::staged_assemble(&clone, locator, "").unwrap_err();
         assert!(error.contains("live"), "{error}");
     }
     assert_eq!(git(&clone, &["status", "--porcelain"]), "");
@@ -315,7 +323,10 @@ fn an_index_failure_at_delivery_leaves_caller_files_and_index_unchanged() {
     {
         let _gates = execute::gate_stub::stub_with(move || std::fs::write(&held, b"").unwrap());
         let refused = run_as(root, &binary, "ma4-evidence-locked").unwrap_err();
-        assert!(refused.contains("update-index failed"), "{refused}");
+        assert!(
+            refused.contains("locked by another Git process"),
+            "{refused}"
+        );
     }
     std::fs::remove_file(&lock).unwrap();
     assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
@@ -325,4 +336,51 @@ fn an_index_failure_at_delivery_leaves_caller_files_and_index_unchanged() {
         index_before
     );
     assert_eq!(git(root, &["ls-files", "--stage"]), staged_before);
+}
+
+#[test]
+fn e_from_a_forged_channel_is_never_delivered() {
+    let (f, host) = chain();
+    let root = f.root.path();
+    let bin = tempfile::tempdir().unwrap();
+    let _installed = f.install();
+    let _reader = host.install();
+    let record_before = std::fs::read(root.join(RECORD)).unwrap();
+    let index_before = git(root, &["ls-files", "--stage"]);
+    // A forged server serves a self-consistent bundle for this generation and P/O; the executor
+    // points the offline command at it, which writes that E and its receipt in the candidate.
+    let forged_dir = tempfile::tempdir().unwrap();
+    let forged = forged_dir.path().join("channel");
+    let _server =
+        crate::depth_evidence::forged_evidence_channel(&forged, &record(root), b"{\"forged\":1}");
+    let binary = executor_via(
+        bin.path(),
+        &format!(
+            "XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL={}",
+            forged.display()
+        ),
+        "",
+    );
+    {
+        let _gates = execute::gate_stub::stub();
+        let refused = run_as(root, &binary, "ma4-evidence-forged").unwrap_err();
+        // Its receipt is not the host-staged bytes, so it never gains an index identity.
+        assert!(refused.contains("untracked bound input"), "{refused}");
+        // The forged run did write E and its receipt, but only in the retained candidate.
+        let candidate = refused
+            .rsplit("candidate retained at ")
+            .next()
+            .unwrap()
+            .trim();
+        let candidate = Path::new(candidate);
+        assert!(record(candidate).execution.is_some());
+        let receipt = format!("{EVIDENCE}/1-1/R1/receipt.json");
+        assert_eq!(
+            std::fs::read(candidate.join(&receipt)).unwrap(),
+            b"{\"forged\":1}"
+        );
+    }
+    assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
+    assert!(!root.join(EVIDENCE).exists());
+    assert_eq!(git(root, &["ls-files", "--stage"]), index_before);
 }

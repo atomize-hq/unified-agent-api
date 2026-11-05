@@ -26,11 +26,17 @@ mod peer;
 #[cfg(all(test, target_os = "linux"))]
 mod channel_tests;
 #[cfg(all(test, target_os = "linux"))]
+pub(crate) use channel_tests::forged_channel;
+#[cfg(all(test, unix, not(target_os = "linux")))]
+mod non_linux_tests;
+#[cfg(all(test, target_os = "linux"))]
 mod tests;
 pub(crate) use channel::Admission;
 
 /// Locates the live invocation channel. It carries no authority: only the host serving it does.
 pub const CHANNEL_ENV: &str = "XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL";
+/// The invocation's random nonce, which the host gives only to its executor.
+pub const NONCE_ENV: &str = "XTASK_AGENT_MAINTENANCE_EVIDENCE_NONCE";
 const SCHEMA: &str = "depth-evidence-bundle-v1";
 const BUNDLE_LIMIT: u64 = 16 * 1024 * 1024;
 
@@ -79,6 +85,15 @@ pub(crate) struct Channel {
     pub admission: Admission,
 }
 impl Staged {
+    /// The private directory holding the bundle and the socket.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn dir(&self) -> &Path {
+        self._dir.path()
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn nonce(&self) -> String {
+        self.channel.admission().nonce().to_owned()
+    }
     #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn locator(&self) -> &Path {
         self.channel.locator()
@@ -94,6 +109,12 @@ impl Staged {
     pub(crate) fn files(&self) -> &BTreeMap<String, String> {
         &self.files
     }
+}
+
+/// A live host serving a crafted bundle for `candidate`, admitting this test process.
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) fn test_staged(candidate: &Path) -> Staged {
+    tests::staged(candidate, &tests::crafted())
 }
 
 /// Host side. `host` is the captured route's evidence host, or why it has none; an assembly
@@ -234,16 +255,27 @@ fn publish(dir: &Path, bundle: &Bundle) -> Result<channel::Offer, String> {
 
 /// `xtask depth-evidence-assemble`, run by the MA4 executor inside its candidate.
 pub fn assemble_staged(root: &Path) -> Result<String, String> {
-    assemble(root, std::env::var_os(CHANNEL_ENV).map(PathBuf::from))
+    assemble(
+        root,
+        std::env::var_os(CHANNEL_ENV).map(PathBuf::from),
+        &std::env::var(NONCE_ENV).unwrap_or_default(),
+    )
 }
 
-pub(crate) fn assemble(root: &Path, locator: Option<PathBuf>) -> Result<String, String> {
+/// Fail-closed convenience: without a live answering channel nothing is written. The channel's
+/// answer is not authenticated here; delivery admits only files byte-identical to what the host
+/// staged, so E written from a forged answer stays local and undeliverable.
+pub(crate) fn assemble(
+    root: &Path,
+    locator: Option<PathBuf>,
+    nonce: &str,
+) -> Result<String, String> {
     let locator = locator.ok_or(
         "depth-evidence-assemble runs only inside a live isolated MA4 execution; no invocation \
          channel is present",
     )?;
     let root = fs::canonicalize(root).map_err(|e| e.to_string())?;
-    let offer = channel::request(&locator, &root)?;
+    let offer = channel::request(&locator, &root, nonce)?;
     let metadata = fs::symlink_metadata(&offer.bundle).map_err(|e| e.to_string())?;
     if !metadata.is_file() || metadata.len() > BUNDLE_LIMIT {
         return Err("staged evidence bundle is not a bounded regular file".into());

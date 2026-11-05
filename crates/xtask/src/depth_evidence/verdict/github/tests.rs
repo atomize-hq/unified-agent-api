@@ -702,6 +702,8 @@ fn core_unadopted_mapping_and_wrong_profile_cannot_verify() {
 
 #[path = "tests/core_repairs.rs"]
 mod core_repairs;
+// Serves the connected MA4 evidence chain, which needs the Linux channel anchor.
+#[cfg(target_os = "linux")]
 pub(super) mod host;
 #[path = "tests/synthetic.rs"]
 mod synthetic;

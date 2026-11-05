@@ -1,7 +1,9 @@
 //! The invocation-local channel: a Unix socket in the host's private staging directory, served by
-//! the live MA4 host for exactly one candidate while its executor runs. Both sides authenticate
-//! the other's process (see `peer`). The host revokes the channel the moment its executor exits,
-//! so nothing copied out of it (bundle, path or locator) can be replayed by a later process.
+//! the live MA4 host for exactly one candidate while its executor runs. The host answers only its
+//! executor's process tree presenting the invocation's random nonce (see `peer`), and revokes the
+//! channel the moment its executor exits, so nothing copied out of it (bundle, path, locator or
+//! nonce) can be replayed by a later process. The assembler does not authenticate the host: its
+//! use of the channel is a fail-closed convenience, and delivery's byte binding is the authority.
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -23,6 +25,7 @@ pub(super) struct Offer {
 #[serde(deny_unknown_fields)]
 struct Request {
     candidate: PathBuf,
+    nonce: String,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
@@ -37,6 +40,8 @@ struct Shared {
     executor: AtomicU32,
     /// The socket and the bundle; both are removed on revocation.
     paths: Vec<PathBuf>,
+    /// Random per invocation; passed only to the executor, in its environment.
+    nonce: String,
 }
 
 /// The host's control over its channel: admit the executor it spawned, and revoke the channel
@@ -48,6 +53,10 @@ impl Admission {
         if !self.0.revoked.load(Ordering::SeqCst) {
             self.0.executor.store(pid, Ordering::SeqCst);
         }
+    }
+    /// The value the executor must present; it reaches only the executor's environment.
+    pub(crate) fn nonce(&self) -> &str {
+        &self.0.nonce
     }
     pub(crate) fn revoke(&self) {
         self.0.revoked.store(true, Ordering::SeqCst);
@@ -80,16 +89,22 @@ impl Server {
         &self.admission
     }
 }
-fn admission(path: &Path, answer: &Result<Offer, String>) -> Admission {
+fn admission(path: &Path, answer: &Result<Offer, String>) -> Result<Admission, String> {
+    use std::io::Read;
     let mut paths = vec![path.to_owned()];
     if let Ok(offer) = answer {
         paths.push(offer.bundle.clone());
     }
-    Admission(Arc::new(Shared {
+    let mut random = [0u8; 32];
+    fs::File::open("/dev/urandom")
+        .and_then(|mut f| f.read_exact(&mut random))
+        .map_err(|e| format!("cannot draw the MA4 evidence channel nonce: {e}"))?;
+    Ok(Admission(Arc::new(Shared {
         revoked: AtomicBool::new(false),
         executor: AtomicU32::new(0),
         paths,
-    }))
+        nonce: hex::encode(random),
+    })))
 }
 
 #[cfg(unix)]
@@ -111,17 +126,35 @@ mod unix {
             candidate: PathBuf,
             answer: Result<Offer, String>,
         ) -> Result<Self, String> {
+            Self::start_with(path, candidate, answer, SERVE_DEADLINE)
+        }
+        /// A host whose per-request deadline is `deadline`, so a test can reach it quickly.
+        #[cfg(all(test, target_os = "linux"))]
+        pub(in super::super) fn start_with_deadline(
+            path: &Path,
+            candidate: PathBuf,
+            answer: Result<Offer, String>,
+            deadline: Duration,
+        ) -> Result<Self, String> {
+            Self::start_with(path, candidate, answer, deadline)
+        }
+        fn start_with(
+            path: &Path,
+            candidate: PathBuf,
+            answer: Result<Offer, String>,
+            deadline: Duration,
+        ) -> Result<Self, String> {
             let listener = UnixListener::bind(path)
                 .map_err(|e| format!("cannot open the MA4 evidence channel: {e}"))?;
             listener.set_nonblocking(true).map_err(|e| e.to_string())?;
-            let admission = admission(path, &answer);
+            let admission = admission(path, &answer)?;
             let thread = {
                 let shared = admission.0.clone();
                 std::thread::spawn(move || {
                     while !shared.revoked.load(Ordering::SeqCst) {
                         match listener.accept() {
                             Ok((stream, _)) => {
-                                let _ = answer_one(stream, &candidate, &answer, &shared);
+                                let _ = answer_one(stream, &candidate, &answer, &shared, deadline);
                             }
                             Err(_) => std::thread::sleep(POLL),
                         }
@@ -187,8 +220,9 @@ mod unix {
         candidate: &Path,
         answer: &Result<Offer, String>,
         shared: &Shared,
+        limit: Duration,
     ) -> std::io::Result<()> {
-        let deadline = Instant::now() + SERVE_DEADLINE;
+        let deadline = Instant::now() + limit;
         stream.set_nonblocking(false)?;
         let client = super::super::peer::authenticate_client(
             &stream,
@@ -201,6 +235,10 @@ mod unix {
                 match serde_json::from_slice::<Request>(&line) {
                     // Equality with this host's own canonical root only; the request path is
                     // never resolved.
+                    Ok(request) if request.nonce != shared.nonce => Response::Refused(
+                        "the evidence channel request does not carry this invocation's nonce"
+                            .into(),
+                    ),
                     Ok(request) if request.candidate == candidate => match answer {
                         Ok(offer) => Response::Offer(offer.clone()),
                         Err(reason) => Response::Refused(format!(
@@ -223,7 +261,11 @@ mod unix {
         writeln!(stream, "{}", serde_json::to_string(&response)?)
     }
 
-    pub(in super::super) fn request(locator: &Path, candidate: &Path) -> Result<Offer, String> {
+    pub(in super::super) fn request(
+        locator: &Path,
+        candidate: &Path,
+        nonce: &str,
+    ) -> Result<Offer, String> {
         use std::os::unix::fs::FileTypeExt;
         let not_live = || {
             "the MA4 invocation that staged evidence is not live; a copied bundle, path or \
@@ -236,13 +278,12 @@ mod unix {
         }
         let deadline = Instant::now() + CLIENT_DEADLINE;
         let mut stream = UnixStream::connect(locator).map_err(|_| not_live())?;
-        // Nothing is sent to, or accepted from, a server that is not the controlling host.
-        super::super::peer::authenticate_server(&stream)?;
         stream
             .set_write_timeout(Some(CLIENT_DEADLINE))
             .map_err(|e| e.to_string())?;
         let request = Request {
             candidate: candidate.to_owned(),
+            nonce: nonce.to_owned(),
         };
         writeln!(
             stream,
@@ -273,6 +314,6 @@ impl Server {
     }
 }
 #[cfg(not(unix))]
-pub(super) fn request(_locator: &Path, _candidate: &Path) -> Result<Offer, String> {
+pub(super) fn request(_locator: &Path, _candidate: &Path, _nonce: &str) -> Result<Offer, String> {
     Err("the MA4 evidence channel requires Unix sockets".into())
 }

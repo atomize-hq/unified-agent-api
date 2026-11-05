@@ -536,7 +536,7 @@ fn prove_profile_in(
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) use tests::host::{synthetic_host, SyntheticHost};
 
 impl Host for Resolved {

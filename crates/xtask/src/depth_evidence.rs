@@ -15,9 +15,14 @@ pub mod native;
 pub mod payload;
 mod staged;
 mod validate;
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) use staged::assemble as staged_assemble;
-pub use staged::{assemble_staged, CHANNEL_ENV as STAGED_EVIDENCE_CHANNEL_ENV};
+pub use staged::{
+    assemble_staged, CHANNEL_ENV as STAGED_EVIDENCE_CHANNEL_ENV,
+    NONCE_ENV as STAGED_EVIDENCE_NONCE_ENV,
+};
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) use staged::{forged_channel as forged_evidence_channel, test_staged};
 pub(crate) use staged::{
     stage as stage_isolated_evidence, Admission, Channel as StagedChannel, Staged,
     Target as StagedTarget,
@@ -25,7 +30,7 @@ pub(crate) use staged::{
 mod verdict;
 pub use verdict::{evaluate_workspace, Evaluation, Verdict};
 pub use verdict::{prove_isolated_ci, prove_isolated_core};
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) use verdict::{synthetic_host, SyntheticHost};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

@@ -1,6 +1,7 @@
 //! Validate prospective bytes against the caller index that copy-back will preserve.
 use super::{
     candidate_git::{self, GitState},
+    index_lock::IndexLock,
     tree::{io, Node, Tree},
     Error,
 };
@@ -79,8 +80,9 @@ pub(super) fn bound_new_evidence(
 
 /// Write each bound file's validated bytes as a blob in `root` and add exactly those index
 /// entries. Live working files are never read, so bytes swapped after validation never gain an
-/// index identity. Refuses if the index already holds any of these paths; on failure the index is
-/// unchanged (blobs alone are unreferenced objects).
+/// index identity. The comparison and the update run under the caller's index lock, so no other
+/// Git process can stage one of these paths in between. Refuses if the index is locked or already
+/// holds any of these paths; on failure the index is unchanged (blobs alone are unreferenced).
 pub(super) fn publish(root: &Path, bound: &[Bound]) -> Result<Vec<Published>, Error> {
     let mut published = Vec::new();
     for file in bound {
@@ -93,11 +95,14 @@ pub(super) fn publish(root: &Path, bound: &[Bound]) -> Result<Vec<Published>, Er
     if published.is_empty() {
         return Ok(published);
     }
-    if !entries(root, &published)?.is_empty() {
+    let lock = IndexLock::acquire(root)?;
+    if !entries(&lock, &published)?.is_empty() {
         return Err(Error::Validation(
             "caller index already holds a path this delivery would add".into(),
         ));
     }
+    #[cfg(test)]
+    super::index_lock::between::run(root);
     let mut args = vec!["update-index".to_owned(), "--add".to_owned()];
     for (file, entry) in bound.iter().zip(&published) {
         let oid = entry.entry.split(' ').nth(1).unwrap_or_default();
@@ -107,23 +112,29 @@ pub(super) fn publish(root: &Path, bound: &[Bound]) -> Result<Vec<Published>, Er
         ]);
     }
     let args: Vec<_> = args.iter().map(String::as_str).collect();
-    candidate_git::run(root, &args)?;
+    lock.run(&args)?;
+    lock.commit()?;
     Ok(published)
 }
 
-/// Remove the index entries [`publish`] added, only where the index still holds exactly them.
-/// A concurrent change to one of those entries is preserved and reported as a conflict.
+/// Remove the index entries [`publish`] added, only where the index still holds exactly them, under
+/// the caller's index lock. An entry someone else changed is preserved and reported as a conflict,
+/// never erased.
 pub(super) fn unpublish(root: &Path, published: &[Published]) -> Result<(), Error> {
     if published.is_empty() {
         return Ok(());
     }
-    let current = entries(root, published)?;
+    let lock = IndexLock::acquire(root)?;
+    let current = entries(&lock, published)?;
     let (owned, conflicts): (Vec<_>, Vec<_>) =
         published.iter().partition(|p| current.contains(&p.entry));
+    #[cfg(test)]
+    super::index_lock::between::run(root);
     if !owned.is_empty() {
         let mut args = vec!["update-index", "--force-remove", "--"];
         args.extend(owned.iter().map(|p| p.path.as_str()));
-        candidate_git::run(root, &args)?;
+        lock.run(&args)?;
+        lock.commit()?;
     }
     if conflicts.is_empty() {
         Ok(())
@@ -140,10 +151,10 @@ pub(super) fn unpublish(root: &Path, published: &[Published]) -> Result<(), Erro
 }
 
 /// The stage entries the index holds for the published paths, as `mode oid stage\tpath`.
-fn entries(root: &Path, published: &[Published]) -> Result<Vec<String>, Error> {
+fn entries(lock: &IndexLock, published: &[Published]) -> Result<Vec<String>, Error> {
     let mut args = vec!["ls-files", "--stage", "-z", "--"];
     args.extend(published.iter().map(|p| p.path.as_str()));
-    let raw = candidate_git::run(root, &args)?;
+    let raw = lock.run(&args)?;
     raw.split(|b| *b == 0)
         .filter(|row| !row.is_empty())
         .map(|row| String::from_utf8(row.to_vec()).map_err(|e| Error::Validation(e.to_string())))

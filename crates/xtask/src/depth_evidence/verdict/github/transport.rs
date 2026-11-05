@@ -218,12 +218,14 @@ pub(crate) mod test_reader {
     pub(crate) type Reader = Arc<dyn Fn(&str, usize) -> Result<Vec<u8>, String>>;
     thread_local!(static READER: RefCell<Option<Reader>> = const { RefCell::new(None) });
     /// Uninstalls on drop, so a failing test never leaks its fake host.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub(crate) struct Installed;
     impl Drop for Installed {
         fn drop(&mut self) {
             READER.with(|r| *r.borrow_mut() = None);
         }
     }
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub(crate) fn install(reader: Reader) -> Installed {
         READER.with(|r| *r.borrow_mut() = Some(reader));
         Installed

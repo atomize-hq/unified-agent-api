@@ -113,3 +113,56 @@ fn host_credentials_never_reach_the_executor_or_green_gates() {
         assert!(!env.contains("uaa-sentinel"), "{phase}");
     }
 }
+
+#[cfg(unix)]
+thread_local!(pub(super) static FAIL_WAIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+
+/// Spawn, prompt-delivery and wait failures each revoke the evidence channel before the spawn
+/// returns, so no gate or leftover process can reach it, and dropping the host removes the
+/// bundle directory.
+#[cfg(target_os = "linux")]
+#[test]
+fn every_executor_failure_path_revokes_the_evidence_channel() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let script = |name: &str, body: &str| {
+        let path = root.path().join(name);
+        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        path.to_string_lossy().into_owned()
+    };
+    let missing = root
+        .path()
+        .join("missing-executor")
+        .to_string_lossy()
+        .into_owned();
+    let closes = script("closes-stdin.sh", "exec 0<&-\nexec sleep 30");
+    let waits = script("waits.sh", "cat >/dev/null\nexec sleep 30");
+    let large = "x".repeat(1_048_576);
+    for (case, binary, prompt, fail_wait) in [
+        ("spawn", missing, "p", false),
+        ("prompt", closes, large.as_str(), false),
+        ("wait", waits, "p", true),
+    ] {
+        let staged = crate::depth_evidence::test_staged(root.path());
+        let channel = staged.channel();
+        let bundle = staged.dir().join("bundle.json");
+        assert!(bundle.is_file() && channel.locator.exists(), "{case}");
+        FAIL_WAIT.with(|f| f.set(fail_wait));
+        let result = spawn_codex_exec(&binary, root.path(), prompt, &[], Some(&channel.admission));
+        FAIL_WAIT.with(|f| f.set(false));
+        assert!(result.is_err(), "{case} succeeded");
+        assert!(
+            !channel.locator.exists(),
+            "{case}: channel outlived the executor"
+        );
+        assert!(
+            std::os::unix::net::UnixStream::connect(&channel.locator).is_err(),
+            "{case}"
+        );
+        assert!(!bundle.exists(), "{case}: bundle outlived the executor");
+        let dir = staged.dir().to_owned();
+        drop(staged);
+        assert!(!dir.exists(), "{case}: bundle directory outlived the host");
+    }
+}

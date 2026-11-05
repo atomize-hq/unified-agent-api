@@ -140,6 +140,12 @@ pub(super) fn execute_codex_write(
             crate::depth_evidence::STAGED_EVIDENCE_CHANNEL_ENV.to_string(),
             channel.locator.to_string_lossy().into_owned(),
         ));
+        // The nonce reaches only the executor: gates and later processes drop every
+        // XTASK_AGENT_MAINTENANCE_* variable, and the channel is revoked when the executor exits.
+        envs.push((
+            crate::depth_evidence::STAGED_EVIDENCE_NONCE_ENV.to_string(),
+            channel.admission.nonce().to_owned(),
+        ));
     }
     let (argv, output) = spawn_codex_exec(
         &context.codex_binary,
@@ -370,7 +376,13 @@ fn spawn_codex_exec(
         let _ = child.wait();
         return Err(error);
     }
-    let status = wait_for_codex(&mut child, |child| child.wait());
+    let status = wait_for_codex(&mut child, |child| {
+        #[cfg(all(test, unix))]
+        if tests::FAIL_WAIT.with(|f| f.get()) {
+            return Err(std::io::Error::other("injected wait failure"));
+        }
+        child.wait()
+    });
     // The executor has exited (or was killed and reaped): no process it left behind, and no gate
     // that runs next, can reach the channel.
     drop(revoke);

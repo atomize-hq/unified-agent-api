@@ -7,7 +7,9 @@ mod fixture;
 #[cfg(unix)]
 mod git_metadata;
 mod ma2_routes;
-#[cfg(unix)]
+// The connected evidence chain needs the Linux channel peer anchor; other platforms refuse it
+// (see `depth_evidence::staged::non_linux_tests`).
+#[cfg(target_os = "linux")]
 mod ma4_evidence;
 #[cfg(unix)]
 mod ma4_route;
