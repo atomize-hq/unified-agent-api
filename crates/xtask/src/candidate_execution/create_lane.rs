@@ -13,6 +13,22 @@ use crate::{
 };
 use sha2::{Digest, Sha256};
 
+pub(super) fn render_depth_prompt(context: &RuntimeContext) -> String {
+    // The executor runs in the independent candidate; every run-file destination must
+    // resolve there, including prompts prepared in the caller before the copy exists.
+    let relative_context = RuntimeContext {
+        approval: context.approval.clone(),
+        input_contract: context.input_contract.clone(),
+        lifecycle_state: context.lifecycle_state.clone(),
+        lifecycle_state_path: context.lifecycle_state_path.clone(),
+        run_id: context.run_id.clone(),
+        run_dir: Path::new(RUNTIME_RUNS_ROOT).join(&context.run_id),
+    };
+    let mut prompt = render_prompt(&relative_context);
+    prompt.push_str("\nDepth candidate boundary: handoff.json is the only run file you may write. The input contract, prompt, lifecycle state, depth record, approval and depth-acquisition statement are immutable. The controller writes all streams, execution evidence, validation, status, written paths and summary after observation. Do not write snapshots.\n");
+    prompt
+}
+
 pub(super) fn candidate_error(error: candidate_execution::Error) -> Error {
     match error {
         candidate_execution::Error::Validation(s) => Error::Validation(s),
@@ -314,7 +330,9 @@ fn check_prepared(
         object.remove("baseline"); // Reporting only; never authenticates the write boundary.
         Ok(value)
     };
-    if comparable(prepared)? != comparable(&context.input_contract)? || prompt.trim().is_empty() {
+    if comparable(prepared)? != comparable(&context.input_contract)?
+        || prompt != render_depth_prompt(context)
+    {
         return Err(Error::Validation(
             "prepared depth packet differs from the approved runtime scope".into(),
         ));
@@ -350,7 +368,14 @@ fn check_prepared(
         version,
     )
     .map_err(Error::Validation)?;
-    if let Some(why) = record.request_mismatch(&object.binding(record.event.clone())) {
+    let approval = crate::depth_record::onboarding::OnboardingApproval::parse(
+        &read_string(&caller.join(&context.approval.relative_path))?,
+        &context.approval.relative_path,
+    )
+    .map_err(Error::Validation)?;
+    // A maintenance Event or an earlier onboarding generation cannot authenticate this
+    // approval's write, even when the lifecycle object repeats the record's P/O identities.
+    if let Some(why) = record.request_mismatch(&object.binding(approval.event)) {
         return Err(Error::Validation(format!("depth write: {why}")));
     }
     Ok(())
@@ -420,3 +445,7 @@ fn diagnostics(
     }
     Ok(out)
 }
+
+#[cfg(all(test, unix))]
+#[path = "create_lane_tests.rs"]
+mod create_candidate;

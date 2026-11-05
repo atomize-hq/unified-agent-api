@@ -380,10 +380,11 @@ fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
         &context.run_dir.join(INPUT_CONTRACT_FILE_NAME),
         &context.input_contract,
     )?;
-    let mut prompt = render_prompt(context);
-    if context.approval.support_depth_version.is_some() {
-        prompt.push_str("\nDepth candidate boundary: handoff.json is the only run file you may write. The input contract, prompt, lifecycle state, depth record, approval and depth-acquisition statement are immutable. The controller writes all streams, execution evidence, validation, status, written paths and summary after observation. Do not write snapshots.\n");
-    }
+    let prompt = if context.approval.support_depth_version.is_some() {
+        depth_candidate::render_depth_prompt(context)
+    } else {
+        render_prompt(context)
+    };
     write_string(&context.run_dir.join(PROMPT_FILE_NAME), &prompt)?;
     write_json(
         &context.run_dir.join(RUN_STATUS_FILE_NAME),
