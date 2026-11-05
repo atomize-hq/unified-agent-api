@@ -389,6 +389,8 @@ fn list(
 }
 
 /// Git state belongs to the explicit root, never an inherited index/object/worktree redirect.
+/// Reads must neither refresh the caller's index nor acquire missing promisor objects. Explicit
+/// mutations/acquisition at other call sites still require their own authorized commands.
 pub(crate) fn command(root: &Path) -> Command {
     let mut command = Command::new("git");
     for (key, _) in std::env::vars_os() {
@@ -396,7 +398,13 @@ pub(crate) fn command(root: &Path) -> Command {
             command.env_remove(key);
         }
     }
-    command.arg("--no-replace-objects").arg("-C").arg(root);
+    // Install these after sanitizing the environment, even if the parent enabled writes/fetches.
+    command
+        .env("GIT_OPTIONAL_LOCKS", "0")
+        .env("GIT_NO_LAZY_FETCH", "1")
+        .args(["--no-optional-locks", "--no-replace-objects"])
+        .arg("-C")
+        .arg(root);
     command
 }
 

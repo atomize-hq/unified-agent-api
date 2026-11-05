@@ -62,7 +62,9 @@ impl ViewEvaluation<'_> {
     #[cfg(test)]
     pub(crate) fn probe_provenance(&self, root: &Path, commit: &str) -> Result<(), String> {
         let _read_only = github::transport::read_only(&self.inputs)?;
-        github::transport::source(root, self.host.repository(), commit).map(drop)
+        let source = github::transport::source(root, self.host.repository(), commit)?;
+        source.tree()?;
+        source.optional_bytes("docs/history.txt").map(drop)
     }
 
     /// Re-authenticate the complete population for this exact record, without any writes.

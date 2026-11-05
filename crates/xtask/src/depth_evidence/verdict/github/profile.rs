@@ -4,7 +4,6 @@ use crate::{
     depth_ci::{self, Witness},
     runtime_advertising::source::Source,
 };
-use std::process::Command;
 
 pub(super) const OPTIONAL: [&str; 4] = [
     ".cargo/config",
@@ -91,18 +90,12 @@ pub(super) fn approved(
     .chain(p.requirements())
     {
         let oid = |commit: &str| -> Result<Vec<u8>, String> {
-            crate::depth_ci::output(
-                Command::new("git")
-                    .arg("--no-replace-objects")
-                    .arg("-C")
-                    .arg(root)
-                    .args([
-                        "rev-parse",
-                        "--verify",
-                        "--end-of-options",
-                        &format!("{commit}:{path}"),
-                    ]),
-            )
+            crate::depth_ci::output(crate::git_inputs::command(root).args([
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                &format!("{commit}:{path}"),
+            ]))
         };
         if oid(built)? != oid(anchor)? || oid(workflow)? != oid(anchor)? {
             return Err(format!(
@@ -135,13 +128,12 @@ pub(super) fn validate_witness(
         if run["event"] != "pull_request" {
             return Err("checkout does not match host head".into());
         }
-        let parents = crate::depth_ci::output(
-            Command::new("git")
-                .arg("--no-replace-objects")
-                .arg("-C")
-                .arg(root)
-                .args(["show", "-s", "--format=%P", &w.build.source_commit]),
-        )?;
+        let parents = crate::depth_ci::output(crate::git_inputs::command(root).args([
+            "show",
+            "-s",
+            "--format=%P",
+            &w.build.source_commit,
+        ]))?;
         let parents = std::str::from_utf8(&parents)
             .map_err(|e| e.to_string())?
             .split_whitespace()

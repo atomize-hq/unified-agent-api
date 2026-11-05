@@ -13,6 +13,7 @@ use crate::{
         prepare_closeout, stand_down,
     },
     depth_ci::profile::Profile,
+    depth_evidence::EvidenceVerdicts,
     depth_record::{AcceptanceEntry, DepthRecord, DepthResult},
 };
 const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json";
@@ -109,9 +110,7 @@ fn delivered(classified: bool, channel: bool) -> (Fixture, crate::depth_evidence
         } else {
             let context = f.resolve().unwrap();
             let host = context.evidence_host(root).unwrap();
-            let assembly =
-                crate::depth_evidence::EvidenceVerdicts::assemble_view_fixture(root, &host)
-                    .unwrap();
+            let assembly = EvidenceVerdicts::assemble_view_fixture(root, &host).unwrap();
             let mut record = DepthRecord::parse(
                 &fs::read_to_string(root.join(RECORD)).unwrap(),
                 "depth_fixture",
@@ -233,7 +232,7 @@ fn view_eval_post_ma5_record_is_verified_in_scratch() {
     publication_proof(true);
 }
 #[test]
-fn view_eval_authenticated_population_renders_verified_without_channel() {
+fn view_eval_authenticated_population_preserves_stale_index_and_renders_verified() {
     publication_proof(false);
 }
 fn publication_proof(channel: bool) {
@@ -252,6 +251,7 @@ fn publication_proof(channel: bool) {
     before.acceptance_entries.clear();
     write(root, RECORD, serde_json::to_vec_pretty(&before).unwrap());
     advance(&f, &host);
+    let index_before = stale_index(root);
     let context = f.resolve().unwrap();
     let evidence_host = context.evidence_host(root).unwrap();
     let captured = Route(f.resolve().unwrap()).capture(root).unwrap();
@@ -260,9 +260,10 @@ fn publication_proof(channel: bool) {
     let view = proposal.isolated_view(root, scratch.path()).unwrap();
     write(scratch.path(), RECORD, post);
     let _guard = captured.bind_view(&view).unwrap();
-    let evaluator =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &evidence_host, RECORD)
-            .unwrap();
+    assert_eq!(index_state(root), index_before);
+    let evaluator = EvidenceVerdicts::bind_view(&view, &context, &evidence_host, RECORD).unwrap();
+    context.recheck(root).unwrap();
+    assert_eq!(index_state(root), index_before);
     let caller_before = snapshot(root);
     let scratch_before = snapshot_files(scratch.path());
     // Poison all route self-resolution after obtaining the caller's authenticated objects.
@@ -270,6 +271,7 @@ fn publication_proof(channel: bool) {
         panic!("view evaluation resolved its own authority")
     }));
     let (record, verdicts) = evaluator.evaluate().unwrap();
+    assert_eq!(index_state(root), index_before);
     assert_eq!(snapshot(root), caller_before);
     assert_eq!(snapshot_files(scratch.path()), scratch_before);
     for obligation in Profile::Synthetic.obligations(&record) {
@@ -345,13 +347,8 @@ fn publication_proof(channel: bool) {
         write(scratch.path(), path, b"substituted evidence/dependency");
         // Tampering before binding cannot become a new trusted proposed input, even when
         // its altered bytes were included in the frozen source and E says verified.
-        let evaluator = crate::depth_evidence::EvidenceVerdicts::bind_view(
-            &view,
-            &context,
-            &evidence_host,
-            RECORD,
-        )
-        .unwrap();
+        let evaluator =
+            EvidenceVerdicts::bind_view(&view, &context, &evidence_host, RECORD).unwrap();
         let err = evaluator.evaluate().err().unwrap();
         assert!(err.contains("working bytes disagree"), "{err}");
         write(scratch.path(), path, original);
@@ -372,9 +369,7 @@ fn publication_proof(channel: bool) {
     }
     // The caller stays current through all three pre-evaluation rechecks, then its host
     // identity changes at the first post-evaluation recheck. No sealed result may escape.
-    let evaluator =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &evidence_host, RECORD)
-            .unwrap();
+    let evaluator = EvidenceVerdicts::bind_view(&view, &context, &evidence_host, RECORD).unwrap();
     let endpoint = "repos/fixture/isolated";
     let identity = f.api.0.lock().unwrap()[endpoint].clone();
     f.api.1.lock().unwrap().insert(
@@ -396,6 +391,43 @@ fn publication_proof(channel: bool) {
     assert!(f.api.1.lock().unwrap()[endpoint].is_empty());
     assert!(!scratch.path().join(".git").exists());
     assert_eq!(snapshot(root), caller_before);
+    // Control: the untouched stat cache really is stale; ordinary status rewrites it.
+    let status = ordinary_git(root)
+        .args(["status", "--porcelain=v1"])
+        .output()
+        .unwrap();
+    assert!(status.status.success());
+    assert!(status.stdout.is_empty());
+    assert_ne!(index_state(root).0, index_before.0);
+}
+
+fn ordinary_git(root: &Path) -> std::process::Command {
+    let mut command = std::process::Command::new("git");
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("GIT_") {
+            command.env_remove(key);
+        }
+    }
+    command.arg("-C").arg(root);
+    command
+}
+fn index_state(root: &Path) -> (Vec<u8>, std::time::SystemTime) {
+    let index = root.join(".git/index");
+    (
+        fs::read(&index).unwrap(),
+        fs::metadata(index).unwrap().modified().unwrap(),
+    )
+}
+fn stale_index(root: &Path) -> (Vec<u8>, std::time::SystemTime) {
+    let before = index_state(root);
+    let file = fs::File::options()
+        .write(true)
+        .open(root.join("docs/input.txt"))
+        .unwrap();
+    let old = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+    file.set_times(fs::FileTimes::new().set_modified(old))
+        .unwrap();
+    before
 }
 
 fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
@@ -445,7 +477,15 @@ fn snapshot(root: &Path) -> Snapshot {
         }
     }
     Snapshot {
-        status: git(root, &["status", "--porcelain=v1", "--untracked-files=all"]),
+        status: git(
+            root,
+            &[
+                "--no-optional-locks",
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+            ],
+        ),
         files: snapshot_files(root),
         git: git_files,
     }
@@ -470,10 +510,8 @@ fn view_eval_refuses_scratch_git_before_and_after_binding() {
             let scratch = tempfile::tempdir().unwrap();
             let view = proposal.isolated_view(root, scratch.path()).unwrap();
             let _guard = captured.bind_view(&view).unwrap();
-            let evaluator = after_binding.then(|| {
-                crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
-                    .unwrap()
-            });
+            let evaluator = after_binding
+                .then(|| EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap());
             match kind {
                 0 => fs::create_dir(scratch.path().join(".git")).unwrap(),
                 1 => write(scratch.path(), ".git", "gitdir: /foreign\n"),
@@ -482,7 +520,7 @@ fn view_eval_refuses_scratch_git_before_and_after_binding() {
             let err = if let Some(evaluator) = evaluator {
                 evaluator.evaluate().err().unwrap()
             } else {
-                crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
+                EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
                     .err()
                     .unwrap()
             };
@@ -505,15 +543,13 @@ fn view_eval_refuses_moved_caller_before_and_after_binding() {
         let scratch = tempfile::tempdir().unwrap();
         let view = proposal.isolated_view(root, scratch.path()).unwrap();
         let _guard = captured.bind_view(&view).unwrap();
-        let evaluator = after_binding.then(|| {
-            crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
-                .unwrap()
-        });
+        let evaluator = after_binding
+            .then(|| EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap());
         git(root, &["commit", "--allow-empty", "-m", "moved caller"]);
         let err = if let Some(evaluator) = evaluator {
             evaluator.evaluate().err().unwrap()
         } else {
-            crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
+            EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
                 .err()
                 .unwrap()
         };
@@ -532,9 +568,7 @@ fn view_eval_refuses_changed_proposal_after_binding() {
         let scratch = tempfile::tempdir().unwrap();
         let view = proposal.isolated_view(root, scratch.path()).unwrap();
         let _guard = captured.bind_view(&view).unwrap();
-        let evaluator =
-            crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD)
-                .unwrap();
+        let evaluator = EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
         write(scratch.path(), path, "changed after binding");
         let err = evaluator.evaluate().err().unwrap();
         assert!(
@@ -558,20 +592,16 @@ fn view_eval_never_resolves_scratch_authority_and_requires_the_callers_guard() {
     let proposal = captured.proposal(root).unwrap();
     let scratch = tempfile::tempdir().unwrap();
     let view = proposal.isolated_view(root, scratch.path()).unwrap();
-    assert!(
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).is_err()
-    );
+    assert!(EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).is_err());
     let guard = captured.bind_view(&view).unwrap();
     assert!(route(scratch.path()).is_err());
     assert!(evidence_host(scratch.path()).is_err());
     assert!(context.evidence_host(scratch.path()).is_err());
     let _no_resolution = fixture::install(Box::new(|| panic!("self-resolution attempted")));
-    let evaluator =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
+    let evaluator = EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
     // A registry/Git binding alone cannot authenticate a population. No fake reader is installed.
     assert!(evaluator.evaluate().is_err());
-    let evaluator =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
+    let evaluator = EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
     drop(guard);
     assert!(evaluator.evaluate().is_err());
 }
@@ -591,47 +621,105 @@ fn view_eval_refuses_foreign_context_and_borrowed_host() {
     let scratch = tempfile::tempdir().unwrap();
     let view = proposal.isolated_view(root, scratch.path()).unwrap();
     let _guard = captured.bind_view(&view).unwrap();
-    let err =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &foreign, &foreign_host, RECORD)
-            .err()
-            .unwrap();
+    let err = EvidenceVerdicts::bind_view(&view, &foreign, &foreign_host, RECORD)
+        .err()
+        .unwrap();
     assert!(err.contains("another caller"), "{err}");
-    let err =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &foreign_host, RECORD)
-            .err()
-            .unwrap();
+    let err = EvidenceVerdicts::bind_view(&view, &context, &foreign_host, RECORD)
+        .err()
+        .unwrap();
     assert!(err.contains("host differs"), "{err}");
-    assert!(crate::depth_evidence::EvidenceVerdicts::bind_view(
-        &view,
-        &context,
-        &host,
-        "docs/forged-record.json"
-    )
-    .is_err());
+    assert!(
+        EvidenceVerdicts::bind_view(&view, &context, &host, "docs/forged-record.json").is_err()
+    );
 }
 
 #[test]
 fn view_eval_provenance_refuses_missing_objects_and_scratch_objects_without_fetching() {
-    let f = simple();
-    let root = f.root.path();
-    let context = f.resolve().unwrap();
-    let host = context.evidence_host(root).unwrap();
-    let captured = Route(f.resolve().unwrap()).capture(root).unwrap();
-    let proposal = captured.proposal(root).unwrap();
-    let scratch = tempfile::tempdir().unwrap();
-    let view = proposal.isolated_view(root, scratch.path()).unwrap();
-    let _guard = captured.bind_view(&view).unwrap();
-    let evaluator =
-        crate::depth_evidence::EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
-    let before = snapshot(root);
-    let commit = git(root, &["rev-parse", "HEAD"]);
-    evaluator.probe_provenance(root, &commit).unwrap();
-    let err = evaluator
-        .probe_provenance(scratch.path(), &commit)
-        .unwrap_err();
-    assert!(err.contains("caller's Git object store"), "{err}");
-    assert!(evaluator.probe_provenance(root, &"f".repeat(40)).is_err());
-    assert_eq!(snapshot(root), before);
-    assert!(!root.join(".git/FETCH_HEAD").exists());
-    assert!(!scratch.path().join(".git").exists());
+    use std::os::unix::fs::PermissionsExt;
+    for kind in ["commit", "tree", "blob"] {
+        let f = simple();
+        let root = f.root.path();
+        write(root, "docs/history.txt", "historical provenance\n");
+        f.commit();
+        let tree = git(root, &["rev-parse", "HEAD^{tree}"]);
+        // A detached historical commit keeps the caller's ancestry complete when it is missing.
+        let history = git(root, &["commit-tree", &tree, "-m", "detached provenance"]);
+        git(root, &["update-ref", "refs/heads/provenance", &history]);
+        let blob = git(root, &["rev-parse", &format!("{history}:docs/history.txt")]);
+        write(root, "docs/history.txt", "current provenance\n");
+        f.commit();
+        let remote = tempfile::tempdir().unwrap();
+        git(
+            root,
+            &[
+                "clone",
+                "--bare",
+                "--no-hardlinks",
+                root.to_str().unwrap(),
+                remote.path().to_str().unwrap(),
+            ],
+        );
+        let attempts = remote.path().join("fetch-attempted");
+        let upload_pack = remote.path().join("upload-pack.sh");
+        fs::write(
+            &upload_pack,
+            format!(
+                "#!/bin/sh\n: > '{}'\nexec git-upload-pack \"$@\"\n",
+                attempts.display()
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&upload_pack, fs::Permissions::from_mode(0o755)).unwrap();
+        for (key, value) in [
+            ("core.repositoryformatversion", "1"),
+            ("extensions.partialClone", "hydration"),
+            ("remote.hydration.url", remote.path().to_str().unwrap()),
+            ("remote.hydration.promisor", "true"),
+            ("remote.hydration.partialclonefilter", "blob:none"),
+            ("remote.hydration.uploadpack", upload_pack.to_str().unwrap()),
+        ] {
+            git(root, &["config", key, value]);
+        }
+        let missing = match kind {
+            "commit" => &history,
+            "tree" => &tree,
+            _ => &blob,
+        };
+        let object = root.join(format!(".git/objects/{}/{}", &missing[..2], &missing[2..]));
+        fs::remove_file(&object).unwrap();
+        let context = f.resolve().unwrap();
+        let host = context.evidence_host(root).unwrap();
+        let captured = Route(f.resolve().unwrap()).capture(root).unwrap();
+        let proposal = captured.proposal(root).unwrap();
+        let scratch = tempfile::tempdir().unwrap();
+        let view = proposal.isolated_view(root, scratch.path()).unwrap();
+        let _guard = captured.bind_view(&view).unwrap();
+        let evaluator = EvidenceVerdicts::bind_view(&view, &context, &host, RECORD).unwrap();
+        let before = snapshot(root);
+        let index_before = index_state(root);
+        let commit = git(root, &["rev-parse", "HEAD"]);
+        evaluator.probe_provenance(root, &commit).unwrap();
+        let err = evaluator
+            .probe_provenance(scratch.path(), &commit)
+            .unwrap_err();
+        assert!(err.contains("caller's Git object store"), "{err}");
+        let refused = evaluator.probe_provenance(root, &history).is_err();
+        assert!(refused, "missing {kind} must refuse");
+        context.recheck(root).unwrap();
+        assert!(!attempts.exists(), "promisor transport fetched {kind}");
+        assert!(!object.exists());
+        assert_eq!(index_state(root), index_before);
+        assert_eq!(snapshot(root), before);
+        assert!(!root.join(".git/FETCH_HEAD").exists());
+        assert!(!scratch.path().join(".git").exists());
+        // Control: the same missing object is lazily acquired by an ordinary provenance read.
+        let acquired = ordinary_git(root)
+            .args(["cat-file", "-p", missing])
+            .output()
+            .unwrap();
+        assert!(acquired.status.success(), "{acquired:?}");
+        assert!(attempts.exists());
+        assert_ne!(snapshot(root).git, before.git);
+    }
 }
