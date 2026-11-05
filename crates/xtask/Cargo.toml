@@ -36,3 +36,7 @@ tokio = { workspace = true, features = ["signal"] }
 
 [dev-dependencies]
 futures-util = "0.3"
+
+# SO_PEERCRED for the MA4 evidence channel's peer authentication; the crate forbids unsafe code.
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1", features = ["net"] }

@@ -17,6 +17,12 @@ pub(super) struct Candidate {
     pub before: Tree,
     pub baseline: String,
     caller_git: Option<GitState>,
+    /// The caller's tracked paths. Every capture used for binding covers them (with the
+    /// candidate's own), including tracked files under directories capture otherwise skips.
+    tracked: std::collections::BTreeSet<String>,
+    /// Evidence the host authenticated and staged for this run (path to SHA-256), under a captured
+    /// isolated route only; `None` in production.
+    pub staged_evidence: Option<std::collections::BTreeMap<String, String>>,
     config: Vec<u8>,
     default_mode: u32,
     default_dir_mode: u32,
@@ -25,7 +31,8 @@ pub(super) struct Candidate {
 impl Candidate {
     pub fn prepare(caller: &Path, context: &Context) -> Result<Self, Error> {
         let caller_git = GitState::read(caller)?;
-        let before = tree::capture(caller, &GitState::tracked(caller)?)?;
+        let tracked = GitState::tracked(caller)?;
+        let before = tree::capture(caller, &tracked)?;
         let holder = tempfile::Builder::new()
             .prefix("uaa-relay-")
             .tempdir()
@@ -67,6 +74,8 @@ impl Candidate {
             before,
             baseline,
             caller_git,
+            tracked,
+            staged_evidence: Default::default(),
             config,
             default_mode,
             default_dir_mode,
@@ -96,7 +105,9 @@ impl Candidate {
                 "executor changed candidate HEAD or Git configuration".into(),
             ));
         }
-        tree::capture(&self.root, &GitState::tracked(&self.root)?)
+        let mut tracked = GitState::tracked(&self.root)?;
+        tracked.extend(self.tracked.iter().cloned());
+        tree::capture(&self.root, &tracked)
     }
     pub fn check(&self, after: &Tree) -> Result<(), Error> {
         for path in tree::changed(&self.before, after) {
@@ -152,7 +163,22 @@ impl Candidate {
         if !errors.is_empty() {
             return Err(Error::Validation(errors.join("\n")));
         }
-        super::delivery_index::validate(&self.root, self.caller_git.as_ref(), || {
+        // The host-side byte binding, by path class: every added, changed or removed evidence
+        // file (evidence destinations and everything an E binds, transitively) is the
+        // host-staged bytes, or the candidate is refused.
+        super::delivery_index::check_staged_closure(
+            &self.before,
+            after,
+            &self.context.run_dir_rel,
+            self.staged_evidence.as_ref(),
+        )?;
+        let indexed = super::delivery_index::bound_new_evidence(
+            &self.before,
+            after,
+            &self.context.run_dir_rel,
+            self.staged_evidence.as_ref(),
+        );
+        super::delivery_index::validate(&self.root, self.caller_git.as_ref(), &indexed, || {
             crate::depth_acceptance::check_captured_relay(
                 tree::source(&self.root, &self.before)?,
                 tree::source(&self.root, after)?,
@@ -177,11 +203,26 @@ impl Candidate {
                 "caller changed during relay; preserving concurrent edits and candidate".into(),
             ));
         }
+        if passed {
+            // Copy-back delivers exactly the bytes the binding admitted; checked again here.
+            super::delivery_index::check_staged_closure(
+                &self.before,
+                after,
+                &self.context.run_dir_rel,
+                self.staged_evidence.as_ref(),
+            )?;
+        }
+        // Diagnostics are host-serialized; still, none is delivered over a path that bound
+        // evidence names in the caller or in the tree being delivered.
+        let bound = super::delivery_index::evidence_paths(&self.before, after);
         let mut mutations = Vec::new();
         let mut paths = Vec::new();
         for path in tree::changed(&self.before, after) {
             let diagnostic = path.starts_with(&format!("{}/", self.context.run_dir_rel));
             if !passed && !diagnostic {
+                continue;
+            }
+            if diagnostic && bound.contains(&path) {
                 continue;
             }
             if path == format!("{}/{INPUT_CONTRACT_FILE_NAME}", self.context.run_dir_rel)
@@ -209,18 +250,29 @@ impl Candidate {
                 paths.push(path)
             }
         }
-        apply_mutations(caller, &mutations)?;
+        // The relay validated exactly the caller index plus the new E-bound evidence. Publish
+        // those entries from the validated bytes first, so an index failure writes nothing; if a
+        // file write then fails, remove exactly the entries this delivery owns.
+        let published = if passed && self.caller_git.is_some() {
+            super::delivery_index::publish(
+                caller,
+                &super::delivery_index::bound_new_evidence(
+                    &self.before,
+                    after,
+                    &self.context.run_dir_rel,
+                    self.staged_evidence.as_ref(),
+                ),
+            )?
+        } else {
+            vec![]
+        };
+        if let Err(e) = apply_mutations(caller, &mutations) {
+            return Err(match super::delivery_index::unpublish(caller, &published) {
+                Ok(()) => e.into(),
+                Err(conflict) => Error::Validation(format!("{e}; {conflict}")),
+            });
+        }
         Ok(paths)
-    }
-    pub fn diagnostic_tree(&self) -> Result<Tree, Error> {
-        // A malformed candidate can still supply bounded regular diagnostic files; never follow links.
-        let jail = crate::workspace_mutation::WorkspacePathJail::new(&self.root)?;
-        let root = jail.resolve(Path::new(&self.context.run_dir_rel))?;
-        let files = tree::capture(&root, &Default::default())?;
-        Ok(files
-            .into_iter()
-            .map(|(p, n)| (format!("{}/{p}", self.context.run_dir_rel), n))
-            .collect())
     }
     pub fn recovery(&self) -> PathBuf {
         self.root.clone()
