@@ -402,7 +402,13 @@ pub(crate) fn command(root: &Path) -> Command {
     command
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("GIT_NO_LAZY_FETCH", "1")
-        .args(["--no-optional-locks", "--no-replace-objects"])
+        // Git before 2.45 ignores GIT_NO_LAZY_FETCH but rejects the unknown option, so this fails
+        // closed there instead of lazily fetching.
+        .args([
+            "--no-optional-locks",
+            "--no-replace-objects",
+            "--no-lazy-fetch",
+        ])
         .arg("-C")
         .arg(root);
     command
