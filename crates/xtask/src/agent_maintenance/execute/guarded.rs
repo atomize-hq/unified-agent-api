@@ -33,6 +33,10 @@ pub(super) fn execute_write_mode<W: Write>(
         .map(|captured| stage_evidence(caller, captured, &candidate.root, context))
         .transpose()?;
     candidate.context.evidence_channel = staged.as_ref().map(|s| s.locator().to_owned());
+    candidate.staged_evidence = staged
+        .as_ref()
+        .map(|s| s.files().clone())
+        .unwrap_or_default();
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
     let execution =

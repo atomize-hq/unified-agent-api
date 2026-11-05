@@ -62,10 +62,16 @@ pub(crate) struct Target {
 pub(crate) struct Staged {
     channel: channel::Server,
     _dir: tempfile::TempDir,
+    files: BTreeMap<String, String>,
 }
 impl Staged {
     pub(crate) fn locator(&self) -> &Path {
         self.channel.locator()
+    }
+    /// The evidence files this host authenticated and staged, by path, with their SHA-256. Only
+    /// these exact bytes may gain an index identity on delivery; an executor-made file never does.
+    pub(crate) fn files(&self) -> &BTreeMap<String, String> {
+        &self.files
     }
 }
 
@@ -88,10 +94,20 @@ fn stage_answer(
 ) -> Result<Staged, String> {
     let dir = private_dir()?;
     let invocation = invocation(dir.path());
-    let answer = assembly
-        .and_then(|a| bundle(&a, target, &invocation))
-        .and_then(|bundle| publish(dir.path(), &bundle));
-    serve(dir, candidate, answer)
+    let bundle = assembly.and_then(|a| bundle(&a, target, &invocation));
+    let files = bundle
+        .as_ref()
+        .map(|b| {
+            b.files
+                .iter()
+                .map(|f| (f.path.clone(), f.sha256.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let answer = bundle.and_then(|bundle| publish(dir.path(), &bundle));
+    let mut staged = serve(dir, candidate, answer)?;
+    staged.files = files;
+    Ok(staged)
 }
 
 fn serve(
@@ -101,7 +117,11 @@ fn serve(
 ) -> Result<Staged, String> {
     let candidate = fs::canonicalize(candidate).map_err(|e| e.to_string())?;
     let channel = channel::Server::start(&dir.path().join("channel"), candidate, answer)?;
-    Ok(Staged { channel, _dir: dir })
+    Ok(Staged {
+        channel,
+        _dir: dir,
+        files: BTreeMap::new(),
+    })
 }
 
 fn private_dir() -> Result<tempfile::TempDir, String> {

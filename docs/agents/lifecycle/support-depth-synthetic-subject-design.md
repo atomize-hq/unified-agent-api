@@ -151,9 +151,11 @@ Each step is a reviewed PR into `staging`.
        the bundle are removed. A copied bundle, a path, the variable alone or a restored origin
        is therefore never a route. `CapturedRegistry` is never serialized.
      - E remains untrusted. The relay checks are unchanged. One delivery change: support
-       publication reads bound evidence only from the Git index, so the relay validates against
-       the caller index plus the new files that a changed record's E binds, and copy-back adds
-       exactly those files to the caller index. `evaluate_isolated_record` now covers the
+       publication reads bound evidence only from the Git index. So the relay validates against
+       the caller index plus the new files that a changed record's E binds and that are
+       byte-identical to files the host itself staged. Copy-back adds exactly those files to the
+       caller index. A receipt that only the candidate made still refuses as an untracked bound
+       input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,
        re-authenticates the full population rather than trusting a bundle.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they

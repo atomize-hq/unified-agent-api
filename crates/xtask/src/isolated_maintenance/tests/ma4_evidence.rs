@@ -246,6 +246,20 @@ fn forbidden_writes_and_route_or_tip_drift_preserve_the_caller() {
     }
     assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), before);
     git(root, &["clean", "-fdxq", "docs"]);
+    // A receipt the executor altered after assembly is not the host's staged bytes, so it never
+    // gains an index identity and the relay refuses it as an untracked bound input.
+    let tampered = executor(
+        bin.path(),
+        &format!("printf ' ' >> {EVIDENCE}/1-1/R1/receipt.json"),
+    );
+    {
+        let _gates = execute::gate_stub::stub();
+        let refused = run_as(root, &tampered, "ma4-evidence-tampered").unwrap_err();
+        assert!(refused.contains("untracked bound input"), "{refused}");
+    }
+    assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), before);
+    assert!(!root.join(EVIDENCE).exists());
+    git(root, &["clean", "-fdxq", "docs"]);
     // The isolated identity or protected tip moves while the executor runs: delivery refuses.
     let binary = executor(bin.path(), "");
     let moved = git(root, &["rev-parse", "HEAD~1"]);

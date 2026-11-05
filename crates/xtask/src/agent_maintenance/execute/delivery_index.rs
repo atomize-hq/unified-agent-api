@@ -6,10 +6,18 @@ use super::{
 };
 use std::{collections::BTreeSet, fs, io::Write, path::Path, process::Stdio};
 
-/// New files that a changed depth record's E binds as evidence (B.4 part 2). Publication reads
+/// New files that a changed depth record's E binds as evidence and that are byte-identical to
+/// evidence the host itself authenticated and staged for this run (B.4 part 2). Publication reads
 /// bound evidence only from the index, so the relay validates, and copy-back delivers, exactly
-/// the caller index plus these paths. Nothing else is ever indexed.
-pub(super) fn bound_new_evidence(before: &Tree, after: &Tree, run_dir_rel: &str) -> Vec<String> {
+/// the caller index plus these paths. A file only the candidate made is never indexed, so it
+/// still refuses as an untracked bound input.
+pub(super) fn bound_new_evidence(
+    before: &Tree,
+    after: &Tree,
+    run_dir_rel: &str,
+    staged: &std::collections::BTreeMap<String, String>,
+) -> Vec<String> {
+    use sha2::{Digest, Sha256};
     let mut bound = BTreeSet::new();
     for (path, node) in after {
         let Node::File(bytes, _) = node else {
@@ -38,8 +46,9 @@ pub(super) fn bound_new_evidence(before: &Tree, after: &Tree, run_dir_rel: &str)
         .into_iter()
         .filter(|p| {
             before.get(p).is_none()
-                && matches!(after.get(p), Some(Node::File(..)))
                 && !p.starts_with(&format!("{run_dir_rel}/"))
+                && matches!(after.get(p), Some(Node::File(bytes, _))
+                    if staged.get(p) == Some(&hex::encode(Sha256::digest(bytes))))
         })
         .collect()
 }
