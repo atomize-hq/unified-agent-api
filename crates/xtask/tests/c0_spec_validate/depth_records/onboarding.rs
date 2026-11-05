@@ -90,6 +90,59 @@ fn lifecycle_rel() -> String {
 }
 
 #[test]
+fn c0_validate_requires_linked_lifecycle_artifacts_only_when_depth_is_present() {
+    let temp = make_temp_dir("ccm-c0-depth-onboarding-links");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    let lifecycle_path = seed_onboarding_pack(&temp);
+    let approval_path = temp.join(GOVERNANCE).join("approved-agent.toml");
+    let approval = fs::read(&approval_path).unwrap();
+    fs::remove_file(&approval_path).unwrap();
+
+    let (passed, report) = validate(&codex_dir);
+    assert!(
+        passed,
+        "no record and no object needs no approval link:\n{report}"
+    );
+
+    // Local depth-field invariants still apply before the no-depth shortcut.
+    edit_state(&lifecycle_path, |state| {
+        state["written_paths_sha256"] = json!("0".repeat(64));
+    });
+    assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
+    edit_state(&lifecycle_path, |state| {
+        state
+            .as_object_mut()
+            .unwrap()
+            .remove("written_paths_sha256");
+    });
+
+    // An object alone still requires the authenticated approval, even before a record is found.
+    set_object(
+        &lifecycle_path,
+        Some(json!({ "policy_identity": "0".repeat(64) })),
+    );
+    assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
+
+    // A record alone still runs check 10's full lifecycle validation on either lifecycle path.
+    set_object(&lifecycle_path, None);
+    for record in [onboarding_record(), record()] {
+        write_record(&codex_dir, &record);
+        assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_DANGLING", &lifecycle_rel());
+    }
+    fs::remove_file(codex_dir.join(format!("reports/{VERSION}/depth-record.json"))).unwrap();
+
+    // An existing but changed approval is also irrelevant until depth is present.
+    fs::write(&approval_path, [&approval[..], b"\n# changed\n"].concat()).unwrap();
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "no depth needs no approval digest check:\n{report}");
+    set_object(
+        &lifecycle_path,
+        Some(json!({ "policy_identity": "0".repeat(64) })),
+    );
+    assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
+}
+
+#[test]
 fn c0_validate_requires_an_onboarding_record_to_state_what_the_lifecycle_object_froze() {
     let temp = make_temp_dir("ccm-c0-depth-onboarding");
     let codex_dir = materialize_minimal_valid_workspace(&temp);
