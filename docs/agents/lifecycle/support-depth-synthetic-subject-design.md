@@ -101,6 +101,18 @@ Each step is a reviewed PR into `staging`.
      - The isolated scope admits classification rows only for the synthetic subject, and only
        when every row selects `CORE` alone. A retained earlier generation may differ from the
        declaration only in those rows and their basis.
+   - B.3 part 2b routes MA2's other read routes through `isolated_maintenance::registry`:
+     `manifest-acquisition-plan`, `maintenance-stand-down-check`, `manifest-validate`'s depth
+     checks, `support-matrix` and `maintenance-audit-status`. A resolved isolated route yields its
+     rechecked scoped registry. Otherwise each keeps the production load and its `support_depth`
+     refusal, and a failing installed route errors instead of falling back. Audit-status is not a
+     depth-gated output (contract, route inventory), so it stays clean while O is unclassified;
+     MA5 closeout gates depth readiness.
+   - Open, outside this subject: in `parity-acquire.yml`, `manifest-validate` runs after
+     `manifest-version-metadata --status reported` but before the re-freeze republishes the
+     support matrix. Its publication-consistency check then reports `SUPPORT_MATRIX_ROW_MISSING`
+     for any agent's newly reported version (reproduced without depth), or a stale depth row once
+     MA1 has published one. The isolated proof validates after the re-freeze.
 
 ## Open risk
 

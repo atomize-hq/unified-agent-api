@@ -10,7 +10,6 @@ use serde::Deserialize;
 
 use agent_api::RuntimeSupportRecord;
 
-use crate::agent_registry::AgentRegistry;
 use crate::depth_record::{self, DepthRecord};
 use crate::root_intake_layout::RootIntakeLayout;
 
@@ -262,8 +261,8 @@ fn render_agent_api_runtime_support_data_for_roots(roots: &[AgentRoot]) -> Resul
 }
 
 pub(super) fn enrolled_agent_roots(workspace_root: &Path) -> Result<Vec<AgentRoot>, String> {
-    let registry =
-        AgentRegistry::load(workspace_root).map_err(|err| format!("load agent registry: {err}"))?;
+    let registry = crate::isolated_maintenance::registry(workspace_root)
+        .map_err(|err| format!("load agent registry: {err}"))?;
 
     // A root the support matrix does not publish would publish its depth facts nowhere.
     for entry in registry

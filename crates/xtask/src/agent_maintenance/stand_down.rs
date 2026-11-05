@@ -45,8 +45,6 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use toml_edit::de::from_str;
 
-use crate::agent_registry::AgentRegistry;
-
 const EXIT_INTERNAL: i32 = 1;
 const EXIT_VALIDATION: i32 = 2;
 
@@ -207,7 +205,7 @@ pub fn run(args: Args) -> Result<StandDownOutcome, Error> {
     // An unknown agent must not read as "no marker, proceed". Resolving the marker path by string
     // formatting alone would turn a typo into a false authorization, which is the one direction
     // this command may never fail in.
-    let registry = AgentRegistry::load(&workspace_root)
+    let registry = crate::isolated_maintenance::registry(&workspace_root)
         .map_err(|err| Error::Validation(format!("could not load the agent registry: {err}")))?;
     if registry.find(&args.agent).is_none() {
         return Err(Error::Validation(format!(

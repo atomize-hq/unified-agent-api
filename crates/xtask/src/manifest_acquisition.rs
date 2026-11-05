@@ -13,7 +13,7 @@ use clap::Parser;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::agent_registry::{AgentRegistry, AgentRegistryError};
+use crate::agent_registry::AgentRegistryError;
 
 pub mod descriptor;
 pub mod plan;
@@ -48,6 +48,10 @@ pub enum AcquisitionError {
     Json(#[from] serde_json::Error),
     #[error("agent registry error: {0}")]
     Registry(#[from] AgentRegistryError),
+    /// The routed registry load (`isolated_maintenance::registry`), which keeps the production
+    /// refusals on the ordinary route.
+    #[error("agent registry error: {0}")]
+    RoutedRegistry(String),
     #[error("unknown agent `{0}` (not present in the committed agent registry)")]
     UnknownAgent(String),
     #[error(
@@ -146,7 +150,8 @@ pub fn plan_for_agent(
 ) -> Result<AcquisitionPlan, AcquisitionError> {
     validate_bare_semver(version)?;
 
-    let registry = AgentRegistry::load(workspace_root)?;
+    let registry = crate::isolated_maintenance::registry(workspace_root)
+        .map_err(|err| AcquisitionError::RoutedRegistry(err.to_string()))?;
     let entry = registry
         .find(agent_id)
         .ok_or_else(|| AcquisitionError::UnknownAgent(agent_id.to_string()))?;

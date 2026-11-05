@@ -146,6 +146,12 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> i32 {
     }
 }
 
+/// The violation codes `run` would report, for in-crate route tests.
+#[cfg(test)]
+pub(crate) fn violation_codes(args: Args) -> Result<Vec<&'static str>, FatalError> {
+    Ok(run_inner(args, None)?.iter().map(|v| v.code).collect())
+}
+
 fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, FatalError> {
     if args.tip.is_some() && matches!(args.mode, Mode::Fix) {
         return Err(FatalError::TipWithFix);

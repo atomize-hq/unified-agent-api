@@ -28,7 +28,7 @@ fn copy(source: &Path, destination: &Path) {
 }
 
 /// The isolated workspace: canonical publication inputs plus the synthetic governing templates.
-fn workspace() -> (Fixture, Args) {
+pub(super) fn workspace() -> (Fixture, Args) {
     let f = Fixture::new_for(&scope::SYNTHETIC);
     let root = f.root.path();
     for path in [
@@ -142,7 +142,7 @@ fn record(plan: &PreparePlan) -> DepthRecord {
 
 /// Acquisition writes for one release: the per-target shard of the fixture CLI's surface, the
 /// union, the wrapper coverage and the reports.
-fn acquire(root: &Path, version: &str) {
+pub(super) fn acquire(root: &Path, version: &str) {
     let base = root.join("cli_manifests/depth_fixture");
     let shard = json!({"snapshot_schema_version":1,"tool":"depth-fixture-cli",
         "collected_at":"2026-11-03T00:00:00Z","binary":{"sha256":"a".repeat(64),"size_bytes":1,
