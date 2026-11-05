@@ -19,7 +19,6 @@ const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.jso
 const CLOSEOUT: &str =
     "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-closeout.json";
 const ENTRY: &str = "isolated_maintenance::tests::ma4_evidence::executor_entry";
-const RUNS: &str = "actions/workflows/ci.yml/runs?created=%3E%3D2026-11-03&per_page=100&page=1";
 fn set_local(root: &Path, tip: &str) {
     git(root, &["update-ref", "refs/remotes/origin/staging", tip]);
 }
@@ -415,15 +414,26 @@ fn ma5_writers_reauthenticate_unverified_population_despite_verified_e_labels() 
     let _reader = host.install();
     author(&f, &host);
     let before = snapshot(root);
-    let edits: [fn(&crate::depth_evidence::SyntheticHost); 3] = [
-        |h| h.add_attempt(RUNS, |job| job["status"] = json!("in_progress")),
-        |h| {
-            h.add_attempt(RUNS, |job| {
+    let crate::depth_record::Event::Maintenance {
+        request_recorded_at,
+        ..
+    } = record(root).event
+    else {
+        panic!("maintenance");
+    };
+    let runs = format!(
+        "actions/workflows/ci.yml/runs?created=%3E%3D{}&per_page=100&page=1",
+        &request_recorded_at[..10]
+    );
+    let edits: [fn(&crate::depth_evidence::SyntheticHost, &str); 3] = [
+        |h, runs| h.add_attempt(runs, |job| job["status"] = json!("in_progress")),
+        |h, runs| {
+            h.add_attempt(runs, |job| {
                 job["steps"][0]["conclusion"] = json!("failure");
                 job["conclusion"] = json!("failure");
             })
         },
-        |h| h.revoke_adoption(),
+        |h, _| h.revoke_adoption(),
     ];
     assert!(record(root)
         .execution
@@ -433,7 +443,7 @@ fn ma5_writers_reauthenticate_unverified_population_despite_verified_e_labels() 
         .all(|r| r.result == DepthResult::Verified));
     for edit in edits {
         let changed = host.fork();
-        edit(&changed);
+        edit(&changed, &runs);
         let _changed = changed.install();
         for writer in [close, prepare] {
             let err = writer(root).unwrap_err();
