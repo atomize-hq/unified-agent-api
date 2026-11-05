@@ -18,26 +18,26 @@ const APPROVAL: &str =
     "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml";
 const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json";
 
-fn tree(root: &Path) -> BTreeMap<std::path::PathBuf, String> {
-    fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<std::path::PathBuf, String>) {
+/// Each path's type, mode and digest of its bytes (or link target), as the integration helper.
+type Tree = BTreeMap<std::path::PathBuf, (char, u32, String)>;
+
+fn tree(root: &Path) -> Tree {
+    use std::os::unix::fs::PermissionsExt;
+    fn walk(root: &Path, dir: &Path, out: &mut Tree) {
         for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
             let meta = fs::symlink_metadata(&path).unwrap();
             let rel = path.strip_prefix(root).unwrap().to_owned();
-            if meta.is_dir() {
-                out.insert(rel, "dir".into());
+            let mode = meta.permissions().mode();
+            if meta.file_type().is_symlink() {
+                let target = fs::read_link(&path).unwrap().display().to_string();
+                out.insert(rel, ('l', mode, target));
+            } else if meta.is_dir() {
+                out.insert(rel, ('d', mode, String::new()));
                 walk(root, &path, out);
             } else {
-                let bytes = if meta.file_type().is_symlink() {
-                    fs::read_link(&path)
-                        .unwrap()
-                        .display()
-                        .to_string()
-                        .into_bytes()
-                } else {
-                    fs::read(&path).unwrap()
-                };
-                out.insert(rel, hex::encode(Sha256::digest(bytes)));
+                let digest = hex::encode(Sha256::digest(fs::read(&path).unwrap()));
+                out.insert(rel, ('f', mode, digest));
             }
         }
     }
