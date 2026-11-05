@@ -240,3 +240,45 @@ fn publication_entrypoints_refuse_deleted_lifecycle_or_record_bindings() {
         }
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn acquired_inputs_refuse_missing_lifecycle_depth_with_unreadable_reports_without_writes() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let f = setup(true);
+    let _installed = f.install();
+    freeze(&f).unwrap();
+    prepare::acquired_inputs::check(f.root.path(), APPROVAL).unwrap();
+    edit_json(&f, STATE, |state| {
+        assert!(state
+            .as_object_mut()
+            .unwrap()
+            .remove("support_depth")
+            .is_some());
+    });
+    assert!(json_file(&f, STATE).get("support_depth").is_none());
+    assert!(f.root.path().join(RECORD).is_file());
+    f.commit();
+
+    let reports = f.root.path().join(format!("{ROOT}/reports"));
+    let permissions = fs::metadata(&reports).unwrap().permissions();
+    let before = lifecycle_depth::snapshot(f.root.path());
+    fs::set_permissions(&reports, fs::Permissions::from_mode(0o000)).unwrap();
+    // Probe while restricted: privileged users may still read through mode 0.
+    let probe = fs::read_dir(&reports);
+    let result = prepare::acquired_inputs::check(f.root.path(), APPROVAL);
+    fs::set_permissions(&reports, permissions).unwrap();
+    assert_eq!(before, lifecycle_depth::snapshot(f.root.path()));
+
+    let denied = match probe {
+        Ok(_) => {
+            eprintln!("skipping unreadable reports assertion: mode 0 is not enforced");
+            return;
+        }
+        Err(error) => error,
+    };
+    assert_eq!(denied.kind(), std::io::ErrorKind::PermissionDenied);
+    let error = result.expect_err("unreadable reports must not take the non-depth early return");
+    assert!(error.contains(reports.to_str().unwrap()), "{error}");
+}
