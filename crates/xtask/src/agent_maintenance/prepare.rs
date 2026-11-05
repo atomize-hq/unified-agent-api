@@ -111,6 +111,8 @@ pub struct PreparePlan {
     pub request: MaintenanceRequest,
     pub files: Vec<PreparedFile>,
     context: guard::Context,
+    /// The isolated route binding this plan was built under; `None` on the ordinary route.
+    isolated: Option<crate::isolated_maintenance::RouteBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -182,10 +184,28 @@ pub fn run_in_workspace_with_report<W: Write>(
 }
 
 pub fn build_prepare_plan(workspace_root: &Path, args: &Args) -> Result<PreparePlan, Error> {
-    let registry = AgentRegistry::load(workspace_root)
-        .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
-    guard::refuse_retained_depth(workspace_root, &registry)?;
-    build_with_registry(workspace_root, args, &registry)
+    let route = crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?;
+    build_routed(workspace_root, args, route.as_ref())
+}
+
+/// MA1 preparation and MA2 re-freeze. Only a resolved isolated route supplies a registry that
+/// may carry the approved depth scope; the ordinary route keeps every production refusal.
+pub(crate) fn build_routed(
+    workspace_root: &Path,
+    args: &Args,
+    route: Option<&crate::isolated_maintenance::Route>,
+) -> Result<PreparePlan, Error> {
+    let Some(route) = route else {
+        let registry = AgentRegistry::load(workspace_root)
+            .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
+        guard::refuse_retained_depth(workspace_root, &registry)?;
+        return build_with_registry(workspace_root, args, &registry);
+    };
+    let registry = route.registry(workspace_root).map_err(Error::Validation)?;
+    let mut plan = build_with_registry(workspace_root, args, registry)?;
+    route.recheck(workspace_root).map_err(Error::Validation)?;
+    plan.isolated = Some(route.binding());
+    Ok(plan)
 }
 
 fn build_with_registry(
@@ -299,6 +319,7 @@ fn build_with_registry(
         request,
         files,
         context,
+        isolated: None,
     })
 }
 
@@ -306,10 +327,32 @@ pub fn apply_prepare_plan(
     workspace_root: &Path,
     plan: &PreparePlan,
 ) -> Result<ApplySummary, Error> {
-    let registry = AgentRegistry::load(workspace_root)
-        .map_err(|err| Error::Validation(format!("load agent registry: {err}")))?;
-    guard::refuse_retained_depth(workspace_root, &registry)?;
-    guard::apply(workspace_root, plan, &registry)
+    let route = crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?;
+    apply_routed(workspace_root, plan, route.as_ref())
+}
+
+/// Apply under a freshly resolved route. A plan applies only under an equal route binding; a moved
+/// candidate, checkout or protected tip needs a new plan, never a silent reseal.
+pub(crate) fn apply_routed(
+    workspace_root: &Path,
+    plan: &PreparePlan,
+    route: Option<&crate::isolated_maintenance::Route>,
+) -> Result<ApplySummary, Error> {
+    match (route, plan.isolated.as_ref()) {
+        (None, None) => {
+            let registry = AgentRegistry::load(workspace_root)
+                .map_err(|err| Error::Validation(format!("load agent registry: {err}")))?;
+            guard::refuse_retained_depth(workspace_root, &registry)?;
+            guard::apply(workspace_root, plan, &registry, None)
+        }
+        (Some(route), Some(binding)) if route.binding() == *binding => {
+            let registry = route.registry(workspace_root).map_err(Error::Validation)?;
+            guard::apply(workspace_root, plan, registry, Some(route))
+        }
+        _ => Err(Error::Validation(
+            "preparation plan was built under a different route binding".into(),
+        )),
+    }
 }
 
 fn validate_prepare_args(
@@ -664,5 +707,5 @@ pub(super) fn isolated_apply(
     plan: &PreparePlan,
     registry: &AgentRegistry,
 ) -> Result<ApplySummary, Error> {
-    guard::apply(root, plan, registry)
+    guard::apply(root, plan, registry, None)
 }

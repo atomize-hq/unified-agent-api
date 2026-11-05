@@ -138,22 +138,17 @@ impl Fixture {
         fixture
     }
     pub(super) fn profile(&self) -> Profile {
-        Profile {
-            isolated: Repository {
-                id: 10,
-                owner: 20,
-                name: "fixture/isolated",
-            },
-            canonical: Repository {
-                id: 30,
-                owner: 40,
-                name: "fixture/canonical",
-            },
-            baseline: self.baseline.clone(),
-            closure: vec![("producer/source.rs", b"approved producer\n", false)],
-            scopes: vec!["producer"],
-            subject: self.subject,
-        }
+        profile_with(self.baseline.clone(), self.subject)
+    }
+    /// Install this fixture's profile and host for the calling thread's public routes.
+    pub(super) fn install(&self) -> Installed {
+        let (baseline, subject, api) = (self.baseline.clone(), self.subject, self.api.clone());
+        install(Box::new(move || {
+            (
+                profile_with(baseline.clone(), subject),
+                api.clone() as Arc<dyn Api>,
+            )
+        }))
     }
     pub(super) fn host(&self) {
         let head = git(self.root.path(), &["rev-parse", "HEAD"]);
@@ -251,4 +246,42 @@ impl Fixture {
             .unwrap();
         raw
     }
+}
+pub(super) fn profile_with(baseline: String, subject: &'static scope::Subject) -> Profile {
+    Profile {
+        isolated: Repository {
+            id: 10,
+            owner: 20,
+            name: "fixture/isolated",
+        },
+        canonical: Repository {
+            id: 30,
+            owner: 40,
+            name: "fixture/canonical",
+        },
+        baseline,
+        closure: vec![("producer/source.rs", b"approved producer\n", false)],
+        scopes: vec!["producer"],
+        subject,
+    }
+}
+
+type Installer = Box<dyn Fn() -> (Profile, Arc<dyn Api>)>;
+thread_local! {
+    static INSTALLED: std::cell::RefCell<Option<Installer>> = const { std::cell::RefCell::new(None) };
+}
+/// The profile and host a unit test installed for this thread's public routes, if any.
+pub(in crate::isolated_maintenance) fn installed() -> Option<(Profile, Arc<dyn Api>)> {
+    INSTALLED.with(|i| i.borrow().as_ref().map(|make| make()))
+}
+/// Uninstalls on drop, so a failing test never leaks its profile into another test.
+pub(super) struct Installed;
+impl Drop for Installed {
+    fn drop(&mut self) {
+        INSTALLED.with(|i| *i.borrow_mut() = None);
+    }
+}
+pub(super) fn install(make: Installer) -> Installed {
+    INSTALLED.with(|i| *i.borrow_mut() = Some(make));
+    Installed
 }

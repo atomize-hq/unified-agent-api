@@ -26,6 +26,9 @@ mod depth_record {
     pub use xtask::depth_record::*;
 }
 
+mod isolated_maintenance {
+    pub use xtask::isolated_maintenance::*;
+}
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }

@@ -31,8 +31,9 @@ Git and cannot be combined with `--mode fix` (exit 3 before any write).
 ## Scope boundaries
 
 - The validator checks manifest-root evidence only.
-- It does not publish backend support or unified support. The registry entry disables both
-  matrices.
+- It does not publish backend support or unified support. In the isolated repository the
+  support matrix publishes this root, because depth records live only in published roots; the
+  capability matrix never does.
 
 ## Pointer posture
 

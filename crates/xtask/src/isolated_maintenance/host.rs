@@ -62,7 +62,7 @@ impl Api for Github {
         serde_json::from_slice(&raw).map_err(|_| "invalid isolated host response".into())
     }
 }
-#[derive(PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Observation {
     pub(super) isolated_tip: String,
     canonical_tip: String,

@@ -77,6 +77,17 @@ Each step is a reviewed PR into `staging`.
    (SA-P3).** Ships read-only positive and negative evaluation tests, in the same shape as the CORE
    bridge.
 4. Continue with roadmap B.3–B.8 against this subject.
+   - B.3 connects the public `prepare-agent-maintenance` route, which is MA1 and MA2's re-freeze,
+     through `isolated_maintenance::route`. While no profile is installed it returns nothing and
+     the route keeps its production refusals. A plan applies only on the route and protected tip it
+     was built under.
+   - Depth records live only in published roots, so the isolated support matrix publishes the
+     subject. The capability matrix never does.
+   - Promotion still loads the production registry (B.6). The isolated baseline therefore promotes
+     `0.1.0` before the depth table is installed in a later protected commit.
+   - The first real O keeps every owned `run` surface `classification_required`, and carries the
+     waived `run --help` as required work. Resolving both is a maintainer change to P (contract,
+     classification rule 6). It is not cleared to make the chain look ready.
 
 ## Open risk
 
