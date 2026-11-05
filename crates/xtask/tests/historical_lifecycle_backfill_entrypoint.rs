@@ -468,6 +468,14 @@ fn historical_lifecycle_backfill_refuses_an_invalid_depth_digest_before_writing(
 #[test]
 fn historical_lifecycle_backfill_writes_no_agent_until_every_agent_is_prepared() {
     let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-all-or-nothing");
+    // A directory of the caller's at the name an earlier scratch check used, with this process's
+    // id, is not backfill's to create, change or remove.
+    let foreign = fixture.join(format!(
+        "docs/agents/.uaa-temp/runtime-follow-on/runs/.check-historical-gemini_cli-runtime-follow-on-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&foreign).expect("create caller directory");
+    fs::write(foreign.join("keep.txt"), "the caller's\n").expect("write caller file");
     let before = lifecycle_depth::snapshot(&fixture);
     let output = run_cli(
         [
@@ -484,7 +492,7 @@ fn historical_lifecycle_backfill_writes_no_agent_until_every_agent_is_prepared()
     assert!(!output.stdout.contains("gemini_cli"), "{}", output.stdout);
     assert_eq!(lifecycle_depth::snapshot(&fixture), before);
 
-    // Alone, the valid agent backfills.
+    // Alone, the valid agent backfills, and the caller's directory is still untouched.
     let output = run_cli(
         [
             "xtask",
@@ -495,4 +503,8 @@ fn historical_lifecycle_backfill_writes_no_agent_until_every_agent_is_prepared()
         &fixture,
     );
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(
+        fs::read_to_string(foreign.join("keep.txt")).expect("caller file"),
+        "the caller's\n"
+    );
 }

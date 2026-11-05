@@ -288,8 +288,11 @@ fn write_backfill(workspace_root: &Path, backfill: PreparedBackfill) -> Result<(
     .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
 }
 
-/// Writes the runtime evidence bundle to a scratch run directory, validates it, and removes it
-/// again, together with any directory it had to create, so the workspace is left as it was.
+/// Writes the runtime evidence bundle into a directory created exclusively for this check outside
+/// the caller workspace, at the run's own relative path, and validates it there. The bundle reads
+/// the workspace only to derive its written paths, and the validator reads only the run directory,
+/// so nothing in the workspace is created, changed or removed. Dropping the directory removes
+/// only what this check created.
 fn check_runtime_evidence(
     workspace_root: &Path,
     approval: &ApprovalArtifact,
@@ -298,43 +301,22 @@ fn check_runtime_evidence(
 ) -> Result<(), Error> {
     let run_relative =
         runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
-    let runs_relative = Path::new(&run_relative)
-        .parent()
-        .ok_or_else(|| Error::Internal(format!("`{run_relative}` has no parent")))?;
-    let created = runs_relative
-        .ancestors()
-        .filter(|dir| !dir.as_os_str().is_empty() && !workspace_root.join(dir).exists())
-        .last()
-        .map(|dir| workspace_root.join(dir));
-    let scratch_relative = format!(
-        "{}/.check-{run_id}-{}",
-        runs_relative.display(),
-        std::process::id()
-    );
-    let scratch = workspace_root.join(&scratch_relative);
-    let result = write_runtime_evidence_bundle_at(
+    let scratch = tempfile::TempDir::new()
+        .map_err(|err| Error::Internal(format!("create runtime evidence scratch: {err}")))?;
+    let run_root = scratch.path().join(&run_relative);
+    write_runtime_evidence_bundle_at(
         workspace_root,
-        &scratch,
-        &scratch_relative,
-        &scratch,
+        &run_root,
+        &run_relative,
+        &run_root,
         approval,
         lifecycle_state,
         &historical_bundle_spec(run_id),
     )
-    .map_err(map_runtime_evidence_bundle_error)
-    .and_then(|_| {
-        validate_runtime_evidence_directory_for_approval(workspace_root, approval, run_id, &scratch)
-            .map(|_| ())
-            .map_err(|err| Error::Validation(err.to_string()))
-    });
-    let cleanup = fs::remove_dir_all(created.as_ref().unwrap_or(&scratch));
-    match (result, cleanup) {
-        (Err(err), _) => Err(err),
-        (Ok(()), Err(err)) if err.kind() != io::ErrorKind::NotFound => Err(Error::Internal(
-            format!("remove {}: {err}", scratch.display()),
-        )),
-        (Ok(()), _) => Ok(()),
-    }
+    .map_err(map_runtime_evidence_bundle_error)?;
+    validate_runtime_evidence_directory_for_approval(scratch.path(), approval, run_id, &run_root)
+        .map(|_| ())
+        .map_err(|err| Error::Validation(err.to_string()))
 }
 
 fn historical_bundle_spec(run_id: &str) -> RuntimeEvidenceBundleSpec<'_> {
