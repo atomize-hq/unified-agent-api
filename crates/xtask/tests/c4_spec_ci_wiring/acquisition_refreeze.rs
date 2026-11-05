@@ -8,7 +8,7 @@ fn c4_spec_acquisition_refreezes_between_union_and_audit() {
     let yml = read_repo_file(WORKFLOW);
     assert_text_order(
         &yml,
-        "Union → wrapper coverage → report → version metadata → validate",
+        "Union → wrapper coverage → report → version metadata\n",
         REFREEZE,
         WORKFLOW,
     );
@@ -111,4 +111,32 @@ fn c4_spec_acquisition_commit_and_bundle_use_the_same_checked_delivery() {
     );
     assert!(upload.contains("path: ${{ runner.temp }}/maintenance-transport/bundle/"));
     assert!(upload.contains("always() && steps.delivery.outcome == 'success'"));
+}
+
+#[test]
+fn c4_spec_acquisition_validates_only_after_support_outputs_are_published() {
+    const UNION: &str = "- name: Union → wrapper coverage → report → version metadata\n";
+    const PUBLISH: &str = "- name: Publish acquisition support outputs after freeze";
+    const VALIDATE: &str =
+        "- name: Validate the acquired manifest root against the published support outputs";
+    const DELIVERY: &str = "- name: Stage the complete checked delivery";
+    let yml = read_repo_file(WORKFLOW);
+
+    // A new version's support-matrix rows exist only once publication runs, so validating the
+    // union output earlier refuses every acquisition with SUPPORT_MATRIX_ROW_MISSING.
+    let union = section_between(&yml, UNION, REFREEZE, WORKFLOW);
+    assert!(
+        !union.contains("manifest-validate"),
+        "the union step must not validate before the support matrix is published"
+    );
+    assert_text_order(&yml, PUBLISH, VALIDATE, WORKFLOW);
+    assert_text_order(&yml, VALIDATE, DELIVERY, WORKFLOW);
+    let step = section_between(&yml, VALIDATE, DELIVERY, WORKFLOW);
+    assert!(step.contains("cargo run -p xtask -- manifest-validate --root \"$ROOT\""));
+    assert!(step.contains("ROOT: ${{ needs.plan.outputs.manifest_root }}"));
+    assert!(
+        !step.contains("if:"),
+        "validation gates both read-only and committing acquisitions"
+    );
+    assert_eq!(yml.matches("manifest-validate").count(), 1);
 }
