@@ -290,8 +290,8 @@ fn onboarding_templates_state_the_synthetic_subject() {
     assert_eq!(maintenance["mode"].as_str(), Some("explicitly_deferred"));
     assert!(maintenance.get("release_watch").is_none());
     assert!(doc["descriptor"].get("backend_module").is_none());
-    // Open question: the full loader still requires `backend_module`, so it refuses a non-runtime
-    // approval. Keep that refusal until a later slice decides.
+    // The full loader still requires `backend_module`; slice 5 uses a private projection only
+    // for the installed synthetic dry run and preserves this production refusal.
     let workspace = tempfile::tempdir().unwrap();
     write(workspace.path(), APPROVAL_PATH, &approval);
     let error = crate::approval_artifact::load_approval_artifact(workspace.path(), APPROVAL_PATH)
@@ -303,8 +303,15 @@ fn onboarding_templates_state_the_synthetic_subject() {
     // The acquisition statement names exactly the inputs O binds, each awaiting its digest.
     let statement: toml_edit::DocumentMut = STATEMENT.parse().unwrap();
     let keys: Vec<_> = statement.iter().map(|(k, _)| k.to_owned()).collect();
-    assert_eq!(keys, ["agent", "version", "inputs"]);
-    assert_eq!(statement["agent"].as_str(), Some("depth_fixture"));
+    assert_eq!(keys, ["schema_version", "agent_id", "version", "inputs"]);
+    assert_eq!(statement["schema_version"].as_integer(), Some(1));
+    assert_eq!(statement["agent_id"].as_str(), Some("depth_fixture"));
+    crate::depth_record::acquisition::AcquisitionStatement::parse(
+        &STATEMENT.replace("{{SHA256}}", &"a".repeat(64)),
+        "depth_fixture",
+        "0.2.0.toml",
+    )
+    .unwrap();
     assert_eq!(statement["version"].as_str(), Some("0.2.0"));
     let inputs = statement["inputs"].as_array_of_tables().unwrap();
     let mut listed = Vec::new();

@@ -11,6 +11,8 @@ use crate::{
 use serde::Deserialize;
 use std::{collections::BTreeSet, path::Path};
 
+mod onboarding;
+
 #[derive(Debug, Clone)]
 pub struct FreezeRequest {
     pub agent: String,
