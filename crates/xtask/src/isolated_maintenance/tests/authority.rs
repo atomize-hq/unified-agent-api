@@ -128,69 +128,44 @@ fn borrowed_evidence_host_evaluates_only_its_compiled_profile() {
 }
 
 #[test]
-fn production_authority_outputs_are_unchanged() {
-    // With no route installed every adapter is the production predicate, byte for byte.
+fn production_ordinary_closeout_bytes_are_the_baseline() {
+    // Independent oracle: with no route, an ordinary (non-depth) closeout proposal admits under
+    // the production host and delivers exactly the proposed bytes, with no acceptance output.
     let f = Fixture::new_for(&scope::SYNTHETIC);
     let root = f.root.path();
-    write(root, RECORD, f.retained());
-    f.commit();
-    let head = git(root, &["rev-parse", "HEAD"]);
-    assert_eq!(
-        crate::depth_acceptance::check_integration(root, &head),
-        crate::depth_acceptance::check_integration_as(Authority::Production, root, &head)
-    );
+    assert!(route(root).unwrap().is_none());
+    let path = "docs/agents/lifecycle/claude_code-maintenance/governance/maintenance-closeout.json";
+    let bytes = b"{\"ordinary\": true}\n".to_vec();
     let proposal = Proposal::capture(root).unwrap();
-    let files = vec![(
-        PathBuf::from(
-            "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-closeout.json",
-        ),
-        b"{}\n".to_vec(),
-    )];
-    let forwarded = proposal.plan(root, files.clone()).map(|m| format!("{m:?}"));
-    let direct = proposal
-        .plan_with(root, files.clone(), |root, before, after, written| {
-            crate::depth_acceptance::plan_manual_closeout(
-                Authority::Production,
-                root,
-                before,
-                after,
-                written,
-            )
-        })
-        .map(|m| format!("{m:?}"));
-    assert_eq!(forwarded, direct);
-    let promotion = proposal
-        .plan_changes(
-            root,
-            vec![(files[0].0.clone(), Some(files[0].1.clone()))],
-            crate::depth_acceptance::plan_promotion,
+    assert!(matches!(proposal.authority(), Authority::Production));
+    let planned = proposal
+        .plan(root, vec![(PathBuf::from(path), bytes.clone())])
+        .unwrap();
+    assert_eq!(
+        format!("{planned:?}"),
+        format!(
+            "{:?}",
+            vec![crate::workspace_mutation::PlannedMutation::create(
+                path,
+                bytes.clone()
+            )]
         )
-        .map(|m| format!("{m:?}"));
-    let explicit = proposal
-        .plan_changes(
-            root,
-            vec![(files[0].0.clone(), Some(files[0].1.clone()))],
-            |root, before, after, written| {
-                crate::depth_acceptance::plan_promotion_as(
-                    Authority::Production,
-                    root,
-                    before,
-                    after,
-                    written,
-                )
-            },
-        )
-        .map(|m| format!("{m:?}"));
-    assert_eq!(promotion, explicit);
+    );
+    proposal
+        .apply(root, vec![(PathBuf::from(path), bytes.clone())])
+        .unwrap();
+    assert_eq!(fs::read(root.join(path)).unwrap(), bytes);
+    assert_eq!(
+        git(root, &["status", "--porcelain=v1", "--untracked-files=all"]),
+        format!("?? {path}")
+    );
     // The production evidence entry still reads nothing without a route.
     let record =
         crate::depth_record::DepthRecord::parse(&f.retained(), "depth_fixture", "0.2.0").unwrap();
     let results = crate::depth_evidence::evaluate_isolated_record(root, &record).unwrap();
     assert_eq!(
         format!("{results:?}"),
-        format!("{:?}", {
-            crate::depth_evidence::EvidenceVerdicts::default()
-        })
+        format!("{:?}", crate::depth_evidence::EvidenceVerdicts::default())
     );
 }
 
@@ -233,7 +208,7 @@ mod evidence {
 
     /// MA1, acquisition, MA2's re-freeze and MA4 with authenticated reporting E, committed to the
     /// fake protected tip.
-    fn delivered() -> (Fixture, crate::depth_evidence::SyntheticHost) {
+    fn delivered(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
         let (f, mut args) = workspace();
         let root = f.root.path();
         args.request_commit = "0b1e1f0a478af0cd06d6ba6998ab594f09fbe592".into();
@@ -249,8 +224,34 @@ mod evidence {
             f.commit();
             acquire(root, "0.2.0");
             f.commit();
-            apply_prepare_plan(root, &build_prepare_plan(root, &args).unwrap()).unwrap();
+            let frozen = build_prepare_plan(root, &args).unwrap();
+            apply_prepare_plan(root, &frozen).unwrap();
             f.commit();
+            if classified {
+                // The approved synthetic CORE classification (B.3) enters as a new generation.
+                let [(_, basis)] = frozen.classification_bases.as_slice() else {
+                    panic!("one basis: {:?}", frozen.classification_bases)
+                };
+                let record = DepthRecord::parse(
+                    &std::fs::read_to_string(root.join(RECORD)).unwrap(),
+                    "depth_fixture",
+                    "0.2.0",
+                )
+                .unwrap();
+                let surfaces: Vec<_> = record
+                    .obligations
+                    .unwrap()
+                    .classification_required
+                    .into_iter()
+                    .map(|c| c.surface)
+                    .collect();
+                classify(&f, &surfaces, basis);
+                f.commit();
+                args.request_recorded_at = "2026-11-04T00:00:00Z".into();
+                args.request_commit = "0c2e2f1b589bf1de17e7c7c7ab695f10cef6fa03".into();
+                apply_prepare_plan(root, &build_prepare_plan(root, &args).unwrap()).unwrap();
+                f.commit();
+            }
         }
         write(
             root,
@@ -285,7 +286,7 @@ mod evidence {
 
     #[test]
     fn isolated_host_borrows_the_callers_context_and_reauthenticates_each_record() {
-        let (f, host) = delivered();
+        let (f, host) = delivered(false);
         let root = f.root.path();
         let record = DepthRecord::parse(
             &std::fs::read_to_string(root.join(RECORD)).unwrap(),
@@ -350,6 +351,215 @@ mod evidence {
         assert!(
             after.map_or(true, |v| results(&v, &record) == unverified),
             "revoked adoption still verified"
+        );
+    }
+
+    /// The approved synthetic classification (B.3, as in `prepare.rs`): every owned `run` unit
+    /// selects only CORE.
+    fn classify(
+        f: &Fixture,
+        surfaces: &[crate::agent_maintenance::support_audit::SurfaceIdentity],
+        basis: &str,
+    ) {
+        f.registry(|doc| {
+            let entry = doc["agents"]
+                .as_array_of_tables_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|a| a["agent_id"].as_str() == Some("depth_fixture"))
+                .unwrap();
+            let operation = &mut entry["support_depth"]["enrollments"][0]["operations"][0];
+            let mut rows = toml_edit::Array::new();
+            for surface in surfaces {
+                let mut identity = toml_edit::InlineTable::new();
+                identity.insert("surface_kind", surface.surface_kind.as_str().into());
+                identity.insert("command_path", surface.command_path.as_str().into());
+                identity.insert("surface_id", surface.surface_id.as_str().into());
+                let mut row = toml_edit::InlineTable::new();
+                row.insert("surface", identity.into());
+                row.insert(
+                    "templates",
+                    ["CORE"].into_iter().collect::<toml_edit::Array>().into(),
+                );
+                row.insert(
+                    "rationale",
+                    "CORE covers this whole `run --json` unit.".into(),
+                );
+                rows.push(row);
+            }
+            operation["classification_basis"] = toml_edit::value(basis);
+            operation["classifications"] = toml_edit::value(rows);
+        });
+    }
+    fn digest(bytes: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        hex::encode(Sha256::digest(bytes))
+    }
+    fn tracked(root: &Path) -> (String, String, Vec<u8>) {
+        (
+            git(root, &["rev-parse", "HEAD"]),
+            git(root, &["status", "--porcelain=v1", "--untracked-files=all"]),
+            std::fs::read(root.join(RECORD)).unwrap(),
+        )
+    }
+    /// Commit the caller and move the fake protected tip, the evidence host and the local
+    /// integration ref to it.
+    fn advance(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) -> String {
+        f.commit();
+        let tip = git(f.root.path(), &["rev-parse", "HEAD"]);
+        host.staging(&tip);
+        set_local(f.root.path(), &tip);
+        tip
+    }
+    fn entries(planned: &[crate::workspace_mutation::PlannedMutation]) -> String {
+        format!("{planned:?}")
+    }
+
+    /// The private owning predicates themselves, reached through an isolated proposal: MA5
+    /// closeout and then MA6 promotion admit only under the proposal's forwarded authority.
+    #[test]
+    fn isolated_proposal_admits_closeout_and_promotion_through_the_owning_predicates() {
+        use crate::agent_maintenance::stand_down;
+        let (f, host) = delivered(true);
+        let root = f.root.path();
+        let _reader = host.install();
+        let record = DepthRecord::parse(
+            &std::fs::read_to_string(root.join(RECORD)).unwrap(),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        let crate::depth_record::Event::Maintenance {
+            request_recorded_at,
+            ..
+        } = &record.event
+        else {
+            panic!("not a maintenance generation");
+        };
+        // The exact-generation marker on the protected tip.
+        let marker = stand_down::marker_relative_path(
+            "docs/agents/lifecycle/depth_fixture-maintenance",
+            "0.2.0",
+        );
+        write(
+            root,
+            &marker,
+            stand_down::render_marker_toml("depth_fixture", "0.2.0", request_recorded_at),
+        );
+        let tip = advance(&f, &host);
+        let request = crate::agent_lifecycle::maintenance_request_path("depth_fixture");
+        let closeout_path =
+            "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-closeout.json";
+        let closeout = serde_json::to_vec_pretty(&json!({
+            "request_ref": request,
+            "request_sha256": digest(&std::fs::read(root.join(&request)).unwrap()),
+            "resolved_findings": [{"category_id":"governance_doc_drift","summary":"fixture","surfaces":["docs/input.txt"]}],
+            "explicit_none_reason": "fixture",
+            "preflight_passed": true,
+            "recorded_at": request_recorded_at,
+            "commit": tip,
+        }))
+        .unwrap();
+        let files = vec![(PathBuf::from(closeout_path), closeout.clone())];
+        let before = tracked(root);
+
+        // Production on the same, otherwise valid, depth proposal: its host has no verdicts.
+        let error = Proposal::capture(root)
+            .unwrap()
+            .plan(root, files.clone())
+            .unwrap_err();
+        assert!(error.contains("not independently satisfied"), "{error}");
+        assert_eq!(tracked(root), before);
+
+        // A local integration ref other than the authenticated tip refuses.
+        let parent = git(root, &["rev-parse", "HEAD~1"]);
+        set_local(root, &parent);
+        let error = f
+            .resolve()
+            .unwrap()
+            .proposal(root)
+            .unwrap()
+            .plan(root, files.clone())
+            .unwrap_err();
+        assert!(error.contains("authenticated protected tip"), "{error}");
+        set_local(root, &tip);
+        assert_eq!(tracked(root), before);
+
+        // A context that moved after capture refuses (here: the protected tip moved on the host).
+        let proposal = f.resolve().unwrap().proposal(root).unwrap();
+        f.api.put(
+            "repos/fixture/isolated/branches/staging",
+            json!({"name":"staging","protected":true,"commit":{"sha":parent}}),
+        );
+        assert!(proposal.plan(root, files.clone()).is_err());
+        assert!(proposal.apply(root, files.clone()).is_err());
+        f.host();
+        assert_eq!(tracked(root), before);
+
+        // Success: one closeout and exactly one current closeout entry, applied as one batch.
+        let proposal = f.resolve().unwrap().proposal(root).unwrap();
+        assert!(matches!(proposal.authority(), Authority::Isolated(_)));
+        let planned = proposal.plan(root, files.clone()).unwrap();
+        assert_eq!(planned.len(), 2, "{}", entries(&planned));
+        proposal.apply(root, files.clone()).unwrap();
+        assert_eq!(std::fs::read(root.join(closeout_path)).unwrap(), closeout);
+        let closed = DepthRecord::parse(
+            &std::fs::read_to_string(root.join(RECORD)).unwrap(),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        assert_eq!(
+            closed.acceptance_entries,
+            vec![AcceptanceEntry::MaintenanceCloseout {
+                closeout: crate::depth_record::FileRef {
+                    path: closeout_path.into(),
+                    sha256: digest(&closeout),
+                },
+                record_sha256: record.stated_sha256().unwrap(),
+            }]
+        );
+        advance(&f, &host);
+
+        // MA6: retire the marker; the promotion predicate appends its own entry.
+        let promote = |authority: Option<()>| {
+            let proposal = match authority {
+                Some(()) => f.resolve().unwrap().proposal(root).unwrap(),
+                None => Proposal::capture(root).unwrap(),
+            };
+            proposal.plan_changes(root, vec![(PathBuf::from(&marker), None)], |r, b, a, w| {
+                crate::depth_acceptance::plan_promotion_as(proposal.authority(), r, b, a, w)
+            })
+        };
+        let before = tracked(root);
+        let error = promote(None).unwrap_err();
+        assert!(error.contains("not independently satisfied"), "{error}");
+        let tip = git(root, &["rev-parse", "HEAD"]);
+        set_local(root, &git(root, &["rev-parse", "HEAD~1"]));
+        let error = promote(Some(())).unwrap_err();
+        assert!(error.contains("authenticated protected tip"), "{error}");
+        set_local(root, &tip);
+        assert_eq!(tracked(root), before);
+        let planned = promote(Some(())).unwrap();
+        assert_eq!(planned.len(), 2, "{}", entries(&planned));
+        crate::workspace_mutation::apply_admitted_mutations(root, &planned).unwrap();
+        assert!(!root.join(&marker).exists());
+        let promoted = DepthRecord::parse(
+            &std::fs::read_to_string(root.join(RECORD)).unwrap(),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        assert_eq!(
+            promoted.acceptance_entries[..1],
+            closed.acceptance_entries[..]
+        );
+        assert_eq!(
+            promoted.acceptance_entries[1..],
+            [AcceptanceEntry::Promotion {
+                targets: vec!["x86_64-unknown-linux-gnu".into()],
+                record_sha256: record.stated_sha256().unwrap(),
+            }]
         );
     }
 }
