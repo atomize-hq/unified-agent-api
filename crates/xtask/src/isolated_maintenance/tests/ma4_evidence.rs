@@ -419,3 +419,62 @@ fn a_payload_substituted_behind_unchanged_receipts_refuses_delivery() {
     assert!(!root.join(EVIDENCE).exists());
     assert_eq!(git(root, &["ls-files", "--stage"]), index_before);
 }
+
+#[test]
+fn evidence_changes_after_committed_genuine_e_refuse_delivery() {
+    let (f, host) = chain();
+    let root = f.root.path();
+    let bin = tempfile::tempdir().unwrap();
+    let _installed = f.install();
+    let _reader = host.install();
+    {
+        let _gates = execute::gate_stub::stub();
+        run_as(root, &executor(bin.path(), ""), "ma4-evidence-first").unwrap();
+    }
+    f.commit();
+    host.staging(&git(root, &["rev-parse", "HEAD"]));
+    // Rerunning over the same population leaves the record and every receipt unchanged; only an
+    // evidence file changes, and the whole delivery is refused by path class.
+    let raw = format!("{EVIDENCE}/1-1/raw.txt");
+    for (run, edit) in [
+        (
+            "ma4-evidence-rerun-substituted",
+            format!("printf substituted > {raw}"),
+        ),
+        ("ma4-evidence-rerun-deleted", format!("rm {raw}")),
+        (
+            "ma4-evidence-rerun-added",
+            format!("printf '{{}}' > {EVIDENCE}/1-1/unreferenced.json"),
+        ),
+    ] {
+        let binary = executor(bin.path(), &format!("test -f {raw} || exit 1\n{edit}"));
+        let record_before = std::fs::read(root.join(RECORD)).unwrap();
+        let raw_before = std::fs::read(root.join(&raw)).unwrap();
+        let index_before = git(root, &["ls-files", "--stage"]);
+        let head = git(root, &["rev-parse", "HEAD"]);
+        {
+            let _gates = execute::gate_stub::stub();
+            let refused = run_as(root, &binary, run).unwrap_err();
+            assert!(
+                refused.contains("not the bytes the host staged")
+                    || refused.contains("unsupported deletion"),
+                "{run}: {refused}"
+            );
+        }
+        assert_eq!(
+            std::fs::read(root.join(RECORD)).unwrap(),
+            record_before,
+            "{run}"
+        );
+        assert_eq!(std::fs::read(root.join(&raw)).unwrap(), raw_before, "{run}");
+        assert!(!root.join(EVIDENCE).join("1-1/unreferenced.json").exists());
+        assert_eq!(git(root, &["ls-files", "--stage"]), index_before, "{run}");
+        assert_eq!(git(root, &["rev-parse", "HEAD"]), head);
+        assert_eq!(
+            git(root, &["status", "--porcelain", "--", "cli_manifests"]),
+            "",
+            "{run}"
+        );
+        git(root, &["clean", "-fdxq", "docs"]);
+    }
+}

@@ -237,7 +237,6 @@ fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
         admitted(&genuine, None).is_empty(),
         "production admitted evidence"
     );
-    check_staged_closure(&Tree::new(), &genuine, "runs/x", None).unwrap();
     // Under a route the whole closure is admitted, payload included.
     assert_eq!(admitted(&genuine, Some(&host)), [receipt, payload]);
     check_staged_closure(&Tree::new(), &genuine, "runs/x", Some(&host)).unwrap();
@@ -252,4 +251,22 @@ fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("not the bytes the host staged"), "{error}");
+    // By path class, whether or not any record changed: with genuine E and evidence already
+    // committed, a substituted, removed or added evidence file refuses, under a route or not.
+    let mut removed = genuine.clone();
+    removed.remove(payload);
+    let mut added = genuine.clone();
+    added.insert(
+        "cli/reports/1/evidence/unreferenced.json".into(),
+        Node::File(b"{}".to_vec(), 0o644),
+    );
+    for after in [&substituted, &removed, &added] {
+        for staged in [None, Some(&host)] {
+            assert!(check_staged_closure(&genuine, after, "runs/x", staged).is_err());
+        }
+    }
+    // Unchanged committed evidence adds no condition, in production too.
+    check_staged_closure(&genuine, &genuine, "runs/x", None).unwrap();
+    // A changed evidence file in production always refuses.
+    assert!(check_staged_closure(&Tree::new(), &genuine, "runs/x", None).is_err());
 }

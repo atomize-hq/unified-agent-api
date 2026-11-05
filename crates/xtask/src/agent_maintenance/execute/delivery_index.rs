@@ -27,10 +27,18 @@ fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-/// The evidence closure of every depth record the candidate changed: the receipts its E binds,
-/// every payload a closure file references (`{path, sha256}` anywhere in its JSON), transitively,
-/// and every file under that record's `evidence/` directory. Paths only; nothing is resolved.
-fn closure(before: &Tree, after: &Tree) -> BTreeSet<String> {
+/// Whether `path` lies in an evidence destination: `.../reports/<version>/evidence/...`.
+fn evidence_destination(path: &str) -> bool {
+    let segments: Vec<_> = path.split('/').collect();
+    segments
+        .windows(3)
+        .take(segments.len().saturating_sub(3))
+        .any(|w| w[0] == "reports" && w[2] == "evidence")
+}
+
+/// Every path an E in `tree` binds (in any depth record, changed or not) and every payload a
+/// bound file references by `{path, sha256}` anywhere in its JSON, transitively.
+fn bound_closure(tree: &Tree, out: &mut BTreeSet<String>) {
     fn references(value: &serde_json::Value, out: &mut Vec<String>) {
         match value {
             serde_json::Value::Object(map) => {
@@ -46,19 +54,13 @@ fn closure(before: &Tree, after: &Tree) -> BTreeSet<String> {
         }
     }
     let mut queue = Vec::new();
-    let mut prefixes = Vec::new();
-    for (path, node) in after {
+    for (path, node) in tree {
         let Node::File(bytes, _) = node else {
             continue;
         };
-        let unchanged = matches!(before.get(path), Some(Node::File(old, _)) if old == bytes);
-        let Some(reports) = path.strip_suffix("/depth-record.json") else {
-            continue;
-        };
-        if unchanged {
+        if !path.ends_with("/depth-record.json") {
             continue;
         }
-        prefixes.push(format!("{reports}/evidence/"));
         let Ok(record) = serde_json::from_slice::<serde_json::Value>(bytes) else {
             continue;
         };
@@ -74,67 +76,72 @@ fn closure(before: &Tree, after: &Tree) -> BTreeSet<String> {
             }
         }
     }
-    let mut closure: BTreeSet<String> = after
-        .iter()
-        .filter(|(p, node)| {
-            matches!(node, Node::File(..)) && prefixes.iter().any(|prefix| p.starts_with(prefix))
-        })
-        .map(|(p, _)| p.clone())
-        .collect();
-    let mut seen = BTreeSet::new();
+    let mut seen = 0usize;
     while let Some(path) = queue.pop() {
-        if !seen.insert(path.clone()) || seen.len() > 100_000 {
+        seen += 1;
+        if seen > 100_000 || !out.insert(path.clone()) {
             continue;
         }
-        if let Some(Node::File(bytes, _)) = after.get(&path) {
+        if let Some(Node::File(bytes, _)) = tree.get(&path) {
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
                 references(&value, &mut queue);
             }
         }
-        closure.insert(path);
     }
-    closure
 }
 
-/// Under a captured route, every file of the changed records' evidence closure that the
-/// candidate delivers new or changed must be byte-identical to what the host itself
-/// authenticated and staged. Any other byte refuses the whole delivery: a substituted payload is
-/// rejected, never merely left unindexed. Without a route (`None`) nothing is staged and nothing
-/// new is ever indexed, so this adds no condition.
+/// The evidence path class: every file in an evidence destination before or after, and every
+/// path an E binds before or after, with its transitive payload references.
+fn evidence_paths(before: &Tree, after: &Tree, run_dir_rel: &str) -> BTreeSet<String> {
+    let mut paths: BTreeSet<String> = before
+        .keys()
+        .chain(after.keys())
+        .filter(|p| evidence_destination(p))
+        .cloned()
+        .collect();
+    bound_closure(before, &mut paths);
+    bound_closure(after, &mut paths);
+    paths.retain(|p| !p.starts_with(&format!("{run_dir_rel}/")));
+    paths
+}
+
+/// The host-side byte binding, by path class and independent of whether any record changed:
+/// every file the candidate adds, changes or removes in the evidence path class must be
+/// byte-identical to the host-staged bundle file at that path. Anything else refuses the whole
+/// delivery. In production (`None`) nothing is staged, so any such change refuses.
 pub(super) fn check_staged_closure(
     before: &Tree,
     after: &Tree,
     run_dir_rel: &str,
     staged: Option<&Staged>,
 ) -> Result<(), Error> {
-    let Some(staged) = staged else {
-        return Ok(());
-    };
-    for path in closure(before, after) {
-        if path.starts_with(&format!("{run_dir_rel}/")) {
-            continue;
-        }
+    for path in evidence_paths(before, after, run_dir_rel) {
         let delivered = match (before.get(&path), after.get(&path)) {
             (Some(Node::File(old, _)), Some(Node::File(new, _))) if old == new => continue,
-            (None, None) | (None, Some(Node::Directory(_))) => continue,
-            (_, Some(Node::File(bytes, _))) => sha256(bytes),
-            _ => String::new(),
+            (None | Some(Node::Directory(_)), None | Some(Node::Directory(_))) => continue,
+            (_, Some(Node::File(bytes, _))) => Some(sha256(bytes)),
+            _ => None,
         };
-        if staged.get(&path) != Some(&delivered) {
+        let expected = staged.and_then(|s| s.get(&path));
+        if delivered.is_none() || expected != delivered.as_ref() {
+            let none = if staged.is_none() {
+                " (nothing is staged without an isolated route)"
+            } else {
+                ""
+            };
             return Err(Error::Validation(format!(
-                "delivered evidence is not the bytes the host staged for this run: {path}"
+                "delivered evidence is not the bytes the host staged for this run{none}: {path}"
             )));
         }
     }
     Ok(())
 }
 
-/// New files of the changed records' evidence closure (E-bound receipts and the payloads they
-/// reference) that are byte-identical to evidence the host itself authenticated and staged for
-/// this run (B.4 part 2). Publication reads bound evidence only from the index, so the relay
-/// validates, and copy-back delivers, exactly the caller index plus these files. A file only the
-/// candidate made is never indexed, so it still refuses as an untracked bound input; under a
-/// route [`check_staged_closure`] refuses it outright. The bytes come from the validated snapshot.
+/// New files of the evidence path class (E-bound receipts and the payloads they reference) that
+/// are byte-identical to evidence the host itself authenticated and staged for this run (B.4
+/// part 2). Publication reads bound evidence only from the index, so the relay validates, and
+/// copy-back delivers, exactly the caller index plus these files. [`check_staged_closure`]
+/// refuses every other change in that class. The bytes come from the validated snapshot.
 pub(super) fn bound_new_evidence(
     before: &Tree,
     after: &Tree,
@@ -144,9 +151,9 @@ pub(super) fn bound_new_evidence(
     let Some(staged) = staged else {
         return vec![];
     };
-    closure(before, after)
+    evidence_paths(before, after, run_dir_rel)
         .into_iter()
-        .filter(|p| before.get(p).is_none() && !p.starts_with(&format!("{run_dir_rel}/")))
+        .filter(|p| before.get(p).is_none())
         .filter_map(|path| match after.get(&path) {
             Some(Node::File(bytes, mode)) if staged.get(&path) == Some(&sha256(bytes)) => {
                 Some(Bound {

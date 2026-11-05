@@ -130,8 +130,11 @@ fn candidate_only_staging_cannot_admit_new_or_preexisting_untracked_receipt() {
         let before = fs::read(root.join(format!("reports/{VERSION}/depth-record.json"))).unwrap();
         let out = mh::run_execute_cli(mh::execute_args("--write", Some(&binary)), temp.path());
         assert_ne!(out.exit_code, 0);
+        // Production stages no evidence, so a candidate-made bound receipt is refused by the
+        // delivery byte binding (or, failing that, as an untracked bound input).
         assert!(
-            out.stderr.contains("untracked bound input"),
+            out.stderr.contains("not the bytes the host staged")
+                || out.stderr.contains("untracked bound input"),
             "{}",
             out.stderr
         );

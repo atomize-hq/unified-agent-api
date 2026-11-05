@@ -180,14 +180,17 @@ Each step is a reviewed PR into `staging`.
        installs that copy with an atomic rename while it still holds the lock. No other Git
        process can change the index between the comparison and the installation, and an
        existing lock refuses with the index unchanged. This byte binding is the authority over
-       the channel. It covers the whole evidence closure of each changed record: the receipts
-       E binds, every payload a closure file references by `{path, sha256}` (toolchain,
-       environment, graph, raw output), transitively, and every file under the record's
-       `evidence/` directory. Under a captured route, any new or changed closure file that is
-       not byte-identical to the host-staged bundle refuses the whole delivery, before
-       publication and again at copy-back, with caller files and index unchanged; matching
-       closure files, payloads included, are what gain index identities. E from a forged
-       channel, or a payload substituted behind unchanged receipts, is therefore refused. Production stages nothing, so no new E-bound
+       the channel, and it binds by path class, whether or not any depth record changed. The
+       class is every file under any evidence destination (`.../reports/<version>/evidence/`)
+       and every path any E binds before or after the run, with every payload a bound file
+       references by `{path, sha256}` (toolchain, environment, graph, raw output), transitively.
+       Every file the candidate adds, changes or removes in that class must be byte-identical to
+       the host-staged bundle file at that path; anything else refuses the whole delivery,
+       before publication and again at copy-back, with caller files and index unchanged. In
+       production nothing is staged, so any change in the class refuses. Matching new files,
+       payloads included, are what gain index identities. E from a forged channel, a payload
+       substituted behind unchanged receipts (also on a rerun over committed evidence), a
+       removed payload or an added unreferenced file are therefore refused. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,

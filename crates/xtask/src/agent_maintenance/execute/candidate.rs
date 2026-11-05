@@ -156,8 +156,9 @@ impl Candidate {
         if !errors.is_empty() {
             return Err(Error::Validation(errors.join("\n")));
         }
-        // The host-side byte binding: the whole evidence closure of a changed record, receipts and
-        // the payloads they reference, is the host-staged bytes or the candidate is refused.
+        // The host-side byte binding, by path class: every added, changed or removed evidence
+        // file (evidence destinations and everything an E binds, transitively) is the
+        // host-staged bytes, or the candidate is refused.
         super::delivery_index::check_staged_closure(
             &self.before,
             after,
