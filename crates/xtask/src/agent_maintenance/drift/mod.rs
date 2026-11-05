@@ -9,10 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
-    support_matrix,
-};
+use crate::{agent_registry::REGISTRY_RELATIVE_PATH, support_matrix};
 use clap::Parser;
 
 use super::finding_signature::FindingSignature;
@@ -170,7 +167,7 @@ pub fn check_agent_drift(
     workspace_root: &Path,
     agent_id: &str,
 ) -> Result<AgentDriftReport, DriftCheckError> {
-    let registry = AgentRegistry::load(workspace_root)
+    let registry = xtask::isolated_maintenance::registry(workspace_root)
         .map_err(|err| DriftCheckError::Validation(format!("load agent registry: {err}")))?;
     let entry = registry.find(agent_id).ok_or_else(|| {
         DriftCheckError::Validation(format!(

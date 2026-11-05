@@ -40,6 +40,14 @@ impl Proposal {
         })
     }
 
+    /// The captured context's authenticated preflight repository; grants no admission authority.
+    pub fn preflight_repository(&self, root: &Path) -> Result<Option<&'static str>, String> {
+        self.isolated
+            .as_ref()
+            .map(|context| context.evidence_host(root).map(|host| host.repository()))
+            .transpose()
+    }
+
     pub(crate) fn capture_isolated(
         root: &Path,
         context: crate::isolated_maintenance::Context,
