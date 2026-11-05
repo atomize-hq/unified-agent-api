@@ -26,18 +26,16 @@ pub(super) fn validate_onboarding_binding(
 ) {
     let lifecycle = agent_lifecycle::lifecycle_state_path_for_entry(entry);
     let lifecycle_path = workspace.join(&lifecycle);
-    // A lifecycle record that is there and cannot be read is check 10's to report.
-    let state = if fs::symlink_metadata(&lifecycle_path).is_err() {
-        None
-    } else {
-        match agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) {
-            Ok(state) => Some(state),
-            Err(_) => return,
-        }
+    // An absent lifecycle record is no onboarding pack, as check 10 reads it, so there is no object
+    // to compare; the merge check decides retained records. One that is there and cannot be read
+    // is check 10's to report.
+    if fs::symlink_metadata(&lifecycle_path).is_err() {
+        return;
+    }
+    let Ok(state) = agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) else {
+        return;
     };
-    let object = state
-        .as_ref()
-        .and_then(|state| state.support_depth.as_ref());
+    let object = state.support_depth.as_ref();
     let onboarding = records
         .values()
         .any(|(_, record)| matches!(record.event, Event::Onboarding { .. }));
@@ -46,19 +44,16 @@ pub(super) fn validate_onboarding_binding(
         return;
     }
 
-    let approval_path = state
-        .as_ref()
-        .map(|state| state.approval_artifact_path.clone())
-        .unwrap_or_else(|| agent_lifecycle::approval_artifact_path_for_entry(entry));
-    let approval = fs::read_to_string(workspace.join(&approval_path))
+    let approval_path = &state.approval_artifact_path;
+    let approval = fs::read_to_string(workspace.join(approval_path))
         .map_err(|err| err.to_string())
-        .and_then(|text| OnboardingApproval::parse(&text, &approval_path));
+        .and_then(|text| OnboardingApproval::parse(&text, approval_path));
     let approval = match approval {
         Ok(approval) => approval,
         Err(err) => {
             fail(
                 "DEPTH_APPROVAL_UNREADABLE",
-                &workspace.join(&approval_path),
+                &workspace.join(approval_path),
                 err,
             );
             return;
