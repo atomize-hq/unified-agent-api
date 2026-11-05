@@ -550,3 +550,56 @@ They distinguish reporting changes from acceptance, require current entries and 
 entry-listing exception. D5 tests separately exercise the complete model domain and unsupported
 source/default/feature inputs. No native execution on unavailable hosts or route admission is
 inferred from structural comparisons.
+
+## Executed depth-refusal coverage (Annex A ON1–ON5, NE1–NE8, LW1)
+
+Roadmap B.7 of the
+[machinery-proof rescope](support-depth-machinery-proof-rescope.md). Each route's public
+entrypoint is executed against a workspace that carries the synthetic `depth_fixture` subject
+(`crates/xtask/tests/fixtures/depth-synthetic`) and must fail with its depth refusal and leave
+the tree byte-, type- and mode-identical, with nothing written to its private `TMPDIR`.
+
+`crates/xtask/tests/depth_refusal_routes.rs` copies every tracked file and runs the real `xtask`
+binary from the copy's root with an empty `PATH`, so a route that failed to refuse could not
+reach `git`, `cargo` or an upstream CLI. Each case runs against three depth carriers:
+
+- **Declared:** the registry carries the synthetic entry with its `support_depth` table and the
+  governing manifest root; no record exists yet.
+- **Retained:** the entry stays without its table and the reviewed synthetic record is retained at
+  `cli_manifests/depth_fixture/reports/0.2.0/depth-record.json`.
+- **Orphaned:** the whole entry is gone; the manifest root and record remain.
+
+`isolated_maintenance/tests/unsupported_routes.rs` (in-crate) installs the authenticated
+synthetic isolated route, prepares the subject through MA1/MA2 (declared table, retained record,
+a depth-bearing support bundle) and drives the library entrypoints: the route is MA authority only
+and grants these writers none. A workspace-wide guard reports the declaration first and a
+manifest-scoped guard the record first.
+
+| Route | Entrypoint(s) executed | Executed tests | Earlier coverage reused |
+| --- | --- | --- | --- |
+| ON1 | `onboard-agent --write` | `onboarding::on1_onboard_agent_write_refuses_depth_workspace`; installed route (library) | — |
+| ON2 | `runtime-follow-on --write`, `repair-runtime-evidence --write` | `onboarding::on2_runtime_follow_on_and_repair_runtime_evidence_writes_refuse_depth_workspace`; installed route | — |
+| ON3 | `prepare-publication --write` | `onboarding::on3_prepare_publication_write_refuses_depth_workspace`; installed route | — |
+| ON4 | `refresh-publication --write` | `onboarding::on4_refresh_publication_write_refuses_depth_workspace`; installed route | — |
+| ON5 | `close-proving-run`, `prepare-proving-run-closeout --write` | `onboarding::on5_proving_run_closeout_entrypoints_refuse_depth_workspace`; installed route (`prepare-proving-run-closeout` only: `close_proving_run` is binary-only) | — |
+| NE1 | `support-matrix` (write) → `support_matrix/publication.rs::write_publication_artifacts` | `neutral::ne1_support_matrix_write_refuses_depth_workspace` (declared, orphaned); installed route delivers a route-generated bundle | — |
+| NE2 | `capability-matrix`, `capability-matrix --out` | `neutral::ne2_capability_matrix_write_refuses_depth_workspace` | — |
+| NE3 | `manifest-version-metadata --root`, alias `codex-version-metadata` | `neutral::ne3_version_metadata_and_its_alias_refuse_depth_manifest`; installed route | `depth_promotion.rs::neutral_lower_batch_cannot_write_retained_depth_even_without_a_declaration` (library `run`) |
+| NE4 | `manifest-validate --mode fix`, alias `codex-validate --mode fix` | `neutral::ne4_manifest_validate_fix_mode_and_its_alias_refuse_depth_manifest`; installed route (`violation_codes`) | — |
+| NE5 | `manifest-retain --apply`, alias `codex-retain --apply` | `neutral::ne5_retention_apply_and_its_alias_refuse_depth_manifest` | — |
+| NE6 | `codex-snapshot`, `claude-snapshot`, `opencode-snapshot` with legacy `--out-dir`, including the subject's root and a not-yet-created destination | `neutral::ne6_legacy_snapshot_out_dir_refuses_depth_destination` | — |
+| NE7 | `historical-lifecycle-backfill --all`, `--agent` | `neutral::ne7_historical_lifecycle_backfill_refuses_depth_workspace` | — |
+| NE8 | `runtime-advertising-model` (write) | `neutral::ne8_runtime_advertising_model_write_refuses_depth_workspace` | — |
+| LW1 | `workspace_mutation::apply_mutations`; `agent_lifecycle::{write_lifecycle_state, write_publication_ready_packet}` | `lower::lw1_apply_mutations_refuses_depth_workspace`, `lower::lw1_apply_mutations_refuses_proposed_record_and_enrollment_destinations`, `lower::lw1_lifecycle_and_packet_storage_writers_refuse_depth_workspace`, `lower::lw1_lifecycle_and_packet_storage_writers_refuse_a_record_destination`; installed route | `depth_promotion.rs`: `neutral_lower_batch_cannot_write_retained_depth_even_without_a_declaration`, `nested_root_cannot_hide_retained_depth_from_public_delivery`, `neutral_batch_cannot_introduce_a_record_or_declaration_before_accepting_outputs`, `publication_packet_lower_writer_cannot_overwrite_a_retained_record`, `nested_standalone_manifest_root_cannot_hide_retained_reports`, `empty_inner_anchor_cannot_hide_an_outer_retained_record` |
+
+`copied_workspace_without_synthetic_depth_is_not_refused` is the control: the copied tree without
+the synthetic depth passes the guard, so each refusal above is caused by the depth it carries.
+
+Two refusals come from the registry loader rather than the route guard. With a declared table,
+`support-matrix` and `historical-lifecycle-backfill` load the registry before their writer guard
+and stop at `AgentRegistry::parse`'s `support_depth` refusal (Annex A "Public refusal"); with
+retained or orphaned depth they reach the guard. The **Retained** carrier is not run for NE1:
+with the subject still registered for support publication, the generator first fails on the
+synthetic root's absent `current.json`, which is not a depth refusal.
+
+Every listed entrypoint refuses today; none needed a production change or an ignored test.

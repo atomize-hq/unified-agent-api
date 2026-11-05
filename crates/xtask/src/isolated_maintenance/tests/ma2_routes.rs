@@ -72,6 +72,14 @@ fn ma2_read_routes_load_the_scoped_registry_only_under_an_installed_route() {
     f.commit();
     acquire(root, "0.2.0");
     f.commit();
+    // Before publication the support matrix is stale for the acquired version, so validation
+    // fails on support-matrix checks alone. This is why parity-acquire.yml validates only after
+    // it publishes the support outputs.
+    let codes = crate::manifest_validate::violation_codes(validate_args(root)).unwrap();
+    assert!(
+        !codes.is_empty() && codes.iter().all(|code| code.starts_with("SUPPORT_MATRIX_")),
+        "{codes:?}"
+    );
     apply_prepare_plan(root, &build_prepare_plan(root, &args).unwrap()).unwrap();
     f.commit();
     assert_eq!(stand_down(root).unwrap(), StandDownOutcome::Authorized);

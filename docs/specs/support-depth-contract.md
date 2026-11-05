@@ -1120,7 +1120,9 @@ Existing source and conformance anchors (test names are searchable in the named 
 | Rollback | `workspace_mutation/tests.rs`: intervening edit/symlink/mode/removal; relay delivery conflict tests | Connected failure checks must preserve concurrent caller state and fail without a final acceptance effect |
 
 Only `codex`, `claude_code` and `opencode` currently have Annex-B-adopting validator specs and
-the fixed per-root CI loop. `aider` and `gemini_cli` do not. D7's all-root admission is not a
+the fixed per-root CI loop. `aider` and `gemini_cli` do not: their validator specs state the
+shared depth checks, but neither root has a `RULES.json` naming the record path, so neither
+adopts Annex B. D7's all-root admission is not a
 substitute for adding a root's canonical validator adoption and complete manifest validation
 before that root may hold a depth record. The isolated refusal matrix must include this boundary.
 

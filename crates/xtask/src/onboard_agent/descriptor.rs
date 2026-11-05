@@ -52,6 +52,7 @@ impl DraftDescriptorInput {
             )?,
             approval_provenance: None,
             approval_maintenance: None,
+            approval_support_depth_version: None,
         })
     }
 }
@@ -63,6 +64,7 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
             sha256,
             descriptor,
             maintenance,
+            support_depth_version,
             ..
         } = artifact;
         Self {
@@ -90,6 +92,7 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
                 approval_recorded_at: String::new(),
             }),
             approval_maintenance: Some(maintenance.into()),
+            approval_support_depth_version: support_depth_version,
         }
     }
 }
