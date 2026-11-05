@@ -11,7 +11,7 @@ const RECEIPT: &str =
 
 type Edit = Box<dyn Fn(&mut Bundle)>;
 
-fn frozen() -> DepthRecord {
+pub(super) fn frozen() -> DepthRecord {
     crate::depth_ci::profile::Profile::Synthetic
         .record(include_str!(
             "../../../tests/fixtures/depth-synthetic/record.json"
@@ -19,7 +19,7 @@ fn frozen() -> DepthRecord {
         .unwrap()
 }
 /// A candidate holding only the frozen packet record.
-fn candidate() -> tempfile::TempDir {
+pub(super) fn candidate() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join(RECORD);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -27,7 +27,7 @@ fn candidate() -> tempfile::TempDir {
     fs::write(path, raw).unwrap();
     dir
 }
-fn crafted() -> Bundle {
+pub(super) fn crafted() -> Bundle {
     crafted_with(b"{\"claimed\":true}")
 }
 fn crafted_with(receipt: &[u8]) -> Bundle {
@@ -71,13 +71,20 @@ fn crafted_with(receipt: &[u8]) -> Bundle {
         }],
     }
 }
-fn staged(candidate: &Path, bundle: &Bundle) -> Staged {
+/// A host serving `bundle`, with this test's own process as both the host the assembler trusts
+/// and the executor the host admits: in-process tests run both sides in one process.
+pub(super) fn staged(candidate: &Path, bundle: &Bundle) -> Staged {
     let dir = private_dir().unwrap();
     let answer = publish(dir.path(), bundle);
-    serve(dir, candidate, answer).unwrap()
+    in_process(serve(dir, candidate, answer).unwrap())
+}
+pub(super) fn in_process(staged: Staged) -> Staged {
+    peer::trust_own_process();
+    staged.channel().admission.admit(std::process::id());
+    staged
 }
 /// Every file under `root`, with its bytes.
-fn snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+pub(super) fn snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     let mut files = BTreeMap::new();
     let mut stack = vec![root.to_owned()];
     while let Some(dir) = stack.pop() {
@@ -290,7 +297,8 @@ fn another_generation_p_o_or_target_refuses() {
         version: "0.2.0".into(),
         manifest_root: "cli_manifests/depth_fixture".into(),
     };
-    let staged = stage_answer(root.path(), Err("missing adoption".into()), &target).unwrap();
+    let staged =
+        in_process(stage_answer(root.path(), Err("missing adoption".into()), &target).unwrap());
     let error = assemble(root.path(), Some(staged.locator().to_owned())).unwrap_err();
     assert!(
         error.contains("no authenticated evidence was staged")

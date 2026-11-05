@@ -18,7 +18,10 @@ mod validate;
 #[cfg(test)]
 pub(crate) use staged::assemble as staged_assemble;
 pub use staged::{assemble_staged, CHANNEL_ENV as STAGED_EVIDENCE_CHANNEL_ENV};
-pub(crate) use staged::{stage as stage_isolated_evidence, Staged, Target as StagedTarget};
+pub(crate) use staged::{
+    stage as stage_isolated_evidence, Admission, Channel as StagedChannel, Staged,
+    Target as StagedTarget,
+};
 mod verdict;
 pub use verdict::{evaluate_workspace, Evaluation, Verdict};
 pub use verdict::{prove_isolated_ci, prove_isolated_core};

@@ -34,7 +34,7 @@ pub(super) fn run_codex_preflight(
         context.run_id.clone(),
     )];
     let (argv, output) =
-        spawn_codex_exec(&context.codex_binary, workspace_root, &prompt, &envs, true)?;
+        spawn_codex_exec(&context.codex_binary, workspace_root, &prompt, &envs, None)?;
     let after = snapshot_workspace(workspace_root, &[Path::new(EXECUTION_RUNS_ROOT)])?;
     let changed_paths = diff_snapshots(&before, &after);
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -133,15 +133,21 @@ pub(super) fn execute_codex_write(
             context.execution_contract.writable_surfaces.join("\n"),
         ),
     ];
-    // Only the locator of the host's live channel; no credential or host handle reaches it.
+    // Only the locator of the host's live channel; no credential or host handle reaches it. The
+    // spawn admits the executor's process to the channel and revokes it when the executor exits.
     if let Some(channel) = &context.evidence_channel {
         envs.push((
             crate::depth_evidence::STAGED_EVIDENCE_CHANNEL_ENV.to_string(),
-            channel.to_string_lossy().into_owned(),
+            channel.locator.to_string_lossy().into_owned(),
         ));
     }
-    let (argv, output) =
-        spawn_codex_exec(&context.codex_binary, workspace_root, prompt, &envs, false)?;
+    let (argv, output) = spawn_codex_exec(
+        &context.codex_binary,
+        workspace_root,
+        prompt,
+        &envs,
+        context.evidence_channel.as_ref().map(|c| &c.admission),
+    )?;
     let stdout_path = context.run_dir.join(CODEX_STDOUT_FILE_NAME);
     let stderr_path = context.run_dir.join(CODEX_STDERR_FILE_NAME);
     write_string(&stdout_path, &String::from_utf8_lossy(&output.stdout))?;
@@ -191,15 +197,7 @@ pub(super) fn run_green_gates(
     }
     for command in commands {
         let mut gate = Command::new("sh");
-        for (key, _) in std::env::vars_os() {
-            if key.to_string_lossy().starts_with("GIT_")
-                || key
-                    .to_string_lossy()
-                    .starts_with("XTASK_AGENT_MAINTENANCE_")
-            {
-                gate.env_remove(key);
-            }
-        }
+        scrub_host_env(&mut gate);
         let output = gate
             .current_dir(workspace_root)
             .arg("-lc")
@@ -272,13 +270,55 @@ pub(crate) mod gate_stub {
     }
 }
 
+/// Host and delivery credentials that never reach the executor or a green gate. The executor's
+/// own home and model-login resolution is left untouched; no auth store is opened.
+pub(super) const HOST_CREDENTIAL_ENV: &[&str] = &[
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
+    "AUTOMATION_TOKEN",
+    "GH_HOST",
+    "GH_REPO",
+    "GH_CONFIG_DIR",
+    "CARGO_REGISTRY_TOKEN",
+    "CRATES_IO_TOKEN",
+    "ACTIONS_RUNTIME_TOKEN",
+    "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+    "ACTIONS_ID_TOKEN_REQUEST_URL",
+];
+
+/// Remove inherited Git redirections, relay variables and host credentials from a child.
+fn scrub_host_env(command: &mut Command) {
+    for (key, _) in std::env::vars_os() {
+        let name = key.to_string_lossy();
+        if name.starts_with("GIT_") || name.starts_with("XTASK_AGENT_MAINTENANCE_") {
+            command.env_remove(&key);
+        }
+    }
+    for key in HOST_CREDENTIAL_ENV {
+        command.env_remove(key);
+    }
+}
+
+/// Revokes the evidence channel when the executor spawn returns, on every path.
+struct Revoke<'a>(Option<&'a crate::depth_evidence::Admission>);
+impl Drop for Revoke<'_> {
+    fn drop(&mut self) {
+        if let Some(admission) = self.0 {
+            admission.revoke();
+        }
+    }
+}
+
 fn spawn_codex_exec(
     binary: &str,
     workspace_root: &Path,
     prompt: &str,
     envs: &[(String, String)],
-    _quiet: bool,
+    channel: Option<&crate::depth_evidence::Admission>,
 ) -> Result<(Vec<String>, Output), Error> {
+    let revoke = Revoke(channel);
     let mut argv = vec![
         "exec".to_string(),
         "--skip-git-repo-check".to_string(),
@@ -292,15 +332,7 @@ fn spawn_codex_exec(
     let mut stdout_file = tempfile::tempfile().map_err(|e| Error::Internal(e.to_string()))?;
     let mut stderr_file = tempfile::tempfile().map_err(|e| Error::Internal(e.to_string()))?;
     let mut command = Command::new(binary);
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("GIT_")
-            || key
-                .to_string_lossy()
-                .starts_with("XTASK_AGENT_MAINTENANCE_")
-        {
-            command.env_remove(key);
-        }
-    }
+    scrub_host_env(&mut command);
     command
         .current_dir(workspace_root)
         .args(&argv)
@@ -321,6 +353,9 @@ fn spawn_codex_exec(
     let mut child = command
         .spawn()
         .map_err(|err| Error::Internal(format!("spawn codex binary `{binary}`: {err}")))?;
+    if let Some(admission) = channel {
+        admission.admit(child.id());
+    }
     let write_prompt = child
         .stdin
         .take()
@@ -335,7 +370,11 @@ fn spawn_codex_exec(
         let _ = child.wait();
         return Err(error);
     }
-    let status = wait_for_codex(&mut child, |child| child.wait())?;
+    let status = wait_for_codex(&mut child, |child| child.wait());
+    // The executor has exited (or was killed and reaped): no process it left behind, and no gate
+    // that runs next, can reach the channel.
+    drop(revoke);
+    let status = status?;
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     stdout_file

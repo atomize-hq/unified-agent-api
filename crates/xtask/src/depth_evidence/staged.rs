@@ -20,8 +20,14 @@ use std::{
     path::{Path, PathBuf},
 };
 mod channel;
-#[cfg(all(test, unix))]
+#[cfg(unix)]
+mod peer;
+// The in-process tests need the Linux peer anchor; other platforms refuse every channel.
+#[cfg(all(test, target_os = "linux"))]
+mod channel_tests;
+#[cfg(all(test, target_os = "linux"))]
 mod tests;
+pub(crate) use channel::Admission;
 
 /// Locates the live invocation channel. It carries no authority: only the host serving it does.
 pub const CHANNEL_ENV: &str = "XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL";
@@ -64,9 +70,24 @@ pub(crate) struct Staged {
     _dir: tempfile::TempDir,
     files: BTreeMap<String, String>,
 }
+/// What the executor runtime holds for a staged invocation: the locator it passes to the
+/// executor (it grants nothing) and the admission it binds to the spawned executor and revokes
+/// when that executor exits.
+#[derive(Debug, Clone)]
+pub(crate) struct Channel {
+    pub locator: PathBuf,
+    pub admission: Admission,
+}
 impl Staged {
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn locator(&self) -> &Path {
         self.channel.locator()
+    }
+    pub(crate) fn channel(&self) -> Channel {
+        Channel {
+            locator: self.channel.locator().to_owned(),
+            admission: self.channel.admission().clone(),
+        }
     }
     /// The evidence files this host authenticated and staged, by path, with their SHA-256. Only
     /// these exact bytes may gain an index identity on delivery; an executor-made file never does.

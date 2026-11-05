@@ -126,9 +126,21 @@ fn ma4_writes_authenticated_reporting_e_that_the_audit_reevaluates() {
     let _installed = f.install();
     let _reader = host.install();
     {
-        let _gates = execute::gate_stub::stub();
+        // While the gates run the executor has exited: its channel is already revoked.
+        let observed = std::rc::Rc::new(std::cell::Cell::new(None));
+        let (seen, locator) = (observed.clone(), bin.path().join("locator"));
+        let _gates = execute::gate_stub::stub_with(move || {
+            let path = PathBuf::from(std::fs::read_to_string(&locator).unwrap().trim());
+            let live = std::os::unix::net::UnixStream::connect(&path).is_ok();
+            seen.set(Some((path.exists(), live)));
+        });
         let written = run_as(root, &binary, "ma4-evidence").unwrap();
         assert!(written.contains("depth_fixture"), "{written}");
+        assert_eq!(
+            observed.get(),
+            Some((false, false)),
+            "channel live in gates"
+        );
     }
     // Only reporting E reached the caller: Event/P/O/entries are the frozen ones.
     let delivered = record(root);
@@ -284,4 +296,33 @@ fn forbidden_writes_and_route_or_tip_drift_preserve_the_caller() {
         git(root, &["clean", "-fdxq", "docs"]);
         f.host();
     }
+}
+
+#[test]
+fn an_index_failure_at_delivery_leaves_caller_files_and_index_unchanged() {
+    let (f, host) = chain();
+    let root = f.root.path();
+    let bin = tempfile::tempdir().unwrap();
+    let binary = executor(bin.path(), "");
+    let _installed = f.install();
+    let _reader = host.install();
+    let record_before = std::fs::read(root.join(RECORD)).unwrap();
+    let index_before = std::fs::read(root.join(".git/index")).unwrap();
+    let staged_before = git(root, &["ls-files", "--stage"]);
+    // Another Git process holds the caller index when delivery would publish the evidence.
+    let lock = root.join(".git/index.lock");
+    let held = lock.clone();
+    {
+        let _gates = execute::gate_stub::stub_with(move || std::fs::write(&held, b"").unwrap());
+        let refused = run_as(root, &binary, "ma4-evidence-locked").unwrap_err();
+        assert!(refused.contains("update-index failed"), "{refused}");
+    }
+    std::fs::remove_file(&lock).unwrap();
+    assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
+    assert!(!root.join(EVIDENCE).exists());
+    assert_eq!(
+        std::fs::read(root.join(".git/index")).unwrap(),
+        index_before
+    );
+    assert_eq!(git(root, &["ls-files", "--stage"]), staged_before);
 }

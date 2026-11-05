@@ -150,11 +150,26 @@ Each step is a reviewed PR into `staging`.
        invocation id against what the socket answers. When the executor exits, the socket and
        the bundle are removed. A copied bundle, a path, the variable alone or a restored origin
        is therefore never a route. `CapturedRegistry` is never serialized.
+     - Each side authenticates the other's process from the kernel (SO_PEERCRED), never from a
+       path or variable. The command accepts only a server that is its own ancestor and runs the
+       same executable file (device and inode) as itself, so only the genuine xtask host, which
+       serves only under a captured route, can answer it; a forged or replaced socket refuses.
+       The host answers only the executor it spawned and that executor's descendants, and
+       compares the requested root with its own canonical root without resolving it. Platforms
+       other than Linux have no such anchor and refuse. The host revokes the channel as soon as
+       the executor process exits, on every path and before any gate runs; each request has an
+       absolute deadline, and nothing is answered after revocation.
+     - The executor and the green gates never inherit host delivery credentials (`GH_TOKEN`,
+       `GITHUB_TOKEN`, `AUTOMATION_TOKEN` and the related GitHub, registry and Actions token
+       variables). The executor's own home and model login are left as they are.
      - E remains untrusted. The relay checks are unchanged. One delivery change: support
        publication reads bound evidence only from the Git index. So the relay validates against
        the caller index plus the new files that a changed record's E binds and that are
        byte-identical to files the host itself staged. Copy-back adds exactly those files to the
-       caller index. A receipt that only the candidate made still refuses as an untracked bound
+       caller index, as blobs written from the validated bytes (never re-read from the working
+       tree). The index entries are published before any file is written, so an index failure
+       writes nothing; if a file write then fails, exactly the owned index entries are removed
+       and a concurrent change to one of them is preserved and reported. A receipt that only the candidate made still refuses as an untracked bound
        input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,
        re-authenticates the full population rather than trusting a bundle.

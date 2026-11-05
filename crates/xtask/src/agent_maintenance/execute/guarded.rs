@@ -32,7 +32,7 @@ pub(super) fn execute_write_mode<W: Write>(
         .as_ref()
         .map(|captured| stage_evidence(caller, captured, &candidate.root, context))
         .transpose()?;
-    candidate.context.evidence_channel = staged.as_ref().map(|s| s.locator().to_owned());
+    candidate.context.evidence_channel = staged.as_ref().map(|s| s.channel());
     candidate.staged_evidence = staged
         .as_ref()
         .map(|s| s.files().clone())
@@ -41,7 +41,7 @@ pub(super) fn execute_write_mode<W: Write>(
     // No `?` escapes between possible execution and observation/finalization.
     let execution =
         workflow::execute_candidate_write(&candidate.root, &candidate.context, &mut output);
-    // The invocation's channel and bundle end with the executor.
+    // The executor spawn revoked the channel when the executor exited; its bundle ends here.
     drop(staged);
     candidate.context.evidence_channel = None;
     let observation = candidate.observe();

@@ -219,10 +219,11 @@ impl Candidate {
                 paths.push(path)
             }
         }
-        apply_mutations(caller, &mutations)?;
-        if passed && self.caller_git.is_some() {
-            // The relay validated exactly the caller index plus the new E-bound evidence.
-            super::delivery_index::add_to_index(
+        // The relay validated exactly the caller index plus the new E-bound evidence. Publish
+        // those entries from the validated bytes first, so an index failure writes nothing; if a
+        // file write then fails, remove exactly the entries this delivery owns.
+        let published = if passed && self.caller_git.is_some() {
+            super::delivery_index::publish(
                 caller,
                 &super::delivery_index::bound_new_evidence(
                     &self.before,
@@ -230,7 +231,15 @@ impl Candidate {
                     &self.context.run_dir_rel,
                     &self.staged_evidence,
                 ),
-            )?;
+            )?
+        } else {
+            vec![]
+        };
+        if let Err(e) = apply_mutations(caller, &mutations) {
+            return Err(match super::delivery_index::unpublish(caller, &published) {
+                Ok(()) => e.into(),
+                Err(conflict) => Error::Validation(format!("{e}; {conflict}")),
+            });
         }
         Ok(paths)
     }

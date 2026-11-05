@@ -130,9 +130,10 @@ pub(super) struct Context {
     /// candidate, uses it, and the candidate's in-process checks are bound to it; the relay
     /// refuses any registry change.
     pub(super) registry: Option<crate::isolated_maintenance::CapturedRegistry>,
-    /// Locator of the live channel serving evidence this host staged for its candidate, set only
-    /// under a captured isolated route while the executor runs. The locator grants nothing.
-    pub(super) evidence_channel: Option<std::path::PathBuf>,
+    /// The live channel serving evidence this host staged for its candidate, set only under a
+    /// captured isolated route. Its locator grants nothing; the write-phase executor spawn admits
+    /// the executor's process and revokes the channel when it exits.
+    pub(super) evidence_channel: Option<crate::depth_evidence::StagedChannel>,
 }
 
 #[derive(Debug, Clone)]
