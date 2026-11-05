@@ -50,6 +50,13 @@ fn fixture(action: &str, evidence: &str) -> (tempfile::TempDir, PathBuf, PathBuf
         let mut value: Value = serde_json::from_str(&receipt).unwrap();
         value["cases"]["raw_output"] = json!({"path": payload, "sha256": sha("raw")});
         receipt = serde_json::to_string_pretty(&value).unwrap();
+        let mut retargeted = value.clone();
+        retargeted["cases"]["raw_output"] =
+            json!({"path": run_dir_payload(), "sha256": sha("substituted")});
+        write_text(
+            &temp.path().join("retargeted-receipt.json"),
+            &serde_json::to_string_pretty(&retargeted).unwrap(),
+        );
         value["build"]["toolchain"] =
             json!({"path": "cli_manifests/codex/reports/0.61.0/extra.txt", "sha256": sha("x")});
         write_text(
@@ -374,4 +381,49 @@ fn committed_evidence_bound_into_the_run_directory_refuses_without_copy_back() {
         files
     );
     assert_eq!(fs::read(temp.path().join(".git/index")).unwrap(), index);
+}
+
+/// Diagnostic copy-back fails closed: the executor retargets the committed receipt into its run
+/// directory, substitutes that payload, then plants something a full candidate capture refuses
+/// (a FIFO, or a literal-backslash name, in a sibling run directory). No substituted byte reaches
+/// the caller; only host-authored diagnostics are delivered.
+#[cfg(unix)]
+#[test]
+fn diagnostic_copy_back_fails_closed_when_the_candidate_cannot_be_captured() {
+    let payload = run_dir_payload();
+    let sibling = "docs/agents/.uaa-temp/agent-maintenance/runs/sibling";
+    for plant in [
+        format!("mkdir -p {sibling}; mkfifo {sibling}/fifo"),
+        format!("mkdir -p {sibling}; printf x > '{sibling}/a\\b'"),
+    ] {
+        let action = format!(
+            "cp retargeted-receipt.json '{EVIDENCE}'; printf substituted > '{payload}'; {plant}"
+        );
+        let (temp, _root, binary, _) = fixture(&action, "committed");
+        let files = [EVIDENCE, PAYLOAD, NOTE].map(|p| fs::read(temp.path().join(p)).ok());
+        let index = fs::read(temp.path().join(".git/index")).unwrap();
+        let out = mh::run_execute_cli(mh::execute_args("--write", Some(&binary)), temp.path());
+        assert_ne!(out.exit_code, 0, "{plant}");
+        assert!(
+            !temp.path().join(&payload).exists(),
+            "{plant}: substituted payload copied back"
+        );
+        assert!(!temp.path().join(sibling).exists(), "{plant}");
+        assert_eq!(
+            [EVIDENCE, PAYLOAD, NOTE].map(|p| fs::read(temp.path().join(p)).ok()),
+            files,
+            "{plant}"
+        );
+        assert_eq!(fs::read(temp.path().join(".git/index")).unwrap(), index);
+        // Host diagnostics still reach the caller.
+        let run = payload.rsplit_once('/').unwrap().0;
+        assert!(
+            temp.path()
+                .join(run)
+                .join("validation-report.json")
+                .is_file(),
+            "{plant}: {}",
+            out.stderr
+        );
+    }
 }

@@ -199,7 +199,11 @@ Each step is a reviewed PR into `staging`.
        never live in an MA4 run directory (`docs/agents/.uaa-temp/agent-maintenance/runs/`),
        whose diagnostics are copied back even when a run fails: any E or receipt reference
        there refuses the whole delivery, and diagnostic copy-back never delivers a path bound
-       in the caller, in the delivered tree or in the candidate as the executor left it. A completely unchanged
+       in the caller, in the delivered tree or in the candidate as the executor left it. If the
+       candidate cannot be captured in full (for example it holds a FIFO or a literal-backslash
+       name), its bound paths are unknown, so copy-back fails closed: it delivers only the
+       diagnostics the host itself writes (reports, status, executor output logs, recovery
+       pointer). A completely unchanged
        MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the

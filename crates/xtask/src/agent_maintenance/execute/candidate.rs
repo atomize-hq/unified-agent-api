@@ -11,6 +11,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// The run files the host itself writes after the executor exits: its reports, status, logs of
+/// the executor's output and the recovery pointer.
+const HOST_DIAGNOSTICS: &[&str] = &[
+    super::RUN_STATUS_FILE_NAME,
+    super::RUN_SUMMARY_FILE_NAME,
+    super::VALIDATION_REPORT_FILE_NAME,
+    super::WRITTEN_PATHS_FILE_NAME,
+    super::CODEX_EXECUTION_FILE_NAME,
+    super::CODEX_STDOUT_FILE_NAME,
+    super::CODEX_STDERR_FILE_NAME,
+    "recovery-candidate.txt",
+];
+
 pub(super) struct Candidate {
     pub root: PathBuf,
     pub context: Context,
@@ -206,11 +219,21 @@ impl Candidate {
             )?;
         }
         // Copy-back never delivers a bound evidence path as a diagnostic: not one bound in the
-        // caller, in the tree being delivered, or in the candidate as the executor left it.
+        // caller, in the tree being delivered, or in the candidate as the executor left it. If
+        // the candidate cannot be fully captured, its bound paths are unknown, so this fails
+        // closed: only diagnostics the host itself writes are delivered.
         let mut bound = super::delivery_index::evidence_paths(&self.before, after);
-        if let Ok(current) = tree::capture(&self.root, &Default::default()) {
-            bound.extend(super::delivery_index::evidence_paths(&current, &current));
-        }
+        let complete = match tree::capture(&self.root, &Default::default()) {
+            Ok(current) => {
+                bound.extend(super::delivery_index::evidence_paths(&current, &current));
+                true
+            }
+            Err(_) => false,
+        };
+        let host_authored = |path: &str| {
+            path.strip_prefix(&format!("{}/", self.context.run_dir_rel))
+                .is_some_and(|name| HOST_DIAGNOSTICS.contains(&name))
+        };
         let mut mutations = Vec::new();
         let mut paths = Vec::new();
         for path in tree::changed(&self.before, after) {
@@ -218,7 +241,7 @@ impl Candidate {
             if !passed && !diagnostic {
                 continue;
             }
-            if diagnostic && bound.contains(&path) {
+            if diagnostic && (bound.contains(&path) || (!complete && !host_authored(&path))) {
                 continue;
             }
             if path == format!("{}/{INPUT_CONTRACT_FILE_NAME}", self.context.run_dir_rel)
