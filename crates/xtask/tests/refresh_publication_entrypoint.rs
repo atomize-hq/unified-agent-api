@@ -319,8 +319,26 @@ fn refresh_publication_help_text_includes_required_surface() {
 
 #[test]
 fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
-    let fixture =
-        prepare_publication_ready_fixture("refresh-publication-success", SUPPORT_AND_CAPABILITY);
+    assert_refresh_publication_write(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn refresh_publication_write_accepts_non_depth_approval_symlink() {
+    assert_refresh_publication_write(true);
+}
+
+fn assert_refresh_publication_write(approval_symlink: bool) {
+    let fixture = prepare_publication_ready_fixture(
+        &format!("refresh-publication-success-{approval_symlink}"),
+        SUPPORT_AND_CAPABILITY,
+    );
+    #[cfg(unix)]
+    if approval_symlink {
+        let path = fixture.join(APPROVAL_PATH);
+        fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+        std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    }
     seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
     write_preflight_makefile(&fixture, true);
 

@@ -1,5 +1,5 @@
 //! OF-P6 read-only refusal. A match grants no publication or acceptance authority.
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use sha2::{Digest, Sha256};
 
@@ -7,7 +7,7 @@ use crate::{
     agent_lifecycle::{lifecycle_state_path, LifecycleState},
     depth_record::{
         onboarding::{onboarding_binding, OnboardingApproval},
-        DepthRecord, Event,
+        record_files, DepthRecord, Event,
     },
     runtime_advertising::source::Source,
 };
@@ -15,6 +15,9 @@ use crate::{
 /// Compare exactly the acquired paths and SHA-256 identities frozen by the shared O derivation,
 /// as MA4's relay does. This neither derives a new identity nor writes/refreezes anything.
 pub fn check(workspace: &Path, approval_path: &str) -> Result<(), String> {
+    if !has_depth_bindings(workspace, approval_path)? {
+        return Ok(());
+    }
     let source = Source::workspace(workspace)?;
     let approval = OnboardingApproval::parse(&source.read(approval_path)?, approval_path)
         .map_err(|err| format!("parse approval artifact `{approval_path}`: {err}"))?;
@@ -79,4 +82,43 @@ pub fn check(workspace: &Path, approval_path: &str) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Detect enrollment with ordinary filesystem reads, preserving the approval loader's
+/// in-workspace symlink semantics. Source's stricter rules apply only after enrollment.
+fn has_depth_bindings(workspace: &Path, approval_path: &str) -> Result<bool, String> {
+    let workspace = workspace.canonicalize().map_err(|e| e.to_string())?;
+    let approval_file = workspace
+        .join(approval_path)
+        .canonicalize()
+        .map_err(|e| format!("approval artifact `{approval_path}` does not resolve: {e}"))?;
+    if !approval_file.starts_with(&workspace) {
+        return Err(format!(
+            "approval artifact `{approval_path}` resolves outside workspace root"
+        ));
+    }
+    let raw = fs::read_to_string(approval_file).map_err(|e| e.to_string())?;
+    let approval = OnboardingApproval::parse(&raw, approval_path)
+        .map_err(|e| format!("parse approval artifact `{approval_path}`: {e}"))?;
+    let state_path = lifecycle_state_path(&approval.onboarding_pack_prefix);
+    match fs::read(workspace.join(&state_path)) {
+        Ok(bytes) => {
+            let state: LifecycleState =
+                serde_json::from_slice(&bytes).map_err(|e| format!("{state_path}: {e}"))?;
+            if state.support_depth.is_some() {
+                return Ok(true);
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(format!("{state_path}: {e}")),
+    }
+    for (version, path) in record_files(&workspace.join(&approval.manifest_root)) {
+        let raw = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let record = DepthRecord::parse(&raw, &approval.agent_id, &version)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if matches!(record.event, Event::Onboarding { .. }) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

@@ -149,6 +149,26 @@ fn publication_entrypoints_unchanged_freeze_reaches_the_existing_approval_refusa
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn publication_entrypoints_with_depth_bindings_keep_strict_source_reads() {
+    let f = setup(true);
+    let _installed = f.install();
+    freeze(&f).unwrap();
+    let path = f.root.path().join(APPROVAL);
+    fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+    std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    f.commit();
+    for entry in ENTRYPOINTS {
+        unchanged(
+            &f,
+            entry,
+            "source symlink is unsupported",
+            &[APPROVAL.into()],
+        );
+    }
+}
+
 #[test]
 fn publication_entrypoints_without_depth_bindings_keep_the_existing_behavior() {
     let f = setup(true);

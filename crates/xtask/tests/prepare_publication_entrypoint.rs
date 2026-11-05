@@ -289,7 +289,24 @@ fn prepare_publication_help_text_includes_required_surface() {
 
 #[test]
 fn prepare_publication_write_emits_packet_and_advances_lifecycle() {
-    let (fixture, approval_path) = prepare_fixture("prepare-publication-success");
+    assert_prepare_publication_write(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn prepare_publication_write_accepts_non_depth_approval_symlink() {
+    assert_prepare_publication_write(true);
+}
+
+fn assert_prepare_publication_write(approval_symlink: bool) {
+    let (fixture, approval_path) =
+        prepare_fixture(&format!("prepare-publication-success-{approval_symlink}"));
+    #[cfg(unix)]
+    if approval_symlink {
+        let path = fixture.join(&approval_path);
+        fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+        std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    }
 
     let output = run_cli(publication_args("--write", &approval_path), &fixture);
 

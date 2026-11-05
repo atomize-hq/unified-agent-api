@@ -72,13 +72,29 @@ fn onboard_agent_write_does_not_rewrite_packet_files_when_closeout_is_invalid() 
 
 #[test]
 fn close_proving_run_validates_and_refreshes_packet_docs() {
-    let fixture = fixture_root("close-proving-run-pass");
+    assert_close_proving_run_write(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn close_proving_run_write_accepts_non_depth_approval_symlink() {
+    assert_close_proving_run_write(true);
+}
+
+fn assert_close_proving_run_write(approval_symlink: bool) {
+    let fixture = fixture_root(&format!("close-proving-run-pass-{approval_symlink}"));
     seed_release_touchpoints(&fixture);
     seed_green_publication_surfaces(&fixture);
     let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     seed_published_baseline(&fixture, &approval_path);
+    #[cfg(unix)]
+    if approval_symlink {
+        let path = fixture.join(&approval_path);
+        fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+        std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    }
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture
         .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
