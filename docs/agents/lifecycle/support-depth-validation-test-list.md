@@ -17,12 +17,14 @@ This note remains non-normative scenario inventory; the validator specs and cont
 The
 [maintenance request contract](../../specs/maintenance-request-contract-v1.md#depth-enrolled-generations)
 states how a maintenance request carries P and O. The
-[onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names no second
-committed statement of them on the create lane yet. Where a check below reads "the frozen request
-or approval", an onboarding generation has only its approval's Event fields beside the record.
-Checks 1 and 3 are therefore decided against a second statement on the maintenance path only. The
-contract's Path enablement requires the charter to name that statement before the onboarding path
-is enabled, and the two checks cover the create lane from then.
+[onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) names the second
+committed statement of them on the create lane: the `support_depth` object of the onboarding
+pack's `lifecycle-state.json` (charter rule 7, OF-P2). Where a check below reads "the frozen
+request or approval", an onboarding generation's second statement is that object, read with its
+approval's Event. No validator reads the object yet, so checks 1 and 3 are still decided against
+a second statement on the maintenance path only. They cover the create lane once the typed
+lifecycle object and its cross-check land (slice 2 of the
+[onboarding freeze decisions](support-depth-onboarding-freeze-decisions.md#implementation-slices)).
 
 ## Checks
 
@@ -174,6 +176,86 @@ Must be refused:
   re-freeze after it was declared changed the request file. The marker no longer names the
   generation. The merge result carries its closeout before the marker has been
   restated.
+
+## Onboarding freeze cases
+
+The [onboarding charter](../../specs/cli-agent-onboarding-charter.md#support-depth) rules 5 to 9
+and 12 to 14 state the create-lane freeze, its identity artifact, acquisition and write-run
+boundary. The cases below are the tests the
+[onboarding freeze decisions](support-depth-onboarding-freeze-decisions.md#options-considered-risks-and-proving-tests)
+name for them. Each row id is the decision a case proves. They run on the synthetic subject in an
+isolated workspace only, with the fake executor and fixture templates, including a template whose
+approval states `explicitly_deferred`; none needs a network or a credential. No case is
+implemented yet, and every public create-lane entry keeps refusing a depth workspace.
+
+Must be admitted:
+
+- **First admitted dry run (OF-P1).** Rule 3 resolves and rule 4 holds. The dry run writes P, the
+  depth record and the lifecycle object in one invocation.
+- **Declared, no record yet (OF-P2).** The declaration and acquired surface are in place and no
+  dry run has run. The generation reads as insufficient depth, and validation does not fail.
+- **New approval before its first dry run (OF-P2).** A new approval with the earlier record keeps
+  the earlier lifecycle object and reads as insufficient depth. Its first dry run replaces the
+  object.
+- **Lifecycle writers preserve the object (OF-P2).** Each of ON1 to ON5 and NE7 leaves the
+  lifecycle `support_depth` object byte for byte unchanged.
+- **Deferred maintenance acquires (OF-P3).** An approval states `explicitly_deferred` and the
+  registry has no `maintenance.release_watch`. The input-only writers produce a surface the dry
+  run admits, and `manifest-acquisition-plan` still refuses the agent. Neither maintenance mode is
+  refused for a depth-enrolled approval.
+- **Input-only writers in a declared workspace (OF-P3).** They succeed and grant nothing.
+- **Re-acquisition under a statement (OF-P4).** A byte-identical re-acquisition covered by an
+  acquisition statement on the integration ref is admitted.
+- **Retry after a failed write (OF-P4, OF-P5, OF-P9).** A write run fails or is interrupted. The
+  caller tree equals the before-tree, and a retried dry run is admitted only with a matching
+  statement and an unchanged P.
+- **Same O on both paths (OF-P6).** For the same tree the onboarding O equals the maintenance
+  derivation's O.
+- **Complete single-target union (OF-P7).** It is admitted, and the maintenance derivation is
+  unchanged.
+- **Unchanged run outputs (OF-P9).** A passing run with an unchanged fake executor is not rejected
+  for its controller outputs: stdout, stderr, execution evidence, report, status and written paths.
+- **Not depth-enrolled (OF-P9).** A write run of a generation that is not depth-enrolled behaves
+  as it does today.
+
+Must be refused:
+
+- **Rule 3 or rule 4 fails (OF-P1).** The dry run refuses and writes nothing. No other create-lane
+  command writes P, O, the record or the object.
+- **Deleted binding (OF-P2).** A record without the object, or the object without the record. A
+  missing object is never read as "not depth-enrolled".
+- **Object mismatch (OF-P2).** The record and the object disagree on Event, P, or O absent versus
+  present.
+- **Unstated executor output (OF-P4).** An earlier generation's executor output already merged to
+  the integration tip, with no statement covering it.
+- **Delayed commit (OF-P4).** Executor output produced before the declaration and first committed
+  to the integration branch after it, with no statement covering it. Commit timing is never
+  consulted.
+- **Statement mismatch (OF-P4).** An input whose bytes differ from the statement, an input the
+  statement does not cover, or a statement entry with no matching input.
+- **Tree differs from the ref (OF-P4).** The dry run names the differing paths. On an isolated
+  route, the protected tip is the ref read.
+- **Statement only on the onboarding branch (OF-P4).** It does not count before it merges.
+- **Write run touches snapshots (OF-P4).** A depth-enrolled write run that writes `snapshots/`
+  fails the boundary check.
+- **Dry run after integration (OF-P5).** A dry run at `runtime_integrated` of a depth-enrolled
+  generation. A dry run that leaves O not yet produced says so and says that a passing write run
+  closes the window.
+- **Changed P on a re-freeze (OF-P5).**
+- **Changed acquired input after the freeze (OF-P6).** ON3, ON4 and ON5 refuse after a frozen
+  acquired input changes, `wrapper_coverage.json` included.
+- **Union not complete (OF-P7).** A `complete:false` union refuses with the missing targets named.
+- **Stale input contract (OF-P8).** A write run refuses when the lifecycle object or the record
+  changed after its dry run, and an input contract without the `support_depth` object is refused
+  for a depth-enrolled generation. The object is present exactly for depth-enrolled dry runs,
+  with `version` equal to the approval's, and `repair-runtime-evidence` copies its identities.
+- **Forged baseline (OF-P8, OF-P9).** A forged saved `baseline` in `input-contract.json` with
+  unchanged depth identities does not hide a forbidden write.
+- **Executor edits a run input (OF-P9).** An executor that edits the input contract, prompt,
+  lifecycle state, record or acquisition statement is rejected. An interruption after the executor
+  tampered with candidate governance delivers nothing but diagnostics.
+- **Forged written paths (OF-P9).** Publication refuses a non-empty `written-paths.json` whose
+  SHA-256 does not match the lifecycle state (check (i)).
 
 ## Support publication cases
 
@@ -432,26 +514,21 @@ Must fail:
   bound evidence cannot be seen from the record and that evidence. Decide what the generator reads
   to publish such a result as `unverified`. Revision 1 does not confine bound evidence to
   `reports/**`: a file reference is any repository-relative path.
-- On the create lane a dry run freezes O from an acquired surface that is already in the manifest
-  root and is not a write run's output. Today the write run's executor is the only create-lane
-  writer of `snapshots/`, both modes of `runtime-follow-on` require the lifecycle stage `enrolled`,
-  and a write run that passes moves the stage on, so no dry run can follow it. A write run that
-  fails leaves the stage `enrolled` and its output in place, so a retried dry run finds an
-  executor-written surface. The failed run's `written-paths.json` lists the paths it changed, but
-  no dry run reads it, it is ignored by git, an executor can rewrite it and an interrupted run
-  writes none, so nothing a dry run reads tells that surface from an acquired one. Onboarding also
-  acquires from a single host, so the surface can be a partial union. Decide which command acquires
-  the surface ahead of the dry run, what marks a surface as acquired, whether a dry run is admitted
-  after `runtime_integrated`, what the acquired inputs of an onboarding O are, and whether a
-  partial union can freeze O for the targets it covers.
-- The charter names no committed create-lane artifact that states the P and O identities beside the
-  depth record, so checks 1 and 3 have no second statement for an onboarding generation, and a
-  record rewritten together with its identities cannot be told from the one that was frozen. A
-  run's input contract cannot serve: run directories are ignored by git, an executor can rewrite
-  the file unnoticed, and `repair-runtime-evidence` writes a different one without a dry run. The
-  publication packet is committed and is consumed with its SHA-256 checked, and it is written only
-  after execution. Decide which artifact states the identities, from which point, and how it
-  reaches the integration branch with the record.
+- Decided by charter rules 5, 6, 12 and 14 (OF-P3 to OF-P7): how the create lane acquires the
+  surface ahead of the dry run, what admits it as acquired, that no dry run is admitted after
+  `runtime_integrated`, the acquired inputs of an onboarding O, and that a union which is not
+  complete refuses. The [onboarding freeze cases](#onboarding-freeze-cases) below are their
+  tests. Still open, and refused meanwhile: whether a union that is not complete may freeze O for
+  exactly the declared targets (OF-P7(b)), and whether publication may regenerate
+  `wrapper_coverage.json` for a depth-enrolled generation instead of being refused for it (OF-P6).
+  Also open: whether version metadata for charter rule 4 is written before the declaration or
+  only by a later writer, since `manifest-version-metadata` refuses a depth manifest, and whether
+  candidate execution later applies to write runs that are not depth-enrolled (OF-P9).
+- Decided by charter rule 7 (OF-P2): the `support_depth` object of the onboarding pack's
+  committed `lifecycle-state.json` states the P and O identities beside the depth record. The dry
+  run writes it with the record, and every other lifecycle writer preserves it. A run's input
+  contract still cannot serve, and carries the identities only as a cross-check (charter rule 8,
+  OF-P8).
 - The charter gives the create lane no route for pointers or for a `validated` or `supported`
   version status. A version whose depth enrollment the onboarding path owns reaches them only after
   its proving-run closeout, once its declaration is moved to the maintenance path and a maintenance
