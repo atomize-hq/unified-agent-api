@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 mod host;
 mod scope;
+mod view;
 
 use crate::{
     agent_maintenance::closeout_proposal::Proposal, agent_registry::AgentRegistry,
@@ -121,7 +122,7 @@ pub fn route(root: &Path) -> Result<Option<Route>, String> {
 /// registry its execution captured. Otherwise this is the production load, with every refusal it
 /// keeps, `support_depth` included. A failing installed route errors; it never falls back.
 pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
-    if let Some(registry) = candidate_registry(root) {
+    if let Some(registry) = candidate_registry(root).map_err(RegistryError::Isolated)? {
         return Ok(registry);
     }
     match route(root).map_err(RegistryError::Isolated)? {
@@ -184,13 +185,23 @@ impl CapturedRegistry {
             if bound.is_some() {
                 return Err("an MA4 candidate registry is already bound on this thread".to_string());
             }
-            *bound = Some((root, self.registry.clone()));
+            *bound = Some(CandidateBinding {
+                root,
+                registry: self.registry.clone(),
+                view: None,
+            });
             Ok(CandidateRegistry(std::marker::PhantomData))
         })
     }
 }
+struct CandidateBinding {
+    root: PathBuf,
+    registry: AgentRegistry,
+    view: Option<view::Binding>,
+}
+pub(crate) use view::git_inputs as view_git_inputs;
 std::thread_local! {
-    static CANDIDATE: std::cell::RefCell<Option<(PathBuf, AgentRegistry)>> =
+    static CANDIDATE: std::cell::RefCell<Option<CandidateBinding>> =
         const { std::cell::RefCell::new(None) };
 }
 /// Unbinds the candidate registry on drop. Not `Send`: it must drop on the thread that bound it.
@@ -200,14 +211,21 @@ impl Drop for CandidateRegistry {
         CANDIDATE.with(|bound| *bound.borrow_mut() = None);
     }
 }
-fn candidate_registry(root: &Path) -> Option<AgentRegistry> {
-    let root = fs::canonicalize(root).ok()?;
+fn candidate_registry(root: &Path) -> Result<Option<AgentRegistry>, String> {
     CANDIDATE.with(|bound| {
-        bound
-            .borrow()
-            .as_ref()
-            .filter(|(candidate, _)| *candidate == root)
-            .map(|(_, registry)| registry.clone())
+        let bound = bound.borrow();
+        let Some(bound) = bound.as_ref() else {
+            return Ok(None);
+        };
+        // Recheck before canonicalization so a removed or redirected destination cannot fall
+        // through to production loading while a scratch binding is still alive.
+        if let Some(view) = &bound.view {
+            view.recheck(&bound.root)?;
+        }
+        Ok(fs::canonicalize(root)
+            .ok()
+            .filter(|root| *root == bound.root)
+            .map(|_| bound.registry.clone()))
     })
 }
 /// Which load failed. A caller that tolerates a production load failure, because another check

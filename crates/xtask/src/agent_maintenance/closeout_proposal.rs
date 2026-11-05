@@ -79,7 +79,7 @@ impl Proposal {
     }
 
     /// A scratch view borrows the original caller's context; copying its files supplies no authority.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // The production MA6 caller is wired in B.6b.
     pub(crate) fn isolated_view(
         &self,
         root: &Path,
@@ -277,15 +277,30 @@ impl Proposal {
     }
 }
 /// Read-only view with borrowed, non-serializable original-caller freshness, never write authority.
-#[allow(dead_code)]
 pub(crate) struct IsolatedView<'a> {
     proposal: &'a Proposal,
     caller: PathBuf,
     destination: PathBuf,
     destination_identity: crate::isolated_maintenance::FileIdentity,
 }
-#[allow(dead_code)]
 impl IsolatedView<'_> {
+    /// Attest this view against the captured registry's caller, returning its root and the
+    /// attested identity and proposal's original registry bytes. These observations grant no
+    /// evidence authority.
+    pub(crate) fn registry_binding(
+        &self,
+        caller: &Path,
+    ) -> Result<(&Path, crate::isolated_maintenance::FileIdentity, Vec<u8>), String> {
+        if caller != self.caller {
+            return Err("isolated scratch belongs to another caller".into());
+        }
+        let bytes = self
+            .source()?
+            .optional_bytes(crate::agent_registry::REGISTRY_RELATIVE_PATH)?
+            .ok_or("isolated proposal has no captured registry bytes")?;
+        Ok((&self.destination, self.destination_identity.clone(), bytes))
+    }
+
     pub(crate) fn source(&self) -> Result<Source, String> {
         self.proposal.verify_current(&self.caller)?;
         if crate::isolated_maintenance::FileIdentity::read(&self.destination)?

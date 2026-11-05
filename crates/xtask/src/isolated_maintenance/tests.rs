@@ -23,6 +23,7 @@ mod registry_tables;
 mod subject;
 #[cfg(unix)]
 mod unsupported_routes;
+mod view;
 use fixture::{declaration, git, write, Fake, Fixture};
 
 #[test]
