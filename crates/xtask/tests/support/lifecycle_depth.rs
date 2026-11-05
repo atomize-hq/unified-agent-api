@@ -31,3 +31,25 @@ pub fn depth_object_bytes(path: &Path) -> String {
     let end = start + text[start..].find('}').expect("object end") + 1;
     text[start..end].to_string()
 }
+
+/// Writes the `support_depth` object in a form no lifecycle writer writes (compact, members
+/// reordered) and returns the whole file's bytes.
+pub fn inject_noncanonical_depth_object(path: &Path) -> Vec<u8> {
+    inject_depth_object(path);
+    let text = fs::read_to_string(path).expect("read lifecycle state");
+    let compact = format!(
+        "\"{DEPTH_OBJECT_KEY}\":{{\"obligations_identity\":\"{}\",\"policy_identity\":\"{}\"}}",
+        "b".repeat(64),
+        "a".repeat(64)
+    );
+    let text = text.replacen(&depth_object_bytes(path), &compact, 1);
+    fs::write(path, &text).expect("write lifecycle state");
+    text.into_bytes()
+}
+
+/// A writer refused a noncanonical depth object for that reason and left the state as it was.
+pub fn assert_refused_unchanged(path: &Path, before: &[u8], exit_code: i32, stderr: &str) {
+    assert_ne!(exit_code, 0, "a noncanonical depth object must be refused");
+    assert!(stderr.contains(DEPTH_OBJECT_KEY), "stderr:\n{stderr}");
+    assert_eq!(fs::read(path).expect("read lifecycle state"), before);
+}

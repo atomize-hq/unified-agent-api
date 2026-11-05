@@ -739,7 +739,7 @@ pub fn load_lifecycle_state(
     workspace_root: &Path,
     relative_path: &str,
 ) -> Result<LifecycleState, LifecycleError> {
-    let state: LifecycleState = storage::load_json_file(workspace_root, relative_path)?;
+    let state = storage::load_lifecycle_state_file(workspace_root, relative_path)?;
     state.validate_in_workspace(workspace_root)?;
     Ok(state)
 }
@@ -753,4 +753,4 @@ pub fn load_publication_ready_packet(
     Ok(packet)
 }
 
-pub use storage::{write_lifecycle_state, write_publication_ready_packet};
+pub use storage::{parse_lifecycle_state, write_lifecycle_state, write_publication_ready_packet};

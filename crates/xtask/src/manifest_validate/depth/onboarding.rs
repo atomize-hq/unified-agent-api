@@ -18,32 +18,63 @@ use xtask::{
     },
 };
 
+/// `check_10_reports` is whether check 10 reports a lifecycle state that cannot be read, as it
+/// does while the root holds a record file; otherwise this check reports it, since such a state
+/// may hold an object no record states.
 pub(super) fn validate_onboarding_binding(
     workspace: &Path,
     entry: &AgentRegistryEntry,
     records: &BTreeMap<String, (&PathBuf, DepthRecord)>,
+    check_10_reports: bool,
     fail: &mut dyn FnMut(&'static str, &Path, String),
 ) {
     let lifecycle = agent_lifecycle::lifecycle_state_path_for_entry(entry);
     let lifecycle_path = workspace.join(&lifecycle);
-    // An absent lifecycle record is no onboarding pack, as check 10 reads it, so there is no object
-    // to compare; the merge check decides retained records. One that is there and cannot be read
-    // is check 10's to report.
+    let onboarding: Vec<(&String, &PathBuf)> = records
+        .iter()
+        .filter(|(_, (_, record))| matches!(record.event, Event::Onboarding { .. }))
+        .map(|(version, (path, _))| (version, *path))
+        .collect();
+
+    // A deleted lifecycle state deletes the object with it: every onboarding record is then a
+    // record without an object. A dangling symlink is there, and is read below.
     if fs::symlink_metadata(&lifecycle_path).is_err() {
+        for (version, path) in &onboarding {
+            let message = format!(
+                "the record states an onboarding generation, but `{lifecycle}` does not exist, so \
+                 no `support_depth` object states it: a deleted binding for version `{version}` \
+                 (check 1)"
+            );
+            fail("DEPTH_LIFECYCLE_BINDING_MISSING", path, message);
+        }
         return;
     }
-    let Ok(state) = agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) else {
-        return;
+    let state = match agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) {
+        Ok(state) => state,
+        Err(err) => {
+            if !check_10_reports {
+                let message = format!("{err}; the lifecycle state may state a depth object");
+                fail("DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_path, message);
+            }
+            return;
+        }
     };
     let object = state.support_depth.as_ref();
-    let onboarding = records
-        .values()
-        .any(|(_, record)| matches!(record.event, Event::Onboarding { .. }));
     // No record and no object: P is not yet frozen, or the root is not depth-enrolled at all.
-    if object.is_none() && !onboarding {
+    if object.is_none() && onboarding.is_empty() {
         return;
     }
 
+    let prefix = &entry.scaffold.onboarding_pack_prefix;
+    if state.agent_id != entry.agent_id || &state.onboarding_pack_prefix != prefix {
+        let message = format!(
+            "the lifecycle state names agent `{}` and pack `{}`, not `{}` and `{prefix}`, the \
+             registry entry's",
+            state.agent_id, state.onboarding_pack_prefix, entry.agent_id
+        );
+        fail("DEPTH_LIFECYCLE_NOT_THE_AGENTS", &lifecycle_path, message);
+        return;
+    }
     let approval_path = &state.approval_artifact_path;
     let approval = fs::read_to_string(workspace.join(approval_path))
         .map_err(|err| err.to_string())
@@ -59,6 +90,15 @@ pub(super) fn validate_onboarding_binding(
             return;
         }
     };
+    if let Some(why) = approval.attribution_mismatch(&entry.agent_id, &entry.manifest_root, prefix)
+    {
+        fail(
+            "DEPTH_APPROVAL_NOT_THE_AGENTS",
+            &workspace.join(approval_path),
+            why,
+        );
+        return;
+    }
 
     let held: BTreeMap<String, DepthRecord> = records
         .iter()

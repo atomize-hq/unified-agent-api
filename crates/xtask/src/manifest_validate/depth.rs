@@ -155,7 +155,13 @@ pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Vio
         }
     }
 
-    onboarding::validate_onboarding_binding(&workspace, entry, &records, &mut fail);
+    onboarding::validate_onboarding_binding(
+        &workspace,
+        entry,
+        &records,
+        !files.is_empty(),
+        &mut fail,
+    );
 
     // Check 10: a lifecycle stage or closeout evidence id reports a file the revision holds.
     if files.is_empty() {

@@ -33,6 +33,27 @@ pub(super) fn load_json_file<T: for<'de> Deserialize<'de>>(
         .map_err(|err| LifecycleError::Validation(format!("parse {}: {err}", resolved.display())))
 }
 
+/// Reads a lifecycle state, refusing depth fields held in any form but the one a writer writes.
+pub(super) fn load_lifecycle_state_file(
+    workspace_root: &Path,
+    relative_path: &str,
+) -> Result<LifecycleState, LifecycleError> {
+    let resolved = validation::resolve_repo_relative_path(workspace_root, relative_path)?;
+    let bytes = fs::read(&resolved)
+        .map_err(|err| LifecycleError::Validation(format!("read {}: {err}", resolved.display())))?;
+    parse_lifecycle_state(&bytes)
+        .map_err(|err| LifecycleError::Validation(format!("{}: {err}", resolved.display())))
+}
+
+/// Parses lifecycle state bytes, refusing depth fields held in any form but the one a writer
+/// writes, so that every writer that re-serializes the state preserves them byte for byte.
+pub fn parse_lifecycle_state(bytes: &[u8]) -> Result<LifecycleState, LifecycleError> {
+    let state = serde_json::from_slice(bytes)
+        .map_err(|err| LifecycleError::Validation(format!("parse lifecycle state: {err}")))?;
+    support_depth::require_written_form(bytes, &state)?;
+    Ok(state)
+}
+
 pub(super) fn write_json_file<T: Serialize>(
     workspace_root: &Path,
     relative_path: &str,

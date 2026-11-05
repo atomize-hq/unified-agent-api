@@ -638,6 +638,15 @@ fn prepare_publication_rejects_capability_continuity_drift() {
 #[test]
 fn prepare_publication_write_preserves_the_lifecycle_depth_object() {
     let (fixture, approval_path) = prepare_fixture("prepare-publication-depth-object");
+    // A depth object in a form no writer writes is refused, not rewritten.
+    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
+    let refused = run_cli(publication_args("--write", &approval_path), &fixture);
+    lifecycle_depth::assert_refused_unchanged(
+        &lifecycle_state_path(&fixture),
+        &before,
+        refused.exit_code,
+        &refused.stderr,
+    );
     let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
     let output = run_cli(publication_args("--write", &approval_path), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);

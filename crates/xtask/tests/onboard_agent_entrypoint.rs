@@ -5,6 +5,7 @@ use xtask::onboard_agent;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[allow(dead_code)]
 #[path = "support/lifecycle_depth.rs"]
 mod lifecycle_depth;
 

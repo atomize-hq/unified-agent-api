@@ -662,18 +662,32 @@ fn refresh_publication_write_preserves_the_lifecycle_depth_object() {
     );
     seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
     write_preflight_makefile(&fixture, true);
+    // The packet binds the lifecycle state's digest, so it is bound again after each injection.
+    let rebind = |fixture: &Path| {
+        let mut packet = read_json(&publication_packet_path(fixture));
+        packet["lifecycle_state_sha256"] =
+            Value::String(sha256_hex(&lifecycle_state_path(fixture)));
+        fs::write(
+            publication_packet_path(fixture),
+            format!(
+                "{}\n",
+                serde_json::to_string_pretty(&packet).expect("packet")
+            ),
+        )
+        .expect("write packet");
+    };
+    // A depth object in a form no writer writes is refused, not rewritten.
+    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
+    rebind(&fixture);
+    let refused = run_cli(refresh_args("--write"), &fixture);
+    lifecycle_depth::assert_refused_unchanged(
+        &lifecycle_state_path(&fixture),
+        &before,
+        refused.exit_code,
+        &refused.stderr,
+    );
     let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
-    // The packet binds the lifecycle state's digest, so it is bound again after the injection.
-    let mut packet = read_json(&publication_packet_path(&fixture));
-    packet["lifecycle_state_sha256"] = Value::String(sha256_hex(&lifecycle_state_path(&fixture)));
-    fs::write(
-        publication_packet_path(&fixture),
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&packet).expect("packet")
-        ),
-    )
-    .expect("write packet");
+    rebind(&fixture);
 
     let output = run_cli(refresh_args("--write"), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);

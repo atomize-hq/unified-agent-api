@@ -10,8 +10,9 @@ pub(super) fn load_lifecycle_state_relaxed(
 ) -> Result<LifecycleState, Error> {
     let bytes = fs::read(workspace_root.join(relative_path))
         .map_err(|err| Error::Validation(format!("read {relative_path}: {err}")))?;
-    let state: LifecycleState = serde_json::from_slice(&bytes)
-        .map_err(|err| Error::Validation(format!("parse {relative_path}: {err}")))?;
+    // Depth fields held in another form would change bytes when this writer re-serializes them.
+    let state = crate::agent_lifecycle::parse_lifecycle_state(&bytes)
+        .map_err(|err| Error::Validation(format!("{relative_path}: {err}")))?;
     state
         .validate()
         .map_err(|err| Error::Validation(err.to_string()))?;

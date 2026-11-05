@@ -51,6 +51,10 @@ pub struct OnboardingApproval {
     pub event: Event,
     /// The version its `[support_depth]` table approves a depth enrollment for, if any.
     pub support_depth_version: Option<String>,
+    /// Whose approval it is: its agent, manifest root and onboarding pack.
+    pub agent_id: String,
+    pub manifest_root: String,
+    pub onboarding_pack_prefix: String,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +77,35 @@ impl OnboardingApproval {
                 approval_recorded_at: stamp.approval_recorded_at,
             },
             support_depth_version: scope.support_depth_version,
+            agent_id: scope.agent_id,
+            manifest_root: scope.manifest_root,
+            onboarding_pack_prefix: scope.onboarding_pack_prefix,
+        })
+    }
+
+    /// Why this approval is not the one of the agent with `agent_id`, `manifest_root` and
+    /// `onboarding_pack_prefix`.
+    pub fn attribution_mismatch(
+        &self,
+        agent_id: &str,
+        manifest_root: &str,
+        onboarding_pack_prefix: &str,
+    ) -> Option<String> {
+        [
+            ("agent_id", &self.agent_id, agent_id),
+            ("manifest_root", &self.manifest_root, manifest_root),
+            (
+                "onboarding_pack_prefix",
+                &self.onboarding_pack_prefix,
+                onboarding_pack_prefix,
+            ),
+        ]
+        .into_iter()
+        .find(|(_, stated, expected)| stated.as_str() != *expected)
+        .map(|(field, stated, expected)| {
+            format!(
+                "the approval states {field} `{stated}`, not `{expected}`, the registry entry's"
+            )
         })
     }
 }

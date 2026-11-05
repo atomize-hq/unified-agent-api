@@ -379,6 +379,23 @@ fn historical_lifecycle_backfill_preserves_the_lifecycle_depth_object() {
     let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-object");
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    // A depth object in a form no writer writes is refused, not rewritten.
+    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let refused = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    lifecycle_depth::assert_refused_unchanged(
+        &lifecycle_path,
+        &before,
+        refused.exit_code,
+        &refused.stderr,
+    );
     let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
     let output = run_cli(
         [

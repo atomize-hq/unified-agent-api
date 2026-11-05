@@ -45,6 +45,9 @@ fn approval(commit: &str, recorded_at: &str, version: Option<&str>) -> Onboardin
     OnboardingApproval {
         event: onboarding_event(commit, recorded_at),
         support_depth_version: version.map(str::to_string),
+        agent_id: "aider".to_string(),
+        manifest_root: "cli_manifests/aider".to_string(),
+        onboarding_pack_prefix: "aider-onboarding".to_string(),
     }
 }
 
@@ -225,6 +228,21 @@ fn the_approval_states_its_event_and_depth_version() {
         )
     );
     assert_eq!(committed.support_depth_version, None);
+    // The approval is bound to the agent whose registry entry it is read for.
+    assert_eq!(
+        committed.attribution_mismatch("aider", "cli_manifests/aider", "aider-onboarding"),
+        None
+    );
+    for (agent, root, pack) in [
+        ("codex", "cli_manifests/aider", "aider-onboarding"),
+        ("aider", "cli_manifests/codex", "aider-onboarding"),
+        ("aider", "cli_manifests/aider", "codex-cli-onboarding"),
+    ] {
+        let why = committed
+            .attribution_mismatch(agent, root, pack)
+            .expect("mismatch");
+        assert!(why.contains("the registry entry's"), "{why}");
+    }
 
     let enrolled = format!("{text}\n[support_depth]\nversion = \"1.2.3\"\n");
     let enrolled = OnboardingApproval::parse(&enrolled, path).expect("parse depth approval");

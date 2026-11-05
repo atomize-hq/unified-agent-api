@@ -354,7 +354,6 @@ fn close_proving_run_preserves_the_lifecycle_depth_object() {
     seed_published_baseline(&fixture, &approval_path);
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
-    let object = super::lifecycle_depth::inject_depth_object(&lifecycle_path);
     let closeout_path = fixture
         .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
     write_text(
@@ -375,17 +374,25 @@ fn close_proving_run_preserves_the_lifecycle_depth_object() {
         }))
         .expect("serialize closeout"),
     );
-    let output = run_cli(
-        [
-            "xtask",
-            "close-proving-run",
-            "--approval",
-            &approval_path,
-            "--closeout",
-            "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
-        ],
-        &fixture,
+    let args = [
+        "xtask",
+        "close-proving-run",
+        "--approval",
+        &approval_path,
+        "--closeout",
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    ];
+    // A depth object in a form no writer writes is refused, not rewritten.
+    let before = super::lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let refused = run_cli(args, &fixture);
+    super::lifecycle_depth::assert_refused_unchanged(
+        &lifecycle_path,
+        &before,
+        refused.exit_code,
+        &refused.stderr,
     );
+    let object = super::lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let output = run_cli(args, &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     let lifecycle = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
     assert!(lifecycle.contains("\"lifecycle_stage\": \"closed_baseline\""));

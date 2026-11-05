@@ -8,7 +8,9 @@ use std::{
 };
 
 use serde_json::{json, Value};
-use xtask::agent_lifecycle::{write_lifecycle_state, LifecycleDepth, LifecycleState};
+use xtask::agent_lifecycle::{
+    parse_lifecycle_state, write_lifecycle_state, LifecycleDepth, LifecycleState,
+};
 
 const SHA: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const OTHER: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -152,7 +154,8 @@ fn write_state(root: &Path, value: &Value) -> Result<(), String> {
 fn seed(root: &Path, value: &Value) {
     let path = root.join(STATE);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    let mut bytes = serde_json::to_vec_pretty(value).unwrap();
+    // Through the typed state, as a lifecycle writer writes it.
+    let mut bytes = serde_json::to_vec_pretty(&state(value).unwrap()).unwrap();
     bytes.push(b'\n');
     fs::write(path, bytes).unwrap();
 }
@@ -203,4 +206,97 @@ fn the_lifecycle_writer_preserves_the_depth_fields_and_refuses_to_change_them() 
     let empty = tempfile::tempdir().unwrap();
     assert!(write_state(empty.path(), &depth).is_err());
     write_state(empty.path(), &sample()).expect("a state with no depth field");
+}
+
+fn pretty(value: &Value) -> String {
+    format!("{}\n", serde_json::to_string_pretty(value).unwrap())
+}
+
+/// The depth object written in a form no lifecycle writer writes: compact, or members reordered.
+fn noncanonical(text: &str) -> Vec<String> {
+    let canonical = format!(
+        "\"support_depth\": {{\n    \"policy_identity\": \"{SHA}\",\n    \"obligations_identity\": \"{OTHER}\"\n  }}"
+    );
+    assert!(text.contains(&canonical), "{text}");
+    [
+        format!("\"support_depth\":{{\"policy_identity\":\"{SHA}\",\"obligations_identity\":\"{OTHER}\"}}"),
+        format!(
+            "\"support_depth\": {{\n    \"obligations_identity\": \"{OTHER}\",\n    \"policy_identity\": \"{SHA}\"\n  }}"
+        ),
+        format!("\"support\\u005fdepth\": {{\"policy_identity\": \"{SHA}\", \"obligations_identity\": \"{OTHER}\"}}"),
+    ]
+    .into_iter()
+    .map(|object| text.replacen(&canonical, &object, 1))
+    .collect()
+}
+
+fn canonical_depth_state() -> String {
+    let mut value = sample();
+    value["support_depth"] = json!({ "policy_identity": SHA, "obligations_identity": OTHER });
+    // Written as a lifecycle writer writes it: through the typed state.
+    let state = state(&value).unwrap();
+    let mut bytes = serde_json::to_vec_pretty(&state).unwrap();
+    bytes.push(b'\n');
+    String::from_utf8(bytes).unwrap()
+}
+
+#[test]
+fn a_reader_refuses_a_depth_object_in_a_form_no_writer_writes() {
+    let canonical = canonical_depth_state();
+    let parsed = parse_lifecycle_state(canonical.as_bytes()).expect("written form");
+    assert!(parsed.support_depth.is_some());
+    // Every committed state, which has no depth field, still reads.
+    for path in committed_states() {
+        parse_lifecycle_state(&fs::read(&path).unwrap())
+            .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+    }
+    for text in noncanonical(&canonical) {
+        // Each form parses to the same state, and is still refused.
+        let same: LifecycleState = serde_json::from_str(&text).expect("valid JSON state");
+        assert_eq!(same, parsed);
+        let err = parse_lifecycle_state(text.as_bytes())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("support_depth"), "{err}");
+    }
+    let mut digest = sample();
+    digest["support_depth"] = json!({ "policy_identity": SHA });
+    digest["written_paths_sha256"] = json!(SHA);
+    // The same digest with an escaped character reads as the same value, in other bytes.
+    let text = pretty(&digest).replace(
+        &format!("\"written_paths_sha256\": \"{SHA}\""),
+        &format!("\"written_paths_sha256\": \"\\u0030{}\"", &SHA[1..]),
+    );
+    assert_eq!(
+        state(&serde_json::from_str(&text).unwrap())
+            .unwrap()
+            .written_paths_sha256
+            .as_deref(),
+        Some(SHA)
+    );
+    let err = parse_lifecycle_state(text.as_bytes())
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("written_paths_sha256"), "{err}");
+}
+
+#[test]
+fn the_lifecycle_writer_compares_depth_bytes_not_values() {
+    let canonical = canonical_depth_state();
+    let next = state(&serde_json::from_str(&canonical).unwrap()).unwrap();
+    let fixture = tempfile::tempdir().unwrap();
+    let path = fixture.path().join(STATE);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    for text in noncanonical(&canonical) {
+        // The same values in another form would change bytes when written, so it is refused.
+        fs::write(&path, &text).unwrap();
+        let err = write_lifecycle_state(fixture.path(), STATE, &next)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("preserved byte for byte"), "{err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), text);
+    }
+    fs::write(&path, &canonical).unwrap();
+    write_lifecycle_state(fixture.path(), STATE, &next).expect("written form is preserved");
+    assert_eq!(fs::read_to_string(&path).unwrap(), canonical);
 }
