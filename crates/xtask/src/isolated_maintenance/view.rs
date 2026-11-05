@@ -2,7 +2,7 @@
 use super::{CandidateBinding, CandidateRegistry, CapturedRegistry, FileIdentity, CANDIDATE};
 use crate::{
     agent_maintenance::closeout_proposal::IsolatedView, agent_registry::REGISTRY_RELATIVE_PATH,
-    runtime_advertising::source::Source,
+    git_inputs::EvaluationSource, runtime_advertising::source::Source,
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -101,4 +101,130 @@ pub(crate) fn git_inputs(root: &Path) -> Result<Option<(PathBuf, String)>, Strin
                 (caller.root.clone(), caller.workspace.head.clone())
             }))
     })
+}
+
+impl EvaluationSource {
+    pub(crate) fn verify_current(
+        &self,
+        view: &IsolatedView<'_>,
+        caller: &Path,
+    ) -> Result<(), String> {
+        view.verify_current(caller)?;
+        if proposed_source(&self.root)?.fingerprint != self.fingerprint {
+            return Err("isolated proposal changed after evaluation binding".into());
+        }
+        Ok(())
+    }
+}
+impl IsolatedView<'_> {
+    /// Recheck the original proposal/caller, destination identity and absence of scratch Git.
+    pub(crate) fn verify_current(&self, caller: &Path) -> Result<(), String> {
+        self.registry_binding(caller).map(drop)
+    }
+
+    /// Read proposed regular bytes only after attesting the original caller and scratch identity.
+    pub(crate) fn evaluation_source(&self, caller: &Path) -> Result<EvaluationSource, String> {
+        let (root, _, _) = self.registry_binding(caller)?;
+        let source = proposed_source(root)?;
+        source.verify_current(self, caller)?;
+        Ok(source)
+    }
+}
+fn proposed_source(root: &Path) -> Result<EvaluationSource, String> {
+    let workspace = Source::workspace(root)?;
+    let mut paths = std::collections::BTreeSet::new();
+    for entry in std::fs::read_dir(root).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| "non-UTF8 proposed input")?;
+        paths.insert(path.clone());
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            paths.extend(workspace.paths(&path)?);
+        }
+    }
+    let mut files = std::collections::BTreeMap::new();
+    let mut digest = Sha256::new();
+    let mut size = 0usize;
+    for path in paths {
+        let metadata = std::fs::symlink_metadata(root.join(&path)).map_err(|e| e.to_string())?;
+        if metadata.is_dir() {
+            continue;
+        }
+        if metadata.len() > (536_870_912 - size) as u64 || files.len() >= 50_000 {
+            return Err("proposed inputs exceed observation limit".into());
+        }
+        let bytes = workspace
+            .optional_bytes(&path)?
+            .ok_or("proposed input disappeared")?;
+        size = size
+            .checked_add(bytes.len())
+            .ok_or("proposed inputs exceed observation limit")?;
+        if size > 536_870_912 || files.len() >= 50_000 {
+            return Err("proposed inputs exceed observation limit".into());
+        }
+        #[cfg(unix)]
+        let executable = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        };
+        #[cfg(not(unix))]
+        let executable = false;
+        digest.update((path.len() as u64).to_le_bytes());
+        digest.update(path.as_bytes());
+        digest.update((bytes.len() as u64).to_le_bytes());
+        digest.update(&bytes);
+        digest.update([u8::from(executable)]);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            digest.update((metadata.permissions().mode() & 0o7777).to_le_bytes());
+        }
+        files.insert(path, (bytes, executable));
+    }
+    Ok(EvaluationSource {
+        source: Source::captured(root, files)?,
+        root: root.to_path_buf(),
+        fingerprint: hex::encode(digest.finalize()),
+    })
+}
+impl super::Context {
+    pub(crate) fn view_inputs(
+        &self,
+        view: &IsolatedView<'_>,
+        host: &super::EvidenceHost,
+    ) -> Result<(EvaluationSource, crate::git_inputs::GitInputs), String> {
+        self.recheck(&self.root)?;
+        self.require_view_host(host)?;
+        let source = view.evaluation_source(&self.root)?;
+        let inputs =
+            crate::git_inputs::GitInputs::borrow_view(&source.root, &self.inputs, &source.source)?;
+        self.verify_view(view, &source, host)?;
+        Ok((source, inputs))
+    }
+    pub(crate) fn verify_view(
+        &self,
+        view: &IsolatedView<'_>,
+        source: &EvaluationSource,
+        host: &super::EvidenceHost,
+    ) -> Result<(), String> {
+        self.recheck(&self.root)?;
+        self.require_view_host(host)?;
+        source.verify_current(view, &self.root)
+    }
+    fn require_view_host(&self, host: &super::EvidenceHost) -> Result<(), String> {
+        let expected = self.evidence_host(&self.root)?;
+        if (host.repository, host.id, host.owner, &host.tip)
+            != (
+                expected.repository,
+                expected.id,
+                expected.owner,
+                &expected.tip,
+            )
+        {
+            return Err("evaluation host differs from the authenticated caller".into());
+        }
+        Ok(())
+    }
 }

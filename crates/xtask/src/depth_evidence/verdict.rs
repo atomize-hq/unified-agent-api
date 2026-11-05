@@ -99,7 +99,17 @@ fn evaluate(
     host: &impl Host,
 ) -> Result<Verdict, String> {
     let mut view = GitInputs::new(workspace)?;
-    let Some(raw) = read(&mut view, selected)? else {
+    evaluate_inputs(workspace, &mut view, selected, current, host)
+}
+
+fn evaluate_inputs(
+    workspace: &Path,
+    view: &mut GitInputs,
+    selected: &FileRef,
+    current: &Evaluation,
+    host: &impl Host,
+) -> Result<Verdict, String> {
+    let Some(raw) = read(view, selected)? else {
         view.verify()?;
         return Ok(Verdict::unverified("missing or changed selected receipt"));
     };
@@ -109,13 +119,16 @@ fn evaluate(
     let header: serde_json::Value =
         serde_json::from_slice(&raw).map_err(|_| "invalid evidence JSON")?;
     if header["schema_version"] == 2 {
-        let verdict = native::evaluate(workspace, &mut view, selected, current, text(&raw)?)?;
+        if view.is_proposed() {
+            return Err("isolated view refuses native host self-resolution".into());
+        }
+        let verdict = native::evaluate(workspace, view, selected, current, text(&raw)?)?;
         view.verify()?;
         return Ok(verdict);
     }
     let receipt = EvidenceReceipt::parse(text(&raw)?)?;
     // Malformed referenced payloads are form errors even when no producer is installed.
-    let payloads = load_payloads(&mut view, &receipt)?;
+    let payloads = load_payloads(view, &receipt)?;
     let record = DepthRecord::parse(
         &serde_json::to_string(&current.record).map_err(|e| e.to_string())?,
         &current.current.agent_id,
@@ -133,7 +146,7 @@ fn evaluate(
     }) {
         Verdict::unverified("selected evidence is not bound by current E")
     } else if let Some(population) = host.population(current)? {
-        reconcile(workspace, &mut view, selected, current, population)?
+        reconcile(workspace, view, selected, current, population)?
     } else {
         // Reading and hashing the graph cannot authenticate its completeness or producer.
         let _ = payloads;
@@ -447,11 +460,8 @@ fn qualify_claims(
     }
     // Reuse unchanged mappings across unrelated source commits. The authenticated endorsement
     // names its actual reviewed source; assertion and production bytes/modes must still agree.
-    let reviewed = crate::runtime_advertising::source::Source::tip(
-        workspace,
-        &adoption.endorsement.source_commit,
-    )?;
-    let built = crate::runtime_advertising::source::Source::tip(workspace, &r.build.source_commit)?;
+    let reviewed = view.provenance(&adoption.endorsement.source_commit)?;
+    let built = view.provenance(&r.build.source_commit)?;
     for file in mapping
         .assertions
         .iter()
@@ -512,3 +522,8 @@ pub(super) fn prepare_native_finish(
 ) -> Result<String, String> {
     native::prepare_finish(root, args)
 }
+
+// B.7a proves this private path; B.7b will wire the owning publication consumers.
+#[allow(dead_code)]
+#[path = "view_eval.rs"]
+mod view_eval;

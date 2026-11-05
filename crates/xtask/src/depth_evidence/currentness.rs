@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::EvidenceReceipt;
 use super::{payload::DependencyGraph, Claims};
-use crate::{git_inputs::GitInputs, runtime_advertising::source::Source};
+use crate::git_inputs::GitInputs;
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, path::Path};
 
@@ -16,13 +16,13 @@ pub(super) fn check(
     check_claims(workspace, view, receipt.claims(), graph, hosted)
 }
 pub(super) fn check_claims(
-    workspace: &Path,
+    _workspace: &Path,
     view: &mut GitInputs,
     receipt: Claims<'_>,
     graph: &DependencyGraph,
     hosted: bool,
 ) -> Result<(), String> {
-    let source = Source::tip(workspace, &receipt.build.source_commit)?;
+    let source = view.provenance(&receipt.build.source_commit)?;
     if source.tree()? != receipt.build.source_tree {
         return Err("actual built source tree mismatch".into());
     }

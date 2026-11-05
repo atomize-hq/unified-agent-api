@@ -8,17 +8,27 @@ use std::{
     process::Command,
 };
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct Input {
     index: Vec<u8>,
     bytes: Option<Vec<u8>>,
 }
 
+#[derive(Clone)]
 pub(crate) struct GitInputs {
     root: PathBuf,
     borrowed: Option<(PathBuf, String)>,
+    proposed: Option<crate::runtime_advertising::source::Source>,
     files: BTreeMap<String, Input>,
     directories: BTreeMap<String, Vec<String>>,
+}
+
+/// A frozen proposed source. It confers no authority; the attested view and caller must still
+/// verify before and after use. Unlike `IsolatedView::source`, this includes scratch proposals.
+pub(crate) struct EvaluationSource {
+    pub(crate) source: crate::runtime_advertising::source::Source,
+    pub(crate) root: PathBuf,
+    pub(crate) fingerprint: String,
 }
 
 impl GitInputs {
@@ -31,6 +41,7 @@ impl GitInputs {
         Ok(Self {
             root,
             borrowed: None,
+            proposed: None,
             files: BTreeMap::new(),
             directories: BTreeMap::new(),
         })
@@ -44,9 +55,53 @@ impl GitInputs {
         Ok(Self {
             root: fs::canonicalize(root).map_err(|e| e.to_string())?,
             borrowed: Some(borrowed),
+            proposed: None,
             files: BTreeMap::new(),
             directories: BTreeMap::new(),
         })
+    }
+
+    /// Reuse CP-P2's exact scratch binding, corroborated by the authenticated caller's inputs.
+    pub(crate) fn borrow_view(
+        root: &Path,
+        caller: &Self,
+        proposed: &crate::runtime_advertising::source::Source,
+    ) -> Result<Self, String> {
+        caller.verify()?;
+        let mut view = Self::for_bound_evidence(root)?;
+        let head = git(&caller.root, &["rev-parse", "--verify", "HEAD"])?;
+        let head = std::str::from_utf8(&head)
+            .map_err(|e| e.to_string())?
+            .trim();
+        if view
+            .borrowed
+            .as_ref()
+            .map(|(root, commit)| (root.as_path(), commit.as_str()))
+            != Some((caller.root.as_path(), head))
+        {
+            return Err("evaluation requires this caller's bound scratch Git inputs".into());
+        }
+        view.proposed = Some(proposed.clone());
+        Ok(view)
+    }
+
+    pub(crate) fn is_proposed(&self) -> bool {
+        self.proposed.is_some()
+    }
+
+    /// Immutable provenance always belongs to the original caller, never the scratch root.
+    pub(crate) fn object_root(&self) -> &Path {
+        self.borrowed
+            .as_ref()
+            .map_or(&self.root, |(root, _)| root.as_path())
+    }
+
+    pub(crate) fn provenance(
+        &self,
+        commit: &str,
+    ) -> Result<crate::runtime_advertising::source::Source, String> {
+        self.recheck_borrowed()?;
+        crate::runtime_advertising::source::Source::tip(self.object_root(), commit)
     }
 
     fn recheck_borrowed(&self) -> Result<(), String> {
@@ -59,8 +114,31 @@ impl GitInputs {
     }
 
     pub(crate) fn optional(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
-        self.recheck_borrowed()?;
-        let input = read(&self.root, path, self.borrowed.as_ref())?;
+        if self.proposed.is_some() {
+            // A proposed evaluation reads one frozen source, then verifies the full binding,
+            // observed files and view before releasing any verdict. Reuse already checked
+            // identities across obligations rather than reopening the caller for every read.
+            if let Some(input) = self.files.get(path) {
+                return Ok(input.bytes.clone());
+            }
+        } else {
+            self.recheck_borrowed()?;
+        }
+        let mut input = read(&self.root, path, self.borrowed.as_ref())?;
+        if let Some(source) = &self.proposed {
+            let bytes = source.optional_bytes(path)?;
+            if bytes != input.bytes
+                || (bytes.is_some()
+                    && source.executable(path)? != input.index.starts_with(b"100755 "))
+            {
+                return Err(format!(
+                    "proposed input changed after evaluation binding: {path}"
+                ));
+            }
+            // Return the frozen IsolatedView source bytes, after retaining CP-P2's full
+            // regular-file, pinned-blob and working-mode checks on the scratch materialization.
+            input.bytes = bytes;
+        }
         if self
             .files
             .get(path)
@@ -79,7 +157,7 @@ impl GitInputs {
     }
 
     pub(crate) fn list(&mut self, path: &str) -> Result<Vec<String>, String> {
-        let names = list(&self.root, path)?;
+        let names = list(&self.root, path, self.borrowed.as_ref())?;
         if self
             .directories
             .get(path)
@@ -138,7 +216,7 @@ impl GitInputs {
             }
         }
         for (path, expected) in &self.directories {
-            if list(&self.root, path)? != *expected {
+            if list(&self.root, path, self.borrowed.as_ref())? != *expected {
                 return Err(format!(
                     "acquisition directory changed during freeze: {path}"
                 ));
@@ -259,7 +337,11 @@ fn read(root: &Path, path: &str, borrowed: Option<&(PathBuf, String)>) -> Result
     })
 }
 
-fn list(root: &Path, path: &str) -> Result<Vec<String>, String> {
+fn list(
+    root: &Path,
+    path: &str,
+    borrowed: Option<&(PathBuf, String)>,
+) -> Result<Vec<String>, String> {
     let full = safe_path(root, path)?;
     let mut names = BTreeSet::new();
     match fs::read_dir(full) {
@@ -278,10 +360,26 @@ fn list(root: &Path, path: &str) -> Result<Vec<String>, String> {
         Err(e) => return Err(format!("{path}: {e}")),
     }
     let prefix = format!("{path}/");
-    let tracked = git(
-        root,
-        &["--literal-pathspecs", "ls-files", "-z", "--", &prefix],
-    )?;
+    let tracked = if let Some((caller, commit)) = borrowed {
+        git(
+            caller,
+            &[
+                "--literal-pathspecs",
+                "ls-tree",
+                "-r",
+                "--name-only",
+                "-z",
+                commit,
+                "--",
+                &prefix,
+            ],
+        )?
+    } else {
+        git(
+            root,
+            &["--literal-pathspecs", "ls-files", "-z", "--", &prefix],
+        )?
+    };
     for file in tracked.split(|b| *b == 0).filter(|b| !b.is_empty()) {
         let file = std::str::from_utf8(file).map_err(|e| e.to_string())?;
         let tail = file.strip_prefix(&prefix).ok_or("unexpected Git path")?;
