@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 mod host;
 mod scope;
+mod view;
 
 use crate::{
     agent_maintenance::closeout_proposal::Proposal, agent_registry::AgentRegistry,
