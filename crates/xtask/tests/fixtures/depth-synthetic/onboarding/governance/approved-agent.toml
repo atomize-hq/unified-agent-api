@@ -1,0 +1,42 @@
+# Onboarding approval template for the synthetic depth_fixture subject (onboarding freeze
+# decisions, slice 0; OF-P3 A). Installed only in the isolated workspace, at
+# docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml, after
+# replacing {{APPROVAL_COMMIT}} and {{APPROVAL_RECORDED_AT}}. It approves depth enrollment of
+# exactly 0.2.0 and states `explicitly_deferred`, so the agent has no `maintenance.release_watch`
+# (see ../registry-entry-deferred.toml). The descriptor omits `backend_module` because the subject
+# is a non-runtime entry (SA-P2); today's full approval loader still requires that field, so it
+# refuses this template (an open question for a later slice).
+artifact_version = "1"
+comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
+selection_mode = "factory_validation"
+recommended_agent_id = "depth_fixture"
+approved_agent_id = "depth_fixture"
+approval_commit = "{{APPROVAL_COMMIT}}"
+approval_recorded_at = "{{APPROVAL_RECORDED_AT}}"
+
+[support_depth]
+version = "0.2.0"
+
+[descriptor]
+agent_id = "depth_fixture"
+display_name = "Depth Fixture"
+crate_path = "crates/depth_fixture"
+manifest_root = "cli_manifests/depth_fixture"
+package_name = "unified-agent-api-depth-fixture"
+canonical_targets = ["x86_64-unknown-linux-gnu"]
+wrapper_coverage_binding_kind = "generated_from_wrapper_crate"
+wrapper_coverage_source_path = "crates/depth_fixture"
+always_on_capabilities = []
+backend_extensions = []
+support_matrix_enabled = true
+capability_matrix_enabled = false
+docs_release_track = "unpublished"
+onboarding_pack_prefix = "depth-fixture-cli-onboarding"
+
+[descriptor.maintenance]
+mode = "explicitly_deferred"
+
+[descriptor.maintenance.deferral]
+reason = "Synthetic machinery-proof subject: release-watch enrollment is deferred so the onboarding proof acquires through the input-only writers (OF-P3 A)."
+follow_up = "None; the subject qualifies no real agent and is never enrolled in maintenance automation."
+approved_scope = "create_lane_closeout"

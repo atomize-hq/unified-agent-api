@@ -13,6 +13,7 @@ mod ma2_routes;
 mod ma4_evidence;
 #[cfg(unix)]
 mod ma4_route;
+mod onboarding_scope;
 mod prepare;
 mod registry_tables;
 mod subject;
