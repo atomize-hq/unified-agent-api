@@ -496,6 +496,9 @@ pub use github::prove as prove_isolated_ci;
 
 pub(super) use github::isolated_record_results;
 pub use github::prove_core as prove_isolated_core;
+pub(crate) use github::{assembly::Assembly, isolated_assembly};
+#[cfg(test)]
+pub(crate) use github::{synthetic_host, SyntheticHost};
 
 mod native;
 

@@ -8,6 +8,8 @@ mod fixture;
 mod git_metadata;
 mod ma2_routes;
 #[cfg(unix)]
+mod ma4_evidence;
+#[cfg(unix)]
 mod ma4_route;
 mod prepare;
 mod subject;

@@ -1,10 +1,58 @@
 //! Validate prospective bytes against the caller index that copy-back will preserve.
 use super::{
     candidate_git::{self, GitState},
-    tree::io,
+    tree::{io, Node, Tree},
     Error,
 };
-use std::{fs, io::Write, path::Path, process::Stdio};
+use std::{collections::BTreeSet, fs, io::Write, path::Path, process::Stdio};
+
+/// New files that a changed depth record's E binds as evidence (B.4 part 2). Publication reads
+/// bound evidence only from the index, so the relay validates, and copy-back delivers, exactly
+/// the caller index plus these paths. Nothing else is ever indexed.
+pub(super) fn bound_new_evidence(before: &Tree, after: &Tree, run_dir_rel: &str) -> Vec<String> {
+    let mut bound = BTreeSet::new();
+    for (path, node) in after {
+        let Node::File(bytes, _) = node else {
+            continue;
+        };
+        let unchanged = matches!(before.get(path), Some(Node::File(old, _)) if old == bytes);
+        if !path.ends_with("/depth-record.json") || unchanged {
+            continue;
+        }
+        let Ok(record) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+            continue;
+        };
+        for result in record["execution"]["results"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            for file in result["evidence"].as_array().into_iter().flatten() {
+                if let Some(path) = file["path"].as_str() {
+                    bound.insert(path.to_owned());
+                }
+            }
+        }
+    }
+    bound
+        .into_iter()
+        .filter(|p| {
+            before.get(p).is_none()
+                && matches!(after.get(p), Some(Node::File(..)))
+                && !p.starts_with(&format!("{run_dir_rel}/"))
+        })
+        .collect()
+}
+
+/// Add `paths` to the index of `root`, as their current working bytes.
+pub(super) fn add_to_index(root: &Path, paths: &[String]) -> Result<(), Error> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut args = vec!["update-index", "--add", "--"];
+    args.extend(paths.iter().map(String::as_str));
+    candidate_git::run(root, &args).map(drop)
+}
 
 pub(super) fn import(
     caller: &Path,
@@ -78,6 +126,7 @@ pub(super) fn import(
 pub(super) fn validate<T>(
     root: &Path,
     state: Option<&GitState>,
+    indexed: &[String],
     check: impl FnOnce() -> Result<T, Error>,
 ) -> Result<T, Error> {
     let jail = crate::workspace_mutation::WorkspacePathJail::new(root)?;
@@ -87,7 +136,11 @@ pub(super) fn validate<T>(
         Some(bytes) => fs::write(&index, bytes).map_err(io)?,
         None => fs::remove_file(&index).map_err(io)?,
     }
-    let outcome = check();
+    let outcome = match state {
+        Some(_) => add_to_index(root, indexed),
+        None => Ok(()),
+    }
+    .and_then(|()| check());
     // This is private candidate metadata. Caller index and files are never written here.
     let index = jail.resolve(Path::new(".git/index"))?;
     fs::write(&index, executor).map_err(io)?;

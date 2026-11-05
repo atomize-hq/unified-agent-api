@@ -69,6 +69,37 @@ impl Api for Github {
         capture(&mut command, limit)
     }
 }
+/// The reader for the isolated repository an authenticated IR-P1 binding names. Unit tests may
+/// substitute fake host responses for the calling thread; production cannot.
+pub(super) struct Isolated {
+    github: Github,
+    #[cfg(test)]
+    fake: Option<test_reader::Reader>,
+}
+impl Isolated {
+    pub(super) fn new(host: &crate::isolated_maintenance::EvidenceHost) -> Self {
+        Self {
+            github: Github::isolated(host),
+            #[cfg(test)]
+            fake: test_reader::installed(),
+        }
+    }
+}
+impl Api for Isolated {
+    fn repository(&self) -> &str {
+        self.github.repository
+    }
+    fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String> {
+        // A unit test never reaches the network: without a fake host its reads are unavailable.
+        #[cfg(test)]
+        return match &self.fake {
+            Some(fake) => fake(endpoint, limit),
+            None => Err("no fake isolated host is installed for this test".into()),
+        };
+        #[cfg(not(test))]
+        self.github.bytes(endpoint, limit)
+    }
+}
 pub(in crate::depth_evidence::verdict) fn capture(
     command: &mut Command,
     limit: usize,
@@ -180,4 +211,24 @@ pub(super) fn required_string<'a>(v: &'a Value, key: &str) -> Result<&'a str, St
         .as_str()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| format!("missing host {key}"))
+}
+#[cfg(test)]
+pub(crate) mod test_reader {
+    use std::{cell::RefCell, sync::Arc};
+    pub(crate) type Reader = Arc<dyn Fn(&str, usize) -> Result<Vec<u8>, String>>;
+    thread_local!(static READER: RefCell<Option<Reader>> = const { RefCell::new(None) });
+    /// Uninstalls on drop, so a failing test never leaks its fake host.
+    pub(crate) struct Installed;
+    impl Drop for Installed {
+        fn drop(&mut self) {
+            READER.with(|r| *r.borrow_mut() = None);
+        }
+    }
+    pub(crate) fn install(reader: Reader) -> Installed {
+        READER.with(|r| *r.borrow_mut() = Some(reader));
+        Installed
+    }
+    pub(super) fn installed() -> Option<Reader> {
+        READER.with(|r| r.borrow().clone())
+    }
 }

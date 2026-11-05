@@ -74,6 +74,9 @@ enum Command {
     DepthSyntheticCollect,
     /// Read-only authenticated per-obligation CORE preview in a disposable checkout.
     DepthCoreProve,
+    /// MA4 executor only: write reporting E from the evidence the live isolated MA4 invocation
+    /// staged. Offline and credential-free; refuses outside that invocation. Grants no admission.
+    DepthEvidenceAssemble,
     /// Plan or apply a coherent, guarded promotion candidate.
     ManifestPromote(xtask::manifest_promotion::Args),
     /// Read-only isolated CI proof; never writes packet or production records.
@@ -269,6 +272,19 @@ fn main() {
                 }
             }
         }
+        Command::DepthEvidenceAssemble => match std::env::current_dir()
+            .map_err(|e| e.to_string())
+            .and_then(|root| xtask::depth_evidence::assemble_staged(&root))
+        {
+            Ok(summary) => {
+                print!("{summary}");
+                0
+            }
+            Err(reason) => {
+                eprintln!("{reason}");
+                1
+            }
+        },
         Command::DepthCiProve => match std::env::current_dir()
             .map_err(|e| e.to_string())
             .and_then(|root| xtask::depth_evidence::prove_isolated_ci(&root))

@@ -115,7 +115,7 @@ pub(super) fn execute_codex_write(
     context: &Context,
     prompt: &str,
 ) -> Result<CodexExecutionEvidence, Error> {
-    let envs = vec![
+    let mut envs = vec![
         (
             "XTASK_AGENT_MAINTENANCE_RUN_ID".to_string(),
             context.run_id.clone(),
@@ -133,6 +133,13 @@ pub(super) fn execute_codex_write(
             context.execution_contract.writable_surfaces.join("\n"),
         ),
     ];
+    // Only the locator of the host's live channel; no credential or host handle reaches it.
+    if let Some(channel) = &context.evidence_channel {
+        envs.push((
+            crate::depth_evidence::STAGED_EVIDENCE_CHANNEL_ENV.to_string(),
+            channel.to_string_lossy().into_owned(),
+        ));
+    }
     let (argv, output) =
         spawn_codex_exec(&context.codex_binary, workspace_root, prompt, &envs, false)?;
     let stdout_path = context.run_dir.join(CODEX_STDOUT_FILE_NAME);

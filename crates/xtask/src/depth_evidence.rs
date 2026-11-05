@@ -13,10 +13,17 @@ pub(crate) use results::test_results;
 pub use results::{evaluate_isolated_record, EvidenceVerdicts};
 pub mod native;
 pub mod payload;
+mod staged;
 mod validate;
+#[cfg(test)]
+pub(crate) use staged::assemble as staged_assemble;
+pub use staged::{assemble_staged, CHANNEL_ENV as STAGED_EVIDENCE_CHANNEL_ENV};
+pub(crate) use staged::{stage as stage_isolated_evidence, Staged, Target as StagedTarget};
 mod verdict;
 pub use verdict::{evaluate_workspace, Evaluation, Verdict};
 pub use verdict::{prove_isolated_ci, prove_isolated_core};
+#[cfg(test)]
+pub(crate) use verdict::{synthetic_host, SyntheticHost};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

@@ -85,8 +85,41 @@ impl Fixture {
         git(path, &["init", "-q"]);
         git(path, &["config", "user.name", "Fixture"]);
         git(path, &["config", "user.email", "fixture@example.invalid"]);
+        let (w, commit) = build(path, p);
+        let mut fixture = Self {
+            profile: p,
+            root,
+            api: Fake::default(),
+            w,
+            commit,
+        };
+        fixture.install(1);
+        fixture
+    }
+    fn install(&mut self, attempts: u64) {
+        self.api = endpoints(
+            self.root.path(),
+            self.profile,
+            &self.w,
+            &self.commit,
+            attempts,
+        );
+    }
+}
+/// Keep a file the workspace already holds, or write the fixture bytes; either way cover it.
+fn keep_or_write(root: &Path, path: &str, bytes: impl FnOnce() -> Vec<u8>) -> FileRef {
+    match fs::read(root.join(path)) {
+        Ok(existing) => depth_ci::reference(path, &existing),
+        Err(_) => write(root, path, bytes()),
+    }
+}
+/// Write the profile's producer closure into `path` (keeping files it already holds), commit,
+/// and return the faithful witness of that commit. A workspace may supply its own frozen record.
+fn build(path: &Path, p: Profile) -> (Witness, String) {
+    {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let record_raw = fs::read_to_string(repo.join(p.fixture())).unwrap();
+        let record_raw = fs::read_to_string(path.join(p.fixture()))
+            .unwrap_or_else(|_| fs::read_to_string(repo.join(p.fixture())).unwrap());
         let record = record_raw.as_str();
         let mut inputs = vec![];
         for (file, raw) in [
@@ -105,7 +138,7 @@ impl Fixture {
             (depth_ci::PRODUCTION, "fn validate() {}"),
             (depth_ci::ASSERTION, "fn test_grammar() {}"),
         ] {
-            inputs.push(write(path, file, raw));
+            inputs.push(keep_or_write(path, file, || raw.as_bytes().to_vec()));
         }
         if p != Profile::Channel {
             inputs.retain(|f| !f.path.starts_with("crates/xtask/tests/fixtures/depth-ci/"));
@@ -144,20 +177,20 @@ impl Fixture {
                 );
             }
             for path_name in files {
-                inputs.push(write(
-                    path,
-                    &path_name,
-                    fs::read(repo.join(&path_name)).unwrap(),
-                ));
+                inputs.push(keep_or_write(path, &path_name, || {
+                    fs::read(repo.join(&path_name)).unwrap()
+                }));
             }
         }
-        write(path, profile::WORKFLOW, "approved exact workflow");
-        write(path, depth_ci::COLLECTOR, "approved collector closure");
-        write(
-            path,
-            depth_ci::ARCHIVE,
-            include_str!("../../../../../../scripts/depth_ci_archive.py"),
-        );
+        keep_or_write(path, profile::WORKFLOW, || {
+            b"approved exact workflow".to_vec()
+        });
+        keep_or_write(path, depth_ci::COLLECTOR, || {
+            b"approved collector closure".to_vec()
+        });
+        keep_or_write(path, depth_ci::ARCHIVE, || {
+            include_bytes!("../../../../../../scripts/depth_ci_archive.py").to_vec()
+        });
         inputs.sort_by(|a, b| a.path.cmp(&b.path));
         let profile: Value =
             serde_json::from_slice(&fs::read(repo.join(p.build_profile())).unwrap()).unwrap();
@@ -171,7 +204,7 @@ impl Fixture {
         for d in &local_dirs {
             let name = format!("{d}/Cargo.toml");
             if !inputs.iter().any(|f| f.path == name) {
-                inputs.push(write(path, &name, "[package]"));
+                inputs.push(keep_or_write(path, &name, || b"[package]".to_vec()));
             }
         }
         inputs.sort();
@@ -280,38 +313,36 @@ impl Fixture {
             toolchain_report: toolchain,
             raw_output: raw,
         };
-        let mut fixture = Self {
-            profile: p,
-            root,
-            api: Fake::default(),
-            w,
-            commit,
-        };
-        fixture.install(1);
-        fixture
+        (w, commit)
     }
-    fn install(&mut self, attempts: u64) {
-        self.api = Fake::default();
-        if self.profile == Profile::Synthetic {
-            self.api.1 = Some(ISOLATED);
+}
+/// The fake host serving one run with `attempts` faithful attempts of `w`, and its adoption.
+fn endpoints(root: &Path, p: Profile, w: &Witness, commit: &str, attempts: u64) -> Fake {
+    let mut fake = Fake::default();
+    {
+        let this = &mut fake;
+        if p == Profile::Synthetic {
+            this.1 = Some(ISOLATED);
         }
-        let repository = self.api.repository().to_owned();
-        let identity = self.api.identity_endpoint();
-        self.api.0.insert(
+        let repository = this.repository().to_owned();
+        let identity = this.identity_endpoint();
+        this.0.insert(
             identity,
             serde_json::to_vec(&json!({"id":10,"owner":{"id":20},"full_name":repository})).unwrap(),
         );
-        let commit = &self.commit;
-        self.api
-            .put("git/ref/heads/staging", json!({"object":{"sha":commit}}));
-        let p = self.profile;
+        this.put("git/ref/heads/staging", json!({"object":{"sha":commit}}));
         let parsed = p
-            .record(&fs::read_to_string(self.root.path().join(p.fixture())).unwrap())
+            .record(&fs::read_to_string(root.join(p.fixture())).unwrap())
             .unwrap();
-        let Event::Maintenance { request_commit, .. } = parsed.event else {
+        let Event::Maintenance {
+            request_commit,
+            request_recorded_at,
+            ..
+        } = parsed.event
+        else {
             panic!()
         };
-        self.api.page(
+        this.page(
             &format!("commits/{request_commit}/pulls"),
             None,
             vec![
@@ -319,43 +350,37 @@ impl Fixture {
             ],
         );
         let run = json!({"id":1,"head_sha":commit,"head_repository":{"full_name":repository},"path":profile::WORKFLOW,"event":"workflow_dispatch","run_attempt":attempts,"status":"completed"});
-        self.api.page(
+        this.page(
             &format!(
                 "actions/workflows/ci.yml/runs?created=%3E%3D{}",
-                match p {
-                    Profile::Channel => "2026-10-23",
-                    Profile::Core => "2026-10-25",
-                    Profile::Synthetic => "2026-11-02",
-                }
+                &request_recorded_at[..10]
             ),
             Some("workflow_runs"),
             vec![run.clone()],
         );
         let mut artifacts = vec![];
         for attempt in 1..=attempts {
-            let mut w = self.w.clone();
+            let mut w = w.clone();
             w.run_attempt = attempt;
             let artifact_id = 100 + attempt;
             let job_id = 200 + attempt;
             let name = format!("{}-1-{attempt}", p.artifact());
-            let file = self.root.path().join("witness.json");
+            let file = root.join("witness.json");
             fs::write(&file, serde_json::to_vec(&w).unwrap()).unwrap();
             let zip=depth_ci::output(Command::new("python3").args(["-c","import sys,zipfile,io; b=io.BytesIO(); z=zipfile.ZipFile(b,'w'); z.write(sys.argv[1],'witness.json'); z.close(); sys.stdout.buffer.write(b.getvalue())"]).arg(&file)).unwrap();
             fs::remove_file(file).unwrap();
             let digest = depth_ci::reference("", &zip).sha256;
             artifacts.push(json!({"id":artifact_id,"name":name,"expired":false,"size_in_bytes":zip.len(),"digest":format!("sha256:{digest}"),"workflow_run":{"id":1,"head_sha":commit}}));
-            self.api.0.insert(
-                self.api
-                    .endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
+            this.0.insert(
+                this.endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
                 zip,
             );
             let mut attempt_run = run.clone();
             attempt_run["run_attempt"] = json!(attempt);
-            self.api
-                .put(&format!("actions/runs/1/attempts/{attempt}"), attempt_run);
-            self.api.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","conclusion":"success","steps":([format!("Collect {} witness",p.step_label()),format!("Upload {} witness",p.step_label()),format!("Bind {} artifact",p.step_label())].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
-            self.api.0.insert(
-                self.api.endpoint(&format!("actions/jobs/{job_id}/logs")),
+            this.put(&format!("actions/runs/1/attempts/{attempt}"), attempt_run);
+            this.page(&format!("actions/runs/1/attempts/{attempt}/jobs"),Some("jobs"),vec![json!({"id":job_id,"name":"Rust tests (workspace)","run_id":1,"run_attempt":attempt,"status":"completed","conclusion":"success","steps":([format!("Collect {} witness",p.step_label()),format!("Upload {} witness",p.step_label()),format!("Bind {} artifact",p.step_label())].map(|s|json!({"name":s,"status":"completed","conclusion":"success","started_at":"2026-10-23T15:00:00Z","completed_at":"2026-10-23T15:00:01Z"})))})]);
+            this.0.insert(
+                this.endpoint(&format!("actions/jobs/{job_id}/logs")),
                 format!(
                     "2026-10-23T15:00:00.123456Z DEPTH_ARTIFACT_BINDING={}\n",
                     json!({"id":artifact_id,"digest":digest,"name":name})
@@ -363,23 +388,18 @@ impl Fixture {
                 .into_bytes(),
             );
         }
-        self.api
-            .page("actions/runs/1/artifacts", Some("artifacts"), artifacts);
-        let proposal = adoption::proposal_for(
-            self.root.path(),
-            &repository,
-            &self.w,
-            "independent-review-invocation",
-            p,
-        )
-        .unwrap();
-        self.api.page("issues/9/comments",None,vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{}\n```",proposal)})]);
-        self.api.page("pulls/9/reviews", None, vec![]);
-        self.api.put(
+        this.page("actions/runs/1/artifacts", Some("artifacts"), artifacts);
+        let proposal =
+            adoption::proposal_for(root, &repository, w, "independent-review-invocation", p)
+                .unwrap();
+        this.page("issues/9/comments",None,vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{}\n```",proposal)})]);
+        this.page("pulls/9/reviews", None, vec![]);
+        this.put(
             "collaborators/maintainer/permission",
             json!({"permission":"write"}),
         );
     }
+    fake
 }
 #[test]
 fn authenticated_artifact_reaches_real_evaluator_and_publisher_without_qualifying_whole_promise() {
@@ -682,5 +702,6 @@ fn core_unadopted_mapping_and_wrong_profile_cannot_verify() {
 
 #[path = "tests/core_repairs.rs"]
 mod core_repairs;
+pub(super) mod host;
 #[path = "tests/synthetic.rs"]
 mod synthetic;

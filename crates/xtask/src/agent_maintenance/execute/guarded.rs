@@ -16,7 +16,7 @@ pub(super) fn execute_write_mode<W: Write>(
 ) -> Result<(), Error> {
     let (prepared, prompt) = load_prepared_packet(context)?;
     validate_prepared_packet(context, &prepared, &prompt)?;
-    let candidate = Candidate::prepare(caller, context)?;
+    let mut candidate = Candidate::prepare(caller, context)?;
     // The candidate cannot resolve the isolated route; bind the registry this execution captured
     // to its exact root for every in-process check below. Nothing has executed yet.
     let _bound = context
@@ -25,10 +25,21 @@ pub(super) fn execute_write_mode<W: Write>(
         .map(|captured| captured.bind_candidate(&candidate.root))
         .transpose()
         .map_err(Error::Validation)?;
+    // Under the captured route only, stage authenticated evidence outside the candidate and serve
+    // it to this candidate alone while the executor runs. Production stages nothing.
+    let staged = context
+        .registry
+        .as_ref()
+        .map(|captured| stage_evidence(caller, captured, &candidate.root, context))
+        .transpose()?;
+    candidate.context.evidence_channel = staged.as_ref().map(|s| s.locator().to_owned());
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
     let execution =
         workflow::execute_candidate_write(&candidate.root, &candidate.context, &mut output);
+    // The invocation's channel and bundle end with the executor.
+    drop(staged);
+    candidate.context.evidence_channel = None;
     let observation = candidate.observe();
     let guard = observation
         .as_ref()
@@ -151,6 +162,38 @@ pub(super) fn execute_write_mode<W: Write>(
         .map_err(|e| Error::Internal(e.to_string()))?;
     // Keep the independently validated candidate for diagnostics/recovery; it is never integrated.
     Ok(())
+}
+
+/// The bundle is assembled by the host from the captured route's evidence host. An assembly
+/// failure is served to the executor as a refusal; only a staging failure stops the run, before
+/// anything executed.
+fn stage_evidence(
+    caller: &Path,
+    captured: &crate::isolated_maintenance::CapturedRegistry,
+    candidate: &Path,
+    context: &Context,
+) -> Result<crate::depth_evidence::Staged, Error> {
+    let request = &context.envelope.request;
+    let target = crate::depth_evidence::StagedTarget {
+        agent_id: request.agent_id.clone(),
+        version: request
+            .detected_release
+            .as_ref()
+            .map(|release| release.target_version.clone())
+            .unwrap_or_default(),
+        manifest_root: captured
+            .registry()
+            .find(&request.agent_id)
+            .map(|entry| entry.manifest_root.clone())
+            .unwrap_or_default(),
+    };
+    crate::depth_evidence::stage_isolated_evidence(
+        caller,
+        candidate,
+        captured.evidence_host(caller),
+        &target,
+    )
+    .map_err(|e| Error::Validation(format!("isolated evidence staging: {e}")))
 }
 
 fn persist_diagnostics(

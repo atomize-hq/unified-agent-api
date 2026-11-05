@@ -152,7 +152,12 @@ impl Candidate {
         if !errors.is_empty() {
             return Err(Error::Validation(errors.join("\n")));
         }
-        super::delivery_index::validate(&self.root, self.caller_git.as_ref(), || {
+        let indexed = super::delivery_index::bound_new_evidence(
+            &self.before,
+            after,
+            &self.context.run_dir_rel,
+        );
+        super::delivery_index::validate(&self.root, self.caller_git.as_ref(), &indexed, || {
             crate::depth_acceptance::check_captured_relay(
                 tree::source(&self.root, &self.before)?,
                 tree::source(&self.root, after)?,
@@ -210,6 +215,17 @@ impl Candidate {
             }
         }
         apply_mutations(caller, &mutations)?;
+        if passed && self.caller_git.is_some() {
+            // The relay validated exactly the caller index plus the new E-bound evidence.
+            super::delivery_index::add_to_index(
+                caller,
+                &super::delivery_index::bound_new_evidence(
+                    &self.before,
+                    after,
+                    &self.context.run_dir_rel,
+                ),
+            )?;
+        }
         Ok(paths)
     }
     pub fn diagnostic_tree(&self) -> Result<Tree, Error> {

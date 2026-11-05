@@ -132,6 +132,30 @@ Each step is a reviewed PR into `staging`.
      captured route is rechecked against the caller before delivery. Capability publication now
      loads through `isolated_maintenance::registry` too. Without a route, every load keeps the
      production `support_depth` refusal.
+   - B.4 part 2 writes reporting E from authenticated isolated evidence (design option A).
+     - Under the captured route only, the guarded MA4 host gets the evidence host from that
+       route. It authenticates the complete applicable run and attempt population with the
+       synthetic profile's resolver. It then stages a bounded, read-only bundle (E plus every
+       referenced receipt and payload) in a private temporary directory outside the candidate.
+       Production has no route and stages nothing.
+     - The executor runs `xtask depth-evidence-assemble` inside the candidate. With no network
+       and no credentials, it writes E and its files only into the packet's normal reporting
+       destination, `<manifest_root>/reports/<version>/`. Its record must hold the same Event,
+       P and O. The E and file assembly is shared with the `prove` diagnostic, which still
+       previews in a scratch clone.
+     - The live invocation is the only route to the bundle. The host serves it through a Unix
+       socket in that private directory, for its own candidate root only, while the executor
+       runs. The executor gets just the socket's path, as
+       `XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL`. The command checks the bundle's digest and
+       invocation id against what the socket answers. When the executor exits, the socket and
+       the bundle are removed. A copied bundle, a path, the variable alone or a restored origin
+       is therefore never a route. `CapturedRegistry` is never serialized.
+     - E remains untrusted. The relay checks are unchanged. One delivery change: support
+       publication reads bound evidence only from the Git index, so the relay validates against
+       the caller index plus the new files that a changed record's E binds, and copy-back adds
+       exactly those files to the caller index. `evaluate_isolated_record` now covers the
+       synthetic profile through the installed binding. It, and every other consumer,
+       re-authenticates the full population rather than trusting a bundle.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the
