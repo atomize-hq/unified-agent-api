@@ -346,6 +346,48 @@ On successful enrollment, `onboard-agent --write` also seeds the committed lifec
 
 If a pre-existing `lifecycle-state.json` diverges from the seeded control-plane truth, `onboard-agent --write` fails closed instead of silently rewriting it.
 
+`onboard-agent` also scaffolds the manifest root at the registry entry's `manifest_root`. The
+dry run prints every file below with its exact contents, and `--write` writes the same bytes:
+
+- `current.json`: the bootstrap pointer, listing the canonical target with no inputs;
+- `RULES.json`: the union and coverage rules in the shape of the committed roots. `union.tool_name`
+  is the agent id with `_` replaced by `-` and a `-cli` suffix (`claude_code` -> `claude-code-cli`).
+  The canonical target is `union.expected_targets` and `union.required_target`, and it maps to
+  `linux`, `macos` or `windows` when its name says so and to itself otherwise. It declares no
+  `parity_exclusions`, no `acquisition` block and no `storage.committed.reports.depth_record`;
+- `SCHEMA.json` and `VERSION_METADATA_SCHEMA.json`: the committed snapshot, coverage, report and
+  version-metadata schemas, bound to this root and tool name;
+- `VALIDATOR_SPEC.md`: the root's `manifest-validate` contract. It states that the root does not
+  adopt Annex B of the support-depth contract, so the root must not hold a depth record;
+- the root version metadata: `min_supported.txt`, `latest_validated.txt` and
+  `pointers/{latest_supported,latest_validated}/<target>.txt`, all `none`;
+- `wrapper_coverage.json`, which claims no coverage until the wrapper's generator runs;
+- `versions/.gitkeep` and `reports/.gitkeep`.
+
+It also writes `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/written-paths.json`, the
+sorted list of every path the plan writes, itself included. The list is derived from the complete
+mutation plan, so it names exactly what `--write` writes.
+
+The output is a function of the registry entry alone, so a rerun is a no-op and a hand-edited
+scaffold file fails the rerun as divergent. `manifest-validate --root <manifest_root>` passes on
+the root as written: while `latest_validated.txt` is `none` the validator accepts the bootstrap
+`current.json`. Onboarding writes no per-version metadata (`versions/<version>.json`) and no
+snapshots: `manifest-version-metadata`, `manifest-promote` and the runtime lane write those once
+a version is acquired. Declaring parity exclusions, an acquisition source or Annex B adoption is a
+reviewed edit to `RULES.json` and `VALIDATOR_SPEC.md`.
+
+`onboard-agent` refuses, in both modes and before writing anything:
+
+- a descriptor with more than one canonical target. Promotion requires the root's required target
+  to pass, and no policy yet decides which target that is, so target order is not allowed to
+  decide it;
+- an approval whose `[support_depth]` table states an exact upstream version. Version metadata
+  for that version would claim a snapshot that does not exist yet, and onboarding depth enablement
+  is not available.
+
+`onboard-agent` enables no depth path: `--write` still refuses a workspace that declares or
+retains depth state.
+
 ### 4. Finish the runtime follow-on
 
 After scaffolding, materialize the runtime packet:

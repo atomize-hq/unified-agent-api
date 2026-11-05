@@ -514,3 +514,48 @@ registry never lists `depth_fixture`. `production_results` stays unverified.
    completion. It ships positive and negative evaluation tests in the shape of the CORE bridge. The
    NE/NC native producer (`depth_evidence/verdict/native*`) is Codex qualification under MP-P2 and
    is not used.
+
+## Synthetic onboarding proof selection
+
+The maintainer approved OF-P1 to OF-P9 in the
+[onboarding freeze decisions](../agents/lifecycle/support-depth-onboarding-freeze-decisions.md) on
+2026-11-05. This bounded amendment is that document's slice 0. It adds one onboarding selection
+for the synthetic subject, in the isolated workspace only, so that later slices can prove the
+onboarding machinery there. It is a proof workspace, not onboarding path enablement, which still
+needs the support-depth contract's "Path enablement" items 1, 3, 4 and 5 and per-agent
+authorization. Like the maintenance profile above, it qualifies no real agent.
+
+**Subject and selection.** The subject is the same compiled `depth_fixture` subject, with the same
+version `0.2.0`, target `x86_64-unknown-linux-gnu`, headless mode, `run` operation, `CORE`
+template, `wrapper_only` mapping, no forwarding and no not-applicable permission. Only the
+lifecycle path differs. The isolated registry's `enabled_paths` is exactly `["onboarding"]`, and
+its one enrollment states `lifecycle_path = "onboarding"`. The Event is the onboarding Event
+(`approval_commit` and `approval_recorded_at`), taken from the approval artifact whose
+`[support_depth]` table states `0.2.0`. The approval may state either maintenance mode. The fixture
+templates state `explicitly_deferred`, with no `maintenance.release_watch` in the registry entry
+(OF-P3 A).
+
+**One path per workspace.** An isolated workspace holds either the maintenance selection or the
+onboarding selection, never both. `enabled_paths` names exactly one path, and the one enrollment
+is on that path. Every retained depth record carries the Event of that path. Two paths, an
+enrollment on a path that is not enabled, and a retained record of the other path all refuse. The
+maintenance selection above is unchanged.
+
+**Compiled scope.** Only the synthetic subject admits the onboarding path. The Codex compiled
+subject stays maintenance-only. No declaration, approval, receipt, remote, environment value or
+flag selects onboarding scope, and every other agent, version, target or path refuses. Production
+installs no isolated profile, so no route exists. The production registry keeps refusing
+`support_depth` tables, and the canonical registry never lists `depth_fixture`.
+
+**Grants nothing.** The selection admits a workspace and nothing more:
+- the `synthetic-wrapper-v1` producer, receipts and verdict above stay bound to the maintenance
+  Event, and an onboarding generation's evidence stays unverified;
+- maintenance routes refuse an onboarding enrollment, as they do today;
+- ON1 to ON5 keep refusing depth until roadmap E.6 wires them, in the isolated workspace only;
+- the create lane gets no packet freeze, pointer, `validated` or `supported` route.
+
+**Templates.** `crates/xtask/tests/fixtures/depth-synthetic/onboarding/` holds the isolated
+registry-entry variant with deferred maintenance and the approval template. It also holds a
+template acquisition statement at `governance/depth-acquisition/<version>.toml` (OF-P4 B), which
+lists each acquired input that O binds (OF-P6). The statement's fields are not normative until the
+onboarding charter defines them (slice 1), and nothing reads it until slice 2.
