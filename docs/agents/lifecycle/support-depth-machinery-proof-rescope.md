@@ -79,6 +79,9 @@ The critical path is A → B → C → D → E. F and G follow and do not block 
 7. **Executed depth-refusal tests** at every ON1–ON5, NE1–NE8 and LW1 entrypoint.
 8. **Registry acceptance of `support_depth` tables** for the isolated profile only. Production
    parsing still refuses them until D.
+   Status: implemented. `AgentRegistry::parse_isolated` is the one accepting parse; only the
+   installed profile mints its admission, for its compiled subject. `AgentRegistry::parse` still
+   refuses every table.
 
 **C. Isolated end-to-end run.** A disposable repository and a temporary runner carry the synthetic
 subject through E1 steps 0–7 and the rejection matrix. The repository and the credential reference
