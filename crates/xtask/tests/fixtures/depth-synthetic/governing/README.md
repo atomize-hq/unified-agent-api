@@ -36,6 +36,9 @@ publishes `v0.1.0` (the baseline), then `v0.2.0` and `v0.3.0`. Each release carr
 `depth_fixture-x86_64-unknown-linux-gnu.tar.gz`, built with `DEPTH_FIXTURE_UPSTREAM_VERSION` set to
 that version.
 
+The onboarding proof uses its own registry-entry variant, approval and acquisition statement
+templates, in `../onboarding/`.
+
 The registry entry uses the `unpublished` release track, so release docs and release-doc drift
 checks never list the fixture crate.
 
