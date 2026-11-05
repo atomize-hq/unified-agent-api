@@ -17,9 +17,9 @@ pub(super) struct Candidate {
     pub before: Tree,
     pub baseline: String,
     caller_git: Option<GitState>,
-    /// Evidence the host authenticated and staged for this run (path to SHA-256); empty without a
-    /// captured isolated route.
-    pub staged_evidence: std::collections::BTreeMap<String, String>,
+    /// Evidence the host authenticated and staged for this run (path to SHA-256), under a captured
+    /// isolated route only; `None` in production.
+    pub staged_evidence: Option<std::collections::BTreeMap<String, String>>,
     config: Vec<u8>,
     default_mode: u32,
     default_dir_mode: u32,
@@ -156,11 +156,19 @@ impl Candidate {
         if !errors.is_empty() {
             return Err(Error::Validation(errors.join("\n")));
         }
+        // The host-side byte binding: the whole evidence closure of a changed record, receipts and
+        // the payloads they reference, is the host-staged bytes or the candidate is refused.
+        super::delivery_index::check_staged_closure(
+            &self.before,
+            after,
+            &self.context.run_dir_rel,
+            self.staged_evidence.as_ref(),
+        )?;
         let indexed = super::delivery_index::bound_new_evidence(
             &self.before,
             after,
             &self.context.run_dir_rel,
-            &self.staged_evidence,
+            self.staged_evidence.as_ref(),
         );
         super::delivery_index::validate(&self.root, self.caller_git.as_ref(), &indexed, || {
             crate::depth_acceptance::check_captured_relay(
@@ -186,6 +194,15 @@ impl Candidate {
             return Err(Error::Validation(
                 "caller changed during relay; preserving concurrent edits and candidate".into(),
             ));
+        }
+        if passed {
+            // Copy-back delivers exactly the bytes the binding admitted; checked again here.
+            super::delivery_index::check_staged_closure(
+                &self.before,
+                after,
+                &self.context.run_dir_rel,
+                self.staged_evidence.as_ref(),
+            )?;
         }
         let mut mutations = Vec::new();
         let mut paths = Vec::new();
@@ -229,7 +246,7 @@ impl Candidate {
                     &self.before,
                     after,
                     &self.context.run_dir_rel,
-                    &self.staged_evidence,
+                    self.staged_evidence.as_ref(),
                 ),
             )?
         } else {

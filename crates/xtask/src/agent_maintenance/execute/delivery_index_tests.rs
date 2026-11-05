@@ -194,39 +194,62 @@ fn an_existing_index_lock_refuses_publication_and_rollback_unchanged() {
     assert_eq!(fs::read(root.path().join(".git/index")).unwrap(), index);
 }
 
-/// Production stages nothing, so no E-bound new file is ever admitted; under a route only the
-/// exact host-staged bytes are.
+/// Production stages nothing, so no evidence-closure file is ever admitted; under a route only
+/// the exact host-staged bytes of the whole closure (receipts and the payloads they reference,
+/// transitively) are, and any other byte refuses the delivery outright.
 #[test]
-fn only_host_staged_bytes_of_e_bound_new_files_are_admitted() {
-    use sha2::{Digest, Sha256};
+fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
     let record = "cli/reports/1/depth-record.json";
     let receipt = "cli/reports/1/evidence/r.json";
-    let mut after = Tree::new();
-    after.insert(
-        record.into(),
-        Node::File(
-            serde_json::to_vec(&serde_json::json!({
-                "execution": {"results": [{"evidence": [{"path": receipt}]}]}
-            }))
-            .unwrap(),
-            0o644,
-        ),
-    );
-    after.insert(receipt.into(), Node::File(b"bytes".to_vec(), 0o644));
-    let admitted = |staged: &[(&str, &[u8])]| {
-        let staged = staged
-            .iter()
-            .map(|(p, b)| (p.to_string(), hex::encode(Sha256::digest(b))))
-            .collect();
-        bound_new_evidence(&Tree::new(), &after, "runs/x", &staged)
+    let payload = "cli/reports/1/evidence/raw.txt";
+    let receipt_bytes = serde_json::to_vec(&serde_json::json!({
+        "raw_output": {"path": payload, "sha256": sha256(b"raw")}
+    }))
+    .unwrap();
+    let tree = |payload_bytes: &[u8]| {
+        let mut after = Tree::new();
+        after.insert(
+            record.into(),
+            Node::File(
+                serde_json::to_vec(&serde_json::json!({
+                    "execution": {"results": [{"evidence": [{"path": receipt}]}]}
+                }))
+                .unwrap(),
+                0o644,
+            ),
+        );
+        after.insert(receipt.into(), Node::File(receipt_bytes.clone(), 0o644));
+        after.insert(payload.into(), Node::File(payload_bytes.to_vec(), 0o644));
+        after
+    };
+    let host: Staged = [(receipt, receipt_bytes.as_slice()), (payload, b"raw")]
+        .iter()
+        .map(|(p, b)| (p.to_string(), sha256(b)))
+        .collect();
+    let admitted = |after: &Tree, staged: Option<&Staged>| {
+        bound_new_evidence(&Tree::new(), after, "runs/x", staged)
             .into_iter()
             .map(|b| b.path)
             .collect::<Vec<_>>()
     };
+    let genuine = tree(b"raw");
     assert!(
-        admitted(&[]).is_empty(),
-        "production admitted an E-bound file"
+        admitted(&genuine, None).is_empty(),
+        "production admitted evidence"
     );
-    assert!(admitted(&[(receipt, b"other")]).is_empty());
-    assert_eq!(admitted(&[(receipt, b"bytes")]), [receipt]);
+    check_staged_closure(&Tree::new(), &genuine, "runs/x", None).unwrap();
+    // Under a route the whole closure is admitted, payload included.
+    assert_eq!(admitted(&genuine, Some(&host)), [receipt, payload]);
+    check_staged_closure(&Tree::new(), &genuine, "runs/x", Some(&host)).unwrap();
+    // A substituted payload behind an unchanged receipt refuses the whole delivery.
+    let substituted = tree(b"substituted");
+    let error = check_staged_closure(&Tree::new(), &substituted, "runs/x", Some(&host))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains(payload), "{error}");
+    // So does a file the host never staged, even with an empty staged set.
+    let error = check_staged_closure(&Tree::new(), &genuine, "runs/x", Some(&Staged::new()))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("not the bytes the host staged"), "{error}");
 }

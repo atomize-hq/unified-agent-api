@@ -266,8 +266,8 @@ fn forbidden_writes_and_route_or_tip_drift_preserve_the_caller() {
     }
     assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), before);
     git(root, &["clean", "-fdxq", "docs"]);
-    // A receipt the executor altered after assembly is not the host's staged bytes, so it never
-    // gains an index identity and the relay refuses it as an untracked bound input.
+    // A receipt the executor altered after assembly is not the host's staged bytes, so the relay
+    // refuses the whole delivery.
     let tampered = executor(
         bin.path(),
         &format!("printf ' ' >> {EVIDENCE}/1-1/R1/receipt.json"),
@@ -275,7 +275,10 @@ fn forbidden_writes_and_route_or_tip_drift_preserve_the_caller() {
     {
         let _gates = execute::gate_stub::stub();
         let refused = run_as(root, &tampered, "ma4-evidence-tampered").unwrap_err();
-        assert!(refused.contains("untracked bound input"), "{refused}");
+        assert!(
+            refused.contains("not the bytes the host staged"),
+            "{refused}"
+        );
     }
     assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), before);
     assert!(!root.join(EVIDENCE).exists());
@@ -364,8 +367,11 @@ fn e_from_a_forged_channel_is_never_delivered() {
     {
         let _gates = execute::gate_stub::stub();
         let refused = run_as(root, &binary, "ma4-evidence-forged").unwrap_err();
-        // Its receipt is not the host-staged bytes, so it never gains an index identity.
-        assert!(refused.contains("untracked bound input"), "{refused}");
+        // Its receipt is not the host-staged bytes, so delivery is refused outright.
+        assert!(
+            refused.contains("not the bytes the host staged"),
+            "{refused}"
+        );
         // The forged run did write E and its receipt, but only in the retained candidate.
         let candidate = refused
             .rsplit("candidate retained at ")
@@ -378,6 +384,35 @@ fn e_from_a_forged_channel_is_never_delivered() {
         assert_eq!(
             std::fs::read(candidate.join(&receipt)).unwrap(),
             b"{\"forged\":1}"
+        );
+    }
+    assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
+    assert!(!root.join(EVIDENCE).exists());
+    assert_eq!(git(root, &["ls-files", "--stage"]), index_before);
+}
+
+#[test]
+fn a_payload_substituted_behind_unchanged_receipts_refuses_delivery() {
+    let (f, host) = chain();
+    let root = f.root.path();
+    let bin = tempfile::tempdir().unwrap();
+    let _installed = f.install();
+    let _reader = host.install();
+    let record_before = std::fs::read(root.join(RECORD)).unwrap();
+    let index_before = git(root, &["ls-files", "--stage"]);
+    // The genuine assembly runs; then the executor replaces one receipt-referenced payload,
+    // leaving E and every receipt byte-identical to what the host staged.
+    let raw = format!("{EVIDENCE}/1-1/raw.txt");
+    let binary = executor(
+        bin.path(),
+        &format!("test -f {raw} || exit 1\nprintf substituted > {raw}"),
+    );
+    {
+        let _gates = execute::gate_stub::stub();
+        let refused = run_as(root, &binary, "ma4-evidence-payload").unwrap_err();
+        assert!(
+            refused.contains("not the bytes the host staged") && refused.contains(&raw),
+            "{refused}"
         );
     }
     assert_eq!(std::fs::read(root.join(RECORD)).unwrap(), record_before);
