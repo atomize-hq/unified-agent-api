@@ -36,6 +36,24 @@ struct Profile {
     subject: &'static scope::Subject,
 }
 const LIVE_PROFILE: Option<Profile> = None;
+impl Profile {
+    fn depth_tables(&self) -> DepthTables {
+        DepthTables {
+            subject: self.subject,
+        }
+    }
+}
+/// Registry admission of exactly one `support_depth` table: the installed profile's compiled
+/// subject's (roadmap B.8). Only an installed profile mints one, so no flag, environment value,
+/// path or registry content can; [`AgentRegistry::parse_isolated`] is its only reader.
+pub(crate) struct DepthTables {
+    subject: &'static scope::Subject,
+}
+impl crate::agent_registry::DepthAdmission for DepthTables {
+    fn admitted_agent(&self) -> &'static str {
+        self.subject.agent_id
+    }
+}
 
 /// Read-only diagnostic. There is no selector for a repository, profile, trust or write mode.
 pub fn check(root: &Path) -> Result<(), String> {
@@ -151,7 +169,9 @@ impl CapturedRegistry {
             .map_err(|_| not_checkout())?;
         let raw = fs::read_to_string(root.join(crate::agent_registry::REGISTRY_RELATIVE_PATH))
             .map_err(|_| not_checkout())?;
-        if AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())? != self.registry {
+        let tables = self.route.0.profile.depth_tables();
+        if AgentRegistry::parse_isolated(&raw, &tables).map_err(|e| e.to_string())? != self.registry
+        {
             return Err(not_checkout());
         }
         CANDIDATE.with(|bound| {
@@ -280,7 +300,7 @@ impl Context {
             &mut inputs,
             &Source::tip(&root, &host.isolated_tip)?,
             &host.registry,
-            profile.subject,
+            &profile.depth_tables(),
         )?;
         let result = Self {
             profile,

@@ -121,7 +121,7 @@ impl Fixture {
             "support_depth",
             toml_edit::Item::Table(depth.as_table().clone()),
         );
-        AgentRegistry::parse_unenforced(&document.to_string()).unwrap();
+        AgentRegistry::parse_isolated(&document.to_string(), &DepthTables { subject }).unwrap();
         write(root.path(), REGISTRY_RELATIVE_PATH, document.to_string());
         write(root.path(), "producer/source.rs", "approved producer\n");
         write(root.path(), "docs/input.txt", "initial\n");

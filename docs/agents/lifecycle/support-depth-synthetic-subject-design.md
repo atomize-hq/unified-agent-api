@@ -108,11 +108,12 @@ Each step is a reviewed PR into `staging`.
      refusal, and a failing installed route errors instead of falling back. Audit-status is not a
      depth-gated output (contract, route inventory), so it stays clean while O is unclassified;
      MA5 closeout gates depth readiness.
-   - Open, outside this subject: in `parity-acquire.yml`, `manifest-validate` runs after
-     `manifest-version-metadata --status reported` but before the re-freeze republishes the
-     support matrix. Its publication-consistency check then reports `SUPPORT_MATRIX_ROW_MISSING`
-     for any agent's newly reported version (reproduced without depth), or a stale depth row once
-     MA1 has published one. The isolated proof validates after the re-freeze.
+   - Resolved, outside this subject: `parity-acquire.yml` ran `manifest-validate` after
+     `manifest-version-metadata --status reported` but before the support matrix was published.
+     Its publication-consistency check then refused any agent's newly reported version
+     (`SUPPORT_MATRIX_ROW_MISSING`, reproduced without depth) or reported a stale depth row once
+     MA1 had published one. Validation now runs in its own step after publication and before
+     delivery; the isolated proof asserts the pre-publication refusal.
 
    - B.4 (MA4) decisions, approved by the maintainer on 2026-11-03:
      - E is written by a new xtask command that the MA4 executor runs inside the candidate. It
