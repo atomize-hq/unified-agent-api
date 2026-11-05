@@ -68,7 +68,13 @@ pub(super) fn plan_with(
         return Err("closeout cannot change registry authority".into());
     }
     let registry = AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?;
-    let mut allowed = BTreeSet::new();
+    let publication = BTreeSet::from([
+        crate::support_matrix::JSON_OUTPUT_PATH.to_owned(),
+        crate::support_matrix::MARKDOWN_OUTPUT_PATH.to_owned(),
+        crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.to_owned(),
+    ]);
+    let publishing = !written.is_disjoint(&publication);
+    let mut allowed = publication;
     for entry in &registry.agents {
         allowed.extend(output_paths(entry));
     }
@@ -77,6 +83,7 @@ pub(super) fn plan_with(
     }
     let mut outputs = BTreeMap::new();
     let mut integration = None;
+    let mut accepted_records = BTreeMap::new();
     for entry in &registry.agents {
         if written.is_disjoint(&output_paths(entry)) {
             continue;
@@ -132,6 +139,7 @@ pub(super) fn plan_with(
             if !accepted.acceptance_entries.contains(&acceptance) {
                 accepted.acceptance_entries.push(acceptance);
             }
+            accepted_records.insert((entry.agent_id.clone(), version.clone()), accepted.clone());
             let mut bytes = serde_json::to_vec_pretty(&accepted).map_err(|e| e.to_string())?;
             bytes.push(b'\n');
             outputs.insert(
@@ -142,6 +150,9 @@ pub(super) fn plan_with(
                 bytes,
             );
         }
+    }
+    if publishing {
+        super::publication::validate_closeout(root, &before, &after, &accepted_records, host)?;
     }
     if let Some(tip) = integration {
         if host.integration_tip(root, integration_tip)? != tip {

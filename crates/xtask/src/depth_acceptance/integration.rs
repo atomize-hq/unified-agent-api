@@ -28,6 +28,13 @@ pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
         &binding.parent,
         &super::isolated::Host::closeout(context),
         &super::isolated::Host::promotion(context),
+        |view| {
+            crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
+                root,
+                context,
+                || super::publication::validate_current(root, view),
+            )
+        },
     )?;
     binding.recheck(root, context)
 }
@@ -60,7 +67,12 @@ impl crate::isolated_maintenance::Route {
         let after = View::with_registry(Source::workspace(root)?, registry, agent)?;
         let mut comparison = super::compare_views(&before, &after)?;
         if !before.records.is_empty() || !after.records.is_empty() {
-            comparison.input_issues = super::publication::validate_current(root, &after)
+            comparison.input_issues =
+                crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
+                    root,
+                    self.context(),
+                    || super::publication::validate_current(root, &after),
+                )
                 .err()
                 .into_iter()
                 .collect();
@@ -78,7 +90,9 @@ pub(super) fn check_with(
 ) -> Result<(), String> {
     let tip = resolve(root, revision)?;
     let head = resolve(root, "HEAD")?;
-    admit_all(root, &tip, closeout_host, promotion_host)?;
+    admit_all(root, &tip, closeout_host, promotion_host, |view| {
+        super::publication::validate_current(root, view)
+    })?;
     if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
         return Err("integration revision moved during admission".into());
     }
@@ -92,6 +106,7 @@ fn admit_all(
     parent: &str,
     closeout_host: &impl manual::Host,
     promotion_host: &impl manual::Host,
+    validate_publication: impl FnOnce(&View) -> Result<(), String>,
 ) -> Result<(), String> {
     let before = Source::tip(root, parent)?;
     let after = Source::workspace(root)?;
@@ -151,7 +166,7 @@ fn admit_all(
         publication = Some(new);
     }
     if let Some(view) = publication {
-        super::publication::validate_current(root, &view)?;
+        validate_publication(&view)?;
     }
     Ok(())
 }
@@ -184,6 +199,7 @@ pub(super) fn admit(
 ) -> Result<(), String> {
     let comparison = super::compare_views(old, new)?;
     let qualifications = super::publication::qualifications(new)?;
+    let candidate_promotion = candidate_has_promotion(old, new)?;
     for (version, prior) in &old.records {
         let record = new
             .records
@@ -241,9 +257,10 @@ pub(super) fn admit(
             "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
             new.entry.agent_id
         );
-        let mut closeout = added
+        let new_closeout = added
             .iter()
             .any(|e| matches!(e, AcceptanceEntry::MaintenanceCloseout { .. }));
+        let mut closeout = new_closeout;
         let mut promote = added
             .iter()
             .any(|e| matches!(e, AcceptanceEntry::Promotion { .. }));
@@ -260,6 +277,9 @@ pub(super) fn admit(
                     }
                     closeout = true;
                 }
+                _ if super::publication::is_qualification(e)
+                    && new_closeout
+                    && !candidate_promotion => {}
                 _ => promote = true,
             }
         }
@@ -297,4 +317,50 @@ pub(super) fn admit(
         }
     }
     Ok(())
+}
+
+// Qualification alone is attributed below. Every other accepting effect (or new Promotion
+// entry), anywhere in the candidate, prevents borrowing closeout authority for qualification.
+fn candidate_has_promotion(old: &View, new: &View) -> Result<bool, String> {
+    for entry in old.registry.agents.iter().chain(&new.registry.agents) {
+        let registry = if new.registry.find(&entry.agent_id).is_some() {
+            &new.registry
+        } else {
+            &old.registry
+        };
+        let prior_registry = if old.registry.find(&entry.agent_id).is_some() {
+            &old.registry
+        } else {
+            &new.registry
+        };
+        let before = View::with_registry(old.source.clone(), prior_registry, &entry.agent_id)?;
+        let after = View::with_registry(new.source.clone(), registry, &entry.agent_id)?;
+        if after.records.iter().any(|(version, record)| {
+            record.acceptance_entries.iter().any(|e| {
+                matches!(e, AcceptanceEntry::Promotion { .. })
+                    && !before
+                        .records
+                        .get(version)
+                        .is_some_and(|r| r.acceptance_entries.contains(e))
+            })
+        }) {
+            return Ok(true);
+        }
+        if super::compare_views(&before, &after)?
+            .effects
+            .iter()
+            .any(|e| {
+                !super::publication::is_qualification(e)
+                    && !matches!(
+                        e.kind.as_str(),
+                        "closeout semantic change"
+                            | "maintenance_closeout_written"
+                            | "absence_of_drifted"
+                    )
+            })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
