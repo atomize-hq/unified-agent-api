@@ -277,8 +277,12 @@ Must fail, each one leaving caller state byte for byte unchanged:
   on unverified (for example, the fake host changes the attempt between admission and evaluation).
   MA5 refuses; it does not deliver the closeout with downgraded rows.
 - **Pre-entry verdicts.** A batch rendered from verdicts sealed to the pre-entry record is refused.
-- **MA6 rendered before its entry.** A promotion proposal rendered before its `Promotion` entry was
-  appended does not match the delivered record and is refused.
+- **MA6 rendered before its entry.** Under option A the retained closeout entry already
+  qualifies the row, so rows rendered before and after the `Promotion` entry can be identical; the
+  test does not rely on a row mismatch. It checks the order and the verdict binding directly: the
+  fake host records that the evaluation MA6 renders from observed the record with its `Promotion`
+  entry appended, and an MA6 proposal that offers verdicts sealed to the pre-entry record is
+  refused, whatever the rows say.
 - **Production control.** With no route installed, both MA5 writers and MA6 keep their current
   refusal on a depth workspace and their ordinary behavior otherwise; production publication still
   uses `production_results` and stays `unverified`.

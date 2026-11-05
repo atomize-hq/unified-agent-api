@@ -1033,7 +1033,11 @@ MA6 and IN1:
 Every other rule of this contract is unchanged: separate closeout and promotion, the exact
 generation marker on the integration parent, owning admission at apply, the
 [Complete mediation](#complete-mediation) refusal of routes without authority, and all-root
-admission at IN1. A route other than MA5 or MA6 still has no authority to publish a qualification.
+admission at IN1. For tuples whose depth enrollment belongs to the maintenance path, a route
+other than MA5 or MA6 still has no authority to publish a qualification. These rules do not change
+the onboarding path: the [onboarding charter](cli-agent-onboarding-charter.md#support-depth)
+rule 9 and [Path enablement](#path-enablement) still govern qualified publication on the create
+lane.
 
 ### A.2 Outputs
 
