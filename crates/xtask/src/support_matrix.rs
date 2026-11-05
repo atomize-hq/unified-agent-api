@@ -20,7 +20,9 @@ pub use preparation::preview_preparation;
 #[path = "support_matrix/runtime_support.rs"]
 mod runtime_support;
 
-use publication::{validate_publication_artifacts, write_publication_artifacts};
+use publication::validate_publication_artifacts;
+// Crate-visible so tests can drive the NE1 writer guard with a bundle from an installed route.
+pub(crate) use publication::write_publication_artifacts;
 
 pub use consistency::{format_publication_issues, validate_publication_consistency};
 pub use derive::derive_rows;
