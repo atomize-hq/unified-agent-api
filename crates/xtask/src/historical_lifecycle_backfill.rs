@@ -20,7 +20,7 @@ use xtask::{
     approval_artifact::{ApprovalArtifact, ApprovalMaintenanceMode},
     prepare_publication::{
         build_publication_ready_packet, validate_runtime_evidence_directory_for_approval,
-        validate_runtime_evidence_run_for_approval, RuntimeEvidenceBundle,
+        validate_runtime_evidence_run_for_approval,
     },
     proving_run_closeout::{
         build_closeout, render_closeout_json, DurationTruth, MaintenanceSettlement,
@@ -28,8 +28,7 @@ use xtask::{
         ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     runtime_evidence_bundle::{
-        self, historical_run_id, write_runtime_evidence_bundle, write_runtime_evidence_bundle_at,
-        RuntimeEvidenceBundleSpec,
+        self, historical_run_id, write_runtime_evidence_bundle_at, RuntimeEvidenceBundleSpec,
     },
     runtime_evidence_run,
 };
@@ -94,17 +93,46 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
-    let agents = select_agents(&args)?;
+    run_in_workspace_with_scratch(workspace_root, args, writer, &std::env::temp_dir())
+}
+
+/// As `run_in_workspace`, preparing in a scratch directory created under `scratch_parent`, which
+/// must lie outside the workspace.
+pub(crate) fn run_in_workspace_with_scratch<W: Write>(
+    workspace_root: &Path,
+    args: Args,
+    writer: &mut W,
+    scratch_parent: &Path,
+) -> Result<(), Error> {
+    let prepared = prepare_backfill(workspace_root, &args, scratch_parent)?;
+    write_prepared(workspace_root, prepared, writer)
+}
+
+/// Every output of every selected agent, prepared and checked, with nothing in the workspace
+/// written, so a refusal for any agent leaves the workspace as it was.
+pub(crate) fn prepare_backfill(
+    workspace_root: &Path,
+    args: &Args,
+    scratch_parent: &Path,
+) -> Result<Vec<PreparedBackfill>, Error> {
+    let agents = select_agents(args)?;
     let registry = AgentRegistry::load(workspace_root)
         .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
+    let scratch = scratch_dir(workspace_root, scratch_parent)?;
+    agents
+        .into_iter()
+        .map(|agent_id| prepare_agent(workspace_root, &registry, agent_id, scratch.path()))
+        .collect()
+}
 
-    // Every output of every selected agent is prepared and checked before the first write, so a
-    // refusal for any agent leaves the workspace as it was.
-    let mut prepared = Vec::with_capacity(agents.len());
-    for agent_id in &agents {
-        prepared.push(prepare_agent(workspace_root, &registry, agent_id)?);
-    }
-    for (agent_id, backfill) in agents.into_iter().zip(prepared) {
+/// Writes exactly the prepared outputs, agent by agent.
+pub(crate) fn write_prepared<W: Write>(
+    workspace_root: &Path,
+    prepared: Vec<PreparedBackfill>,
+    writer: &mut W,
+) -> Result<(), Error> {
+    for backfill in prepared {
+        let agent_id = backfill.approval.descriptor.agent_id.clone();
         write_backfill(workspace_root, backfill)?;
         writeln!(
             writer,
@@ -112,8 +140,27 @@ pub fn run_in_workspace<W: Write>(
         )
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     }
-
     Ok(())
+}
+
+/// A scratch directory created exclusively under `parent`, refused when `parent` lies inside the
+/// workspace, both compared as canonical paths, so preparing never writes to the workspace.
+fn scratch_dir(workspace_root: &Path, parent: &Path) -> Result<tempfile::TempDir, Error> {
+    let canonical = |path: &Path| {
+        fs::canonicalize(path)
+            .map_err(|err| Error::Internal(format!("canonicalize {}: {err}", path.display())))
+    };
+    let (workspace, parent) = (canonical(workspace_root)?, canonical(parent)?);
+    if parent.starts_with(&workspace) {
+        return Err(Error::Validation(format!(
+            "the temporary directory `{}` is inside the workspace `{}`; set TMPDIR to a \
+             directory outside it",
+            parent.display(),
+            workspace.display()
+        )));
+    }
+    tempfile::TempDir::new_in(&parent)
+        .map_err(|err| Error::Internal(format!("create scratch in {}: {err}", parent.display())))
 }
 
 fn select_agents(args: &Args) -> Result<Vec<&str>, Error> {
@@ -146,10 +193,13 @@ fn select_agents(args: &Args) -> Result<Vec<&str>, Error> {
     Ok(selected)
 }
 
-/// One agent's backfill, prepared and checked, with nothing written yet.
-struct PreparedBackfill {
+/// One agent's backfill, prepared and checked, with nothing written yet. Every output is held
+/// as the exact bytes, or the exact value, that will be written.
+pub(crate) struct PreparedBackfill {
     approval: ApprovalArtifact,
-    normalized_state: LifecycleState,
+    run_id: String,
+    /// The runtime evidence bundle's files, by name, as validated.
+    bundle: Vec<(String, Vec<u8>)>,
     packet_path: String,
     packet: PublicationReadyPacket,
     packet_sha256: String,
@@ -163,6 +213,7 @@ fn prepare_agent(
     workspace_root: &Path,
     registry: &AgentRegistry,
     agent_id: &str,
+    scratch: &Path,
 ) -> Result<PreparedBackfill, Error> {
     xtask::depth_routes::refuse_workspace(workspace_root, "historical-lifecycle-backfill")
         .map_err(Error::Validation)?;
@@ -241,10 +292,17 @@ fn prepare_agent(
     check_lifecycle_state_write(workspace_root, &lifecycle_path, &repaired_state)
         .map_err(|err| Error::Validation(format!("lifecycle state: {err}")))?;
 
-    check_runtime_evidence(workspace_root, &approval, &normalized_state, &run_id)?;
+    let bundle = prepare_runtime_evidence(
+        workspace_root,
+        scratch,
+        &approval,
+        &normalized_state,
+        &run_id,
+    )?;
     Ok(PreparedBackfill {
         approval,
-        normalized_state,
+        run_id,
+        bundle,
         packet_path,
         packet,
         packet_sha256,
@@ -256,15 +314,20 @@ fn prepare_agent(
 }
 
 fn write_backfill(workspace_root: &Path, backfill: PreparedBackfill) -> Result<(), Error> {
-    let runtime_evidence = write_runtime_evidence(
-        workspace_root,
-        &backfill.approval,
-        &backfill.normalized_state,
-    )?;
+    let run_relative =
+        runtime_evidence_run::run_relative_root(&backfill.run_id).map_err(Error::Validation)?;
+    let run_root = workspace_root.join(&run_relative);
+    fs::create_dir_all(&run_root)
+        .map_err(|err| Error::Internal(format!("create {}: {err}", run_root.display())))?;
+    for (name, bytes) in &backfill.bundle {
+        let path = run_root.join(name);
+        fs::write(&path, bytes)
+            .map_err(|err| Error::Internal(format!("write {}: {err}", path.display())))?;
+    }
     validate_runtime_evidence_run_for_approval(
         workspace_root,
         &backfill.approval,
-        &runtime_evidence.run_id,
+        &backfill.run_id,
     )
     .map_err(|err| Error::Validation(err.to_string()))?;
     write_publication_ready_packet(workspace_root, &backfill.packet_path, &backfill.packet)
@@ -288,35 +351,51 @@ fn write_backfill(workspace_root: &Path, backfill: PreparedBackfill) -> Result<(
     .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
 }
 
-/// Writes the runtime evidence bundle into a directory created exclusively for this check outside
-/// the caller workspace, at the run's own relative path, and validates it there. The bundle reads
-/// the workspace only to derive its written paths, and the validator reads only the run directory,
-/// so nothing in the workspace is created, changed or removed. Dropping the directory removes
-/// only what this check created.
-fn check_runtime_evidence(
+/// Writes the runtime evidence bundle into `scratch`, outside the caller workspace, at the run's
+/// own relative path, validates it there, and returns its files' bytes, which are the bytes
+/// written. The bundle records its run directory as that relative path, which the validator
+/// accepts wherever the run directory sits, so the bytes validated in scratch are valid in place.
+/// The bundle reads the workspace only to derive its written paths, and the validator reads only
+/// the run directory, so nothing in the workspace is created, changed or removed.
+fn prepare_runtime_evidence(
     workspace_root: &Path,
+    scratch: &Path,
     approval: &ApprovalArtifact,
     lifecycle_state: &LifecycleState,
     run_id: &str,
-) -> Result<(), Error> {
+) -> Result<Vec<(String, Vec<u8>)>, Error> {
     let run_relative =
         runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
-    let scratch = tempfile::TempDir::new()
-        .map_err(|err| Error::Internal(format!("create runtime evidence scratch: {err}")))?;
-    let run_root = scratch.path().join(&run_relative);
+    let run_root = scratch.join(&run_relative);
     write_runtime_evidence_bundle_at(
         workspace_root,
         &run_root,
         &run_relative,
-        &run_root,
+        Path::new(&run_relative),
         approval,
         lifecycle_state,
         &historical_bundle_spec(run_id),
     )
     .map_err(map_runtime_evidence_bundle_error)?;
-    validate_runtime_evidence_directory_for_approval(scratch.path(), approval, run_id, &run_root)
-        .map(|_| ())
-        .map_err(|err| Error::Validation(err.to_string()))
+    validate_runtime_evidence_directory_for_approval(scratch, approval, run_id, &run_root)
+        .map_err(|err| Error::Validation(err.to_string()))?;
+    let mut files = Vec::new();
+    for entry in fs::read_dir(&run_root)
+        .map_err(|err| Error::Internal(format!("read {}: {err}", run_root.display())))?
+    {
+        let path = entry
+            .map_err(|err| Error::Internal(format!("read {}: {err}", run_root.display())))?
+            .path();
+        let bytes = fs::read(&path)
+            .map_err(|err| Error::Internal(format!("read {}: {err}", path.display())))?;
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| Error::Internal(format!("`{}` has no file name", path.display())))?;
+        files.push((name.to_string(), bytes));
+    }
+    files.sort();
+    Ok(files)
 }
 
 fn historical_bundle_spec(run_id: &str) -> RuntimeEvidenceBundleSpec<'_> {
@@ -331,26 +410,6 @@ fn historical_bundle_spec(run_id: &str) -> RuntimeEvidenceBundleSpec<'_> {
         validation_message:
             "historical runtime evidence was reconstructed from committed runtime-owned outputs",
     }
-}
-
-fn write_runtime_evidence(
-    workspace_root: &Path,
-    approval: &ApprovalArtifact,
-    lifecycle_state: &LifecycleState,
-) -> Result<RuntimeEvidenceBundle, Error> {
-    let run_id = historical_run_id(&approval.descriptor.agent_id);
-    let bundle = write_runtime_evidence_bundle(
-        workspace_root,
-        approval,
-        lifecycle_state,
-        &historical_bundle_spec(&run_id),
-    )
-    .map_err(map_runtime_evidence_bundle_error)?;
-
-    Ok(RuntimeEvidenceBundle {
-        run_id: bundle.run_id,
-        runtime_evidence_paths: bundle.runtime_evidence_paths,
-    })
 }
 
 /// The closeout backfill writes, rendered and validated, with nothing written.
