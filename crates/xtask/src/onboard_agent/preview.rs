@@ -1,3 +1,4 @@
+mod governing;
 mod release;
 mod render;
 mod write;
@@ -280,14 +281,19 @@ fn approval_render_input(draft: &DraftEntry) -> Option<ApprovalRenderInput<'_>> 
 }
 
 pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<String>)> {
-    vec![
-        (
-            Path::new(&draft.manifest_root)
-                .join("current.json")
-                .display()
-                .to_string(),
-            Some(render_current_json(draft)),
-        ),
+    let mut previews = vec![(
+        Path::new(&draft.manifest_root)
+            .join("current.json")
+            .display()
+            .to_string(),
+        Some(render_current_json(draft)),
+    )];
+    previews.extend(
+        governing::governing_files(draft)
+            .into_iter()
+            .map(|(path, contents)| (path, Some(contents))),
+    );
+    previews.extend([
         (
             Path::new(&draft.manifest_root)
                 .join("versions/.gitkeep")
@@ -316,7 +322,8 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
                 .to_string(),
             None,
         ),
-    ]
+    ]);
+    previews
 }
 
 fn render_current_json(draft: &DraftEntry) -> String {

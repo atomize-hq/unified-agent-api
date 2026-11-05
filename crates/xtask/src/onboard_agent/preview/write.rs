@@ -236,6 +236,11 @@ fn write_scaffold_preview<W: Write>(
         writeln!(writer, "Path: {path}")
             .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
         if let Some(contents) = contents {
+            let language = if path.ends_with(".md") {
+                "md"
+            } else {
+                language
+            };
             write_code_block(writer, language, contents)?;
         } else {
             writeln!(writer, "(empty file)")

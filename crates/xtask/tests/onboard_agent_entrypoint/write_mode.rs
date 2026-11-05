@@ -49,11 +49,11 @@ fn onboard_agent_write_applies_plan_and_replays_identically() {
     assert!(first.stdout.contains("OK: onboard-agent write complete."));
     assert!(first
         .stdout
-        .contains("Mutation summary: 16 written, 0 identical, 16 total planned."));
+        .contains("Mutation summary: 20 written, 0 identical, 20 total planned."));
     assert!(second.stdout.contains("OK: onboard-agent write complete."));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
+        .contains("Mutation summary: 0 written, 20 identical, 20 total planned."));
 
     let registry = fs::read_to_string(fixture.join("crates/xtask/data/agent_registry.toml"))
         .expect("read registry");
@@ -238,10 +238,10 @@ fn onboard_agent_closeout_packet_replays_identically_without_rewriting_manual_me
     assert_eq!(second.exit_code, 0, "stderr:\n{}", second.stderr);
     assert!(first
         .stdout
-        .contains("Mutation summary: 16 written, 0 identical, 16 total planned."));
+        .contains("Mutation summary: 20 written, 0 identical, 20 total planned."));
     assert!(second
         .stdout
-        .contains("Mutation summary: 0 written, 16 identical, 16 total planned."));
+        .contains("Mutation summary: 0 written, 20 identical, 20 total planned."));
     assert_eq!(metrics_before, metrics_after_first);
     assert_eq!(metrics_before, metrics_after_second);
     assert_eq!(after_first, after_second);

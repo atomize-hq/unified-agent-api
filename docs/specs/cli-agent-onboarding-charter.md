@@ -374,10 +374,14 @@ Only the approval loader's reading of rule 3 is implemented. Source references a
   `[support_depth]` table of rule 3 and refuses an unknown root key; that is not at `f61534be`.
   No committed approval carries the table, no command writes it, and no create-lane command acts
   on the version it states.
-- `onboard-agent --write` scaffolds the manifest root with a `current.json` and placeholder
-  directories (`crates/xtask/src/onboard_agent/preview.rs:282-320`). It writes no version
-  metadata, no `RULES.json` and no validator spec. The `aider` and `gemini_cli` roots have neither
-  of the last two, and the `aider` root's only version is the placeholder `0.0.0`.
+- `onboard-agent --write` scaffolds the manifest root with a `current.json`, placeholder
+  directories, a `RULES.json`, `SCHEMA.json`, `VERSION_METADATA_SCHEMA.json` and a validator spec
+  (`crates/xtask/src/onboard_agent/preview.rs`, `crates/xtask/src/onboard_agent/preview/governing.rs`).
+  The validator spec does not adopt Annex B and `RULES.json` names no depth record path, so rule 4
+  does not hold for a freshly onboarded root. It writes no version metadata for any version,
+  because it reads no `[support_depth]` version and no surface has been acquired. The `aider` and
+  `gemini_cli` roots, onboarded before the scaffold, have no `RULES.json` and no validator spec,
+  and the `aider` root's only version is the placeholder `0.0.0`.
 - `runtime-follow-on --dry-run` writes a frozen prompt and input contract under
   `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`, and `--write` requires the run id of a
   prepared dry run (`crates/xtask/src/runtime_follow_on.rs:165-169,235-238`). Both modes require

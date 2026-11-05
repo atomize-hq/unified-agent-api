@@ -346,6 +346,32 @@ On successful enrollment, `onboard-agent --write` also seeds the committed lifec
 
 If a pre-existing `lifecycle-state.json` diverges from the seeded control-plane truth, `onboard-agent --write` fails closed instead of silently rewriting it.
 
+`onboard-agent` also scaffolds the manifest root at the registry entry's `manifest_root`. The
+dry run prints every file below with its exact contents, and `--write` writes the same bytes:
+
+- `current.json`: the bootstrap pointer, listing the canonical targets with no inputs;
+- `RULES.json`: the union and coverage rules in the shape of the committed roots. `union.tool_name`
+  is the agent id with `_` replaced by `-` and a `-cli` suffix (`claude_code` -> `claude-code-cli`),
+  the canonical targets are `union.expected_targets` in registry order, the first of them is
+  `union.required_target`, and each target maps to `linux`, `macos` or `windows` when its name
+  says so and to itself otherwise. It declares no `parity_exclusions`, no `acquisition` block and
+  no `storage.committed.reports.depth_record`;
+- `SCHEMA.json` and `VERSION_METADATA_SCHEMA.json`: the committed snapshot, coverage, report and
+  version-metadata schemas, bound to this root and tool name;
+- `VALIDATOR_SPEC.md`: the root's `manifest-validate` contract. It states that the root does not
+  adopt Annex B of the support-depth contract, so the root must not hold a depth record;
+- `versions/.gitkeep`, `pointers/latest_supported/.gitkeep`, `pointers/latest_validated/.gitkeep`
+  and `reports/.gitkeep`.
+
+The output is a function of the registry entry alone, so a rerun is a no-op and a hand-edited
+scaffold file fails the rerun as divergent. Onboarding writes no per-version metadata
+(`versions/<version>.json`), no pointer values and no snapshots: `manifest-version-metadata`,
+`manifest-promote` and the runtime lane write those once a version is acquired, and
+`manifest-validate --root <manifest_root>` passes only after that. Declaring parity exclusions,
+an acquisition source or Annex B adoption is a reviewed edit to `RULES.json` and
+`VALIDATOR_SPEC.md`. `onboard-agent` enables no depth path: `--write` still refuses a workspace
+that declares or retains depth state.
+
 ### 4. Finish the runtime follow-on
 
 After scaffolding, materialize the runtime packet:
