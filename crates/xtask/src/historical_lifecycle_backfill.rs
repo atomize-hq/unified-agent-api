@@ -10,15 +10,17 @@ use serde::Deserialize;
 use sha2::Digest;
 use xtask::{
     agent_lifecycle::{
-        self, file_sha256, lifecycle_state_path, proving_run_closeout_path, publication_ready_path,
+        self, check_lifecycle_state_write, check_publication_ready_packet_write, file_sha256,
+        lifecycle_state_path, proving_run_closeout_path, publication_ready_path,
         reconstruct_publication_ready_state_from_closed_baseline, required_evidence_for_stage,
         write_lifecycle_state, write_publication_ready_packet, LifecycleStage, LifecycleState,
+        PublicationReadyPacket,
     },
     agent_registry::{AgentRegistry, AgentRegistryEntry},
     approval_artifact::{ApprovalArtifact, ApprovalMaintenanceMode},
     prepare_publication::{
-        build_publication_ready_packet, validate_runtime_evidence_run_for_approval,
-        RuntimeEvidenceBundle,
+        build_publication_ready_packet, validate_runtime_evidence_directory_for_approval,
+        validate_runtime_evidence_run_for_approval, RuntimeEvidenceBundle,
     },
     proving_run_closeout::{
         build_closeout, render_closeout_json, DurationTruth, MaintenanceSettlement,
@@ -26,8 +28,10 @@ use xtask::{
         ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     runtime_evidence_bundle::{
-        self, historical_run_id, write_runtime_evidence_bundle, RuntimeEvidenceBundleSpec,
+        self, historical_run_id, write_runtime_evidence_bundle, write_runtime_evidence_bundle_at,
+        RuntimeEvidenceBundleSpec,
     },
+    runtime_evidence_run,
 };
 
 const HISTORICAL_AGENTS: [&str; 4] = ["codex", "claude_code", "opencode", "gemini_cli"];
@@ -94,8 +98,14 @@ pub fn run_in_workspace<W: Write>(
     let registry = AgentRegistry::load(workspace_root)
         .map_err(|err| Error::Internal(format!("load agent registry: {err}")))?;
 
-    for agent_id in agents {
-        backfill_agent(workspace_root, &registry, agent_id)?;
+    // Every output of every selected agent is prepared and checked before the first write, so a
+    // refusal for any agent leaves the workspace as it was.
+    let mut prepared = Vec::with_capacity(agents.len());
+    for agent_id in &agents {
+        prepared.push(prepare_agent(workspace_root, &registry, agent_id)?);
+    }
+    for (agent_id, backfill) in agents.into_iter().zip(prepared) {
+        write_backfill(workspace_root, backfill)?;
         writeln!(
             writer,
             "backfilled historical lifecycle baseline for `{agent_id}`"
@@ -136,11 +146,24 @@ fn select_agents(args: &Args) -> Result<Vec<&str>, Error> {
     Ok(selected)
 }
 
-fn backfill_agent(
+/// One agent's backfill, prepared and checked, with nothing written yet.
+struct PreparedBackfill {
+    approval: ApprovalArtifact,
+    normalized_state: LifecycleState,
+    packet_path: String,
+    packet: PublicationReadyPacket,
+    packet_sha256: String,
+    closeout_path: String,
+    closeout: String,
+    lifecycle_path: String,
+    repaired_state: LifecycleState,
+}
+
+fn prepare_agent(
     workspace_root: &Path,
     registry: &AgentRegistry,
     agent_id: &str,
-) -> Result<(), Error> {
+) -> Result<PreparedBackfill, Error> {
     xtask::depth_routes::refuse_workspace(workspace_root, "historical-lifecycle-backfill")
         .map_err(Error::Validation)?;
     let entry = registry.find(agent_id).ok_or_else(|| {
@@ -160,14 +183,7 @@ fn backfill_agent(
     }
     let mut normalized_state = raw_state.clone();
     normalized_state.approval_artifact_sha256 = approval.sha256.clone();
-    // The lifecycle state is written last, so its depth fields are checked before anything is
-    // written: a refusal then leaves no runtime evidence, packet or closeout half written.
-    agent_lifecycle::check_depth_preserved(workspace_root, &lifecycle_path, &normalized_state)
-        .map_err(|err| Error::Validation(err.to_string()))?;
 
-    let runtime_evidence = write_runtime_evidence(workspace_root, &approval, &normalized_state)?;
-    validate_runtime_evidence_run_for_approval(workspace_root, &approval, &runtime_evidence.run_id)
-        .map_err(|err| Error::Validation(err.to_string()))?;
     let historical_publication_state =
         reconstruct_publication_ready_state_from_closed_baseline(&normalized_state);
     historical_publication_state
@@ -175,6 +191,9 @@ fn backfill_agent(
         .map_err(|err| Error::Validation(err.to_string()))?;
     let historical_publication_sha =
         sha256_pretty_json(&historical_publication_state).map_err(Error::Internal)?;
+    let run_id = historical_run_id(&approval.descriptor.agent_id);
+    let runtime_evidence_paths =
+        runtime_evidence_run::runtime_evidence_paths_for_run(&run_id).map_err(Error::Validation)?;
     let packet_path = publication_ready_path(&entry.scaffold.onboarding_pack_prefix);
     let packet = build_publication_ready_packet(
         &approval,
@@ -190,15 +209,17 @@ fn backfill_agent(
                     "`{lifecycle_path}` is missing implementation_summary"
                 ))
             })?,
-        runtime_evidence.runtime_evidence_paths.clone(),
+        runtime_evidence_paths,
         historical_publication_state.blocking_issues.clone(),
     )
     .map_err(|err| Error::Validation(err.to_string()))?;
-    write_publication_ready_packet(workspace_root, &packet_path, &packet)
-        .map_err(|err| Error::Internal(format!("write publication-ready packet: {err}")))?;
+    check_publication_ready_packet_write(workspace_root, &packet_path, &packet)
+        .map_err(|err| Error::Validation(format!("publication-ready packet: {err}")))?;
+    // The packet writer writes exactly these bytes, so the lifecycle state can bind them now.
+    let packet_sha256 = sha256_pretty_json(&packet).map_err(Error::Internal)?;
 
     let closeout_path = proving_run_closeout_path(&entry.scaffold.onboarding_pack_prefix);
-    ensure_closeout(
+    let closeout = prepare_closeout(
         workspace_root,
         entry,
         &approval,
@@ -213,15 +234,121 @@ fn backfill_agent(
         required_evidence_for_stage(LifecycleStage::ClosedBaseline).to_vec();
     repaired_state.active_runtime_evidence_run_id = None;
     repaired_state.publication_packet_path = Some(packet_path.clone());
-    repaired_state.publication_packet_sha256 = Some(
-        file_sha256(workspace_root, &packet_path)
-            .map_err(|err| Error::Internal(format!("hash {packet_path}: {err}")))?,
-    );
-    repaired_state.closeout_baseline_path = Some(closeout_path);
-    write_lifecycle_state(workspace_root, &lifecycle_path, &repaired_state)
-        .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))?;
+    repaired_state.publication_packet_sha256 = Some(packet_sha256.clone());
+    repaired_state.closeout_baseline_path = Some(closeout_path.clone());
+    // Every check the lifecycle writer makes: the state's own validation, the support-depth
+    // object and digest included, the depth output refusal and byte preservation.
+    check_lifecycle_state_write(workspace_root, &lifecycle_path, &repaired_state)
+        .map_err(|err| Error::Validation(format!("lifecycle state: {err}")))?;
 
-    Ok(())
+    check_runtime_evidence(workspace_root, &approval, &normalized_state, &run_id)?;
+    Ok(PreparedBackfill {
+        approval,
+        normalized_state,
+        packet_path,
+        packet,
+        packet_sha256,
+        closeout_path,
+        closeout,
+        lifecycle_path,
+        repaired_state,
+    })
+}
+
+fn write_backfill(workspace_root: &Path, backfill: PreparedBackfill) -> Result<(), Error> {
+    let runtime_evidence = write_runtime_evidence(
+        workspace_root,
+        &backfill.approval,
+        &backfill.normalized_state,
+    )?;
+    validate_runtime_evidence_run_for_approval(
+        workspace_root,
+        &backfill.approval,
+        &runtime_evidence.run_id,
+    )
+    .map_err(|err| Error::Validation(err.to_string()))?;
+    write_publication_ready_packet(workspace_root, &backfill.packet_path, &backfill.packet)
+        .map_err(|err| Error::Internal(format!("write publication-ready packet: {err}")))?;
+    let written = file_sha256(workspace_root, &backfill.packet_path)
+        .map_err(|err| Error::Internal(format!("hash {}: {err}", backfill.packet_path)))?;
+    if written != backfill.packet_sha256 {
+        return Err(Error::Internal(format!(
+            "`{}` was not written as prepared",
+            backfill.packet_path
+        )));
+    }
+    let closeout = workspace_root.join(&backfill.closeout_path);
+    fs::write(&closeout, backfill.closeout.as_bytes())
+        .map_err(|err| Error::Internal(format!("write {}: {err}", closeout.display())))?;
+    write_lifecycle_state(
+        workspace_root,
+        &backfill.lifecycle_path,
+        &backfill.repaired_state,
+    )
+    .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+}
+
+/// Writes the runtime evidence bundle to a scratch run directory, validates it, and removes it
+/// again, together with any directory it had to create, so the workspace is left as it was.
+fn check_runtime_evidence(
+    workspace_root: &Path,
+    approval: &ApprovalArtifact,
+    lifecycle_state: &LifecycleState,
+    run_id: &str,
+) -> Result<(), Error> {
+    let run_relative =
+        runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
+    let runs_relative = Path::new(&run_relative)
+        .parent()
+        .ok_or_else(|| Error::Internal(format!("`{run_relative}` has no parent")))?;
+    let created = runs_relative
+        .ancestors()
+        .filter(|dir| !dir.as_os_str().is_empty() && !workspace_root.join(dir).exists())
+        .last()
+        .map(|dir| workspace_root.join(dir));
+    let scratch_relative = format!(
+        "{}/.check-{run_id}-{}",
+        runs_relative.display(),
+        std::process::id()
+    );
+    let scratch = workspace_root.join(&scratch_relative);
+    let result = write_runtime_evidence_bundle_at(
+        workspace_root,
+        &scratch,
+        &scratch_relative,
+        &scratch,
+        approval,
+        lifecycle_state,
+        &historical_bundle_spec(run_id),
+    )
+    .map_err(map_runtime_evidence_bundle_error)
+    .and_then(|_| {
+        validate_runtime_evidence_directory_for_approval(workspace_root, approval, run_id, &scratch)
+            .map(|_| ())
+            .map_err(|err| Error::Validation(err.to_string()))
+    });
+    let cleanup = fs::remove_dir_all(created.as_ref().unwrap_or(&scratch));
+    match (result, cleanup) {
+        (Err(err), _) => Err(err),
+        (Ok(()), Err(err)) if err.kind() != io::ErrorKind::NotFound => Err(Error::Internal(
+            format!("remove {}: {err}", scratch.display()),
+        )),
+        (Ok(()), _) => Ok(()),
+    }
+}
+
+fn historical_bundle_spec(run_id: &str) -> RuntimeEvidenceBundleSpec<'_> {
+    RuntimeEvidenceBundleSpec {
+        run_id,
+        host_surface: "xtask historical-lifecycle-backfill",
+        loaded_skill_ref: "historical-lifecycle-backfill",
+        mode: "historical_backfill",
+        source_label: "historical-lifecycle-backfill",
+        summary_title: "Runtime Follow-On Validation",
+        validation_check_name: "historical_runtime_evidence",
+        validation_message:
+            "historical runtime evidence was reconstructed from committed runtime-owned outputs",
+    }
 }
 
 fn write_runtime_evidence(
@@ -229,21 +356,12 @@ fn write_runtime_evidence(
     approval: &ApprovalArtifact,
     lifecycle_state: &LifecycleState,
 ) -> Result<RuntimeEvidenceBundle, Error> {
+    let run_id = historical_run_id(&approval.descriptor.agent_id);
     let bundle = write_runtime_evidence_bundle(
         workspace_root,
         approval,
         lifecycle_state,
-        &RuntimeEvidenceBundleSpec {
-            run_id: &historical_run_id(&approval.descriptor.agent_id),
-            host_surface: "xtask historical-lifecycle-backfill",
-            loaded_skill_ref: "historical-lifecycle-backfill",
-            mode: "historical_backfill",
-            source_label: "historical-lifecycle-backfill",
-            summary_title: "Runtime Follow-On Validation",
-            validation_check_name: "historical_runtime_evidence",
-            validation_message:
-                "historical runtime evidence was reconstructed from committed runtime-owned outputs",
-        },
+        &historical_bundle_spec(&run_id),
     )
     .map_err(map_runtime_evidence_bundle_error)?;
 
@@ -253,13 +371,14 @@ fn write_runtime_evidence(
     })
 }
 
-fn ensure_closeout(
+/// The closeout backfill writes, rendered and validated, with nothing written.
+fn prepare_closeout(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     approval: &ApprovalArtifact,
     closeout_path: &str,
     lifecycle_state: &LifecycleState,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     let absolute = workspace_root.join(closeout_path);
     let maintenance_settlement = settle_maintenance_readiness(entry, approval, closeout_path)?;
     let existing = load_existing_closeout_seed(&absolute)
@@ -305,13 +424,7 @@ fn ensure_closeout(
         },
     )
     .map_err(map_closeout_error)?;
-    fs::write(
-        &absolute,
-        render_closeout_json(&closeout)
-            .map_err(map_closeout_error)?
-            .into_bytes(),
-    )
-    .map_err(|err| Error::Internal(format!("write {}: {err}", absolute.display())))
+    render_closeout_json(&closeout).map_err(map_closeout_error)
 }
 
 fn settle_maintenance_readiness(

@@ -426,3 +426,73 @@ fn historical_lifecycle_backfill_refuses_an_unreadable_depth_object_before_writi
     );
     assert_eq!(lifecycle_depth::snapshot(&fixture), before);
 }
+
+/// NE7: a depth object that reads but does not validate, such as one whose P identity is not a
+/// digest, is refused while backfill is still preparing, before it writes runtime evidence, a
+/// packet, a closeout or any directory.
+#[test]
+fn historical_lifecycle_backfill_refuses_an_invalid_depth_digest_before_writing() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-invalid");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let text = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
+    let invalid = text.replacen(
+        &format!("\"policy_identity\": \"{}\"", "a".repeat(64)),
+        "\"policy_identity\": \"invalid\"",
+        1,
+    );
+    assert_ne!(invalid, text);
+    fs::write(&lifecycle_path, invalid).expect("write lifecycle state");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(
+        output.stderr.contains("support_depth.policy_identity"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+}
+
+/// NE7: every selected agent is prepared before any is written, so an agent that cannot be
+/// backfilled leaves an earlier, valid agent unwritten too.
+#[test]
+fn historical_lifecycle_backfill_writes_no_agent_until_every_agent_is_prepared() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-all-or-nothing");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+            "--agent",
+            "codex",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(!output.stdout.contains("gemini_cli"), "{}", output.stdout);
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+
+    // Alone, the valid agent backfills.
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+}

@@ -74,19 +74,21 @@ pub fn assert_depth_preserved(path: &Path, object: &str) {
     );
 }
 
-/// Every file under `root`, by path, for checking that a refused command wrote nothing.
-pub fn snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
-    let mut files = BTreeMap::new();
+/// Every file and directory under `root`, by path (a directory with no bytes), for checking that a
+/// refused command wrote nothing, not even an empty directory.
+pub fn snapshot(root: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
+    let mut entries = BTreeMap::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         for entry in fs::read_dir(&dir).expect("read dir").flatten() {
             let path = entry.path();
             if path.is_dir() {
+                entries.insert(path.clone(), None);
                 pending.push(path);
             } else {
-                files.insert(path.clone(), fs::read(&path).unwrap_or_default());
+                entries.insert(path.clone(), Some(fs::read(&path).unwrap_or_default()));
             }
         }
     }
-    files
+    entries
 }

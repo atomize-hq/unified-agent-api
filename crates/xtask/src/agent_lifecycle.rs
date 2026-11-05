@@ -754,4 +754,7 @@ pub fn load_publication_ready_packet(
     Ok(packet)
 }
 
-pub use storage::{check_depth_preserved, write_lifecycle_state, write_publication_ready_packet};
+pub use storage::{
+    check_depth_preserved, check_lifecycle_state_write, check_publication_ready_packet_write,
+    write_lifecycle_state, write_publication_ready_packet,
+};
