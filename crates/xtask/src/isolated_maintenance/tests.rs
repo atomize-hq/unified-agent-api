@@ -12,6 +12,8 @@ mod ma4_route;
 mod prepare;
 mod registry_tables;
 mod subject;
+#[cfg(unix)]
+mod unsupported_routes;
 use fixture::{declaration, git, write, Fake, Fixture};
 
 pub(super) use fixture::installed;
