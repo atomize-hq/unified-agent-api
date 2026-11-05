@@ -484,25 +484,16 @@ fn prepare_proving_run_closeout_rejects_non_published_lifecycle_state_without_wr
     );
 }
 
-/// `prepare-proving-run-closeout --write` writes the lifecycle state in its own batch. It refuses a
-/// depth object in a form no writer writes, and keeps one in the written form byte for byte
-/// (OF-P2).
+/// `prepare-proving-run-closeout --write` writes the lifecycle state in its own batch, and keeps a
+/// depth object in whatever form it was written in byte for byte (OF-P2).
 #[test]
 fn prepare_proving_run_closeout_write_preserves_the_lifecycle_depth_object() {
     let fixture = prepare_published_fixture("prepare-closeout-depth-object");
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
-    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
-    let refused = run_cli(prepare_args("--write"), &fixture);
-    lifecycle_depth::assert_refused_unchanged(
-        &lifecycle_path,
-        &before,
-        refused.exit_code,
-        &refused.stderr,
-    );
 
-    let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
     let output = run_cli(prepare_args("--write"), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
-    assert_eq!(lifecycle_depth::depth_object_bytes(&lifecycle_path), object);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
 }

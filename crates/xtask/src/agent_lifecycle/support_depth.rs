@@ -3,18 +3,84 @@
 //! `docs/agents/lifecycle/support-depth-onboarding-freeze-decisions.md`.
 //!
 //! Only the onboarding depth freeze may write or replace the object, and only a passing
-//! depth-enrolled write run may record the digest. Neither is installed, so the lifecycle writer
-//! refuses any write that changes either field's bytes, and every lifecycle writer preserves both.
-//! Because every writer re-serializes the state, the fields are byte-preserved only when they are
-//! held in the one form a writer writes; a reader therefore refuses any other form.
+//! depth-enrolled write run may record the digest. Neither is installed. Each field is read as a
+//! [`Preserved`] value, which a writer writes back in the exact bytes it was read in, so every
+//! lifecycle writer preserves both byte for byte whatever their formatting; the lifecycle writer
+//! also refuses any write that would change those bytes.
 
-use serde_json::Value;
+use std::{fmt, ops::Deref};
+
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::value::RawValue;
 
 use super::{validation::validate_sha256, LifecycleError, LifecycleStage, LifecycleState};
 
 const OBJECT: &str = "support_depth";
 const WRITTEN_PATHS: &str = "written_paths_sha256";
-const FIELDS: [&str; 2] = [OBJECT, WRITTEN_PATHS];
+
+/// A value together with the exact JSON bytes it was read in. It is written back in those bytes,
+/// and two are equal only when their bytes are.
+#[derive(Clone)]
+pub struct Preserved<T> {
+    value: T,
+    raw: Box<RawValue>,
+}
+
+impl<T: Serialize> Preserved<T> {
+    /// A new value, in the form a lifecycle writer writes a root member: pretty JSON indented
+    /// for that depth.
+    pub fn new(value: T) -> Result<Self, serde_json::Error> {
+        let pretty = serde_json::to_string_pretty(&value)?.replace('\n', "\n  ");
+        Ok(Self {
+            raw: RawValue::from_string(pretty)?,
+            value,
+        })
+    }
+}
+
+impl<T> Preserved<T> {
+    /// The exact bytes the value is held in.
+    pub fn raw(&self) -> &str {
+        self.raw.get()
+    }
+}
+
+impl<T> Deref for Preserved<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> PartialEq for Preserved<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw.get() == other.raw.get()
+    }
+}
+
+impl<T> Eq for Preserved<T> {}
+
+impl<T: fmt::Debug> fmt::Debug for Preserved<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<'de, T: DeserializeOwned> Deserialize<'de> for Preserved<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = Box::<RawValue>::deserialize(deserializer)?;
+        // A real parse of the held bytes: escapes are decoded, and a repeated or unknown member
+        // of a typed object is refused.
+        let value = serde_json::from_str(raw.get()).map_err(serde::de::Error::custom)?;
+        Ok(Self { value, raw })
+    }
+}
+
+impl<T> Serialize for Preserved<T> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.raw.serialize(serializer)
+    }
+}
 
 pub(super) fn validate_state_fields(state: &LifecycleState) -> Result<(), LifecycleError> {
     if let Some(object) = &state.support_depth {
@@ -38,144 +104,60 @@ pub(super) fn validate_state_fields(state: &LifecycleState) -> Result<(), Lifecy
     Ok(())
 }
 
-/// The bytes a lifecycle writer writes for `state`.
-pub(super) fn written_bytes(state: &LifecycleState) -> Result<Vec<u8>, LifecycleError> {
-    let mut bytes = serde_json::to_vec_pretty(state)
-        .map_err(|err| LifecycleError::Internal(format!("serialize lifecycle state: {err}")))?;
-    bytes.push(b'\n');
-    Ok(bytes)
+/// The root depth members of a lifecycle state, by their exact bytes, read by a real JSON parser:
+/// member names are decoded, a repeated depth member is refused, and other members are ignored.
+#[derive(Deserialize)]
+struct DepthBytes {
+    #[serde(default)]
+    support_depth: Option<Box<RawValue>>,
+    #[serde(default)]
+    written_paths_sha256: Option<Box<RawValue>>,
 }
 
-/// Refuses a state whose depth fields are not written byte for byte as a lifecycle writer writes
-/// them, since a writer would then change their bytes.
-pub(super) fn require_written_form(
-    bytes: &[u8],
-    state: &LifecycleState,
-) -> Result<(), LifecycleError> {
-    let written = written_bytes(state)?;
-    for field in FIELDS {
-        if top_level_value(bytes, field) != top_level_value(&written, field) {
-            return Err(LifecycleError::Validation(format!(
-                "lifecycle state: `{field}` must be written exactly as the lifecycle writer writes \
-                 it (two-space pretty JSON, members in declared order), so that every writer \
-                 preserves it byte for byte"
-            )));
-        }
+impl DepthBytes {
+    fn read(bytes: &[u8]) -> Result<Self, String> {
+        serde_json::from_slice(bytes).map_err(|err| err.to_string())
     }
-    Ok(())
+
+    fn fields(&self) -> [(&'static str, Option<&str>); 2] {
+        [
+            (OBJECT, self.support_depth.as_deref().map(RawValue::get)),
+            (
+                WRITTEN_PATHS,
+                self.written_paths_sha256.as_deref().map(RawValue::get),
+            ),
+        ]
+    }
 }
 
 /// Refuses a lifecycle write that adds, changes or removes a depth field's bytes, compared with
 /// the state already at the destination. `previous` is the destination's bytes, `None` when there
-/// is no file.
+/// is no file; a destination whose depth members cannot be read is refused, since what it states
+/// cannot then be preserved.
 pub(super) fn require_preserved(
     previous: Option<&[u8]>,
     next: &LifecycleState,
 ) -> Result<(), LifecycleError> {
-    let next = written_bytes(next)?;
-    // A destination that is not JSON states no depth field this write could preserve. The write
-    // may replace it only while it adds none.
-    let previous = previous.filter(|bytes| serde_json::from_slice::<Value>(bytes).is_ok());
-    for field in FIELDS {
-        let before = previous.and_then(|bytes| top_level_value(bytes, field));
-        if before != top_level_value(&next, field) {
-            return Err(LifecycleError::Validation(format!(
-                "lifecycle writer: `{field}` must be preserved byte for byte; only the onboarding \
-                 depth freeze writes the depth object and only a depth-enrolled write run records \
-                 the written-paths digest, and neither is installed"
+    let refuse = |why: String| LifecycleError::Validation(format!("lifecycle writer: {why}"));
+    let next = serde_json::to_vec_pretty(next)
+        .map_err(|err| LifecycleError::Internal(format!("serialize lifecycle state: {err}")))?;
+    let next = DepthBytes::read(&next).map_err(LifecycleError::Internal)?;
+    let previous = previous.map(DepthBytes::read).transpose().map_err(|err| {
+        refuse(format!(
+            "the lifecycle state at the destination cannot be read, so its depth fields \
+                 cannot be preserved: {err}"
+        ))
+    })?;
+    let before = previous.as_ref().map(DepthBytes::fields);
+    for (index, (field, after)) in next.fields().into_iter().enumerate() {
+        let before = before.as_ref().and_then(|fields| fields[index].1);
+        if before != after {
+            return Err(refuse(format!(
+                "`{field}` must be preserved byte for byte; only the onboarding depth freeze \
+                 writes the depth object and only a depth-enrolled write run records the \
+                 written-paths digest, and neither is installed"
             )));
         }
     }
     Ok(())
-}
-
-/// The exact bytes of the value of the root member `key` of a JSON object, `None` when there is no
-/// such member or the bytes are not an object. A member name written with an escape is not
-/// matched, which reads as a missing member and so is refused wherever the member is expected.
-pub(super) fn top_level_value<'a>(bytes: &'a [u8], key: &str) -> Option<&'a [u8]> {
-    let mut at = skip_ws(bytes, 0);
-    if bytes.get(at) != Some(&b'{') {
-        return None;
-    }
-    at += 1;
-    loop {
-        at = skip_ws(bytes, at);
-        match bytes.get(at)? {
-            b'}' => return None,
-            b',' => at = skip_ws(bytes, at + 1),
-            _ => {}
-        }
-        let name_end = skip_string(bytes, at)?;
-        let name = &bytes[at + 1..name_end - 1];
-        at = skip_ws(bytes, name_end);
-        if bytes.get(at) != Some(&b':') {
-            return None;
-        }
-        let start = skip_ws(bytes, at + 1);
-        let end = skip_value(bytes, start)?;
-        if name == key.as_bytes() {
-            return Some(&bytes[start..end]);
-        }
-        at = end;
-    }
-}
-
-fn skip_ws(bytes: &[u8], mut at: usize) -> usize {
-    while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
-        at += 1;
-    }
-    at
-}
-
-/// The index just past the string that starts at `at`.
-fn skip_string(bytes: &[u8], at: usize) -> Option<usize> {
-    if bytes.get(at) != Some(&b'"') {
-        return None;
-    }
-    let mut at = at + 1;
-    loop {
-        match bytes.get(at)? {
-            b'\\' => at += 2,
-            b'"' => return Some(at + 1),
-            _ => at += 1,
-        }
-    }
-}
-
-/// The index just past the value that starts at `at`.
-fn skip_value(bytes: &[u8], at: usize) -> Option<usize> {
-    match bytes.get(at)? {
-        b'"' => skip_string(bytes, at),
-        b'{' | b'[' => {
-            let mut depth = 0usize;
-            let mut at = at;
-            loop {
-                match bytes.get(at)? {
-                    b'"' => {
-                        at = skip_string(bytes, at)?;
-                        continue;
-                    }
-                    b'{' | b'[' => depth += 1,
-                    b'}' | b']' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            return Some(at + 1);
-                        }
-                    }
-                    _ => {}
-                }
-                at += 1;
-            }
-        }
-        _ => {
-            let mut at = at;
-            while bytes
-                .get(at)
-                .is_some_and(|b| !matches!(b, b',' | b'}' | b']') && !b.is_ascii_whitespace())
-            {
-                at += 1;
-            }
-            Some(at)
-        }
-    }
 }

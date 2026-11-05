@@ -69,7 +69,7 @@ fn edit_state(lifecycle_path: &Path, edit: impl FnOnce(&mut Value)) {
     let mut lifecycle: Value =
         serde_json::from_str(&fs::read_to_string(lifecycle_path).unwrap()).unwrap();
     edit(&mut lifecycle);
-    let state: LifecycleState = serde_json::from_value(lifecycle).unwrap();
+    let state: LifecycleState = serde_json::from_str(&lifecycle.to_string()).unwrap();
     write_text(
         lifecycle_path,
         &format!("{}\n", serde_json::to_string_pretty(&state).unwrap()),
@@ -175,19 +175,63 @@ fn c0_validate_refuses_a_deleted_or_unreadable_lifecycle_state_of_an_onboarding_
             "\"support_depth\": {",
             "\"support_depth\": {\n    \"extra\": 1,",
         ),
-        // The object in a form no lifecycle writer writes, which a writer would rewrite.
-        bound.replace("{\n    \"policy_identity\"", "{\"policy_identity\""),
+        // A repeated member, here written once with an escaped name.
+        bound.replacen(
+            "\"support_depth\":",
+            &format!(
+                "\"support_depth\": {{\"policy_identity\": \"{}\"}},\n  \"support\\u005fdepth\":",
+                "0".repeat(64)
+            ),
+            1,
+        ),
     ];
     for text in unreadable {
         write_text(&lifecycle_path, &text);
         assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
     }
-    write_text(&lifecycle_path, &bound);
-    assert_fails_at(
-        &codex_dir,
-        "DEPTH_LIFECYCLE_BINDING_ORPHANED",
-        &lifecycle_rel(),
-    );
+    // Any formatting of the object reads: it is the orphaned object that is reported.
+    for text in [
+        bound.clone(),
+        bound.replace(
+            "{\n    \"policy_identity\": ",
+            "{\"policy\\u005fidentity\":",
+        ),
+    ] {
+        write_text(&lifecycle_path, &text);
+        assert_fails_at(
+            &codex_dir,
+            "DEPTH_LIFECYCLE_BINDING_ORPHANED",
+            &lifecycle_rel(),
+        );
+    }
+}
+
+#[test]
+fn c0_validate_reports_a_lifecycle_state_it_cannot_look_up() {
+    let temp = make_temp_dir("ccm-c0-depth-onboarding-metadata");
+    let codex_dir = materialize_minimal_valid_workspace(&temp);
+    seed_onboarding_pack(&temp);
+    let governance = temp.join(GOVERNANCE);
+    let held = temp.join("held-governance");
+    fs::rename(&governance, &held).unwrap();
+
+    // A parent that is not a directory is not an absent file, and neither is a symlink loop.
+    write_text(&governance, "not a directory\n");
+    assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
+    fs::remove_file(&governance).unwrap();
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink("governance", &governance).unwrap();
+        assert_fails_at(&codex_dir, "DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_rel());
+        fs::remove_file(&governance).unwrap();
+    }
+
+    // With the pack gone altogether and no record, there is nothing to report.
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "no pack, no record:\n{report}");
+    fs::rename(&held, &governance).unwrap();
+    let (passed, report) = validate(&codex_dir);
+    assert!(passed, "declared, no record yet:\n{report}");
 }
 
 #[test]

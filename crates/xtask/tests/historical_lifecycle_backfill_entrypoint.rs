@@ -379,24 +379,7 @@ fn historical_lifecycle_backfill_preserves_the_lifecycle_depth_object() {
     let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-object");
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
-    // A depth object in a form no writer writes is refused, not rewritten.
-    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
-    let refused = run_cli(
-        [
-            "xtask",
-            "historical-lifecycle-backfill",
-            "--agent",
-            "gemini_cli",
-        ],
-        &fixture,
-    );
-    lifecycle_depth::assert_refused_unchanged(
-        &lifecycle_path,
-        &before,
-        refused.exit_code,
-        &refused.stderr,
-    );
-    let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
     let output = run_cli(
         [
             "xtask",
@@ -407,5 +390,39 @@ fn historical_lifecycle_backfill_preserves_the_lifecycle_depth_object() {
         &fixture,
     );
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
-    assert_eq!(lifecycle_depth::depth_object_bytes(&lifecycle_path), object);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
+}
+
+/// NE7: a lifecycle state whose depth members cannot be read is refused before backfill writes
+/// anything, so no runtime evidence, packet or closeout is left half written.
+#[test]
+fn historical_lifecycle_backfill_refuses_an_unreadable_depth_object_before_writing() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-refused");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let text = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
+    let repeated = text.replacen(
+        "\"support_depth\":",
+        &format!("\"support_depth\": {object},\n  \"support\\u005fdepth\":"),
+        1,
+    );
+    fs::write(&lifecycle_path, repeated).expect("write lifecycle state");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(
+        output.stderr.contains("duplicate field"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
 }

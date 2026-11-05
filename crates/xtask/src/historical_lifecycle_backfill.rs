@@ -160,6 +160,10 @@ fn backfill_agent(
     }
     let mut normalized_state = raw_state.clone();
     normalized_state.approval_artifact_sha256 = approval.sha256.clone();
+    // The lifecycle state is written last, so its depth fields are checked before anything is
+    // written: a refusal then leaves no runtime evidence, packet or closeout half written.
+    agent_lifecycle::check_depth_preserved(workspace_root, &lifecycle_path, &normalized_state)
+        .map_err(|err| Error::Validation(err.to_string()))?;
 
     let runtime_evidence = write_runtime_evidence(workspace_root, &approval, &normalized_state)?;
     validate_runtime_evidence_run_for_approval(workspace_root, &approval, &runtime_evidence.run_id)

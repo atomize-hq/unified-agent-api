@@ -8,9 +8,7 @@ use std::{
 };
 
 use serde_json::{json, Value};
-use xtask::agent_lifecycle::{
-    parse_lifecycle_state, write_lifecycle_state, LifecycleDepth, LifecycleState,
-};
+use xtask::agent_lifecycle::{write_lifecycle_state, LifecycleDepth, LifecycleState};
 
 const SHA: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const OTHER: &str = "1111111111111111111111111111111111111111111111111111111111111111";
@@ -37,7 +35,11 @@ fn sample() -> Value {
 }
 
 fn state(value: &Value) -> Result<LifecycleState, String> {
-    serde_json::from_value(value.clone()).map_err(|err| err.to_string())
+    parse(&value.to_string())
+}
+
+fn parse(text: &str) -> Result<LifecycleState, String> {
+    serde_json::from_str(text).map_err(|err| err.to_string())
 }
 
 #[test]
@@ -92,8 +94,8 @@ fn the_depth_object_and_written_paths_digest_are_typed_and_checked() {
     let parsed = state(&value).unwrap();
     parsed.validate().expect("P frozen, O not yet");
     assert_eq!(
-        parsed.support_depth,
-        Some(LifecycleDepth {
+        parsed.support_depth.as_deref(),
+        Some(&LifecycleDepth {
             policy_identity: SHA.to_string(),
             obligations_identity: None
         })
@@ -208,95 +210,158 @@ fn the_lifecycle_writer_preserves_the_depth_fields_and_refuses_to_change_them() 
     write_state(empty.path(), &sample()).expect("a state with no depth field");
 }
 
-fn pretty(value: &Value) -> String {
-    format!("{}\n", serde_json::to_string_pretty(value).unwrap())
-}
-
-/// The depth object written in a form no lifecycle writer writes: compact, or members reordered.
-fn noncanonical(text: &str) -> Vec<String> {
-    let canonical = format!(
-        "\"support_depth\": {{\n    \"policy_identity\": \"{SHA}\",\n    \"obligations_identity\": \"{OTHER}\"\n  }}"
-    );
-    assert!(text.contains(&canonical), "{text}");
-    [
-        format!("\"support_depth\":{{\"policy_identity\":\"{SHA}\",\"obligations_identity\":\"{OTHER}\"}}"),
-        format!(
-            "\"support_depth\": {{\n    \"obligations_identity\": \"{OTHER}\",\n    \"policy_identity\": \"{SHA}\"\n  }}"
-        ),
-        format!("\"support\\u005fdepth\": {{\"policy_identity\": \"{SHA}\", \"obligations_identity\": \"{OTHER}\"}}"),
-    ]
-    .into_iter()
-    .map(|object| text.replacen(&canonical, &object, 1))
-    .collect()
-}
-
-fn canonical_depth_state() -> String {
+/// A depth state whose object is written as `object` and whose digest as `digest`, both raw JSON.
+fn depth_text(object: &str, digest: &str) -> String {
     let mut value = sample();
-    value["support_depth"] = json!({ "policy_identity": SHA, "obligations_identity": OTHER });
-    // Written as a lifecycle writer writes it: through the typed state.
-    let state = state(&value).unwrap();
-    let mut bytes = serde_json::to_vec_pretty(&state).unwrap();
-    bytes.push(b'\n');
-    String::from_utf8(bytes).unwrap()
+    value["support_depth"] = json!("OBJECT");
+    value["written_paths_sha256"] = json!("DIGEST");
+    format!("{}\n", serde_json::to_string_pretty(&value).unwrap())
+        .replace("\"OBJECT\"", object)
+        .replace("\"DIGEST\"", digest)
+}
+
+/// The depth fields in forms other than the one a lifecycle writer emits for a new value.
+fn forms() -> Vec<(String, String)> {
+    let object = |p: &str, o: &str| {
+        format!("{{\"policy_identity\": \"{p}\", \"obligations_identity\": \"{o}\"}}")
+    };
+    vec![
+        (object(SHA, OTHER), format!("\"{SHA}\"")),
+        (
+            format!("{{\"policy_identity\":\"{SHA}\",\"obligations_identity\":\"{OTHER}\"}}"),
+            format!("\"{SHA}\""),
+        ),
+        (
+            format!("{{\n\"obligations_identity\" : \"{OTHER}\",\n\"policy_identity\" : \"{SHA}\"\n}}"),
+            format!("\"{SHA}\""),
+        ),
+        (
+            format!("{{\"policy\\u005fidentity\": \"\\u0030{}\", \"obligations_identity\": \"{OTHER}\"}}", &SHA[1..]),
+            format!("\"\\u0030{}\"", &SHA[1..]),
+        ),
+    ]
 }
 
 #[test]
-fn a_reader_refuses_a_depth_object_in_a_form_no_writer_writes() {
-    let canonical = canonical_depth_state();
-    let parsed = parse_lifecycle_state(canonical.as_bytes()).expect("written form");
-    assert!(parsed.support_depth.is_some());
-    // Every committed state, which has no depth field, still reads.
-    for path in committed_states() {
-        parse_lifecycle_state(&fs::read(&path).unwrap())
-            .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+fn the_depth_fields_are_read_by_a_json_parser_in_any_form() {
+    for (object, digest) in forms() {
+        let text = depth_text(&object, &digest);
+        let parsed = parse(&text).unwrap_or_else(|err| panic!("{err}:\n{text}"));
+        parsed.validate().expect("valid");
+        assert_eq!(
+            parsed.support_depth.as_deref().unwrap().policy_identity,
+            SHA
+        );
+        assert_eq!(
+            parsed
+                .support_depth
+                .as_deref()
+                .unwrap()
+                .obligations_identity
+                .as_deref(),
+            Some(OTHER)
+        );
+        assert_eq!(
+            parsed.written_paths_sha256.as_deref().map(String::as_str),
+            Some(SHA)
+        );
+        // An escaped member name is the same member.
+        let escaped = text.replacen("\"support_depth\"", "\"support\\u005fdepth\"", 1);
+        assert_eq!(
+            parse(&escaped).unwrap().support_depth.as_deref(),
+            parsed.support_depth.as_deref()
+        );
     }
-    for text in noncanonical(&canonical) {
-        // Each form parses to the same state, and is still refused.
-        let same: LifecycleState = serde_json::from_str(&text).expect("valid JSON state");
-        assert_eq!(same, parsed);
-        let err = parse_lifecycle_state(text.as_bytes())
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("support_depth"), "{err}");
+    // A repeated member is refused, at the root and in the object.
+    let (object, digest) = forms().remove(0);
+    let text = depth_text(&object, &digest);
+    let repeated = [
+        text.replacen(
+            "\"support_depth\":",
+            &format!("\"support_depth\": {object},\n  \"support\\u005fdepth\":"),
+            1,
+        ),
+        text.replacen(
+            "\"written_paths_sha256\":",
+            &format!("\"written_paths_sha256\": {digest},\n  \"written_paths_sha256\":"),
+            1,
+        ),
+        text.replacen(
+            "{\"policy_identity\"",
+            &format!("{{\"policy_identity\": \"{OTHER}\", \"policy_identity\""),
+            1,
+        ),
+    ];
+    for text in repeated {
+        assert!(
+            parse(&text).unwrap_err().contains("duplicate field"),
+            "{text}"
+        );
     }
-    let mut digest = sample();
-    digest["support_depth"] = json!({ "policy_identity": SHA });
-    digest["written_paths_sha256"] = json!(SHA);
-    // The same digest with an escaped character reads as the same value, in other bytes.
-    let text = pretty(&digest).replace(
-        &format!("\"written_paths_sha256\": \"{SHA}\""),
-        &format!("\"written_paths_sha256\": \"\\u0030{}\"", &SHA[1..]),
-    );
-    assert_eq!(
-        state(&serde_json::from_str(&text).unwrap())
-            .unwrap()
-            .written_paths_sha256
-            .as_deref(),
-        Some(SHA)
-    );
-    let err = parse_lifecycle_state(text.as_bytes())
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("written_paths_sha256"), "{err}");
 }
 
 #[test]
-fn the_lifecycle_writer_compares_depth_bytes_not_values() {
-    let canonical = canonical_depth_state();
-    let next = state(&serde_json::from_str(&canonical).unwrap()).unwrap();
+fn every_writer_writes_the_depth_fields_back_in_the_bytes_they_were_read_in() {
+    for (object, digest) in forms() {
+        let fixture = tempfile::tempdir().unwrap();
+        let path = fixture.path().join(STATE);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let text = depth_text(&object, &digest);
+        fs::write(&path, &text).unwrap();
+        let mut next = parse(&text).unwrap();
+        next.last_transition_by = "xtask some-writer --write".to_string();
+        write_lifecycle_state(fixture.path(), STATE, &next).expect("preserving write");
+        let written = fs::read_to_string(&path).unwrap();
+        assert!(
+            written.contains(&format!("\"support_depth\": {object}")),
+            "{written}"
+        );
+        assert!(
+            written.contains(&format!("\"written_paths_sha256\": {digest}")),
+            "{written}"
+        );
+        assert!(written.contains("xtask some-writer --write"));
+    }
+}
+
+#[test]
+fn the_lifecycle_writer_refuses_to_remove_escaped_depth_members() {
+    let (object, digest) = forms().remove(0);
+    let plain = parse(&depth_text(&object, &digest)).unwrap();
     let fixture = tempfile::tempdir().unwrap();
     let path = fixture.path().join(STATE);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    for text in noncanonical(&canonical) {
-        // The same values in another form would change bytes when written, so it is refused.
+    for (escape, field) in [
+        ("\"support\\u005fdepth\"", "support_depth"),
+        ("\"written_paths\\u005fsha256\"", "written_paths_sha256"),
+    ] {
+        let text = depth_text(&object, &digest).replacen(&format!("\"{field}\""), escape, 1);
         fs::write(&path, &text).unwrap();
-        let err = write_lifecycle_state(fixture.path(), STATE, &next)
+        let mut removed = plain.clone();
+        match field {
+            "support_depth" => {
+                removed.support_depth = None;
+                removed.written_paths_sha256 = None;
+            }
+            _ => removed.written_paths_sha256 = None,
+        }
+        let err = write_lifecycle_state(fixture.path(), STATE, &removed)
             .unwrap_err()
             .to_string();
-        assert!(err.contains("preserved byte for byte"), "{err}");
+        assert!(err.contains("preserved byte for byte"), "{field}: {err}");
         assert_eq!(fs::read_to_string(&path).unwrap(), text);
     }
-    fs::write(&path, &canonical).unwrap();
-    write_lifecycle_state(fixture.path(), STATE, &next).expect("written form is preserved");
-    assert_eq!(fs::read_to_string(&path).unwrap(), canonical);
+    // A destination whose depth members cannot be read is not overwritten.
+    let text = depth_text(&object, &digest);
+    let repeated = text.replacen(
+        "\"support_depth\":",
+        &format!("\"support_depth\": {object},\n  \"support_depth\":"),
+        1,
+    );
+    fs::write(&path, &repeated).unwrap();
+    let err = write_lifecycle_state(fixture.path(), STATE, &plain)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("cannot be read"), "{err}");
+    assert_eq!(fs::read_to_string(&path).unwrap(), repeated);
 }

@@ -21,7 +21,7 @@ jsonschema = { version = "0.18", features = ["draft202012"] }
 regex = "1.10"
 semver = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2 = "0.10"
 syn = { version = "2", features = ["full", "visit"] }
 quote = "1"

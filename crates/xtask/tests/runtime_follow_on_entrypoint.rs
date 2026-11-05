@@ -529,27 +529,7 @@ fn runtime_follow_on_write_marks_blocked_when_handoff_reports_exact_blockers() {
 #[test]
 fn runtime_follow_on_write_preserves_the_lifecycle_depth_object() {
     let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-depth-object");
-    // A depth object in a form no writer writes is refused, not rewritten.
-    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
-    let refused = run_cli(
-        [
-            "xtask",
-            "runtime-follow-on",
-            "--dry-run",
-            "--approval",
-            &approval_path,
-            "--run-id",
-            WRITE_RUN_ID,
-        ],
-        &fixture,
-    );
-    lifecycle_depth::assert_refused_unchanged(
-        &lifecycle_state_path(&fixture),
-        &before,
-        refused.exit_code,
-        &refused.stderr,
-    );
-    let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
     let dry_run = run_cli(
         [
             "xtask",
@@ -563,10 +543,7 @@ fn runtime_follow_on_write_preserves_the_lifecycle_depth_object() {
         &fixture,
     );
     assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
-    assert_eq!(
-        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
-        object
-    );
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
     write_fake_codex_scenario(&fixture, "success");
     let binary = fake_codex_binary_with_exact_commands(&fixture);
     let output = run_cli(
@@ -576,8 +553,5 @@ fn runtime_follow_on_write_preserves_the_lifecycle_depth_object() {
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     let state = read_json(&lifecycle_state_path(&fixture));
     assert_eq!(state["lifecycle_stage"], "runtime_integrated");
-    assert_eq!(
-        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
-        object
-    );
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
 }

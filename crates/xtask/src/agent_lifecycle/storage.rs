@@ -33,27 +33,6 @@ pub(super) fn load_json_file<T: for<'de> Deserialize<'de>>(
         .map_err(|err| LifecycleError::Validation(format!("parse {}: {err}", resolved.display())))
 }
 
-/// Reads a lifecycle state, refusing depth fields held in any form but the one a writer writes.
-pub(super) fn load_lifecycle_state_file(
-    workspace_root: &Path,
-    relative_path: &str,
-) -> Result<LifecycleState, LifecycleError> {
-    let resolved = validation::resolve_repo_relative_path(workspace_root, relative_path)?;
-    let bytes = fs::read(&resolved)
-        .map_err(|err| LifecycleError::Validation(format!("read {}: {err}", resolved.display())))?;
-    parse_lifecycle_state(&bytes)
-        .map_err(|err| LifecycleError::Validation(format!("{}: {err}", resolved.display())))
-}
-
-/// Parses lifecycle state bytes, refusing depth fields held in any form but the one a writer
-/// writes, so that every writer that re-serializes the state preserves them byte for byte.
-pub fn parse_lifecycle_state(bytes: &[u8]) -> Result<LifecycleState, LifecycleError> {
-    let state = serde_json::from_slice(bytes)
-        .map_err(|err| LifecycleError::Validation(format!("parse lifecycle state: {err}")))?;
-    support_depth::require_written_form(bytes, &state)?;
-    Ok(state)
-}
-
 pub(super) fn write_json_file<T: Serialize>(
     workspace_root: &Path,
     relative_path: &str,
@@ -87,19 +66,7 @@ pub fn write_lifecycle_state(
         "lifecycle writer",
     )
     .map_err(LifecycleError::Validation)?;
-    let destination =
-        validation::resolve_repo_relative_path_for_write(workspace_root, relative_path)?;
-    let previous = match fs::read(&destination) {
-        Ok(bytes) => Some(bytes),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
-        Err(err) => {
-            return Err(LifecycleError::Internal(format!(
-                "read {}: {err}",
-                destination.display()
-            )))
-        }
-    };
-    support_depth::require_preserved(previous.as_deref(), state)?;
+    check_depth_preserved(workspace_root, relative_path, state)?;
     write_json_file(workspace_root, relative_path, state)
 }
 
@@ -119,4 +86,27 @@ pub fn write_publication_ready_packet(
     )
     .map_err(LifecycleError::Validation)?;
     write_json_file(workspace_root, relative_path, packet)
+}
+
+/// Whether writing `state` at `relative_path` would keep the depth fields of the state already
+/// there byte for byte, without writing anything. A writer that makes other changes first calls
+/// this before its first change, so a refusal leaves nothing half written.
+pub fn check_depth_preserved(
+    workspace_root: &Path,
+    relative_path: &str,
+    state: &LifecycleState,
+) -> Result<(), LifecycleError> {
+    let destination =
+        validation::resolve_repo_relative_path_for_write(workspace_root, relative_path)?;
+    let previous = match fs::read(&destination) {
+        Ok(bytes) => Some(bytes),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
+        Err(err) => {
+            return Err(LifecycleError::Internal(format!(
+                "read {}: {err}",
+                destination.display()
+            )))
+        }
+    };
+    support_depth::require_preserved(previous.as_deref(), state)
 }

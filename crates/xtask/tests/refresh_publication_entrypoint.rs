@@ -676,25 +676,12 @@ fn refresh_publication_write_preserves_the_lifecycle_depth_object() {
         )
         .expect("write packet");
     };
-    // A depth object in a form no writer writes is refused, not rewritten.
-    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
-    rebind(&fixture);
-    let refused = run_cli(refresh_args("--write"), &fixture);
-    lifecycle_depth::assert_refused_unchanged(
-        &lifecycle_state_path(&fixture),
-        &before,
-        refused.exit_code,
-        &refused.stderr,
-    );
-    let object = lifecycle_depth::inject_depth_object(&lifecycle_state_path(&fixture));
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
     rebind(&fixture);
 
     let output = run_cli(refresh_args("--write"), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
     let state = read_json(&lifecycle_state_path(&fixture));
     assert_eq!(state["lifecycle_stage"], "published");
-    assert_eq!(
-        lifecycle_depth::depth_object_bytes(&lifecycle_state_path(&fixture)),
-        object
-    );
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
 }

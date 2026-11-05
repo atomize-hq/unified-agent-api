@@ -37,17 +37,27 @@ pub(super) fn validate_onboarding_binding(
         .collect();
 
     // A deleted lifecycle state deletes the object with it: every onboarding record is then a
-    // record without an object. A dangling symlink is there, and is read below.
-    if fs::symlink_metadata(&lifecycle_path).is_err() {
-        for (version, path) in &onboarding {
-            let message = format!(
-                "the record states an onboarding generation, but `{lifecycle}` does not exist, so \
-                 no `support_depth` object states it: a deleted binding for version `{version}` \
-                 (check 1)"
-            );
-            fail("DEPTH_LIFECYCLE_BINDING_MISSING", path, message);
+    // record without an object. Only a file that is not there is absent; any other failure to
+    // look, such as a symlink loop or a parent that is not a directory, is reported. A dangling
+    // symlink is there, and is read below.
+    match fs::symlink_metadata(&lifecycle_path) {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            for (version, path) in &onboarding {
+                let message = format!(
+                    "the record states an onboarding generation, but `{lifecycle}` does not \
+                     exist, so no `support_depth` object states it: a deleted binding for \
+                     version `{version}` (check 1)"
+                );
+                fail("DEPTH_LIFECYCLE_BINDING_MISSING", path, message);
+            }
+            return;
         }
-        return;
+        Err(err) => {
+            let message = format!("`{lifecycle}` cannot be looked up: {err}");
+            fail("DEPTH_LIFECYCLE_UNREADABLE", &lifecycle_path, message);
+            return;
+        }
     }
     let state = match agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) {
         Ok(state) => state,
@@ -59,7 +69,7 @@ pub(super) fn validate_onboarding_binding(
             return;
         }
     };
-    let object = state.support_depth.as_ref();
+    let object = state.support_depth.as_deref();
     // No record and no object: P is not yet frozen, or the root is not depth-enrolled at all.
     if object.is_none() && onboarding.is_empty() {
         return;

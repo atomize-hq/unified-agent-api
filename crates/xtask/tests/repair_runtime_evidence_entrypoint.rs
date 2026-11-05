@@ -517,17 +517,8 @@ fn repair_runtime_evidence_write_preserves_the_lifecycle_depth_object() {
     let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-depth-object");
     let lifecycle_path =
         fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
-    // A depth object in a form no writer writes is refused, not rewritten.
-    let before = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
-    let refused = run_cli(repair_args("--write", &approval_path), &fixture);
-    lifecycle_depth::assert_refused_unchanged(
-        &lifecycle_path,
-        &before,
-        refused.exit_code,
-        &refused.stderr,
-    );
-    let object = lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
     let output = run_cli(repair_args("--write", &approval_path), &fixture);
     assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
-    assert_eq!(lifecycle_depth::depth_object_bytes(&lifecycle_path), object);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
 }
