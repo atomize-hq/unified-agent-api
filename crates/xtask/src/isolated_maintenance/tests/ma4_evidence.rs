@@ -522,7 +522,8 @@ fn evidence_changes_after_committed_genuine_e_refuse_delivery() {
             let _gates = execute::gate_stub::stub();
             let refused = run_as(root, &binary, run).unwrap_err();
             assert!(
-                refused.contains("not the bytes the host staged"),
+                refused.contains("not the bytes the host staged")
+                    || refused.contains("outside its evidence destination"),
                 "{run}: {refused}"
             );
         }

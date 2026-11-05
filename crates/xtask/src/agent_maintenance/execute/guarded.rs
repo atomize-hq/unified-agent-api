@@ -5,7 +5,8 @@ use super::{
     tree,
     types::{Context, ValidationCheck, ValidationReport},
     validate::validate_prepared_packet,
-    workflow, Error, VALIDATION_REPORT_FILE_NAME, WORKFLOW_VERSION,
+    workflow, Error, CODEX_STDERR_FILE_NAME, CODEX_STDOUT_FILE_NAME, INPUT_CONTRACT_FILE_NAME,
+    VALIDATION_REPORT_FILE_NAME, WORKFLOW_VERSION,
 };
 use std::{io::Write, path::Path};
 
@@ -56,9 +57,12 @@ pub(super) fn execute_write_mode<W: Write>(
     }
     let passed = errors.is_empty();
     let report_path = format!("{}/{VALIDATION_REPORT_FILE_NAME}", context.run_dir_rel);
+    // A failed candidate is never read back: its report, like every failure diagnostic, comes
+    // only from what the host holds in memory.
     let mut report = observation
         .as_ref()
         .ok()
+        .filter(|_| passed)
         .and_then(|after| match after.get(&report_path) {
             Some(tree::Node::File(bytes, _)) if bytes.len() <= 1_048_576 => {
                 serde_json::from_slice::<ValidationReport>(bytes).ok()
@@ -77,6 +81,12 @@ pub(super) fn execute_write_mode<W: Write>(
         });
     report.workflow_version = WORKFLOW_VERSION.into();
     report.run_id = context.run_id.clone();
+    report.codex_execution = candidate
+        .context
+        .host_capture
+        .lock()
+        .ok()
+        .and_then(|capture| capture.as_ref().map(|c| c.execution.clone()));
     report.status = if passed { "pass" } else { "fail" }.into();
     report.errors.extend(errors.clone());
     report.checks.push(ValidationCheck {
@@ -197,15 +207,34 @@ fn stage_evidence(
     .map_err(|e| Error::Validation(format!("isolated evidence staging: {e}")))
 }
 
+/// The run's diagnostics, serialized by the host into its own private directory from what it
+/// holds in memory (report, status, the executor's output as the host received it, the recovery
+/// pointer). Nothing is read from the candidate, so a failed run copies back no file the executor
+/// wrote.
 fn persist_diagnostics(
     candidate: &Candidate,
     report: &ValidationReport,
     passed: bool,
     written: &[String],
 ) -> Result<tree::Tree, Error> {
-    let attempt = || {
+    let attempt = || -> Result<tree::Tree, Error> {
+        let dir = tempfile::Builder::new()
+            .prefix("uaa-diagnostics-")
+            .tempdir()
+            .map_err(tree::io)?;
+        let mut context = candidate.context.clone();
+        context.run_dir = dir.path().join(&context.run_dir_rel);
+        std::fs::create_dir_all(&context.run_dir).map_err(tree::io)?;
+        // Persistence requires the prepared contract: the caller's own copy, never delivered.
+        let contract = format!("{}/{INPUT_CONTRACT_FILE_NAME}", context.run_dir_rel);
+        let contract = match candidate.before.get(&contract) {
+            Some(tree::Node::File(bytes, _)) => bytes.clone(),
+            _ => b"{}".to_vec(),
+        };
+        std::fs::write(context.run_dir.join(INPUT_CONTRACT_FILE_NAME), contract)
+            .map_err(tree::io)?;
         let status = build_run_status(
-            &candidate.context,
+            &context,
             "write",
             if passed {
                 "write_validated"
@@ -217,7 +246,7 @@ fn persist_diagnostics(
             report.errors.clone(),
         )?;
         persist_run_packet(
-            &candidate.context,
+            &context,
             report,
             &status,
             written,
@@ -225,10 +254,38 @@ fn persist_diagnostics(
             "write",
         )?;
         packet::write_string(
-            &candidate.context.run_dir.join("recovery-candidate.txt"),
+            &context.run_dir.join("recovery-candidate.txt"),
             &format!("{}\n", candidate.recovery().display()),
         )?;
-        candidate.diagnostic_tree()
+        let capture = context.host_capture.lock().ok().and_then(|c| c.clone());
+        if let Some(capture) = capture {
+            packet::write_string(
+                &context.run_dir.join(CODEX_STDOUT_FILE_NAME),
+                &String::from_utf8_lossy(&capture.stdout),
+            )?;
+            packet::write_string(
+                &context.run_dir.join(CODEX_STDERR_FILE_NAME),
+                &String::from_utf8_lossy(&capture.stderr),
+            )?;
+        }
+        let files = tree::capture(&context.run_dir, &Default::default())?;
+        // The retained candidate records the same outcome for recovery, best effort: it is
+        // written, never read back, and an executor-broken path there never blocks the caller's
+        // diagnostics.
+        for (relative, node) in &files {
+            if let tree::Node::File(bytes, _) = node {
+                if relative != INPUT_CONTRACT_FILE_NAME {
+                    let _ = packet::write_string(
+                        &candidate.context.run_dir.join(relative),
+                        &String::from_utf8_lossy(bytes),
+                    );
+                }
+            }
+        }
+        Ok(files
+            .into_iter()
+            .map(|(p, n)| (format!("{}/{p}", context.run_dir_rel), n))
+            .collect())
     };
     attempt().map_err(|e| {
         Error::Validation(format!(

@@ -11,25 +11,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// The run files the host itself writes after the executor exits: its reports, status, logs of
-/// the executor's output and the recovery pointer.
-const HOST_DIAGNOSTICS: &[&str] = &[
-    super::RUN_STATUS_FILE_NAME,
-    super::RUN_SUMMARY_FILE_NAME,
-    super::VALIDATION_REPORT_FILE_NAME,
-    super::WRITTEN_PATHS_FILE_NAME,
-    super::CODEX_EXECUTION_FILE_NAME,
-    super::CODEX_STDOUT_FILE_NAME,
-    super::CODEX_STDERR_FILE_NAME,
-    "recovery-candidate.txt",
-];
-
 pub(super) struct Candidate {
     pub root: PathBuf,
     pub context: Context,
     pub before: Tree,
     pub baseline: String,
     caller_git: Option<GitState>,
+    /// The caller's tracked paths. Every capture used for binding covers them (with the
+    /// candidate's own), including tracked files under directories capture otherwise skips.
+    tracked: std::collections::BTreeSet<String>,
     /// Evidence the host authenticated and staged for this run (path to SHA-256), under a captured
     /// isolated route only; `None` in production.
     pub staged_evidence: Option<std::collections::BTreeMap<String, String>>,
@@ -41,7 +31,8 @@ pub(super) struct Candidate {
 impl Candidate {
     pub fn prepare(caller: &Path, context: &Context) -> Result<Self, Error> {
         let caller_git = GitState::read(caller)?;
-        let before = tree::capture(caller, &GitState::tracked(caller)?)?;
+        let tracked = GitState::tracked(caller)?;
+        let before = tree::capture(caller, &tracked)?;
         let holder = tempfile::Builder::new()
             .prefix("uaa-relay-")
             .tempdir()
@@ -83,6 +74,7 @@ impl Candidate {
             before,
             baseline,
             caller_git,
+            tracked,
             staged_evidence: Default::default(),
             config,
             default_mode,
@@ -113,7 +105,9 @@ impl Candidate {
                 "executor changed candidate HEAD or Git configuration".into(),
             ));
         }
-        tree::capture(&self.root, &GitState::tracked(&self.root)?)
+        let mut tracked = GitState::tracked(&self.root)?;
+        tracked.extend(self.tracked.iter().cloned());
+        tree::capture(&self.root, &tracked)
     }
     pub fn check(&self, after: &Tree) -> Result<(), Error> {
         for path in tree::changed(&self.before, after) {
@@ -218,22 +212,9 @@ impl Candidate {
                 self.staged_evidence.as_ref(),
             )?;
         }
-        // Copy-back never delivers a bound evidence path as a diagnostic: not one bound in the
-        // caller, in the tree being delivered, or in the candidate as the executor left it. If
-        // the candidate cannot be fully captured, its bound paths are unknown, so this fails
-        // closed: only diagnostics the host itself writes are delivered.
-        let mut bound = super::delivery_index::evidence_paths(&self.before, after);
-        let complete = match tree::capture(&self.root, &Default::default()) {
-            Ok(current) => {
-                bound.extend(super::delivery_index::evidence_paths(&current, &current));
-                true
-            }
-            Err(_) => false,
-        };
-        let host_authored = |path: &str| {
-            path.strip_prefix(&format!("{}/", self.context.run_dir_rel))
-                .is_some_and(|name| HOST_DIAGNOSTICS.contains(&name))
-        };
+        // Diagnostics are host-serialized; still, none is delivered over a path that bound
+        // evidence names in the caller or in the tree being delivered.
+        let bound = super::delivery_index::evidence_paths(&self.before, after);
         let mut mutations = Vec::new();
         let mut paths = Vec::new();
         for path in tree::changed(&self.before, after) {
@@ -241,7 +222,7 @@ impl Candidate {
             if !passed && !diagnostic {
                 continue;
             }
-            if diagnostic && (bound.contains(&path) || (!complete && !host_authored(&path))) {
+            if diagnostic && bound.contains(&path) {
                 continue;
             }
             if path == format!("{}/{INPUT_CONTRACT_FILE_NAME}", self.context.run_dir_rel)
@@ -292,16 +273,6 @@ impl Candidate {
             });
         }
         Ok(paths)
-    }
-    pub fn diagnostic_tree(&self) -> Result<Tree, Error> {
-        // A malformed candidate can still supply bounded regular diagnostic files; never follow links.
-        let jail = crate::workspace_mutation::WorkspacePathJail::new(&self.root)?;
-        let root = jail.resolve(Path::new(&self.context.run_dir_rel))?;
-        let files = tree::capture(&root, &Default::default())?;
-        Ok(files
-            .into_iter()
-            .map(|(p, n)| (format!("{}/{p}", self.context.run_dir_rel), n))
-            .collect())
     }
     pub fn recovery(&self) -> PathBuf {
         self.root.clone()

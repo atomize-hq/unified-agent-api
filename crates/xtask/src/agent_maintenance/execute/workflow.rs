@@ -112,6 +112,7 @@ pub(super) fn build_context(workspace_root: &Path, args: &Args) -> Result<Contex
         input_contract,
         registry,
         evidence_channel: None,
+        host_capture: Default::default(),
     })
 }
 

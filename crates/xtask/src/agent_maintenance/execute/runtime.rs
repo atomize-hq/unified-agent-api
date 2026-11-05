@@ -156,10 +156,7 @@ pub(super) fn execute_codex_write(
     )?;
     let stdout_path = context.run_dir.join(CODEX_STDOUT_FILE_NAME);
     let stderr_path = context.run_dir.join(CODEX_STDERR_FILE_NAME);
-    write_string(&stdout_path, &String::from_utf8_lossy(&output.stdout))?;
-    write_string(&stderr_path, &String::from_utf8_lossy(&output.stderr))?;
-
-    Ok(CodexExecutionEvidence {
+    let execution = CodexExecutionEvidence {
         workflow_version: WORKFLOW_VERSION.to_string(),
         generated_at: now_rfc3339()?,
         run_id: context.run_id.clone(),
@@ -173,7 +170,19 @@ pub(super) fn execute_codex_write(
         stdout_path: stdout_path.to_string_lossy().into_owned(),
         stderr_path: stderr_path.to_string_lossy().into_owned(),
         exit_code: output.status.code().unwrap_or(1),
-    })
+    };
+    // Record what the host received before touching the candidate, so failure diagnostics never
+    // depend on anything the executor left there.
+    if let Ok(mut capture) = context.host_capture.lock() {
+        *capture = Some(super::types::HostCapture {
+            execution: execution.clone(),
+            stdout: output.stdout.clone(),
+            stderr: output.stderr.clone(),
+        });
+    }
+    write_string(&stdout_path, &String::from_utf8_lossy(&output.stdout))?;
+    write_string(&stderr_path, &String::from_utf8_lossy(&output.stderr))?;
+    Ok(execution)
 }
 
 pub(super) fn run_green_gates(

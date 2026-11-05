@@ -271,13 +271,13 @@ fn only_host_staged_bytes_of_the_evidence_closure_are_admitted() {
     assert!(check_staged_closure(&Tree::new(), &genuine, "runs/x", None).is_err());
 }
 
-/// A payload outside any evidence destination, referenced by an unchanged committed receipt, is
-/// still evidence: substituting it, or a receipt newly referencing another external file,
-/// refuses in production and under a route. A receipt's source inputs are not evidence.
+/// Containment at MA4 delivery: a payload outside its receipt's evidence destination, a
+/// receipt newly referencing another external file, or an E reference outside its record's
+/// evidence destination refuses, whether or not it changed, in production and under a route.
+/// A receipt's source inputs are not evidence and may change freely.
 #[test]
-fn payloads_outside_evidence_destinations_are_bound_through_their_receipts() {
+fn references_outside_evidence_destinations_refuse() {
     let receipt = "cli/reports/1/evidence/run/receipt.json";
-    let external = "cli/reports/1/raw.txt";
     let source = "crates/cli/src/lib.rs";
     let receipt_for = |payloads: &[&str]| {
         let mut value = serde_json::json!({
@@ -289,36 +289,66 @@ fn payloads_outside_evidence_destinations_are_bound_through_their_receipts() {
         }
         serde_json::to_vec(&value).unwrap()
     };
-    let mut committed = Tree::new();
-    committed.insert(receipt.into(), Node::File(receipt_for(&[external]), 0o644));
-    committed.insert(external.into(), Node::File(b"raw".to_vec(), 0o644));
-    committed.insert(source.into(), Node::File(b"src".to_vec(), 0o644));
-    let host: Staged = Staged::new();
-    // (a) substitute the external payload behind the unchanged receipt
-    let mut substituted = committed.clone();
-    substituted.insert(external.into(), Node::File(b"substituted".to_vec(), 0o644));
-    // (b) the receipt newly references another external file
-    let mut extended = committed.clone();
+    let committed_with = |payload: &str| {
+        let mut tree = Tree::new();
+        tree.insert(receipt.into(), Node::File(receipt_for(&[payload]), 0o644));
+        tree.insert(payload.into(), Node::File(b"raw".to_vec(), 0o644));
+        tree.insert(source.into(), Node::File(b"src".to_vec(), 0o644));
+        tree
+    };
+    let inside = committed_with("cli/reports/1/evidence/run/raw.txt");
+    let outside = committed_with("cli/reports/1/raw.txt");
+    // An external payload refuses even unchanged, and substituted.
+    let mut substituted = outside.clone();
+    substituted.insert(
+        "cli/reports/1/raw.txt".into(),
+        Node::File(b"substituted".to_vec(), 0o644),
+    );
+    // A contained receipt newly referencing an external file.
+    let mut extended = inside.clone();
     extended.insert(
         receipt.into(),
-        Node::File(receipt_for(&[external, "cli/reports/1/extra.txt"]), 0o644),
+        Node::File(
+            receipt_for(&[
+                "cli/reports/1/evidence/run/raw.txt",
+                "cli/reports/1/extra.txt",
+            ]),
+            0o644,
+        ),
     );
-    extended.insert(
-        "cli/reports/1/extra.txt".into(),
-        Node::File(b"x".to_vec(), 0o644),
+    // An E reference outside its record's evidence destination.
+    let mut e_outside = Tree::new();
+    e_outside.insert(
+        "cli/reports/1/depth-record.json".into(),
+        Node::File(
+            serde_json::to_vec(&serde_json::json!({
+                "execution": {"results": [{"evidence": [{"path": "target/receipt.json"}]}]}
+            }))
+            .unwrap(),
+            0o644,
+        ),
     );
-    for after in [&substituted, &extended] {
+    let host = Staged::new();
+    for (before, after) in [
+        (&outside, &outside),
+        (&outside, &substituted),
+        (&inside, &extended),
+        (&e_outside, &e_outside),
+    ] {
         for staged in [None, Some(&host)] {
-            let error = check_staged_closure(&committed, after, "runs/x", staged)
+            let error = check_staged_closure(before, after, "runs/x", staged)
                 .unwrap_err()
                 .to_string();
-            assert!(error.contains("not the bytes the host staged"), "{error}");
+            assert!(
+                error.contains("outside its evidence destination"),
+                "{error}"
+            );
         }
     }
     // A product source file the receipt names as an input may change freely.
-    let mut edited = committed.clone();
+    let mut edited = inside.clone();
     edited.insert(source.into(), Node::File(b"edited".to_vec(), 0o644));
-    check_staged_closure(&committed, &edited, "runs/x", None).unwrap();
+    check_staged_closure(&inside, &edited, "runs/x", None).unwrap();
 }
 
 /// Bound evidence may never live in an MA4 run directory, whose diagnostics are copied back even

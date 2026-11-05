@@ -27,13 +27,15 @@ fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-/// Whether `path` lies in an evidence destination: `.../reports/<version>/evidence/...`.
-fn evidence_destination(path: &str) -> bool {
+/// The evidence destination `path` lies in (`.../reports/<version>/evidence/`), if any.
+fn evidence_root(path: &str) -> Option<String> {
     let segments: Vec<_> = path.split('/').collect();
-    segments
-        .windows(3)
-        .take(segments.len().saturating_sub(3))
-        .any(|w| w[0] == "reports" && w[2] == "evidence")
+    (0..segments.len().saturating_sub(3))
+        .find(|&i| segments[i] == "reports" && segments[i + 2] == "evidence")
+        .map(|i| format!("{}/", segments[..=i + 2].join("/")))
+}
+fn evidence_destination(path: &str) -> bool {
+    evidence_root(path).is_some()
 }
 
 /// The payloads a receipt references: its toolchain, environment, dependency graph and raw
@@ -53,7 +55,10 @@ fn payload_references(receipt: &serde_json::Value) -> impl Iterator<Item = &str>
 /// The evidence bound in one snapshot, traversed on its own: every receipt any E binds, every
 /// file in an evidence destination (each read as a possible receipt), and every payload those
 /// receipts reference. Every receipt is read, whether or not it was also found another way.
-fn bound_closure(tree: &Tree) -> BTreeSet<String> {
+/// Also returns each reference that leaves its owner's evidence destination: an E reference
+/// outside its record's `reports/<version>/evidence/`, or a payload outside its receipt's.
+fn bound_closure(tree: &Tree) -> (BTreeSet<String>, BTreeSet<String>) {
+    let mut outside = BTreeSet::new();
     let mut receipts: BTreeSet<String> = tree
         .iter()
         .filter(|(p, node)| matches!(node, Node::File(..)) && evidence_destination(p))
@@ -63,12 +68,13 @@ fn bound_closure(tree: &Tree) -> BTreeSet<String> {
         let Node::File(bytes, _) = node else {
             continue;
         };
-        if !path.ends_with("/depth-record.json") {
+        let Some(reports) = path.strip_suffix("/depth-record.json") else {
             continue;
-        }
+        };
         let Ok(record) = serde_json::from_slice::<serde_json::Value>(bytes) else {
             continue;
         };
+        let destination = format!("{reports}/evidence/");
         for result in record["execution"]["results"]
             .as_array()
             .into_iter()
@@ -76,6 +82,9 @@ fn bound_closure(tree: &Tree) -> BTreeSet<String> {
         {
             for file in result["evidence"].as_array().into_iter().flatten() {
                 if let Some(path) = file["path"].as_str() {
+                    if !path.starts_with(&destination) {
+                        outside.insert(path.to_owned());
+                    }
                     receipts.insert(path.to_owned());
                 }
             }
@@ -85,19 +94,25 @@ fn bound_closure(tree: &Tree) -> BTreeSet<String> {
     for receipt in &receipts {
         if let Some(Node::File(bytes, _)) = tree.get(receipt) {
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
-                bound.extend(payload_references(&value).map(str::to_owned));
+                let root = evidence_root(receipt);
+                for payload in payload_references(&value) {
+                    if !root.as_ref().is_some_and(|root| payload.starts_with(root)) {
+                        outside.insert(payload.to_owned());
+                    }
+                    bound.insert(payload.to_owned());
+                }
             }
         }
     }
-    bound
+    (bound, outside)
 }
 
 /// The evidence path class: every file in an evidence destination before or after, and the
 /// bound closure of each snapshot, each traversed independently, in union. Nothing is excluded:
 /// bound evidence inside a run directory is refused by [`check_staged_closure`].
 pub(super) fn evidence_paths(before: &Tree, after: &Tree) -> BTreeSet<String> {
-    let mut paths = bound_closure(before);
-    paths.extend(bound_closure(after));
+    let mut paths = bound_closure(before).0;
+    paths.extend(bound_closure(after).0);
     paths
 }
 
@@ -119,6 +134,15 @@ pub(super) fn check_staged_closure(
     }) {
         return Err(Error::Validation(format!(
             "bound evidence may not live in an MA4 run directory: {path}"
+        )));
+    }
+    // Containment, at MA4 delivery only (contract revision 1 allows any repository-relative
+    // path, and evaluation is unchanged): bound evidence stays in its evidence destination.
+    let mut outside = bound_closure(before).1;
+    outside.extend(bound_closure(after).1);
+    if let Some(path) = outside.first() {
+        return Err(Error::Validation(format!(
+            "bound evidence outside its evidence destination (reports/<version>/evidence/): {path}"
         )));
     }
     for path in paths {

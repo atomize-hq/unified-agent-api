@@ -198,12 +198,20 @@ Each step is a reviewed PR into `staging`.
        or a receipt newly referencing another file are therefore refused. Bound evidence may
        never live in an MA4 run directory (`docs/agents/.uaa-temp/agent-maintenance/runs/`),
        whose diagnostics are copied back even when a run fails: any E or receipt reference
-       there refuses the whole delivery, and diagnostic copy-back never delivers a path bound
-       in the caller, in the delivered tree or in the candidate as the executor left it. If the
-       candidate cannot be captured in full (for example it holds a FIFO or a literal-backslash
-       name), its bound paths are unknown, so copy-back fails closed: it delivers only the
-       diagnostics the host itself writes (reports, status, executor output logs, recovery
-       pointer). A completely unchanged
+       there refuses the whole delivery.
+     - Failure delivery copies back no file the candidate holds. The host serializes every run
+       diagnostic itself, in its own private directory, from what it holds in memory: its
+       validation report, run status, summary, the executor's exit record and its stdout and
+       stderr as the host received them, and the recovery pointer. A failed candidate's own
+       report is never read back. No diagnostic is written over a path bound evidence names.
+     - Every capture used for binding covers the caller's tracked paths together with the
+       candidate's, so a tracked file under a directory capture otherwise skips (such as
+       `target/`) is always classified.
+     - Containment, at MA4 delivery only: every E reference must lie in its own record's
+       `<manifest_root>/reports/<version>/evidence/`, and every payload a receipt references in
+       that receipt's evidence destination. Anything else refuses the delivery. Contract
+       revision 1 allows any repository-relative path, and evaluation is unchanged; whether the
+       contract should adopt this containment is an open question for the maintainer. A completely unchanged
        MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the
