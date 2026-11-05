@@ -33,6 +33,13 @@ const MANIFEST_ROOT_PREFIX: &str = "cli_manifests/";
 /// The compiled `agent_api` built-in backend inventory. Membership is fixed here, never by an entry.
 pub const BUILT_IN_AGENTS: [&str; 5] = ["aider", "claude_code", "codex", "gemini_cli", "opencode"];
 
+/// Admission of one agent's `support_depth` table to [`AgentRegistry::parse_isolated`]. Its only
+/// implementation is `isolated_maintenance::DepthTables`, which only an installed isolated profile
+/// mints, for its compiled subject; no flag, environment value, path or registry content names it.
+pub(crate) trait DepthAdmission {
+    fn admitted_agent(&self) -> &'static str;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentRegistry {
@@ -54,11 +61,29 @@ impl AgentRegistry {
     }
 
     pub fn parse(raw: &str) -> Result<Self, AgentRegistryError> {
+        Self::parse_admitting(raw, None)
+    }
+
+    /// The one accepting parse for the installed isolated maintenance profile (roadmap B.8). It
+    /// fully validates the registry, `support_depth` included, and admits a table only on the
+    /// admitted agent; every other table keeps the production refusal.
+    pub(crate) fn parse_isolated(
+        raw: &str,
+        admission: &impl DepthAdmission,
+    ) -> Result<Self, AgentRegistryError> {
+        Self::parse_admitting(raw, Some(admission.admitted_agent()))
+    }
+
+    fn parse_admitting(raw: &str, admitted: Option<&str>) -> Result<Self, AgentRegistryError> {
         let registry = Self::parse_unenforced(raw)?;
-        // No route enforces depth admission yet, and the support-depth contract forbids reading
-        // a declared version as not depth-enrolled. Remove this refusal with the change that
-        // lands that enforcement.
-        if let Some(agent) = registry.agents.iter().find(|a| a.support_depth.is_some()) {
+        // No production route enforces depth admission yet, and the support-depth contract
+        // forbids reading a declared version as not depth-enrolled. Remove this refusal with the
+        // change that lands that enforcement (roadmap D).
+        if let Some(agent) = registry
+            .agents
+            .iter()
+            .find(|a| a.support_depth.is_some() && Some(a.agent_id.as_str()) != admitted)
+        {
             return Err(AgentRegistryError::Validation(format!(
                 "agent `{}` carries `support_depth`, which no command enforces yet",
                 agent.agent_id

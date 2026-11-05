@@ -10,6 +10,7 @@ mod ma2_routes;
 #[cfg(unix)]
 mod ma4_route;
 mod prepare;
+mod registry_tables;
 mod subject;
 use fixture::{declaration, git, write, Fake, Fixture};
 
