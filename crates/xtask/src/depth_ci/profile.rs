@@ -13,6 +13,14 @@ impl Profile {
             Self::Synthetic => "depth_fixture",
         }
     }
+    /// The `rust-tests` collection, upload and binding step names use `<verb> <label> ...`.
+    pub(crate) fn step_label(self) -> &'static str {
+        match self {
+            Self::Channel => "isolated depth",
+            Self::Core => "isolated CORE depth",
+            Self::Synthetic => "isolated synthetic depth",
+        }
+    }
     pub(crate) fn fixture(self) -> &'static str {
         match self {
             Self::Channel => super::FIXTURE,
@@ -272,5 +280,30 @@ mod tests {
             p.evidence(),
             "cli_manifests/depth_fixture/reports/0.2.0/evidence/synthetic-wrapper-v1"
         );
+    }
+
+    #[test]
+    fn ci_workflow_names_every_profile_step_and_artifact() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let ci = std::fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
+        let profiles = [Profile::Channel, Profile::Core, Profile::Synthetic];
+        for p in profiles {
+            for step in [
+                "Collect {} witness",
+                "Upload {} witness",
+                "Bind {} artifact",
+            ] {
+                let name = format!("- name: {}", step.replace("{}", p.step_label()));
+                assert_eq!(ci.matches(&format!("{name}\n")).count(), 1, "{name}");
+            }
+            let artifact = format!(
+                "{}-${{{{ github.run_id }}}}-${{{{ github.run_attempt }}}}",
+                p.artifact()
+            );
+            assert_eq!(ci.matches(&artifact).count(), 1, "{artifact}");
+        }
+        assert!(ci.contains("run: cargo run -p xtask -- depth-synthetic-collect\n"));
+        let labels: std::collections::BTreeSet<_> = profiles.map(Profile::step_label).into();
+        assert_eq!(labels.len(), 3);
     }
 }

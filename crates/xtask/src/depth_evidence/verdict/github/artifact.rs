@@ -58,11 +58,7 @@ pub(super) fn witness(
         return Err("nonterminal/wrong-attempt producer job".into());
     }
     let steps = job["steps"].as_array().ok_or("missing job steps")?;
-    let label = if profile == crate::depth_ci::profile::Profile::Channel {
-        "isolated depth"
-    } else {
-        "isolated CORE depth"
-    };
+    let label = profile.step_label();
     let names = [
         format!("Collect {label} witness"),
         format!("Upload {label} witness"),

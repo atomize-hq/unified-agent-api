@@ -160,3 +160,18 @@ fn synthetic_profile_has_no_whole_workflow_path() {
         .unwrap();
     assert!(error.contains("no whole-workflow evidence path"), "{error}");
 }
+
+#[test]
+fn synthetic_scope_names_its_own_agent_and_trust() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let p = Profile::Synthetic;
+    let record = p
+        .record(&fs::read_to_string(root.join(p.fixture())).unwrap())
+        .unwrap();
+    for obligation in p.obligations(&record) {
+        let scope = profile::scope_for(&record, p, obligation);
+        assert_eq!(scope.agent_id, "depth_fixture");
+        assert_eq!(scope.version, "0.2.0");
+        assert_eq!(scope.trust_revision, "github-actions-synthetic-wrapper-v1");
+    }
+}
