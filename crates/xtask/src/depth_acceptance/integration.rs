@@ -15,28 +15,41 @@ pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     let Some(route) = crate::isolated_maintenance::route(root)? else {
         return check_with(root, revision, &manual::Production, &promotion::Production);
     };
-    // The existing proposal adapter exposes only its captured authority, never a caller-built
-    // context. No proposal is planned or delivered by this read-only check.
-    let proposal = route.proposal(root)?;
-    let authority = proposal.authority();
-    let super::Authority::Isolated(context) = authority else {
-        return Err("isolated IN1 binding lost its captured authority".into());
-    };
-    let binding = binding::capture(root, revision, context)?;
-    admit_all(
-        root,
-        &binding.parent,
-        &super::isolated::Host::closeout(context),
-        &super::isolated::Host::promotion(context),
-        |view| {
-            crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
-                root,
-                context,
-                || super::publication::validate_current(root, view),
-            )
-        },
-    )?;
-    binding.recheck(root, context)
+    route.with_admitted_publication(root, revision, || Ok(()))
+}
+
+impl crate::isolated_maintenance::Route {
+    /// The public --tip consistency boundary and check_integration share authenticated IN1
+    /// admission and fresh B.7a evaluation under the same captured caller authority.
+    pub(crate) fn with_admitted_publication<T>(
+        self,
+        root: &Path,
+        revision: &str,
+        validate: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let captured = self.capture(root)?;
+        let proposal = captured.proposal(root)?;
+        let super::Authority::Isolated(context) = proposal.authority() else {
+            return Err("isolated IN1 binding lost its captured authority".into());
+        };
+        let binding = binding::capture(root, revision, context)?;
+        let outcome = crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
+            root,
+            &captured,
+            || {
+                admit_all(
+                    root,
+                    &binding.parent,
+                    &super::isolated::Host::closeout(context),
+                    &super::isolated::Host::promotion(context),
+                    |view| super::publication::validate_current(root, view),
+                )?;
+                validate()
+            },
+        );
+        binding.recheck(root, context)?;
+        outcome
+    }
 }
 
 // Per-root IN1 readers borrow the same routed scope instead of re-entering production-only
@@ -56,28 +69,29 @@ impl crate::isolated_maintenance::Route {
     }
 
     pub(crate) fn integration_comparison(
-        &self,
+        self,
         root: &Path,
         revision: &str,
         agent: &str,
     ) -> Result<super::Comparison, String> {
-        let registry = self.registry(root)?;
+        let registry = self.registry(root)?.clone();
         let earlier = self.integration_registry(root, revision)?;
         let before = View::with_registry(Source::tip(root, revision)?, &earlier, agent)?;
-        let after = View::with_registry(Source::workspace(root)?, registry, agent)?;
+        let after = View::with_registry(Source::workspace(root)?, &registry, agent)?;
         let mut comparison = super::compare_views(&before, &after)?;
+        let captured = self.capture(root)?;
         if !before.records.is_empty() || !after.records.is_empty() {
             comparison.input_issues =
                 crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
                     root,
-                    self.context(),
+                    &captured,
                     || super::publication::validate_current(root, &after),
                 )
                 .err()
                 .into_iter()
                 .collect();
         }
-        self.recheck(root)?;
+        captured.recheck(root)?;
         Ok(comparison)
     }
 }
@@ -257,9 +271,9 @@ pub(super) fn admit(
             "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
             new.entry.agent_id
         );
-        let new_closeout = added
-            .iter()
-            .any(|e| matches!(e, AcceptanceEntry::MaintenanceCloseout { .. }));
+        let new_closeout = added.iter().any(|e| {
+            matches!(e, AcceptanceEntry::MaintenanceCloseout { .. }) && !previous.contains(e)
+        });
         let mut closeout = new_closeout;
         let mut promote = added
             .iter()
@@ -285,8 +299,10 @@ pub(super) fn admit(
         }
         let manual_entry = if closeout {
             let entry = manual::acceptance(root, new, record, tip, closeout_host)?;
-            if !record.acceptance_entries.contains(&entry) {
-                return Err("integration closeout lacks its exact current entry".into());
+            if !record.acceptance_entries.contains(&entry)
+                || (new_closeout && (!added.contains(&entry) || previous.contains(&entry)))
+            {
+                return Err("integration closeout lacks its exact new current entry".into());
             }
             Some(entry)
         } else {

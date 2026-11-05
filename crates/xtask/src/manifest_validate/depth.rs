@@ -20,6 +20,44 @@ use xtask::{
 
 use super::{rel_path, workspace_root_for, ValidateCtx, Violation};
 
+/// Only routed `--tip` validation selects authenticated post-entry verdicts. Keep the
+/// ordinary consistency check unchanged when either the tip or isolated route is absent.
+pub(super) fn validate_support_matrix_publication(
+    ctx: &ValidateCtx,
+    tip: Option<&str>,
+    violations: &mut Vec<Violation>,
+    validate: impl FnOnce(&ValidateCtx, &mut Vec<Violation>),
+) {
+    let Some(tip) = tip else {
+        return validate(ctx, violations);
+    };
+    let Some(workspace) = workspace_root_for(&ctx.root) else {
+        return validate(ctx, violations);
+    };
+    let route = match xtask::isolated_maintenance::route(&workspace) {
+        Ok(Some(route)) => route,
+        Ok(None) => return validate(ctx, violations),
+        Err(error) => {
+            violations.push(violation(
+                "DEPTH_ROUTE_REFUSED",
+                rel_path(&workspace, &ctx.root),
+                error,
+            ));
+            return;
+        }
+    };
+    if let Err(error) = route.with_admitted_publication(&workspace, tip, || {
+        validate(ctx, violations);
+        Ok(())
+    }) {
+        violations.push(violation(
+            "DEPTH_ADMISSION_REFUSED",
+            rel_path(&workspace, &ctx.root),
+            error,
+        ));
+    }
+}
+
 pub(super) fn validate_depth_records(ctx: &ValidateCtx, violations: &mut Vec<Violation>) {
     // Canonical, as the workspace root is, so the root's path can be named relative to it.
     let root_dir = fs::canonicalize(&ctx.root).unwrap_or_else(|_| ctx.root.clone());

@@ -280,45 +280,72 @@ impl crate::depth_evidence::EvidenceVerdicts {
         render()
     }
 
-    /// IN1 evaluates the delivered post-entry records in the caller, which owns its Git
-    /// inputs. Pass those fresh verdicts through the same explicit rendering/consistency
-    /// scope as MA5/MA6; route presence alone never selects them in derivation.
+    /// Evaluate a read-only post-entry view through B.7a, borrowing the route captured by
+    /// IN1. Only current owning entries select authenticated verdicts; ordinary derivation
+    /// and records without such an entry keep production behavior.
     pub(crate) fn with_integration_publication<T>(
         root: &Path,
-        context: &crate::isolated_maintenance::Context,
+        captured: &crate::isolated_maintenance::CapturedRegistry,
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
-        let registry = context.registry(root)?;
-        let host = context.evidence_host(root)?;
+        let proposal = captured.proposal(root)?;
+        let super::Authority::Isolated(context) = proposal.authority() else {
+            return Err("integration publication lacks captured authority".into());
+        };
+        let host = captured.evidence_host(root)?;
+        let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let view = proposal.isolated_view(root, scratch.path())?;
         let mut values = std::collections::BTreeMap::new();
-        for entry in &registry.agents {
-            let view = View::with_registry(
-                crate::runtime_advertising::source::Source::workspace(root)?,
-                registry,
-                &entry.agent_id,
-            )?;
-            for record in view.records.values() {
-                let digest = record.stated_sha256()?;
-                let verdicts = if record.acceptance_entries.iter().any(|entry| {
-                    matches!(
-                        entry,
-                        crate::depth_record::AcceptanceEntry::MaintenanceCloseout { .. }
-                            | crate::depth_record::AcceptanceEntry::Promotion { .. }
-                    ) && entry.record_sha256() == digest
-                }) {
-                    Self::authenticate(root, record, &host)?
-                } else {
-                    crate::depth_evidence::production_results(root, record)?
-                };
-                values.insert(
-                    serde_json::to_string(record).map_err(|e| e.to_string())?,
-                    verdicts,
-                );
+        {
+            let _binding = captured.bind_view(&view)?;
+            for entry in &captured.registry().agents {
+                for (version, path) in
+                    crate::depth_record::record_files(&scratch.path().join(&entry.manifest_root))
+                {
+                    let relative = path
+                        .strip_prefix(scratch.path())
+                        .map_err(|e| e.to_string())?
+                        .to_str()
+                        .ok_or("non-UTF8 record path")?;
+                    let record = crate::depth_record::DepthRecord::parse(
+                        &std::fs::read_to_string(&path).map_err(|e| e.to_string())?,
+                        &entry.agent_id,
+                        &version,
+                    )?;
+                    let digest = record.stated_sha256()?;
+                    let verdicts = if record.acceptance_entries.iter().any(|entry| {
+                        matches!(
+                            entry,
+                            crate::depth_record::AcceptanceEntry::MaintenanceCloseout { .. }
+                                | crate::depth_record::AcceptanceEntry::Promotion { .. }
+                        ) && entry.record_sha256() == digest
+                    }) {
+                        let (evaluated, verdicts) =
+                            Self::bind_view(&view, context, &host, relative)?.evaluate()?;
+                        if evaluated != record {
+                            return Err(
+                                "integration publication record changed during evaluation".into()
+                            );
+                        }
+                        #[cfg(test)]
+                        EVALUATED_ENTRIES.with(|entries| {
+                            entries.borrow_mut().push(evaluated.acceptance_entries)
+                        });
+                        verdicts
+                    } else {
+                        crate::depth_evidence::production_results(root, &record)?
+                    };
+                    values.insert(
+                        serde_json::to_string(&record).map_err(|e| e.to_string())?,
+                        verdicts,
+                    );
+                }
             }
         }
-        context.recheck(root)?;
+        view.verify_current(root)?;
         let outcome = Self::with_publication_results(root, values, validate);
-        context.recheck(root)?;
+        view.verify_current(root)?;
+        captured.recheck(root)?;
         outcome
     }
 
@@ -500,7 +527,9 @@ pub(super) fn validate_closeout(
             let evidence = crate::depth_record::bound_evidence(root, [record])?;
             row.depth = support_matrix::depth::derive_evaluated_depth_facts(
                 Some(record),
-                true,
+                // Match committed derivation: only the record's covered modes enroll a
+                // target here; declaration-only enrollment belongs to preparation preview.
+                false,
                 &row.target,
                 &|p| evidence.get(p).cloned(),
                 &verdicts,
@@ -556,7 +585,9 @@ pub(super) fn validate_promoted(
         }) {
             let expected = support_matrix::depth::derive_evaluated_depth_facts(
                 Some(record),
-                true,
+                // Match committed derivation: only the record's covered modes enroll a
+                // target here; declaration-only enrollment belongs to preparation preview.
+                false,
                 &row.target,
                 &|p| evidence.get(p).cloned(),
                 &verdicts,
@@ -570,4 +601,59 @@ pub(super) fn validate_promoted(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publication_promoted_re_admission_keeps_uncovered_ordinary_target_without_depth() {
+        let root = tempfile::tempdir().unwrap();
+        let record = crate::depth_record::DepthRecord::parse(
+            include_str!("../../tests/fixtures/depth-synthetic/record.json"),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        let rows = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+            .into_iter()
+            .map(|target| {
+                let depth = support_matrix::depth::derive_depth_facts(
+                    Some(&record),
+                    false,
+                    target,
+                    &|_| None,
+                )
+                .unwrap();
+                support_matrix::SupportRow {
+                    agent: "depth_fixture".into(),
+                    version: "0.2.0".into(),
+                    target: target.into(),
+                    manifest_support: support_matrix::ManifestSupportState::Supported,
+                    backend_support: support_matrix::BackendSupportState::Supported,
+                    uaa_support: support_matrix::UaaSupportState::Supported,
+                    pointer_promotion: support_matrix::PointerPromotionState::LatestValidated,
+                    evidence_notes: vec![],
+                    depth,
+                }
+            })
+            .collect::<Vec<_>>();
+        assert!(rows[0].depth.is_some());
+        assert!(rows[1].depth.is_none());
+        let artifact = SupportMatrixArtifact {
+            schema_version: 2,
+            rows,
+        };
+        let path = root.path().join(support_matrix::JSON_OUTPUT_PATH);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, serde_json::to_vec(&artifact).unwrap()).unwrap();
+        validate_promoted(
+            root.path(),
+            &crate::runtime_advertising::source::Source::workspace(root.path()).unwrap(),
+            &[record],
+            &super::super::manual::Production,
+        )
+        .unwrap();
+    }
 }

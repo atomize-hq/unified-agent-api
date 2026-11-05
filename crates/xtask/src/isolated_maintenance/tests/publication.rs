@@ -9,7 +9,11 @@ pub(super) fn assert_qualified(root: &Path) {
     let row = artifact
         .rows
         .iter()
-        .find(|r| r.agent == "depth_fixture" && r.version == "0.2.0")
+        .find(|r| {
+            r.agent == "depth_fixture"
+                && r.version == "0.2.0"
+                && r.target == "x86_64-unknown-linux-gnu"
+        })
         .unwrap();
     let depth = row.depth.as_ref().unwrap();
     assert!(!depth.promises.is_empty());
@@ -40,28 +44,17 @@ fn publication_closeout_writer_socket_free_qualified_batch() {
     crate::depth_acceptance::check_integration(root, &parent).unwrap();
 }
 
-/// The proof's full --tip validator explicitly consumes fresh post-entry verdicts too.
-/// Its nested IN1 check still independently authenticates and admits the candidate.
+/// Exercise the public command without an externally supplied verdict scope.
 pub(super) fn validate_candidate(root: &Path, parent: &str) -> i32 {
-    let route = route(root).unwrap().unwrap();
-    crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
-        root,
-        route.context(),
-        || {
-            Ok(crate::manifest_validate::run(
-                crate::manifest_validate::Args {
-                    root: Some(root.join("cli_manifests/depth_fixture")),
-                    rules: None,
-                    schema: None,
-                    version_schema: None,
-                    mode: crate::manifest_validate::Mode::Check,
-                    json: true,
-                    tip: Some(parent.into()),
-                },
-            ))
-        },
-    )
-    .unwrap()
+    crate::manifest_validate::run(crate::manifest_validate::Args {
+        root: Some(root.join("cli_manifests/depth_fixture")),
+        rules: None,
+        schema: None,
+        version_schema: None,
+        mode: crate::manifest_validate::Mode::Check,
+        json: true,
+        tip: Some(parent.into()),
+    })
 }
 
 #[test]
@@ -89,6 +82,23 @@ fn publication_default_keeps_production_verdicts_with_a_route_and_in_scratch() {
         && p.obligations
             .iter()
             .all(|o| o.result == crate::depth_record::DepthResult::Unverified)));
+
+    // Without --tip the public validator still uses production verdicts, so qualified
+    // synthetic publication disagrees without triggering an authenticated evaluation.
+    crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations();
+    assert_eq!(
+        crate::manifest_validate::run(crate::manifest_validate::Args {
+            root: Some(root.join("cli_manifests/depth_fixture")),
+            rules: None,
+            schema: None,
+            version_schema: None,
+            mode: crate::manifest_validate::Mode::Check,
+            json: true,
+            tip: None,
+        }),
+        2
+    );
+    assert!(crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations().is_empty());
 
     // This view has no Git repository or remote of its own. Borrowing registry/Git inputs
     // must suffice for ordinary rendering, without triggering isolated evidence observation.
@@ -153,13 +163,33 @@ fn publication_ma5_socket_free_own_rows_and_in1_closeout_attribution() {
     );
     let head = candidate(&f, &parent);
     crate::depth_acceptance::check_integration(root, &parent).unwrap();
+    crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations();
     assert_eq!(validate_candidate(root, &parent), 0);
+    assert!(!crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations().is_empty());
     f.host();
     host.staging(&head);
     git(root, &["update-ref", "refs/remotes/origin/staging", &head]);
     crate::depth_acceptance::check_integration(root, &parent).unwrap();
+    crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations();
     assert_eq!(validate_candidate(root, &parent), 0);
+    assert!(!crate::depth_evidence::EvidenceVerdicts::take_publication_evaluations().is_empty());
+}
 
+#[test]
+fn publication_retained_closeout_and_appended_duplicate_cannot_own_new_qualification() {
+    let (f, host) = super::ma5_closeout::publication_ready();
+    let root = f.root.path();
+    let _installed = f.install();
+    let _reader = host.install();
+    let before: crate::support_matrix::SupportMatrixArtifact = serde_json::from_slice(
+        &fs::read(root.join(crate::support_matrix::JSON_OUTPUT_PATH)).unwrap(),
+    )
+    .unwrap();
+    let runtime =
+        fs::read(root.join(crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH))
+            .unwrap();
+    super::ma5_closeout::prepare(root).unwrap();
+    super::ma5_closeout::advance(&f, &host);
     // A retained closeout alone cannot own a *new* qualification in a later candidate.
     let stale = crate::support_matrix::render_publication_artifacts(
         &fs::read_to_string(root.join(crate::support_matrix::MARKDOWN_OUTPUT_PATH)).unwrap(),
@@ -180,12 +210,35 @@ fn publication_ma5_socket_free_own_rows_and_in1_closeout_attribution() {
     write(
         root,
         crate::support_matrix::JSON_OUTPUT_PATH,
-        qualified_json,
+        &qualified_json,
     );
     write(
         root,
         crate::support_matrix::MARKDOWN_OUTPUT_PATH,
-        qualified_markdown,
+        &qualified_markdown,
+    );
+    candidate(&f, &stale_tip);
+    let snapshot = super::ma5_closeout::snapshot(root);
+    let refusal = crate::depth_acceptance::check_integration(root, &stale_tip).unwrap_err();
+    assert!(refusal.contains("promotion"), "{refusal}");
+    assert_eq!(super::ma5_closeout::snapshot(root), snapshot);
+
+    // Appending an identical retained entry does not make it a new owning closeout.
+    git(root, &["reset", "--hard", &stale_tip]);
+    let mut record = super::ma5_closeout::record(root);
+    record
+        .acceptance_entries
+        .push(record.acceptance_entries[0].clone());
+    write(root, RECORD, serde_json::to_vec_pretty(&record).unwrap());
+    write(
+        root,
+        crate::support_matrix::JSON_OUTPUT_PATH,
+        &qualified_json,
+    );
+    write(
+        root,
+        crate::support_matrix::MARKDOWN_OUTPUT_PATH,
+        &qualified_markdown,
     );
     candidate(&f, &stale_tip);
     let snapshot = super::ma5_closeout::snapshot(root);
@@ -378,7 +431,84 @@ fn publication_ma6_renders_and_admits_its_post_entry_record() {
             crate::depth_record::AcceptanceEntry::Promotion { .. }
         ]
     ));
-    candidate(&f, &closed);
+    let promoted = candidate(&f, &closed);
     crate::depth_acceptance::check_integration(root, &closed).unwrap();
     assert_eq!(validate_candidate(root, &closed), 0);
+    f.host();
+    host.staging(&promoted);
+    git(
+        root,
+        &["update-ref", "refs/remotes/origin/staging", &promoted],
+    );
+    crate::depth_acceptance::check_integration(root, &closed).unwrap();
+    assert_eq!(validate_candidate(root, &closed), 0);
+}
+
+#[test]
+fn publication_ma5_preserves_ordinary_target_outside_depth_selection() {
+    use crate::support_matrix as matrix;
+    let (f, host) = super::ma5_closeout::publication_ready();
+    let root = f.root.path();
+    let _installed = f.install();
+    let _reader = host.install();
+    let ordinary = "aarch64-unknown-linux-gnu";
+    let current = "cli_manifests/depth_fixture/current.json";
+    let mut value: Value = serde_json::from_slice(&fs::read(root.join(current)).unwrap()).unwrap();
+    value["expected_targets"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(ordinary));
+    write(root, current, serde_json::to_vec_pretty(&value).unwrap());
+    let layout =
+        crate::root_intake_layout::RootIntakeLayout::new(root.join("cli_manifests/depth_fixture"));
+    for path in [
+        layout.latest_supported_pointer_path(ordinary),
+        layout.latest_validated_pointer_path(ordinary),
+    ] {
+        write(
+            root,
+            path.strip_prefix(root).unwrap().to_str().unwrap(),
+            "none\n",
+        );
+    }
+    let mut metadata: Value = serde_json::from_slice(
+        &fs::read(root.join("cli_manifests/depth_fixture/versions/0.1.0.json")).unwrap(),
+    )
+    .unwrap();
+    metadata["semantic_version"] = json!("0.2.0");
+    metadata["coverage"]["supported_targets"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(ordinary));
+    write(
+        root,
+        "cli_manifests/depth_fixture/versions/0.2.0.json",
+        serde_json::to_vec_pretty(&metadata).unwrap(),
+    );
+    super::ma5_closeout::advance(&f, &host);
+    refresh_installed(&f, &host);
+    git(
+        root,
+        &[
+            "update-ref",
+            "refs/remotes/origin/staging",
+            &git(root, &["rev-parse", "HEAD"]),
+        ],
+    );
+    let ordinary_row = || {
+        let artifact: matrix::SupportMatrixArtifact =
+            serde_json::from_slice(&fs::read(root.join(matrix::JSON_OUTPUT_PATH)).unwrap())
+                .unwrap();
+        artifact
+            .rows
+            .into_iter()
+            .find(|r| r.agent == "depth_fixture" && r.version == "0.2.0" && r.target == ordinary)
+            .unwrap()
+    };
+    let before = ordinary_row();
+    assert!(before.depth.is_none());
+    super::ma5_closeout::prepare(root).unwrap();
+    assert_qualified(root);
+    assert_eq!(ordinary_row(), before);
+    assert!(ordinary_row().depth.is_none());
 }

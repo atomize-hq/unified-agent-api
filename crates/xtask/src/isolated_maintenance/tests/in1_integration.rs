@@ -608,6 +608,7 @@ mod connected {
                 let err = check_integration(root, &parent).unwrap_err();
                 assert!(
                     err.contains("exact current entry")
+                        || err.contains("exact new current entry")
                         || err.contains("describe the current record"),
                     "{err}"
                 );
