@@ -42,13 +42,11 @@ use std::{
 
 use clap::Parser;
 
-use crate::agent_registry::AgentRegistry;
-
 use super::{
     closeout::{
         derive_findings, read_recorded_dispositions, reject_merge_commit, require_commit_binding,
         resolve_preflight_with_fetcher, serialize_closeout_json, DeferredFindingsTruth,
-        MaintenanceCloseout, MaintenanceCloseoutError, WrapperOnlyDisposition,
+        MaintenanceCloseout, MaintenanceCloseoutError, ResolvedPreflight, WrapperOnlyDisposition,
     },
     support_audit::{wrapper_only_baseline, SurfaceIdentity},
 };
@@ -104,12 +102,24 @@ pub fn run_in_workspace_with_fetcher<W: Write, F>(
 where
     F: FnMut(&str) -> Result<String, MaintenanceCloseoutError>,
 {
-    let proposal = args
-        .write
-        .then(|| super::closeout_proposal::Proposal::capture(workspace_root))
+    // Capture once, before any preflight read. Preview also uses the isolated repository; ordinary
+    // preview keeps its existing behavior and needs no production proposal.
+    let proposal = match xtask::isolated_maintenance::route(workspace_root)
+        .map_err(MaintenanceCloseoutError::Validation)?
+    {
+        Some(route) => Some(route.proposal(workspace_root)),
+        None if args.write => Some(super::closeout_proposal::Proposal::capture(workspace_root)),
+        None => None,
+    }
+    .transpose()
+    .map_err(MaintenanceCloseoutError::Validation)?;
+    let repository = proposal
+        .as_ref()
+        .map(|proposal| proposal.preflight_repository(workspace_root))
         .transpose()
-        .map_err(MaintenanceCloseoutError::Validation)?;
-    let prepared = build_closeout(workspace_root, &args, fetch)?;
+        .map_err(MaintenanceCloseoutError::Validation)?
+        .flatten();
+    let prepared = build_closeout(workspace_root, &args, repository, fetch)?;
     let bytes = serialize_closeout_json(&prepared.closeout)?;
 
     write_preview(writer, &prepared, args.write)?;
@@ -142,6 +152,7 @@ struct PreparedCloseout {
 fn build_closeout<F>(
     workspace_root: &Path,
     args: &Args,
+    repository: Option<&str>,
     fetch: F,
 ) -> Result<PreparedCloseout, MaintenanceCloseoutError>
 where
@@ -169,7 +180,12 @@ where
     // the network.
     require_commit_binding(workspace_root, &args.commit)?;
     reject_merge_commit(workspace_root, &args.commit)?;
-    let preflight = resolve_preflight_with_fetcher(&args.commit, fetch)?;
+    let preflight = match repository {
+        Some(repository) => {
+            ResolvedPreflight::resolve_in_repository(&args.commit, repository, fetch)?
+        }
+        None => resolve_preflight_with_fetcher(&args.commit, fetch)?,
+    };
     if !preflight.passed {
         return Err(MaintenanceCloseoutError::Validation(format!(
             "CI for `{}` resolved to a failure, so there is no closeout to write. The generator \
@@ -182,7 +198,7 @@ where
 
     let findings = derive_findings(workspace_root, &agent_id, &target_version)?;
 
-    let registry = AgentRegistry::load(workspace_root)
+    let registry = xtask::isolated_maintenance::registry(workspace_root)
         .map_err(|err| MaintenanceCloseoutError::Internal(format!("load agent registry: {err}")))?;
     let entry = registry.find(&agent_id).ok_or_else(|| {
         MaintenanceCloseoutError::Validation(format!("`{agent_id}` is not an enrolled agent"))

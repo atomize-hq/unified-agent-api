@@ -218,6 +218,29 @@ Each step is a reviewed PR into `staging`.
        untracked bound input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,
        re-authenticates the full population rather than trusting a bundle.
+   - B.5b connects both MA5 writers to the B.5a owning authority (G2–G4, CP-P4 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). Both the closeout
+     planner/writer and `prepare-agent-closeout` capture the resolved route's proposal before
+     preparing outputs. A failed installed route refuses; an absent route keeps production
+     behavior and its depth refusal. The request validator, findings, support-audit truth, drift
+     readers and maintenance-adoption validator use the routed registry. The proposal rechecks
+     its captured caller and host before delivery and MA5 re-authenticates the full applicable
+     evidence population for the exact record, rather than trusting E's labels.
+     - Under the route, preparation reads preflight from the authenticated isolated repository
+       of its captured context through `Proposal::preflight_repository`, a read accessor that
+       exposes no context, evidence host or admission authority. Neither a flag nor the spelling
+       of `origin` selects it. Production keeps the canonical repository. Run selection, attempt
+       handling and whole-workflow
+       terminality are unchanged, including in preview.
+     - `isolated_maintenance/tests/ma5_closeout.rs` exercises each writer on the classified
+       synthetic MA1 → acquisition → MA2 → MA4 → audit chain, with the exact-generation marker
+       on the fake protected tip. Refusals cover production/no route, captured-route drift,
+       missing or wrong-generation markers, changed generation/P/O and an unverified population
+       despite E's verified labels. The socket-free checks also cover preflight policy and routed
+       preview/readers with a missing-E refusal. Full connected chains require Unix sockets and
+       must run outside the restricted sandbox; the MA4 green gates remain stubbed.
+     - Publication is unchanged. **Qualified publication not exercised**: CP-P3 option A belongs
+       to B.7b, which must rerun the complete chains. MA6 and IN1 wiring belong to later slices.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

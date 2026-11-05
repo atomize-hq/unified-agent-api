@@ -14,6 +14,7 @@ mod ma2_routes;
 mod ma4_evidence;
 #[cfg(unix)]
 mod ma4_route;
+mod ma5_closeout;
 mod prepare;
 mod registry_tables;
 mod subject;
@@ -24,8 +25,7 @@ use fixture::{declaration, git, write, Fake, Fixture};
 #[test]
 fn matching_authenticated_private_scope_resolves_without_admission() {
     let f = Fixture::new();
-    let context = f.resolve().unwrap();
-    context.recheck(f.root.path()).unwrap();
+    f.resolve().unwrap().recheck(f.root.path()).unwrap();
 }
 #[test]
 fn absent_profile_never_reads_host() {
