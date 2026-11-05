@@ -25,8 +25,15 @@ The manifest-root files are the same as for the maintenance proof (`../governing
   producing command. A maintainer commits it to the integration branch, and it counts only from
   there. Its fields are not normative until the charter revision (slice 1).
 
-Placeholders: `{{APPROVAL_COMMIT}}` and `{{APPROVAL_RECORDED_AT}}` in the approval, and each
-`{{SHA256}}` in the statement. The registry entry has none.
+Placeholders: `{{APPROVAL_COMMIT}}` and `{{APPROVAL_RECORDED_AT}}` in the approval. In the
+statement, `{{DEPTH_FIXTURE_BINARY}}` is the path of the acquired release executable that the
+snapshot command ran, and each `{{SHA256}}` is that input's digest at the integration tip. The
+registry entry has none.
+
+Each statement `command` is the exact invocation, run from the workspace root in the order listed,
+that produced its input. `crates/xtask/src/acquisition_statement_cli_tests.rs` parses every
+`xtask` command with the real CLI definitions and checks that it writes the input it is listed
+for.
 
 The approval descriptor omits `backend_module`, because the subject is a non-runtime entry
 (SA-P2). Today's full approval loader still requires that field and refuses the template. Only the

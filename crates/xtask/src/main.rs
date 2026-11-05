@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+mod acquisition_statement_cli_tests;
 mod agent_api_backend_type_leak_guard;
 mod capability_matrix_audit;
 mod claude_snapshot;

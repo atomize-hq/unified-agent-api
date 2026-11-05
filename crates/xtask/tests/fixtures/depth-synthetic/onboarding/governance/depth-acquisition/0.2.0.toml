@@ -1,8 +1,13 @@
 # Acquisition statement template (OF-P4 B) for the synthetic depth_fixture onboarding proof.
 # Installed only in the isolated workspace, at
 # docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/depth-acquisition/0.2.0.toml,
-# by a maintainer's change to the integration branch; it takes effect only from there. Replace each
-# {{SHA256}} with the SHA-256 of that path's bytes at the integration tip.
+# by a maintainer's change to the integration branch; it takes effect only from there.
+#
+# Each `command` is the exact invocation that produced that input. Run them from the workspace
+# root, in the order listed; `xtask` is `cargo run -p xtask --`. Before committing:
+# - replace {{DEPTH_FIXTURE_BINARY}} with the path of the acquired `depth_fixture` 0.2.0 release
+#   executable that the snapshot ran;
+# - replace each {{SHA256}} with the SHA-256 of that path's bytes at the integration tip.
 #
 # Non-normative until the charter revision (slice 1) defines the statement's fields, and no reader
 # exists until slice 2. The inputs are exactly the set the shared O derivation binds (OF-P6) for a
@@ -13,39 +18,39 @@ version = "0.2.0"
 [[inputs]]
 path = "cli_manifests/depth_fixture/RULES.json"
 sha256 = "{{SHA256}}"
-command = "maintainer: install governing template manifest-root/RULES.json"
+command = "cp crates/xtask/tests/fixtures/depth-synthetic/governing/manifest-root/RULES.json cli_manifests/depth_fixture/RULES.json"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/SCHEMA.json"
 sha256 = "{{SHA256}}"
-command = "maintainer: install governing template manifest-root/SCHEMA.json"
+command = "cp crates/xtask/tests/fixtures/depth-synthetic/governing/manifest-root/SCHEMA.json cli_manifests/depth_fixture/SCHEMA.json"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json"
 sha256 = "{{SHA256}}"
-command = "xtask depth-fixture-snapshot --raw-help-target x86_64-unknown-linux-gnu"
+command = "xtask depth-fixture-snapshot --depth-fixture-binary {{DEPTH_FIXTURE_BINARY}} --out-file cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json --capture-raw-help --raw-help-target x86_64-unknown-linux-gnu"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/snapshots/0.2.0/union.json"
 sha256 = "{{SHA256}}"
-command = "xtask manifest-union --version 0.2.0"
+command = "xtask manifest-union --root cli_manifests/depth_fixture --version 0.2.0"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/wrapper_coverage.json"
 sha256 = "{{SHA256}}"
-command = "xtask depth-fixture-wrapper-coverage"
+command = "xtask depth-fixture-wrapper-coverage --out cli_manifests/depth_fixture/wrapper_coverage.json --rules cli_manifests/depth_fixture/RULES.json"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json"
 sha256 = "{{SHA256}}"
-command = "xtask manifest-report --version 0.2.0"
+command = "xtask manifest-report --root cli_manifests/depth_fixture --version 0.2.0"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json"
 sha256 = "{{SHA256}}"
-command = "xtask manifest-report --version 0.2.0"
+command = "xtask manifest-report --root cli_manifests/depth_fixture --version 0.2.0"
 
 [[inputs]]
 path = "cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json"
 sha256 = "{{SHA256}}"
-command = "xtask manifest-report --version 0.2.0"
+command = "xtask manifest-report --root cli_manifests/depth_fixture --version 0.2.0"
