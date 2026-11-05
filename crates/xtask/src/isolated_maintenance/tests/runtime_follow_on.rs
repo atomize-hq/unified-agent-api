@@ -3,6 +3,9 @@ use super::*;
 use crate::{agent_lifecycle as life, runtime_follow_on as runtime};
 use sha2::{Digest, Sha256};
 
+#[path = "runtime_follow_on/authority.rs"]
+mod authority;
+
 const PACK: &str = "depth-fixture-cli-onboarding";
 const APPROVAL: &str =
     "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml";

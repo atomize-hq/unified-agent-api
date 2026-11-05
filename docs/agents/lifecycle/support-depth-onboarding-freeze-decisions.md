@@ -348,6 +348,9 @@ only.
    and refuses incomplete unions and post-integration re-freezes. Its narrow non-runtime approval
    projection is private to that dry run; the production approval loader and public ON2 refusal
    are unchanged. End-to-end fixture coverage includes deferred maintenance and refusal rollback.
+   Review fixes: statement enumeration, statement blobs and bound inputs use the same hardened
+   Git view pinned to the authenticated integration tip; rule 4 admits targets covered by that
+   tip's version record, with replacement-ref, graft, alternate and environment regressions.
    - A private, isolated-route-only dry-run path: resolve rule 3, check rule 4, write P, the
      record and the object, read the named integration ref and the acquisition statement there,
      require every bound input to equal both, and call the shared `derive`.

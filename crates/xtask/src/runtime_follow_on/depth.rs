@@ -2,7 +2,7 @@
 use super::*;
 use crate::{
     agent_lifecycle::{self, LifecycleState},
-    depth_record::{acquisition::read_from_ref, onboarding::OnboardingApproval},
+    depth_record::onboarding::OnboardingApproval,
     git_inputs::GitInputs,
     isolated_maintenance::CapturedRegistry,
     runtime_advertising::source::Source,
@@ -11,6 +11,7 @@ use crate::{
 use serde_json::Value;
 
 mod approval;
+mod integration;
 mod packet;
 
 struct Freeze {
@@ -30,6 +31,9 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
         .capture(workspace)?;
     // This host exists ONLY for scope.rs's compiled synthetic subject, never the runtime pilot.
     let host = captured.evidence_host(workspace)?;
+    // Pin every integration read to the authenticated object id through the hardened Git runner.
+    // The route rejects grafts and object alternates on capture and recheck.
+    let tip = Source::tip(workspace, host.tip())?;
     let mut view = GitInputs::new(workspace)?;
     let raw = view.required(approval_path)?;
     let approval = approval::read(&raw, approval_path, &captured)?;
@@ -77,14 +81,20 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
         .ok_or(
             "charter rule 3 unresolved: no enabled onboarding enrollment for the approved version",
         )?;
-    rule_four(&mut view, root, version, &declaration.targets)?;
+    rule_four(
+        &mut view,
+        &tip,
+        &approval.agent_id,
+        root,
+        version,
+        &declaration.targets,
+    )?;
     complete_union(&mut view, root, version)?;
     let plan = FreezePlan::onboarding(&mut view, &approval, state.support_depth.as_deref())?;
     if let Some(obligations) = &plan.record.obligations {
         // The protected tip is the named integration ref. Never read a branch-local statement.
-        let statement = read_from_ref(
-            workspace,
-            host.tip(),
+        let statement = integration::statement(
+            &tip,
             &approval.onboarding_pack_prefix,
             &approval.agent_id,
             version,
@@ -98,7 +108,6 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
         if let Some(why) = statement.mismatch(&obligations.acquired_inputs) {
             return Err(why);
         }
-        let tip = Source::tip(workspace, host.tip())?;
         let mut differing = Vec::new();
         for input in &obligations.acquired_inputs {
             let bytes = view.required(&input.path)?;
@@ -130,6 +139,8 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
 
 fn rule_four(
     view: &mut GitInputs,
+    tip: &Source,
+    agent: &str,
     root: &str,
     version: &str,
     targets: &[String],
@@ -154,11 +165,7 @@ fn rule_four(
     }
     let expected: Vec<String> = serde_json::from_value(rules["union"]["expected_targets"].clone())
         .map_err(|e| format!("charter rule 4: {rules_path}: {e}"))?;
-    if targets.iter().any(|t| !expected.contains(t)) {
-        return Err(format!(
-            "charter rule 4: {rules_path} does not authorize every declared target"
-        ));
-    }
+    integration::targets(tip, agent, root, version, targets, &expected)?;
     let path = format!("{root}/VALIDATOR_SPEC.md");
     let spec = view.required(&path)?;
     let spec = text(&spec)?;
