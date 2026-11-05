@@ -1,6 +1,7 @@
 # Support depth: isolated closeout, promotion and integration (B.5, B.6)
 
-Status: design for review. CP-P1 to CP-P6 below are **awaiting maintainer approval**.
+Status: design for review, revised after two independent reviews. Every decision row (CP-P1 to
+CP-P6) is **proposed, awaiting maintainer approval**.
 Source baseline: `feat/depth-isolated-ma4-route` `f8fcdc8` (PR #323). It assumes PR #324 (B.4
 part 2: MA4 writes a reporting E from authenticated isolated evidence) lands first.
 This is roadmap items B.5 and B.6 of [MP-P1](support-depth-machinery-proof-rescope.md), on the
@@ -19,9 +20,11 @@ promoted version, in process and under the cfg(test) route:
 
 1. audit and an exact-generation stand-down marker on the integration parent;
 2. **MA5**, through each of `close-agent-maintenance` and `prepare-agent-closeout --write`;
-3. **IN1** (`manifest-validate --tip`) admits one resulting closeout candidate;
-4. **MA6**, `manifest-promote`, as a separate change, including the A.5 replay;
-5. **IN1** admits the promotion candidate.
+3. **IN1** (`manifest-validate --tip`) admits one resulting closeout candidate before merge, and
+   validates it again after the push;
+4. **MA6**, `manifest-promote`, as a separate change. The A.5 replay forks from the admitted
+   closeout, before any promotion;
+5. **IN1** admits the promotion candidate before merge and validates it after the push.
 
 These steps are proof plan steps 4 to 7 ([proof plan](support-depth-isolated-proof-plan.md)), run
 in process. The native merge queue, the protected host and the credential stay phase C. In
@@ -46,6 +49,9 @@ whatever compiled `scope::Subject` the installed profile names.
   `admitted` refuses nonempty `acceptance_work` (`:250`) and requires each due obligation to be
   `verified` by the host's verdicts (`:270`). `integration_tip` (`:208-219`) reads the local
   `origin/staging` ref.
+  `plan_with` admits only the closeout's own outputs: the closeout, `HANDOFF.md`, the remediation
+  log and lifecycle state (`output_paths`, `:318-326`). Any publication output is refused as
+  "unowned" (`:63-67`).
 - `depth_acceptance/promotion.rs` is the promotion predicate. It has the same `Production` shape
   (`:17-29`), using `current_promotion_bindings`. `acceptance` (`:116-195`) requires:
   - a retained closeout entry;
@@ -54,6 +60,21 @@ whatever compiled `scope::Subject` the installed profile names.
   `integration_tip` (`:197-208`) is local too.
 - `depth_acceptance/integration.rs` is IN1. `check` (`:12-13`) always passes `manual::Production`
   and `promotion::Production`; `admit` (`:108`) reuses both predicates (`:198`, `:216`).
+  Attribution (`:181-195`) treats only the lifecycle closeout kinds as closeout effects. Every other
+  effect, including a newly qualified publication row (`publication.rs::detect`, `:154-164`),
+  counts as promotion.
+- Publication consistency: `publication::validate_current` (`publication.rs:196-211`) requires
+  the committed support rows to equal the derived ones, including depth facts
+  (`support_matrix/consistency.rs:388`). The derivation marks a promise qualified as soon as the
+  record lists any entry made for what it states now (`support_matrix/depth.rs:188-193`, `:378`).
+  The support-matrix spec says the same (`support-matrix.md:360-363`): a closeout entry alone
+  qualifies a promise whose obligations are verified.
+- Evidence evaluation needs a Git workspace. `verdict.rs::evaluate` (`:101`) opens
+  `GitInputs::new(workspace)`, which refuses anything but a Git top level (`git_inputs.rs:24-29`).
+  On #324's branch, `isolated_record_results` re-resolves `isolated_maintenance::evidence_host(root)`
+  from the root it is given (`verdict/github/mod.rs:622`). It does not borrow a caller's context.
+  The verdict seal covers the acceptance entries (`depth_evidence/results.rs:6-28`), so verdicts
+  computed before an entry is appended read `unverified` for the post-entry record.
 - `support_depth/closeout.rs::current_bindings` reparses the registry with `parse_unenforced`
   from Git inputs. It is not production-bound, but it never compares that registry with the
   route's scoped registry.
@@ -109,6 +130,9 @@ whatever compiled `scope::Subject` the installed profile names.
   - It runs the declared validation per target, then `manifest-promote --write` (`:289-292`), then
     `manifest-validate --root` (`:300`).
   - It opens the promotion PR with `AUTOMATION_TOKEN`.
+- Neither MA5 writer renders publication. `closeout/write.rs::closeout_files` (`:62-74`) proposes
+  only the closeout, `HANDOFF.md` and the remediation log (plus lifecycle state, `:86-88`).
+  `prepare_closeout.rs::write_and_verify` (`:285-289`) proposes the closeout alone.
 
 ### IN1 entrypoint and host
 
@@ -116,8 +140,13 @@ whatever compiled `scope::Subject` the installed profile names.
   It then loads the **production** registry with `.ok()` (`:47`). With a depth table, that yields
   `None`, and the subject root's records report `DEPTH_RECORD_UNANCHORED`.
 - `ci.yml` runs `--tip` validation only for the fixed roots `codex`, `claude_code` and `opencode`
-  (`:345-390`). `depth-tip.yml` loops over the same three (`:34-36`) and checks out shallowly
-  (`:18-20`, `--depth=1` at `:33`). Contract A.4 says all-root admission does not replace
+  (`:345-390`). Its parent comes from `scripts/check_staging_integration.py tip`: the PR base or
+  the merge-group base. `depth-tip.yml` loops over the same three (`:34-36`) after the push. It
+  passes `github.event.before` as `--tip` (`:26-35`), so there the candidate is the new protected
+  tip and the parent is the previous one. It checks out shallowly (`:18-20`, `--depth=1` at `:33`).
+- The preflight and manifest-validation jobs in `ci.yml` do not depend on the `rust-tests`
+  producer job. The route design requires evidence consumers to be scheduled after the terminal
+  producer through reviewed `needs` edges (`support-depth-isolated-route-design.md:154-161`). Contract A.4 says all-root admission does not replace
   per-root validation of a root that holds a depth record.
 - Route resolution (`isolated_maintenance/mod.rs:259-286`, `host.rs:91-182`) requires:
   - a clean, non-shallow, unshared checkout whose `origin` is one of two spellings (`mod.rs:409-423`);
@@ -138,10 +167,13 @@ the existing `manual::Host` trait (`manual.rs`) in a new `depth_acceptance/isola
 
 - `bindings` = `current_closeout_bindings` or `current_promotion_bindings`, plus a check that the
   registry they parse equals `Context::registry(root)`.
-- `evidence` = `Context::evidence_host(root)` (`mod.rs:308-319`) and then
-  `depth_evidence::evaluate_isolated_record`, which PR #324 extends to the synthetic profile. It
-  is re-authenticated for this exact record state on every call. E labels are never trusted, and
-  an earlier verdict set is never resealed.
+- `evidence` = `Context::evidence_host(root)` (`mod.rs:308-319`), passed to a new host-taking
+  evaluation entry in `depth_evidence` that borrows that `EvidenceHost`, as #324's
+  `isolated_assembly` already does (`verdict/github/mod.rs` on #324). It must not call
+  `evaluate_isolated_record`, which re-resolves authority from its root (`:622` on #324). The
+  verdict is re-authenticated for the exact record state on every call. E labels are never
+  trusted, and an earlier verdict set is never resealed. This runs on the caller's Git workspace
+  only; scratch evaluation is G7's separate question.
 - A new `tip` method returns the authenticated protected tip. It refuses unless the local
   `origin/staging` equals that tip. This replaces `manual.rs:208` and `promotion.rs:197` for the
   isolated host only.
@@ -198,6 +230,13 @@ The renderers and `manifest_validate::run` then get the scoped registry through 
 `build_plan` replaces `AgentRegistry::load(scratch)` (`manifest_promotion.rs:108`) with the
 captured registry. Without a route, `build_plan` is unchanged.
 
+This binding supplies **only the registry**. It is enough while publication renders production
+verdicts (CP-P3 not adopted): `production_results` reads no Git input, so the scratch renderers
+need nothing else. Whether `manifest_validate::run` on scratch needs any other Git-backed input is
+not yet established, and B.6a's positive scratch test must show it. The binding gives no evidence
+authority. Scratch evaluation of authenticated evidence needs the separate view-aware evaluator in
+G7 (CP-P3).
+
 `isolated_maintenance/mod.rs` is 549 code lines on this base, and PR #324 adds about 229. Put the
 binding in a new `isolated_maintenance/view.rs` to stay under 700.
 
@@ -211,16 +250,55 @@ from G1.
 
 ### G7 — publication renders production verdicts
 
-Recommendation (CP-P3): inside a resolved route, `support_matrix/derive.rs:400` uses the same
-isolated evaluator as G1. Otherwise it uses `production_results`. This keeps one reporting truth
-for render and for IN1's `publication::validate_current` and `qualifications`
-(`integration.rs`, `admit`).
+Swapping the evaluator in `support_matrix/derive.rs:400` alone **breaks the closeout chain**,
+because of the publication-consistency facts in the inventory:
 
-Until CP-P3 is approved, the conservative option holds: publication stays `unverified`. Promotion
-still moves pointers, metadata and `current.json`, under its own entry, but the proof run must
-record "qualified publication not exercised". Qualified output still needs an owning entry and
-current final admission; reporting alone never creates qualification (route design, "Real packet
-evidence and reporting").
+1. The closeout entry qualifies the promise (`support_matrix/depth.rs:188-193`, `:378`;
+   `support-matrix.md:360-363`).
+2. Neither MA5 writer renders publication, and `manual.rs:63-67` would refuse it if one did.
+3. IN1 rejects the stale rows (`publication.rs:196-211`).
+4. IN1 would attribute a rendered qualification to promotion, not to closeout
+   (`integration.rs:181-195`).
+
+Qualified output also needs authenticated evidence for the **post-entry** record. The seal covers
+entries (`results.rs:6-28`), so that evaluation must run after the entry is appended. It must also
+run where publication is rendered, which for MA6 is the scratch view. The evaluator cannot run
+there (`verdict.rs:101`, `git_inputs.rs:24-29`, and `evidence_host(root)` on #324).
+
+CP-P3 is therefore a package, not one switch. Both semantics below are consistent with some
+current text, and each needs a normative amendment. This document does not choose between them:
+
+| | **A — closeout publishes qualification** | **B — qualification waits for promotion** |
+| --- | --- | --- |
+| Rule | Keep the spec rule: any current entry qualifies. The MA5 proposal becomes one coherent batch: admit the entry, freshly evaluate the post-entry record, render support JSON, Markdown and runtime data. | Amend the support-matrix spec (`:360-363`) and record invariant 4 so that only a current `Promotion` entry qualifies. MA5 publication stays unchanged and unqualified. |
+| Code changes | `manual.rs` admits publication outputs for the closeout's own agent and version only. IN1 attribution (`integration.rs:181-195`) counts a qualification effect as closeout when the candidate adds a matching `MaintenanceCloseout` entry and no promotion effect; otherwise it stays promotion. Both MA5 writers render publication through that proposal. | `support_matrix/depth.rs` derivation; no MA5 or IN1 attribution change. |
+| Normative change | Annex A.1 (MA5 outputs) and A.2 (publication writers) gain MA5. | Support-matrix spec and record invariant 4. |
+| Evaluation in scratch | Needed for MA6 and for any MA5 rendering in a view. Add the private view-aware evaluator described below. | Same, for MA6. |
+| Risk | Widens MA5's write envelope to aggregate publication, which touches every agent's rows. | Changes a published meaning for every depth-enrolled agent, not just this proof. |
+
+**View-aware evaluator (needed under A or B).** This is a private evaluation path that:
+- borrows the caller's authenticated `Context` and `EvidenceHost`, never resolving one from the
+  scratch view;
+- reads proposed bytes from the `IsolatedView` source;
+- reads immutable provenance (commits, trees, blobs) from the caller's Git object store through
+  the caller's `GitInputs`;
+- checks dependency currentness against the proposed view;
+- evaluates the exact post-entry record.
+
+Its freshness check is the view's `verify_current` plus `Context::recheck` before and after
+evaluation. It may write nothing, and its verdicts are sealed to the evaluated record only. It
+needs changes in `depth_evidence/` (`verdict.rs`, `verdict/github/mod.rs`, `currentness.rs`) and
+`git_inputs.rs`. Those are outside this packet's write scope, and the other worker owns
+`depth_evidence/` today, so these slices must be scheduled after #324 and coordinated with that
+owner. Before any MA6 wiring relies on it, a positive scratch-publication test must show a verified
+row rendered in scratch.
+
+**Until CP-P3 is approved (conservative):** publication keeps `production_results` and stays
+`unverified`. The closeout and promotion chains then hold publication consistency without any
+publication change. Promotion still moves pointers, metadata and `current.json` under its own
+entry. The proof run records "qualified publication not exercised". Chain tests run with CP-P3 off
+establish only that chain. Once CP-P3 lands, both complete MA5→IN1 chains and the MA6→IN1 chain
+must run again with it on; the earlier proofs do not carry over.
 
 ### G8 — IN1 uses production hosts and the production registry
 
@@ -230,45 +308,84 @@ Recommendation:
   `Some` selects `Authority::Isolated`; an error refuses.
 - `merge.rs:47` uses `isolated_maintenance::registry`, with the same production/isolated error
   split as `manifest_validate/depth.rs:63-73`.
-- Under an installed route, IN1 requires the supplied parent to equal the authenticated protected
-  tip (CP-P1). That is conservative: a merge-group entry stacked on another entry refuses, and the
-  queue rebuilds it.
+- IN1 has two uses: admission before merge (`ci.yml`) and observation after the push
+  (`depth-tip.yml`). A single "parent equals the current tip" rule would reject every successful
+  post-push readback. So the binding (CP-P1) is chosen from authenticated facts, never from a flag,
+  an event name or another caller assertion. With T the authenticated protected tip, H the
+  checkout HEAD and P the supplied parent:
+  - **Admission:** P = T, H ≠ T and H descends from P. This covers merge-group and PR
+    candidates. A merge-group entry stacked on another entry has P ≠ T and refuses; the queue
+    rebuilds it. A PR merge ref built on an older base also refuses.
+  - **Observation:** H = T and P is the first parent of H. That parent relation is read from Git
+    objects reachable from the authenticated T, not from the event payload. The full admission
+    then runs for the P → H transition, as D7 requires. Observation detects a bad transition; it
+    cannot undo the push (Annex A.3).
+  - Anything else, including H = P, refuses.
+
+  Whether P must be the *first* parent of H depends on the queue's merge method. With a merge
+  commit, a squash or a rebase, the base is H's first parent. A multi-commit rebase would put
+  several commits between P and H, so observation would need "P is an ancestor of H on the
+  first-parent chain". The conservative choice is single first-parent only; widening it needs
+  approval (CP-P1).
 
 A route resolved in the integration checkout grants no final permission by itself. The
 existing all-root generation, closeout and promotion checks decide.
 
 ### G9 — CI and host wiring of the isolated repository (phase C)
 
-Recommendation (CP-P5): no change to canonical workflows in B.5 or B.6. Record the needed host
-changes as phase C prerequisites:
+Recommendation (CP-P5): B.5 and B.6 change no workflow. Record these as phase C prerequisites,
+each delivered by a **reviewed change to the existing canonical workflows**:
 
-- `--tip` per-root validation of the subject root in the merge-queue and post-push jobs;
-- full-history checkouts in `depth-tip.yml`, since the route refuses shallow history;
-- a least-privilege read credential for route observations of both repositories in the
-  merge-queue, closeout and promote jobs;
-- an `origin` spelling that `Workspace::read` accepts.
+- **Consumer ordering.** Trace every evidence consumer that runs under the route: the preflight
+  run selection, every `manifest-validate --tip` step, support publication checks and
+  `make preflight`/support-matrix. Schedule each after the terminal `rust-tests` producer through
+  minimal explicit `needs` edges. The producer must never depend on its own admission. A failed
+  producer must stay observable rather than silently skipping its consumers. The 17-job result
+  policy and the terminal gate stay unchanged (`support-depth-isolated-route-design.md:142-161`).
+- **Per-root validation.** `--tip` validation of every root that holds a depth record, in the
+  merge-queue and post-push jobs. The fixed three-root loops (`ci.yml:345-390`,
+  `depth-tip.yml:34-36`) do not cover the subject root, and contract A.4 says all-root admission
+  does not substitute for that.
+- **History, credentials and origin.** Full-history checkouts in every job that resolves the
+  route, `depth-tip.yml` included (the route refuses shallow history, `mod.rs:415-420`). A
+  least-privilege read credential reference for the route's host observations of both
+  repositories (`host.rs:24-35`). An `origin` spelling that `Workspace::read` accepts
+  (`mod.rs:409-414`).
 
-Whether the isolated repository may carry workflow bytes that differ from canonical depends on the
-approved producer closure. That is CP-P5's open question.
+Workflow source belongs to the independently approved protected source (route design,
+`:112-118`). So the isolated repository runs the canonical bytes, and these become canonical
+changes, not isolated-only edits. For example, the root loops derive from the registry instead of
+a fixed list. Each such change is a no-op where no depth record exists. Letting the isolated
+workflows diverge from canonical would be an exception to that source boundary, and it would need
+an explicit contract amendment. This design does not propose one.
 
 ### G10 — the A.5 replay with a single-version subject
 
 `scope.rs:112-119` refuses any retained record other than the subject's version.
 Recommendation (CP-P6): the replay opens an ordinary, non-depth `0.3.0` maintenance generation.
-The declaration still names only `0.2.0`, so that generation has no record. It replaces the working
-request (and later the closeout); then MA6 promotes `0.2.0` from its retained record and entries.
-The isolated scope is not widened.
+The declaration still names only `0.2.0`, so that generation has no record. The isolated scope is
+not widened.
+
+The replay **forks from the committed, IN1-admitted MA5 state, before any MA6**. On that fork:
+1. The `0.3.0` generation replaces the working request.
+2. Its own ordinary closeout replaces the closeout file.
+3. MA6 for `0.2.0` must then create the **first** `Promotion` entry and move the pointers, from
+   the retained closeout entry alone.
+
+This proves A.5. Repeating MA6 after a promotion would only exercise an idempotent re-run whose
+entry already exists. A sibling fork from the same checkpoint changes wrapper code that a `0.2.0`
+result depends on, and MA6 must refuse there.
 
 ## Decisions awaiting approval
 
 | Id | Proposed decision (awaiting approval) | Reason / boundary |
 | --- | --- | --- |
-| CP-P1 — isolated owning host | MA5, MA6 and IN1 admit through one private `Authority::Isolated(&Context)`. Evidence is the re-authenticated isolated verdict for the exact record state. The integration tip is the authenticated protected tip, and the local `origin/staging` must equal it. At IN1 under an installed route, the supplied parent must equal that tip. | Applies the approved IR-P1 threading to the owning cores without a second predicate. The tip-equality rule serializes depth candidates in the queue; that is conservative. Production stays `Production`. |
-| CP-P2 — promotion scratch binding | MA6's scratch view inherits the caller's captured scoped registry through an `IsolatedView`-attested, thread-bound guard. It never resolves itself. | Removes the "workspace-wide regeneration cannot run in scratch" gap without changing any renderer. It extends the MA4 candidate binding to a non-Git view, which is an authority-boundary change, so it needs approval. |
-| CP-P3 — isolated publication verdicts | Inside a resolved route only, support publication renders verdicts from the isolated evaluator. | Without it, the chain cannot show qualified output. Until approved: `unverified`, and the claim is recorded as not exercised. |
-| CP-P4 — closeout preflight repository | Under a route, `prepare-agent-closeout` reads preflight from the authenticated isolated repository. | The packet's CI runs live there. Until approved, `prepare-agent-closeout` refuses under a route. |
-| CP-P5 — isolated CI wiring | The B.5 and B.6 PRs make no canonical workflow change. Per-root `--tip` validation of the subject root, full-history checkouts, an `origin` spelling the route accepts and a read credential become phase C host prerequisites. | The canonical loops are fixed to three roots (`ci.yml:345-390`, `depth-tip.yml:34-36`). Open: may the isolated workflows differ from canonical, or must canonical gain a registry-derived loop? |
-| CP-P6 — A.5 replay shape | Replay with an ordinary (non-depth) later-version generation. The isolated scope is not widened. | `scope.rs:112-119` admits only the subject's version. |
+| CP-P1 — isolated owning host and IN1 binding | MA5, MA6 and IN1 admit through one private `Authority::Isolated(&Context)`. Evidence is re-authenticated for the exact record state through a host-taking entry that borrows the caller's `EvidenceHost`. The local integration tip must equal the authenticated protected tip T. IN1 picks its binding from authenticated facts only: **admission** (P = T, H descends from P, H ≠ T) or **observation** (H = T, P is H's single first parent read from Git); anything else refuses. | Applies the approved IR-P1 threading to the owning cores without a second predicate, and keeps D7's post-push readback (proof plan step 7). Admission serializes depth candidates in the queue, which is conservative. Widening observation to a multi-commit first-parent chain needs separate approval. Production stays `Production`. Revised after review: the unconditional parent-equals-tip rule is withdrawn. |
+| CP-P2 — promotion scratch registry binding | MA6's scratch view inherits the caller's captured scoped registry through an `IsolatedView`-attested, thread-bound guard. It never resolves itself and gives no evidence authority. | Enough for MA6 while CP-P3 is not adopted, since publication evaluation then reads no Git input; B.6a's scratch test must show this. Extends the MA4 candidate binding to a non-Git view, an authority-boundary change. Scratch evidence evaluation is CP-P3's view-aware evaluator, not this row. Revised after review. |
+| CP-P3 — qualified publication (package) | Choose one semantics. **A:** a closeout publishes qualification, through one MA5 batch (entry, fresh post-entry evaluation, rendering) and closeout attribution at IN1, with Annex A.1/A.2 amended. **B:** only a current `Promotion` entry qualifies, with the support-matrix spec and record invariant 4 amended. Either one also needs the private view-aware evaluator (borrowed context, proposed bytes, caller Git objects, post-entry record, no writes). | The two options are compared side by side in G7. An evaluator-only switch breaks the closeout chain at IN1 (`publication.rs:196-211`, `integration.rs:181-195`). Until approved: production verdicts and `unverified`, recorded as not exercised. Once adopted, every chain test runs again with it on. Revised after review. |
+| CP-P4 — closeout preflight repository | Under a route, `prepare-agent-closeout` reads preflight from the authenticated isolated repository (from the context, never `origin` or a flag). The existing run selection and whole-workflow terminality rules stay. | The packet's CI runs live there. Both reviewers agree. Until approved, `prepare-agent-closeout` refuses under a route. |
+| CP-P5 — CI prerequisites (phase C) | The B.5 and B.6 PRs change no workflow. Phase C delivers reviewed changes to the **canonical** workflows: route consumers ordered after the terminal `rust-tests` producer with failure-preserving `needs` edges; registry-derived per-root `--tip` loops; full history in every routed checkout; an accepted `origin`; a least-privilege read credential reference. The 17-job result policy and the terminal gate are unchanged. | Workflow source is part of the independently approved protected source (route design `:112-118`, `:154-161`). Isolated-only divergence would need an explicit contract amendment; none is proposed. Revised after review. |
+| CP-P6 — A.5 replay shape | Replay with an ordinary (non-depth) later-version generation, forked from the admitted MA5 state **before the first MA6**. MA6 must then create its first `Promotion` entry from retained closeout authority. A sibling fork with dependency-invalidating changes must refuse. | `scope.rs:112-119` admits only the subject's version. Both reviewers agree; forking before the first MA6 is per their notes. |
 
 These are existing requirements, not new decisions: maintainer classification, empty carried
 `acceptance_work` (no corroborator), the exact generation marker on the integration parent,
@@ -312,16 +429,31 @@ PR #324):
      `MaintenanceCloseout` entry.
    - `prepare-agent-closeout --write`: the same, with the frozen-fetcher preflight from the
      isolated repository.
-4. IN1 (`check_integration` with the route) admits the closeout candidate against the parent.
-5. Advance the fake tip to that candidate. Then run MA6 `build_plan` and `apply` with the
-   captured route. Expect one coherent proposal:
+4. IN1 admission (`check_integration` with the route, P = T) admits the closeout candidate. The
+   fake host then advances T to that candidate, and IN1 observation (H = T, P = H's first parent)
+   passes for the same transition.
+5. Checkpoint "admitted MA5". From it, run MA6 `build_plan` and `apply` with the captured route.
+   Expect one coherent proposal:
    - pointers, metadata and `current.json`;
    - support, runtime and capability outputs;
    - one `Promotion` entry;
    - the marker retired.
-6. IN1 admits the promotion candidate.
-7. A.5 replay: a `0.3.0` ordinary generation replaces the request and closeout, then MA6 for
-   `0.2.0` passes and IN1 admits.
+6. IN1 admission and post-push observation both pass for the promotion candidate.
+7. A.5 replay, forked from the "admitted MA5" checkpoint **before any MA6** (CP-P6):
+   - an ordinary `0.3.0` generation replaces the request, then its ordinary closeout replaces the
+     closeout file;
+   - MA6 for `0.2.0` creates its **first** `Promotion` entry and moves the pointers;
+   - IN1 admits it.
+
+   A sibling fork from the same checkpoint changes wrapper code that a `0.2.0` result depends on,
+   and MA6 refuses there.
+
+With CP-P3 not adopted, publication stays `unverified` throughout, and IN1 publication consistency
+holds unchanged. A CP-P3 slice reruns steps 3 to 7 with it on, and adds:
+- a qualified row appears only through the chosen owning route (option A: the MA5 batch; option
+  B: the first promotion);
+- IN1 attributes it to that route;
+- a positive scratch-publication test with the view-aware evaluator.
 
 **Refusals** (each one preserves caller state byte for byte):
 
@@ -339,7 +471,13 @@ PR #324):
   - a forged or copied context;
   - a scratch view with `.git`, a non-empty destination or a changed identity;
   - a registry byte change in scratch.
-- An IN1 parent that is not the protected tip, plus the IN1 cases of the proof plan:
+- IN1 binding refusals:
+  - admission with P ≠ T (including a stacked merge-group base);
+  - observation where P is not H's first parent, or H ≠ T;
+  - H = P;
+  - a forged transition: an event-supplied parent that the Git history reachable from T does not
+    support.
+- The proof plan's IN1 cases:
   - forged entries;
   - a promotion with no admitted retained closeout;
   - another root's record removed.
@@ -355,17 +493,20 @@ unchanged: `tests/agent_maintenance_closeout/`, `tests/depth_promotion.rs`,
 ## Implementation slices
 
 Each slice is one reviewed PR into `staging`, stacked in this order after #324. No slice edits
-`.github/workflows/`, `depth_evidence/`, `agent_maintenance/execute/` or
-`isolated_maintenance/tests/ma4_route.rs`.
+`.github/workflows/` (phase C, CP-P5), `agent_maintenance/execute/` or
+`isolated_maintenance/tests/ma4_route.rs`. Slices that touch `depth_evidence/` are marked; the
+concurrent worker owns that directory today, so they wait for #324 and are coordinated with that
+owner.
 
 | Slice | Content | Write scope |
 | --- | --- | --- |
-| B.5a — owning authority (CP-P1) | `Authority` and the isolated `Host`, the tip binding, `Proposal` forwarding, `Route::proposal`. No public route changes yet. Unit tests on the predicates with the fake host, plus production byte-identity controls. | `depth_acceptance/{mod,manual,promotion,integration}.rs`, new `depth_acceptance/isolated.rs`, `agent_maintenance/closeout_proposal.rs`, `isolated_maintenance/mod.rs` (accessors only), new `isolated_maintenance/tests/authority.rs` |
-| B.5b — both MA5 writers (G2–G4; CP-P4) | Route capture in both writers, routed registry loads, the isolated preflight repository (or a refusal until CP-P4 is approved). Positive chain to closeout for each writer, plus MA5 refusals. | `agent_maintenance/closeout/{write,findings,support_audit_truth,validate,evidence}.rs`, `agent_maintenance/prepare_closeout.rs`, `agent_maintenance/drift/{mod,shared}.rs`, `agent_lifecycle/maintenance_adoption.rs`, new `isolated_maintenance/tests/ma5_closeout.rs`, the B.5 notes in `support-depth-synthetic-subject-design.md` |
-| B.5c — IN1 for closeout (G8) | Route-selected authority in `check_integration`, the routed registry in `merge.rs`, parent equals protected tip. Closeout-candidate admission and the IN1 refusals. | `depth_acceptance/integration.rs`, `manifest_validate/depth/merge.rs`, new `isolated_maintenance/tests/in1_integration.rs` |
-| B.6a — scratch binding (CP-P2) | `CapturedRegistry::bind_view` over `IsolatedView`; removes the `dead_code` allowances that this slice now uses. Binding positive and refusal tests. | new `isolated_maintenance/view.rs`, `isolated_maintenance/mod.rs` (module line), `agent_maintenance/closeout_proposal.rs`, new `isolated_maintenance/tests/view.rs` |
-| B.6b — MA6 through the route (G5, G6, G10) | Captured route, isolated proposal and scratch binding in `build_plan`, plus the tip and apply rechecks. Positive promotion and IN1 admission, the A.5 replay (CP-P6), MA6 refusals. | `manifest_promotion.rs`, new `isolated_maintenance/tests/ma6_promotion.rs`, the B.6 notes in `support-depth-synthetic-subject-design.md` |
-| B.6c — publication verdicts (CP-P3; only if approved) | The isolated evaluator in support derivation inside a route. Tests that the qualified row appears only after the owning entry, and that IN1 publication consistency holds. | `support_matrix/derive.rs`, new `isolated_maintenance/tests/publication.rs` |
+| B.5a — owning authority (CP-P1, host part) | `Authority` and the isolated `Host`, the tip binding, `Proposal` forwarding, `Route::proposal`, and a host-taking evaluation entry that borrows the caller's `EvidenceHost`. No public route changes yet. Unit tests on the predicates with the fake host, plus production byte-identity controls. | `depth_acceptance/{mod,manual,promotion,integration}.rs`, new `depth_acceptance/isolated.rs`, `agent_maintenance/closeout_proposal.rs`, `isolated_maintenance/mod.rs` (accessors only), **`depth_evidence/{results.rs,verdict/github/mod.rs}` (entry point only, coordinated)**, new `isolated_maintenance/tests/authority.rs` |
+| B.5b — both MA5 writers (G2–G4; CP-P4) | Route capture in both writers, routed registry loads, the isolated preflight repository (or a refusal until CP-P4 is approved). Positive chain to closeout for each writer, plus MA5 refusals. Publication unchanged. | `agent_maintenance/closeout/{write,findings,support_audit_truth,validate,evidence}.rs`, `agent_maintenance/prepare_closeout.rs`, `agent_maintenance/drift/{mod,shared}.rs`, `agent_lifecycle/maintenance_adoption.rs`, new `isolated_maintenance/tests/ma5_closeout.rs`, the B.5 notes in `support-depth-synthetic-subject-design.md` |
+| B.5c — IN1 binding (G8; CP-P1, IN1 part) | Route-selected authority in `check_integration`; admission and observation chosen from authenticated facts; the routed registry in `merge.rs`. Closeout-candidate admission and post-push observation, plus the binding refusals. | `depth_acceptance/integration.rs` (and a new `depth_acceptance/integration/binding.rs` if needed), `manifest_validate/depth/merge.rs`, new `isolated_maintenance/tests/in1_integration.rs` |
+| B.6a — scratch registry binding (CP-P2) | `CapturedRegistry::bind_view` over `IsolatedView`; removes the `dead_code` allowances that this slice now uses. Binding positive and refusal tests, plus a positive scratch render and `manifest_validate::run` with CP-P3 off. | new `isolated_maintenance/view.rs`, `isolated_maintenance/mod.rs` (module line), `agent_maintenance/closeout_proposal.rs`, new `isolated_maintenance/tests/view.rs` |
+| B.6b — MA6 through the route (G5, G6, G10) | Captured route, isolated proposal and scratch binding in `build_plan`, plus the tip and apply rechecks. Positive promotion with IN1 admission and observation, the A.5 replay forked before the first MA6 (CP-P6), MA6 refusals. | `manifest_promotion.rs`, new `isolated_maintenance/tests/ma6_promotion.rs`, the B.6 notes in `support-depth-synthetic-subject-design.md` |
+| B.7a — view-aware evaluator (CP-P3; only if approved) | Private evaluation over an `IsolatedView`: borrowed context and host, proposed bytes, caller Git objects, dependency currentness against the view, post-entry record, no writes. Positive scratch-publication test, plus refusals for a scratch `.git`, a moved caller and self-resolution. | **`depth_evidence/{verdict.rs,verdict/github/mod.rs,currentness.rs}` (coordinated)**, `git_inputs.rs`, `isolated_maintenance/view.rs`, new `isolated_maintenance/tests/view_evidence.rs` |
+| B.7b — owning qualified publication (CP-P3 option A or B; only if approved) | The normative amendment first, as its own docs PR: A amends contract Annex A.1/A.2, B amends the support-matrix spec and record invariant 4. Then, for A: MA5's coherent batch (entry → fresh post-entry evaluation → rendering) in both writers, `manual.rs` admitting the closeout's own publication rows, closeout attribution in `integration.rs`. For B: `support_matrix/depth.rs` derivation. Either way: the isolated evaluator in `support_matrix/derive.rs` inside a route, and every chain test of B.5b, B.5c and B.6b rerun with CP-P3 on. | A: `depth_acceptance/{manual,integration,publication}.rs`, `agent_maintenance/closeout/write.rs`, `agent_maintenance/prepare_closeout.rs`, `support_matrix/derive.rs`. B: `support_matrix/{depth,derive}.rs`. Both: new `isolated_maintenance/tests/publication.rs` and the chain test files above. |
 
 Phase C (CP-P5) carries the workflow and host prerequisites and the real native-queue run. Every
 slice runs the required gates. Approving this design enables no path and installs no profile.
