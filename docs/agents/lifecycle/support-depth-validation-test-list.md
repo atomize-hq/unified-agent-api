@@ -197,8 +197,10 @@ Must be admitted:
 - **New approval before its first dry run (OF-P2).** A new approval with the earlier record keeps
   the earlier lifecycle object and reads as insufficient depth. Its first dry run replaces the
   object.
-- **Lifecycle writers preserve the object (OF-P2).** Each of ON1 to ON5 and NE7 leaves the
-  lifecycle `support_depth` object byte for byte unchanged.
+- **Lifecycle writers preserve the object (OF-P2).** Every lifecycle writer other than the
+  `runtime-follow-on --dry-run` that writes or replaces it, that is ON1, `runtime-follow-on
+  --write` and `repair-runtime-evidence` of ON2, ON3 to ON5, and NE7, leaves the lifecycle
+  `support_depth` object byte for byte unchanged.
 - **Deferred maintenance acquires (OF-P3).** An approval states `explicitly_deferred` and the
   registry has no `maintenance.release_watch`. The input-only writers produce a surface the dry
   run admits, and `manifest-acquisition-plan` still refuses the agent. Neither maintenance mode is
@@ -220,8 +222,11 @@ Must be admitted:
 
 Must be refused:
 
-- **Rule 3 or rule 4 fails (OF-P1).** The dry run refuses and writes nothing. No other create-lane
-  command writes P, O, the record or the object.
+- **Rule 3 or rule 4 fails (OF-P1).** The dry run refuses and writes nothing.
+- **Freeze outside the dry run (OF-P1, OF-P2).** A create-lane command other than
+  `runtime-follow-on --dry-run` freezes or re-freezes P or O, or writes or replaces the lifecycle
+  object. This does not cover the acceptance entries that publication and closeout list in the
+  record under charter rule 9, which change neither P nor O.
 - **Deleted binding (OF-P2).** A record without the object, or the object without the record. A
   missing object is never read as "not depth-enrolled".
 - **Object mismatch (OF-P2).** The record and the object disagree on Event, P, or O absent versus
