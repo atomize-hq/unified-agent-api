@@ -376,8 +376,10 @@ Only the approval loader's reading of rule 3 is implemented. Source references a
   on the version it states.
 - `onboard-agent --write` scaffolds the manifest root with a `current.json` and placeholder
   directories (`crates/xtask/src/onboard_agent/preview.rs:282-320`). It writes no version
-  metadata, no `RULES.json` and no validator spec. The `aider` and `gemini_cli` roots have neither
-  of the last two, and the `aider` root's only version is the placeholder `0.0.0`.
+  metadata, no `RULES.json` and no validator spec. The `aider` and `gemini_cli` roots have no
+  `RULES.json`. Their validator specs were written by hand; each states the shared depth checks
+  and says that its root adopts no Annex B record until a `RULES.json` names the record path. The
+  `aider` root's only version is the placeholder `0.0.0`.
 - `runtime-follow-on --dry-run` writes a frozen prompt and input contract under
   `docs/agents/.uaa-temp/runtime-follow-on/runs/<run_id>/`, and `--write` requires the run id of a
   prepared dry run (`crates/xtask/src/runtime_follow_on.rs:165-169,235-238`). Both modes require
