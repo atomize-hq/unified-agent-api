@@ -675,7 +675,7 @@ jobs:
           done < <(jq -r '.include[].target_triple' "$PLAN" | tr -d '\r')
           echo "missing target snapshots: ${MISSING}"
 
-      - name: Union → wrapper coverage → report → version metadata → validate
+      - name: Union → wrapper coverage → report → version metadata
         shell: bash
         env:
           VERSION: ${{ inputs.target_version }}
@@ -697,7 +697,6 @@ jobs:
 
           cargo run -p xtask -- manifest-report --root "$ROOT" --version "$VERSION"
           cargo run -p xtask -- manifest-version-metadata --root "$ROOT" --version "$VERSION" --status reported
-          cargo run -p xtask -- manifest-validate --root "$ROOT"
 
       - name: Stage exact acquisition inputs before freeze
         if: ${{ inputs.commit }}
@@ -787,6 +786,17 @@ jobs:
           else
             cargo run -p xtask -- support-matrix
           fi
+
+      # Validation reads the published support matrix, which gains the acquired version's rows only
+      # in the step above. Validating earlier refuses every new version with
+      # SUPPORT_MATRIX_ROW_MISSING, so validate the complete root here, before any delivery.
+      - name: Validate the acquired manifest root against the published support outputs
+        shell: bash
+        env:
+          ROOT: ${{ needs.plan.outputs.manifest_root }}
+        run: |
+          set -euo pipefail
+          cargo run -p xtask -- manifest-validate --root "$ROOT"
 
       - name: Stage the complete checked delivery
         id: delivery
