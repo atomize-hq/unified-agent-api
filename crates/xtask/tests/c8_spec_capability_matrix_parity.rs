@@ -43,25 +43,35 @@ mod capability_matrix {
                     .collect(),
             };
 
-            let commands = match entry.agent_id.as_str() {
-                "codex" => vec![
-                    command(&["mcp", "list"], &["x86_64-unknown-linux-musl"]),
-                    command(&["mcp", "get"], &["x86_64-unknown-linux-musl"]),
-                    command(&["mcp", "add"], &["x86_64-unknown-linux-musl"]),
-                    command(&["mcp", "remove"], &["x86_64-unknown-linux-musl"]),
-                ],
-                "claude_code" => vec![
-                    command(
-                        &["mcp", "list"],
-                        &["linux-x64", "darwin-arm64", "win32-x64"],
-                    ),
-                    command(&["mcp", "get"], &["win32-x64"]),
-                    command(&["mcp", "add"], &["win32-x64"]),
-                    command(&["mcp", "remove"], &["win32-x64"]),
-                ],
-                "opencode" | "gemini_cli" | "aider" => Vec::new(),
-                other => panic!("unexpected agent `{other}`"),
-            };
+            // Each gated capability the entry declares that projects onto a manifest command
+            // gets that command on the gate's targets (all canonical targets when the gate names
+            // none). The set derives from the registry, so no agent id is listed here.
+            let declaration = &entry.capability_declaration;
+            let gates = declaration
+                .target_gated
+                .iter()
+                .map(|gate| (gate.capability_id.as_str(), Some(&gate.targets)))
+                .chain(
+                    declaration
+                        .config_gated
+                        .iter()
+                        .map(|gate| (gate.capability_id.as_str(), gate.targets.as_ref())),
+                );
+            let mut commands = Vec::new();
+            for (capability_id, targets) in gates {
+                let Some(path) =
+                    crate::capability_projection::manifest_projected_capability_path(capability_id)
+                else {
+                    continue;
+                };
+                let targets: Vec<&str> = targets
+                    .filter(|targets| !targets.is_empty())
+                    .unwrap_or(&entry.canonical_targets)
+                    .iter()
+                    .map(String::as_str)
+                    .collect();
+                commands.push(command(path, &targets));
+            }
 
             UnionManifest {
                 expected_targets: entry.canonical_targets.clone(),
@@ -103,11 +113,23 @@ mod capability_matrix {
                 collect_inventory_from_registry(&registry, |entry| Ok(valid_manifest_for(entry)))
                     .expect("matching parity should pass");
 
-            assert!(inventory.backends.contains_key("codex"));
-            assert!(inventory.backends.contains_key("claude_code"));
-            assert!(inventory.backends.contains_key("opencode"));
-            assert!(inventory.backends.contains_key("gemini_cli"));
-            assert!(inventory.backends.contains_key("aider"));
+            let enrolled: Vec<&str> = registry
+                .capability_matrix_entries()
+                .map(|entry| entry.agent_id.as_str())
+                .collect();
+            assert!(!enrolled.is_empty());
+            assert_eq!(
+                inventory
+                    .backends
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>(),
+                {
+                    let mut sorted = enrolled.clone();
+                    sorted.sort_unstable();
+                    sorted
+                }
+            );
         }
 
         #[test]

@@ -133,6 +133,91 @@ Each step is a reviewed PR into `staging`.
      captured route is rechecked against the caller before delivery. Capability publication now
      loads through `isolated_maintenance::registry` too. Without a route, every load keeps the
      production `support_depth` refusal.
+   - B.4 part 2 writes reporting E from authenticated isolated evidence (design option A).
+     - Under the captured route only, the guarded MA4 host gets the evidence host from that
+       route. It authenticates the complete applicable run and attempt population with the
+       synthetic profile's resolver. It then stages a bounded, read-only bundle (E plus every
+       referenced receipt and payload) in a private temporary directory outside the candidate.
+       Production has no route and stages nothing.
+     - The executor runs `xtask depth-evidence-assemble` inside the candidate. With no network
+       and no credentials, it writes E and its files only into the packet's normal reporting
+       destination, `<manifest_root>/reports/<version>/`. Its record must hold the same Event,
+       P and O. The E and file assembly is shared with the `prove` diagnostic, which still
+       previews in a scratch clone.
+     - The live invocation is the only route to the bundle. The host serves it through a Unix
+       socket in that private directory, for its own candidate root only, while the executor
+       runs. The executor gets just the socket's path, as
+       `XTASK_AGENT_MAINTENANCE_EVIDENCE_CHANNEL`. The command checks the bundle's digest and
+       invocation id against what the socket answers. When the executor exits, the socket and
+       the bundle are removed. A copied bundle, a path, the variable alone or a restored origin
+       is therefore never a route. `CapturedRegistry` is never serialized.
+     - The assembler's channel check is fail-closed convenience; authority is the host's
+       captured route plus byte binding at delivery; a forged standalone run can write only an
+       undeliverable local E. The command writes nothing without a live socket that answers, but
+       it does not authenticate the server: any check of a socket's listener is forgeable by a
+       same-user process, and an identity check would also reject a legitimately built
+       `cargo run -p xtask -- depth-evidence-assemble`.
+     - The host answers only a peer whose process (read from the kernel with SO_PEERCRED)
+       descends from the executor it spawned, and only when the request carries the
+       invocation's random nonce. The host passes the nonce to the executor alone, as
+       `XTASK_AGENT_MAINTENANCE_EVIDENCE_NONCE`; green gates never inherit it. The requested
+       root must equal the host's own canonical candidate root; it is never resolved. Platforms
+       other than Linux have no such anchor, so the host refuses every client. The host revokes
+       the channel as soon as the executor process exits, on every path and before any gate
+       runs. Each request has an absolute deadline, and nothing is answered after revocation.
+     - The executor and the green gates never inherit host delivery credentials (`GH_TOKEN`,
+       `GITHUB_TOKEN`, `AUTOMATION_TOKEN` and the related GitHub, registry and Actions token
+       variables). The executor's own home and model login are left as they are.
+     - E remains untrusted. The relay checks are unchanged. One delivery change: support
+       publication reads bound evidence only from the Git index. So the relay validates against
+       the caller index plus the new files that a changed record's E binds and that are
+       byte-identical to files the host itself staged. Copy-back adds exactly those files to the
+       caller index, as blobs written from the validated bytes (never re-read from the working
+       tree). The index entries are published before any file is written, so an index failure
+       writes nothing; if a file write then fails, exactly the owned index entries are removed
+       and a concurrent change to one of them is preserved and reported. Publication and
+       rollback each follow Git's lockfile protocol: the relay creates `index.lock`
+       exclusively before it compares anything, works on a private copy of the index, and
+       installs that copy with an atomic rename while it still holds the lock. No other Git
+       process can change the index between the comparison and the installation, and an
+       existing lock refuses with the index unchanged. This byte binding is the authority over
+       the channel, and it binds by path class, whether or not any depth record changed. The
+       class is every file under any evidence destination (`.../reports/<version>/evidence/`),
+       every receipt any E binds, and every payload those receipts reference (toolchain,
+       environment, dependency graph, raw output), wherever it lies. Each snapshot, before and
+       after the run, is traversed on its own and the results are unioned; every receipt is
+       read, including those found in an evidence destination. A receipt's source inputs
+       (covered inputs, provenance, assertion sources) are product files the run may change, so
+       they are not in the class.
+       Every file the candidate adds, changes or removes in that class must be byte-identical to
+       the host-staged bundle file at that path; anything else refuses the whole delivery,
+       before publication and again at copy-back, with caller files and index unchanged. In
+       production nothing is staged, so any change in the class refuses. Matching new files,
+       payloads included, are what gain index identities. E from a forged channel, a payload
+       substituted behind unchanged receipts (also on a rerun over committed evidence), a
+       removed payload, an added unreferenced file, a substituted payload outside `evidence/`
+       or a receipt newly referencing another file are therefore refused. Bound evidence may
+       never live in an MA4 run directory (`docs/agents/.uaa-temp/agent-maintenance/runs/`),
+       whose diagnostics are copied back even when a run fails: any E or receipt reference
+       there refuses the whole delivery.
+     - Failure delivery copies back no file the candidate holds. The host serializes every run
+       diagnostic itself, in its own private directory, from what it holds in memory: its
+       validation report, run status, summary, the executor's exit record and its stdout and
+       stderr as the host received them, and the recovery pointer. A failed candidate's own
+       report is never read back. No diagnostic is written over a path bound evidence names.
+     - Every capture used for binding covers the caller's tracked paths together with the
+       candidate's, so a tracked file under a directory capture otherwise skips (such as
+       `target/`) is always classified.
+     - Containment, at MA4 delivery only: every E reference must lie in its own record's
+       `<manifest_root>/reports/<version>/evidence/`, and every payload a receipt references in
+       that receipt's evidence destination. Anything else refuses the delivery. Contract
+       revision 1 allows any repository-relative path, and evaluation is unchanged; whether the
+       contract should adopt this containment is an open question for the maintainer. A completely unchanged
+       MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
+       file is ever admitted. A receipt that only the candidate made still refuses as an
+       untracked bound input. `evaluate_isolated_record` now covers the
+       synthetic profile through the installed binding. It, and every other consumer,
+       re-authenticates the full population rather than trusting a bundle.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

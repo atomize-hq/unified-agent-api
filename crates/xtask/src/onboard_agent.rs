@@ -41,6 +41,7 @@ const PUBLISH_WORKFLOW_PATH: &str = ".github/workflows/publish-crates.yml";
 const PUBLISH_SCRIPT_PATH: &str = "scripts/publish_crates.py";
 const VALIDATE_PUBLISH_SCRIPT_PATH: &str = "scripts/validate_publish_versions.py";
 const CHECK_PUBLISH_READINESS_SCRIPT_PATH: &str = "scripts/check_publish_readiness.py";
+const WRITTEN_PATHS_FILE_NAME: &str = "written-paths.json";
 const CURRENT_OWNER_COMMAND: &str = "onboard-agent --write";
 const LAST_TRANSITION_BY: &str = "onboard-agent --write";
 const RAW_APPROVAL_SHA256_PLACEHOLDER: &str =
@@ -188,6 +189,8 @@ struct DraftEntry {
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
     approval_maintenance: Option<ApprovalMaintenanceSummary>,
+    /// The exact upstream version the approval's `[support_depth]` table states, if any.
+    approval_support_depth_version: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -270,6 +273,8 @@ struct DraftDescriptorInput {
     onboarding_pack_prefix: String,
     approval_provenance: Option<ApprovalProvenance>,
     approval_maintenance: Option<ApprovalMaintenanceSummary>,
+    /// The exact upstream version the approval's `[support_depth]` table states, if any.
+    approval_support_depth_version: Option<String>,
 }
 
 #[derive(Debug)]
@@ -311,6 +316,7 @@ pub fn run_in_workspace<W: Write>(
         .map_err(|err| Error::Internal(format!("read {REGISTRY_RELATIVE_PATH}: {err}")))?;
     let registry = AgentRegistry::parse(&registry_text).map_err(map_registry_load_error)?;
     let draft = DraftEntry::from_args(args, workspace_root)?;
+    preview::refuse_unscaffoldable_manifest_root(&draft)?;
 
     validate_registry_conflicts(&registry, &draft)?;
     validate_workspace_package_name_conflicts(&draft, &jail)?;
@@ -441,6 +447,7 @@ impl DraftEntry {
             onboarding_pack_prefix: input.onboarding_pack_prefix,
             approval_provenance: input.approval_provenance,
             approval_maintenance: input.approval_maintenance,
+            approval_support_depth_version: input.approval_support_depth_version,
         })
     }
 
@@ -491,7 +498,7 @@ impl OnboardingPlan {
 
         let release_preview = build_release_preview(workspace_root, draft)?;
         let proving_run_metrics = load_proving_run_metrics(workspace_root, draft)?;
-        let docs_preview =
+        let mut docs_preview =
             build_docs_preview(draft, &release_preview, proving_run_metrics.as_ref());
         let lifecycle_state_preview = build_lifecycle_state_preview(workspace_root, draft)?;
         let manifest_preview = build_manifest_preview(draft);
@@ -537,6 +544,12 @@ impl OnboardingPlan {
             lifecycle_state_preview.contents.clone().into_bytes(),
         ));
         mutations.extend(preview_writes(&manifest_preview));
+        let inventory = written_paths_inventory(draft, &mutations)?;
+        mutations.push(PlannedMutation::create(
+            inventory.0.clone(),
+            inventory.1.clone().into_bytes(),
+        ));
+        docs_preview.push((inventory.0, Some(inventory.1)));
 
         Ok(Self {
             registry_entry_preview,
@@ -548,6 +561,32 @@ impl OnboardingPlan {
             mutations,
         })
     }
+}
+
+/// `<pack>/governance/written-paths.json`: every path the plan writes, itself included, sorted.
+/// It is derived from the complete mutation plan, so it lists exactly what `--write` writes and
+/// is byte-identical on replay.
+fn written_paths_inventory(
+    draft: &DraftEntry,
+    mutations: &[PlannedMutation],
+) -> Result<(String, String), Error> {
+    let path = draft
+        .docs_pack_root()
+        .join("governance")
+        .join(WRITTEN_PATHS_FILE_NAME)
+        .display()
+        .to_string();
+    let mut paths = mutations
+        .iter()
+        .map(|mutation| mutation.relative_path().display().to_string())
+        .collect::<Vec<_>>();
+    paths.push(path.clone());
+    paths.sort();
+    paths.dedup();
+    let mut contents = serde_json::to_string_pretty(&paths)
+        .map_err(|err| Error::Internal(format!("serialize {path}: {err}")))?;
+    contents.push('\n');
+    Ok((path, contents))
 }
 
 fn resolve_workspace_root() -> Result<PathBuf, Error> {

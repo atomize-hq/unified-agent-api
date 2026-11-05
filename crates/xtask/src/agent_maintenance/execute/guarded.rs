@@ -5,7 +5,8 @@ use super::{
     tree,
     types::{Context, ValidationCheck, ValidationReport},
     validate::validate_prepared_packet,
-    workflow, Error, VALIDATION_REPORT_FILE_NAME, WORKFLOW_VERSION,
+    workflow, Error, CODEX_STDERR_FILE_NAME, CODEX_STDOUT_FILE_NAME, INPUT_CONTRACT_FILE_NAME,
+    VALIDATION_REPORT_FILE_NAME, WORKFLOW_VERSION,
 };
 use std::{io::Write, path::Path};
 
@@ -16,7 +17,7 @@ pub(super) fn execute_write_mode<W: Write>(
 ) -> Result<(), Error> {
     let (prepared, prompt) = load_prepared_packet(context)?;
     validate_prepared_packet(context, &prepared, &prompt)?;
-    let candidate = Candidate::prepare(caller, context)?;
+    let mut candidate = Candidate::prepare(caller, context)?;
     // The candidate cannot resolve the isolated route; bind the registry this execution captured
     // to its exact root for every in-process check below. Nothing has executed yet.
     let _bound = context
@@ -25,10 +26,22 @@ pub(super) fn execute_write_mode<W: Write>(
         .map(|captured| captured.bind_candidate(&candidate.root))
         .transpose()
         .map_err(Error::Validation)?;
+    // Under the captured route only, stage authenticated evidence outside the candidate and serve
+    // it to this candidate alone while the executor runs. Production stages nothing.
+    let staged = context
+        .registry
+        .as_ref()
+        .map(|captured| stage_evidence(caller, captured, &candidate.root, context))
+        .transpose()?;
+    candidate.context.evidence_channel = staged.as_ref().map(|s| s.channel());
+    candidate.staged_evidence = staged.as_ref().map(|s| s.files().clone());
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
     let execution =
         workflow::execute_candidate_write(&candidate.root, &candidate.context, &mut output);
+    // The executor spawn revoked the channel when the executor exited; its bundle ends here.
+    drop(staged);
+    candidate.context.evidence_channel = None;
     let observation = candidate.observe();
     let guard = observation
         .as_ref()
@@ -44,9 +57,12 @@ pub(super) fn execute_write_mode<W: Write>(
     }
     let passed = errors.is_empty();
     let report_path = format!("{}/{VALIDATION_REPORT_FILE_NAME}", context.run_dir_rel);
+    // A failed candidate is never read back: its report, like every failure diagnostic, comes
+    // only from what the host holds in memory.
     let mut report = observation
         .as_ref()
         .ok()
+        .filter(|_| passed)
         .and_then(|after| match after.get(&report_path) {
             Some(tree::Node::File(bytes, _)) if bytes.len() <= 1_048_576 => {
                 serde_json::from_slice::<ValidationReport>(bytes).ok()
@@ -65,6 +81,12 @@ pub(super) fn execute_write_mode<W: Write>(
         });
     report.workflow_version = WORKFLOW_VERSION.into();
     report.run_id = context.run_id.clone();
+    report.codex_execution = candidate
+        .context
+        .host_capture
+        .lock()
+        .ok()
+        .and_then(|capture| capture.as_ref().map(|c| c.execution.clone()));
     report.status = if passed { "pass" } else { "fail" }.into();
     report.errors.extend(errors.clone());
     report.checks.push(ValidationCheck {
@@ -153,15 +175,66 @@ pub(super) fn execute_write_mode<W: Write>(
     Ok(())
 }
 
+/// The bundle is assembled by the host from the captured route's evidence host. An assembly
+/// failure is served to the executor as a refusal; only a staging failure stops the run, before
+/// anything executed.
+fn stage_evidence(
+    caller: &Path,
+    captured: &crate::isolated_maintenance::CapturedRegistry,
+    candidate: &Path,
+    context: &Context,
+) -> Result<crate::depth_evidence::Staged, Error> {
+    let request = &context.envelope.request;
+    let target = crate::depth_evidence::StagedTarget {
+        agent_id: request.agent_id.clone(),
+        version: request
+            .detected_release
+            .as_ref()
+            .map(|release| release.target_version.clone())
+            .unwrap_or_default(),
+        manifest_root: captured
+            .registry()
+            .find(&request.agent_id)
+            .map(|entry| entry.manifest_root.clone())
+            .unwrap_or_default(),
+    };
+    crate::depth_evidence::stage_isolated_evidence(
+        caller,
+        candidate,
+        captured.evidence_host(caller),
+        &target,
+    )
+    .map_err(|e| Error::Validation(format!("isolated evidence staging: {e}")))
+}
+
+/// The run's diagnostics, serialized by the host into its own private directory from what it
+/// holds in memory (report, status, the executor's output as the host received it, the recovery
+/// pointer). Nothing is read from the candidate, so a failed run copies back no file the executor
+/// wrote.
 fn persist_diagnostics(
     candidate: &Candidate,
     report: &ValidationReport,
     passed: bool,
     written: &[String],
 ) -> Result<tree::Tree, Error> {
-    let attempt = || {
+    let attempt = || -> Result<tree::Tree, Error> {
+        let dir = tempfile::Builder::new()
+            .prefix("uaa-diagnostics-")
+            .tempdir()
+            .map_err(tree::io)?;
+        let mut context = candidate.context.clone();
+        context.run_dir = dir.path().join(&context.run_dir_rel);
+        std::fs::create_dir_all(&context.run_dir).map_err(tree::io)?;
+        // Persistence requires the prepared contract: the caller's own copy, never delivered.
+        let contract = format!("{}/{INPUT_CONTRACT_FILE_NAME}", context.run_dir_rel);
+        let contract = match candidate.before.get(&contract) {
+            Some(tree::Node::File(bytes, _)) => bytes.clone(),
+            _ => b"{}".to_vec(),
+        };
+        std::fs::write(context.run_dir.join(INPUT_CONTRACT_FILE_NAME), contract)
+            .map_err(tree::io)?;
         let status = build_run_status(
-            &candidate.context,
+            &context,
             "write",
             if passed {
                 "write_validated"
@@ -173,7 +246,7 @@ fn persist_diagnostics(
             report.errors.clone(),
         )?;
         persist_run_packet(
-            &candidate.context,
+            &context,
             report,
             &status,
             written,
@@ -181,10 +254,38 @@ fn persist_diagnostics(
             "write",
         )?;
         packet::write_string(
-            &candidate.context.run_dir.join("recovery-candidate.txt"),
+            &context.run_dir.join("recovery-candidate.txt"),
             &format!("{}\n", candidate.recovery().display()),
         )?;
-        candidate.diagnostic_tree()
+        let capture = context.host_capture.lock().ok().and_then(|c| c.clone());
+        if let Some(capture) = capture {
+            packet::write_string(
+                &context.run_dir.join(CODEX_STDOUT_FILE_NAME),
+                &String::from_utf8_lossy(&capture.stdout),
+            )?;
+            packet::write_string(
+                &context.run_dir.join(CODEX_STDERR_FILE_NAME),
+                &String::from_utf8_lossy(&capture.stderr),
+            )?;
+        }
+        let files = tree::capture(&context.run_dir, &Default::default())?;
+        // The retained candidate records the same outcome for recovery, best effort: it is
+        // written, never read back, and an executor-broken path there never blocks the caller's
+        // diagnostics.
+        for (relative, node) in &files {
+            if let tree::Node::File(bytes, _) = node {
+                if relative != INPUT_CONTRACT_FILE_NAME {
+                    let _ = packet::write_string(
+                        &candidate.context.run_dir.join(relative),
+                        &String::from_utf8_lossy(bytes),
+                    );
+                }
+            }
+        }
+        Ok(files
+            .into_iter()
+            .map(|(p, n)| (format!("{}/{p}", context.run_dir_rel), n))
+            .collect())
     };
     attempt().map_err(|e| {
         Error::Validation(format!(
