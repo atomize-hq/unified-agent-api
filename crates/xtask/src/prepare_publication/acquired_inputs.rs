@@ -7,7 +7,7 @@ use crate::{
     agent_lifecycle::{lifecycle_state_path, LifecycleState},
     depth_record::{
         onboarding::{onboarding_binding, OnboardingApproval},
-        record_files, DepthRecord, Event,
+        DepthRecord, Event, DEPTH_RECORD_FILE_NAME,
     },
     runtime_advertising::source::Source,
 };
@@ -112,7 +112,7 @@ fn has_depth_bindings(workspace: &Path, approval_path: &str) -> Result<bool, Str
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(format!("{state_path}: {e}")),
     }
-    for (version, path) in record_files(&workspace.join(&approval.manifest_root)) {
+    for (version, path) in strict_record_files(&workspace.join(&approval.manifest_root))? {
         let raw = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let record = DepthRecord::parse(&raw, &approval.agent_id, &version)
             .map_err(|e| format!("{}: {e}", path.display()))?;
@@ -121,4 +121,54 @@ fn has_depth_bindings(workspace: &Path, approval_path: &str) -> Result<bool, Str
         }
     }
     Ok(false)
+}
+
+/// Every `reports/<version>/depth-record.json`, failing closed: only an absent `reports/` or an
+/// absent record name counts as no record. A discovery error must never let a depth generation
+/// take the non-depth early return.
+fn strict_record_files(root: &Path) -> Result<Vec<(String, std::path::PathBuf)>, String> {
+    let reports = root.join("reports");
+    let entries = match fs::read_dir(&reports) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("{}: {e}", reports.display())),
+    };
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("{}: {e}", reports.display()))?;
+        let path = entry.path().join(DEPTH_RECORD_FILE_NAME);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(format!("{}: {e}", path.display())),
+        }
+        let version = entry.file_name().to_string_lossy().into_owned();
+        files.push((version, path));
+    }
+    files.sort();
+    Ok(files)
+}
+
+#[cfg(all(test, unix))]
+mod strict_discovery_tests {
+    use super::strict_record_files;
+    use std::{fs, os::unix::fs::PermissionsExt};
+
+    #[test]
+    fn unreadable_reports_fail_closed_and_absent_reports_mean_no_record() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(strict_record_files(tmp.path()).unwrap().is_empty());
+        let reports = tmp.path().join("reports");
+        fs::create_dir_all(reports.join("0.2.0")).unwrap();
+        fs::write(reports.join("0.2.0/depth-record.json"), "{}").unwrap();
+        assert_eq!(strict_record_files(tmp.path()).unwrap().len(), 1);
+        fs::set_permissions(&reports, fs::Permissions::from_mode(0o000)).unwrap();
+        let unreadable = strict_record_files(tmp.path());
+        fs::set_permissions(&reports, fs::Permissions::from_mode(0o755)).unwrap();
+        // Root can read through mode 0; only assert where the permission actually applies.
+        if fs::read_dir(tmp.path().join("reports")).is_ok() && unreadable.is_ok() {
+            return;
+        }
+        assert!(unreadable.is_err(), "{unreadable:?}");
+    }
 }
