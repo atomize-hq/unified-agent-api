@@ -47,7 +47,7 @@ fn project_capability_truth(
     workspace_root: &Path,
     manifest: &capability_publication_mod::ManifestCurrent,
 ) -> Result<BTreeSet<String>, String> {
-    let registry = crate::agent_registry::AgentRegistry::load(workspace_root)
+    let registry = xtask::isolated_maintenance::registry(workspace_root)
         .map_err(|err| format!("load agent registry: {err}"))?;
     let publication_entry = registry.find(&entry.agent_id).ok_or_else(|| {
         format!(

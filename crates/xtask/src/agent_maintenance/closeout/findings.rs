@@ -40,7 +40,7 @@
 
 use std::{collections::BTreeSet, path::Path};
 
-use crate::{agent_registry::AgentRegistry, support_matrix};
+use crate::support_matrix;
 
 use super::{
     super::drift,
@@ -160,7 +160,7 @@ fn derive_resolved(
     agent_id: &str,
     target_version: &str,
 ) -> Result<Vec<MaintenanceFinding>, MaintenanceCloseoutError> {
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| {
+    let registry = xtask::isolated_maintenance::registry(workspace_root).map_err(|err| {
         MaintenanceCloseoutError::Validation(format!("load agent registry: {err}"))
     })?;
     let entry = registry.find(agent_id).ok_or_else(|| {

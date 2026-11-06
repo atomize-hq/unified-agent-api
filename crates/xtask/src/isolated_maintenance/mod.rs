@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 mod host;
 mod scope;
+mod view;
 
 use crate::{
     agent_maintenance::closeout_proposal::Proposal, agent_registry::AgentRegistry,
@@ -77,6 +78,9 @@ impl Route {
             registry,
         })
     }
+    pub(crate) fn context(&self) -> &Context {
+        &self.0
+    }
     /// Everything a plan built under this route is bound to: the workspace path, its root and Git
     /// directory identities, the candidate HEAD and index, and the host observation (repository
     /// identities, protected tips, approved source and governing registry).
@@ -89,6 +93,12 @@ impl Route {
     }
     pub fn recheck(&self, root: &Path) -> Result<(), String> {
         self.0.recheck(root)
+    }
+    /// MA5 captures its closeout proposal under this route (CP-P1, G2). The proposal borrows the
+    /// context as its owning authority; copying the route's files or binding supplies none.
+    pub fn proposal(self, root: &Path) -> Result<Proposal, String> {
+        self.recheck(root)?;
+        Proposal::capture_isolated(root, Arc::new(self))
     }
 }
 /// An opaque, comparable copy of a route's binding. It carries no authority of its own: only a
@@ -105,7 +115,7 @@ pub struct RouteBinding {
 pub fn route(root: &Path) -> Result<Option<Route>, String> {
     // Unit tests may install a fixture profile for the calling thread; production cannot.
     #[cfg(test)]
-    if let Some((profile, api)) = tests::installed() {
+    if let Some((profile, api)) = tests::fixture::installed() {
         return route_in(root, Some(profile), api);
     }
     route_in(root, LIVE_PROFILE, Arc::new(host::Github))
@@ -116,7 +126,7 @@ pub fn route(root: &Path) -> Result<Option<Route>, String> {
 /// registry its execution captured. Otherwise this is the production load, with every refusal it
 /// keeps, `support_depth` included. A failing installed route errors; it never falls back.
 pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
-    if let Some(registry) = candidate_registry(root) {
+    if let Some(registry) = candidate_registry(root).map_err(RegistryError::Isolated)? {
         return Ok(registry);
     }
     match route(root).map_err(RegistryError::Isolated)? {
@@ -143,6 +153,10 @@ impl std::fmt::Debug for CapturedRegistry {
     }
 }
 impl CapturedRegistry {
+    /// MA6's proposal shares the resolved caller route; scratch never resolves another context.
+    pub(crate) fn proposal(&self, root: &Path) -> Result<Proposal, String> {
+        Proposal::capture_isolated(root, self.route.clone())
+    }
     pub(crate) fn registry(&self) -> &AgentRegistry {
         &self.registry
     }
@@ -179,13 +193,23 @@ impl CapturedRegistry {
             if bound.is_some() {
                 return Err("an MA4 candidate registry is already bound on this thread".to_string());
             }
-            *bound = Some((root, self.registry.clone()));
+            *bound = Some(CandidateBinding {
+                root,
+                registry: self.registry.clone(),
+                view: None,
+            });
             Ok(CandidateRegistry(std::marker::PhantomData))
         })
     }
 }
+struct CandidateBinding {
+    root: PathBuf,
+    registry: AgentRegistry,
+    view: Option<view::Binding>,
+}
+pub(crate) use view::git_inputs as view_git_inputs;
 std::thread_local! {
-    static CANDIDATE: std::cell::RefCell<Option<(PathBuf, AgentRegistry)>> =
+    static CANDIDATE: std::cell::RefCell<Option<CandidateBinding>> =
         const { std::cell::RefCell::new(None) };
 }
 /// Unbinds the candidate registry on drop. Not `Send`: it must drop on the thread that bound it.
@@ -195,14 +219,21 @@ impl Drop for CandidateRegistry {
         CANDIDATE.with(|bound| *bound.borrow_mut() = None);
     }
 }
-fn candidate_registry(root: &Path) -> Option<AgentRegistry> {
-    let root = fs::canonicalize(root).ok()?;
+fn candidate_registry(root: &Path) -> Result<Option<AgentRegistry>, String> {
     CANDIDATE.with(|bound| {
-        bound
-            .borrow()
-            .as_ref()
-            .filter(|(candidate, _)| *candidate == root)
-            .map(|(_, registry)| registry.clone())
+        let bound = bound.borrow();
+        let Some(bound) = bound.as_ref() else {
+            return Ok(None);
+        };
+        // Recheck before canonicalization so a removed or redirected destination cannot fall
+        // through to production loading while a scratch binding is still alive.
+        if let Some(view) = &bound.view {
+            view.recheck(&bound.root)?;
+        }
+        Ok(fs::canonicalize(root)
+            .ok()
+            .filter(|root| *root == bound.root)
+            .map(|_| bound.registry.clone()))
     })
 }
 /// Which load failed. A caller that tolerates a production load failure, because another check
@@ -271,7 +302,7 @@ impl EvidenceHost {
 pub(crate) fn evidence_host(root: &Path) -> Result<EvidenceHost, String> {
     // Unit tests may install a fixture profile for the calling thread; production cannot.
     #[cfg(test)]
-    if let Some((profile, api)) = tests::installed() {
+    if let Some((profile, api)) = tests::fixture::installed() {
         return Context::resolve(root, Some(profile), api)?.evidence_host(root);
     }
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github))?.evidence_host(root)
@@ -332,8 +363,7 @@ impl Context {
         Ok(())
     }
     fn proposal(self, root: &Path) -> Result<Proposal, String> {
-        self.recheck(root)?;
-        Proposal::capture_isolated(root, self)
+        Route(self).proposal(root)
     }
     pub(crate) fn evidence_host(&self, root: &Path) -> Result<EvidenceHost, String> {
         self.recheck(root)?;
@@ -350,6 +380,23 @@ impl Context {
     pub(crate) fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
         self.recheck(root)?;
         Ok(&self.registry)
+    }
+    /// The authenticated protected tip T (CP-P1), after rechecking the caller. The owning
+    /// predicates bind the local integration ref to it; it is not itself an admission.
+    pub(crate) fn protected_tip(&self, root: &Path) -> Result<&str, String> {
+        self.recheck(root)?;
+        Ok(&self.host.isolated_tip)
+    }
+    /// Whether `raw` registry bytes parse, under this profile's depth admission, to exactly the
+    /// scoped registry, after rechecking the caller.
+    pub(crate) fn require_registry(&self, root: &Path, raw: &str) -> Result<(), String> {
+        self.recheck(root)?;
+        let tables = self.profile.depth_tables();
+        if AgentRegistry::parse_isolated(raw, &tables).map_err(|e| e.to_string())? != self.registry
+        {
+            return Err("owning bindings read a registry other than the isolated scope".into());
+        }
+        Ok(())
     }
 }
 

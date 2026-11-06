@@ -7,10 +7,67 @@ use crate::{
 };
 use std::{collections::BTreeSet, path::Path};
 
+mod binding;
 mod generation;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
-    check_with(root, revision, &manual::Production, &promotion::Production)
+    // Resolve repository-wide authority before enumerating or narrowing to any manifest root.
+    let Some(route) = crate::isolated_maintenance::route(root)? else {
+        return check_with(root, revision, &manual::Production, &promotion::Production);
+    };
+    // The existing proposal adapter exposes only its captured authority, never a caller-built
+    // context. No proposal is planned or delivered by this read-only check.
+    let proposal = route.proposal(root)?;
+    let authority = proposal.authority();
+    let super::Authority::Isolated(context) = authority else {
+        return Err("isolated IN1 binding lost its captured authority".into());
+    };
+    let binding = binding::capture(root, revision, context)?;
+    admit_all(
+        root,
+        &binding.parent,
+        &super::isolated::Host::closeout(context),
+        &super::isolated::Host::promotion(context),
+    )?;
+    binding.recheck(root, context)
+}
+
+// Per-root IN1 readers borrow the same routed scope instead of re-entering production-only
+// parsers. These are read adapters; all-root `check` remains the owning admission.
+impl crate::isolated_maintenance::Route {
+    pub(crate) fn integration_registry(
+        &self,
+        root: &Path,
+        revision: &str,
+    ) -> Result<AgentRegistry, String> {
+        self.recheck(root)?;
+        let source = Source::tip(root, revision)?;
+        let registry = AgentRegistry::parse_unenforced(&source.read(REGISTRY_RELATIVE_PATH)?)
+            .map_err(|e| e.to_string())?;
+        self.recheck(root)?;
+        Ok(registry)
+    }
+
+    pub(crate) fn integration_comparison(
+        &self,
+        root: &Path,
+        revision: &str,
+        agent: &str,
+    ) -> Result<super::Comparison, String> {
+        let registry = self.registry(root)?;
+        let earlier = self.integration_registry(root, revision)?;
+        let before = View::with_registry(Source::tip(root, revision)?, &earlier, agent)?;
+        let after = View::with_registry(Source::workspace(root)?, registry, agent)?;
+        let mut comparison = super::compare_views(&before, &after)?;
+        if !before.records.is_empty() || !after.records.is_empty() {
+            comparison.input_issues = super::publication::validate_current(root, &after)
+                .err()
+                .into_iter()
+                .collect();
+        }
+        self.recheck(root)?;
+        Ok(comparison)
+    }
 }
 
 pub(super) fn check_with(
@@ -21,7 +78,22 @@ pub(super) fn check_with(
 ) -> Result<(), String> {
     let tip = resolve(root, revision)?;
     let head = resolve(root, "HEAD")?;
-    let before = Source::tip(root, &tip)?;
+    admit_all(root, &tip, closeout_host, promotion_host)?;
+    if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
+        return Err("integration revision moved during admission".into());
+    }
+    Ok(())
+}
+
+/// Admission consumes the already pinned parent. In particular it must never resolve a
+/// caller's mutable parent ref again after the isolated binding has authenticated P -> H.
+fn admit_all(
+    root: &Path,
+    parent: &str,
+    closeout_host: &impl manual::Host,
+    promotion_host: &impl manual::Host,
+) -> Result<(), String> {
+    let before = Source::tip(root, parent)?;
     let after = Source::workspace(root)?;
     let old_registry = AgentRegistry::parse_unenforced(&before.read(REGISTRY_RELATIVE_PATH)?)
         .map_err(|e| e.to_string())?;
@@ -80,9 +152,6 @@ pub(super) fn check_with(
     }
     if let Some(view) = publication {
         super::publication::validate_current(root, &view)?;
-    }
-    if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
-        return Err("integration revision moved during admission".into());
     }
     Ok(())
 }

@@ -218,6 +218,85 @@ Each step is a reviewed PR into `staging`.
        untracked bound input. `evaluate_isolated_record` now covers the
        synthetic profile through the installed binding. It, and every other consumer,
        re-authenticates the full population rather than trusting a bundle.
+   - B.5b connects both MA5 writers to the B.5a owning authority (G2–G4, CP-P4 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). Both the closeout
+     planner/writer and `prepare-agent-closeout` capture the resolved route's proposal before
+     preparing outputs. A failed installed route refuses; an absent route keeps production
+     behavior and its depth refusal. The request validator, findings, support-audit truth, drift
+     readers and maintenance-adoption validator use the routed registry. The proposal rechecks
+     its captured caller and host before delivery and MA5 re-authenticates the full applicable
+     evidence population for the exact record, rather than trusting E's labels.
+     - Under the route, preparation reads preflight from the authenticated isolated repository
+       of its captured context through `Proposal::preflight_repository`, a read accessor that
+       exposes no context, evidence host or admission authority. Neither a flag nor the spelling
+       of `origin` selects it. Production keeps the canonical repository. Run selection, attempt
+       handling and whole-workflow
+       terminality are unchanged, including in preview.
+     - `isolated_maintenance/tests/ma5_closeout.rs` exercises each writer on the classified
+       synthetic MA1 → acquisition → MA2 → MA4 → audit chain, with the exact-generation marker
+       on the fake protected tip. Refusals cover production/no route, captured-route drift,
+       missing or wrong-generation markers, changed generation/P/O and an unverified population
+       despite E's verified labels. The socket-free checks also cover preflight policy and routed
+       preview/readers with a missing-E refusal. Full connected chains require Unix sockets and
+       must run outside the restricted sandbox; the MA4 green gates remain stubbed.
+     - Publication is unchanged. **Qualified publication not exercised**: CP-P3 option A belongs
+       to B.7b, which must rerun the complete chains. MA6 wiring belongs to B.6.
+   - B.5c connects IN1 to route-selected owning authority (G8, CP-P1 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). The repository-wide
+     `check_integration` resolves the route before enumerating roots. An absent route retains
+     production semantics; a failed installed route refuses. Per-root `manifest-validate --tip`
+     uses the routed registry and route-bound baseline/comparison readers, retaining the existing
+     distinction between a production registry failure and an isolated route refusal.
+     - The fully qualified local `refs/remotes/origin/staging` must equal authenticated protected
+       tip T; similarly named tags or local branches supply no authority. With H the checkout
+       HEAD and P the supplied parent, admission requires P = T, H != T and local Git ancestry
+       from P to H. Observation requires H = T and P equal to H's immediate first parent, read
+       from T's raw commit headers with replacement objects disabled; message encoding is
+       irrelevant. P, H and T are pinned to object IDs once. Both run full all-root generation,
+       closeout and promotion admission for that exact P → H, then recheck the captured context,
+       HEAD and fully qualified local tip. A moving caller parent ref cannot change the comparison.
+       Caller labels, flags and event payloads confer no authority. Equal H/P, stacked bases,
+       unsupported parentage and observation across several first-parent commits refuse.
+     - `isolated_maintenance/tests/in1_integration.rs` covers binding decisions without sockets,
+       including distinct merge parents, a multi-commit first-parent chain, forged or unrelated
+       parents, shadow tags/branches, non-UTF-8 commit messages, a parent-ref race with a forged
+       closeout entry, local-tip mismatch, authenticated-tip drift and unchanged ordinary production
+       behavior, plus per-root `--tip` validation of a frozen P through the routed readers.
+       The connected Linux tests take each B.5b MA5 writer's output through admission,
+       post-push observation and per-root `--tip` validation, and refuse forged entries and an
+       unverified population despite verified E labels. They also retain the production depth
+       refusal and check that validation preserves caller files and index. These full chains
+       require Unix sockets and must run outside the restricted sandbox; publication remains
+       unchanged pending B.7b. No workflow is changed (CP-P5).
+   - B.6b connects MA6 to the caller's captured route (G5, G6, G10 of the
+     [closeout/promotion design](support-depth-closeout-promotion-design.md)). `build_plan`
+     resolves once and captures the registry; its proposal shares that same `Arc<Route>`.
+     `Proposal::isolated_view` and B.6a's `CapturedRegistry::bind_view` give scratch renderers
+     and canonical validation the captured registry and pinned, read-only caller Git inputs.
+     Scratch never resolves authority. The ordinary, absent-route path retains its production
+     registry and proposal.
+     - Under a route, validation must name HEAD, the local integration tip and the authenticated
+       protected tip. Planning and apply use `Proposal::authority` to run the existing promotion
+       predicate through B.5a's isolated host. Apply rechecks the captured route immediately before
+       delivery. No context is serialized and no new public authority is introduced.
+     - `isolated_maintenance/tests/ma6_promotion.rs` covers both MA5 alternatives through IN1
+       admission and observation, then MA6's pointers, metadata, publication outputs, first
+       `Promotion` entry and marker retirement, followed by IN1 admission and observation.
+       The A.5 replay forks from the committed, IN1-admitted MA5 checkpoint before any MA6;
+       an ordinary non-depth `0.3.0` request and its own closeout replace the working files.
+       MA6 for `0.2.0` then relies on the retained closeout entry alone. A sibling fork changes
+       the wrapper's prompt limit, invalidating the earlier evidence, and must refuse at the
+       producer-closure approval check (`crates` differs from the retained producer build).
+       Each replay advance asserts a clean committed tree, local integration ref and
+       authenticated protected tip; ordinary generation replacement preserves the producer tree.
+       Refusals also cover production/no route, local/authenticated-tip mismatch, route drift
+       before apply and unbound or forged scratch. The production predicate refusal proposes the
+       pointer advance directly: a refused apply leaves new version metadata absent in the caller.
+       Socket-free tests count one route resolution
+       and exercise the ordinary replay generation separately; the full MA4-connected chains
+       require the lead's run outside the socket sandbox.
+     - Publication remains on production verdicts and unqualified throughout this slice. The
+       option A ordering and qualified publication belong to B.7b; no workflow changes here.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

@@ -3,6 +3,7 @@
 use crate::{
     agent_maintenance::closeout_proposal::Proposal,
     agent_registry::AgentRegistry,
+    isolated_maintenance::{self, CapturedRegistry},
     runtime_advertising::source::Source,
     workspace_mutation::{apply_admitted_mutations as apply_mutations, ApplySummary},
 };
@@ -33,6 +34,7 @@ pub struct Args {
 pub struct PromotionPlan {
     root: PathBuf,
     observation: Proposal,
+    captured: Option<CapturedRegistry>,
     files: Vec<(PathBuf, Option<Vec<u8>>)>,
     validation_commit: String,
 }
@@ -44,14 +46,33 @@ impl PromotionPlan {
         if root.canonicalize().map_err(|e| e.to_string())? != self.root {
             return Err("promotion workspace changed".into());
         }
-        require_revision(root, &self.validation_commit)?;
-        let plans = self.observation.plan_changes(
-            root,
-            self.files,
-            crate::depth_acceptance::plan_promotion,
-        )?;
-        require_revision(root, &self.validation_commit)?;
+        require_revision(root, &self.validation_commit, Some(&self.observation))?;
+        let plans =
+            self.observation
+                .plan_changes(root, self.files, |root, before, after, written| {
+                    admit_promotion(&self.observation, root, before, after, written)
+                })?;
+        require_revision(root, &self.validation_commit, Some(&self.observation))?;
+        if let Some(captured) = &self.captured {
+            captured.recheck(root)?;
+        }
         apply_mutations(root, &plans).map_err(|e| e.to_string())
+    }
+}
+fn admit_promotion(
+    observation: &Proposal,
+    root: &Path,
+    before: Source,
+    after: Source,
+    written: &BTreeSet<String>,
+) -> Result<BTreeMap<String, Vec<u8>>, String> {
+    match observation.authority() {
+        crate::depth_acceptance::Authority::Production => {
+            crate::depth_acceptance::plan_promotion(root, before, after, written)
+        }
+        authority => {
+            crate::depth_acceptance::plan_promotion_as(authority, root, before, after, written)
+        }
     }
 }
 fn git(root: &Path, revision: &str) -> Result<String, String> {
@@ -66,7 +87,22 @@ fn git(root: &Path, revision: &str) -> Result<String, String> {
         .map(|s| s.trim().into())
         .map_err(|e| e.to_string())
 }
-fn require_revision(root: &Path, revision: &str) -> Result<(), String> {
+fn require_revision(
+    root: &Path,
+    revision: &str,
+    proposal: Option<&Proposal>,
+) -> Result<(), String> {
+    if let Some(tip) = proposal
+        .map(|p| p.protected_tip(root))
+        .transpose()?
+        .flatten()
+    {
+        if tip != revision {
+            return Err(
+                "promotion validation revision differs from authenticated protected tip".into(),
+            );
+        }
+    }
     if revision.len() != 40
         || !revision.bytes().all(|b| b.is_ascii_hexdigit())
         || git(root, "HEAD^{commit}")? != revision
@@ -99,13 +135,36 @@ fn require_revision(root: &Path, revision: &str) -> Result<(), String> {
 }
 pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
     semver::Version::parse(&args.version).map_err(|e| e.to_string())?;
-    require_revision(root, &args.validation_commit)?;
-    let observation = Proposal::capture(root)?;
+    require_revision(root, &args.validation_commit, None)?;
+    let captured = isolated_maintenance::route(root)?
+        .map(|route| route.capture(root))
+        .transpose()?;
+    let observation = match &captured {
+        Some(captured) => captured.proposal(root)?,
+        None => Proposal::capture(root)?,
+    };
+    if captured.is_some() {
+        require_revision(root, &args.validation_commit, Some(&observation))?;
+    }
     let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
-    observation.materialize(scratch.path())?;
+    let view = match &captured {
+        Some(_) => Some(observation.isolated_view(root, scratch.path())?),
+        None => {
+            observation.materialize(scratch.path())?;
+            None
+        }
+    };
+    let scratch_binding = captured
+        .as_ref()
+        .zip(view.as_ref())
+        .map(|(captured, view)| captured.bind_view(view))
+        .transpose()?;
     let scratch_jail = crate::workspace_mutation::WorkspacePathJail::new(scratch.path())
         .map_err(|e| e.to_string())?;
-    let registry = AgentRegistry::load(scratch.path()).map_err(|e| e.to_string())?;
+    let registry = match &captured {
+        Some(captured) => captured.registry().clone(),
+        None => AgentRegistry::load(scratch.path()).map_err(|e| e.to_string())?,
+    };
     let entry = registry
         .find(&args.agent)
         .ok_or("unknown promotion agent")?;
@@ -266,11 +325,16 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
         .into_iter()
         .map(|(p, b)| (p.into(), b))
         .collect::<Vec<_>>();
-    observation.plan_changes(root, files.clone(), crate::depth_acceptance::plan_promotion)?;
-    require_revision(root, &args.validation_commit)?;
+    observation.plan_changes(root, files.clone(), |root, before, after, written| {
+        admit_promotion(&observation, root, before, after, written)
+    })?;
+    require_revision(root, &args.validation_commit, Some(&observation))?;
+    drop(scratch_binding);
+    drop(view);
     Ok(PromotionPlan {
         root: root.canonicalize().map_err(|e| e.to_string())?,
         observation,
+        captured,
         files,
         validation_commit: args.validation_commit.clone(),
     })
