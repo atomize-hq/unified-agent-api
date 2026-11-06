@@ -17,6 +17,8 @@ mod lifecycle;
 mod models;
 mod render;
 
+pub(crate) use models::SupportDepthContract;
+
 use self::{
     codex_exec::{
         allowed_write_paths, approval_descriptor_view, docs_to_read, execute_codex_write,
@@ -53,7 +55,7 @@ const RUN_STATUS_FILE_NAME: &str = "run-status.json";
 const RUN_SUMMARY_FILE_NAME: &str = "run-summary.md";
 const VALIDATION_REPORT_FILE_NAME: &str = "validation-report.json";
 const WRITTEN_PATHS_FILE_NAME: &str = "written-paths.json";
-const WORKFLOW_VERSION: &str = "runtime_follow_on_v1";
+pub(crate) const WORKFLOW_VERSION: &str = "runtime_follow_on_v2";
 const CODEX_BINARY_ENV: &str = "XTASK_RUNTIME_FOLLOW_ON_CODEX_BINARY";
 const WRAPPER_COVERAGE_MANIFEST_PATH: &str = "src/wrapper_coverage_manifest.rs";
 const PROMPT_TEMPLATE: &str = include_str!("../templates/runtime_follow_on_codex_prompt.md");
@@ -191,6 +193,11 @@ pub fn run_in_workspace<W: Write>(
 
     let prior_contract =
         load_json::<InputContract>(&context.run_dir.join(INPUT_CONTRACT_FILE_NAME))?;
+    prior_contract.check_support_depth(
+        workspace_root,
+        &context.approval,
+        &context.lifecycle_state,
+    )?;
     let prompt = read_string(&context.run_dir.join(PROMPT_FILE_NAME))?;
     if context.approval.support_depth_version.is_some() {
         return depth_candidate::execute(
@@ -328,6 +335,8 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
     let required_agent_api_test = required_agent_api_test(&approval.descriptor.agent_id);
     let mut input_contract = InputContract {
         workflow_version: WORKFLOW_VERSION.to_string(),
+        support_depth: SupportDepthContract::copy_from(&approval, &lifecycle_state)
+            .map_err(Error::Validation)?,
         generated_at: now_rfc3339()?,
         run_id: run_id.clone(),
         approval_artifact_path: approval.relative_path.clone(),

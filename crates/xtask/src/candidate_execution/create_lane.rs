@@ -135,6 +135,7 @@ pub(super) fn execute<W: Write>(
         let after = observation
             .as_ref()
             .map_err(|e| Error::Validation(e.to_string()))?;
+        check_observed_depth_identity(&candidate.root, &candidate_context, prepared)?;
         candidate.check(after).map_err(candidate_error)?;
         let changes = tree::changed(&candidate.before, after);
         let mut source_paths = Vec::new();
@@ -379,6 +380,18 @@ fn check_prepared(
         return Err(Error::Validation(format!("depth write: {why}")));
     }
     Ok(())
+}
+
+fn check_observed_depth_identity(
+    candidate_root: &Path,
+    context: &RuntimeContext,
+    prepared: &InputContract,
+) -> Result<(), Error> {
+    // Re-read after execution, before controller diagnostics or any successful delivery.
+    let state = load_json::<crate::agent_lifecycle::LifecycleState>(
+        &candidate_root.join(&context.lifecycle_state_path),
+    )?;
+    prepared.check_support_depth(candidate_root, &context.approval, &state)
 }
 
 fn diagnostics(
