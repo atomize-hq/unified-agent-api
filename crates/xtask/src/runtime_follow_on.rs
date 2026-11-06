@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::{agent_registry::AgentRegistry, approval_artifact::load_approval_artifact};
 
 mod codex_exec;
+#[path = "candidate_execution/create_lane.rs"]
+mod depth_candidate;
 mod io;
 mod lifecycle;
 mod models;
@@ -159,8 +161,18 @@ pub fn run_in_workspace<W: Write>(
     writer: &mut W,
 ) -> Result<(), Error> {
     if args.write {
-        xtask::depth_routes::refuse_workspace(workspace_root, "runtime_follow_on")
-            .map_err(Error::Validation)?;
+        // Ordinary approvals keep the original workspace refusal, even inside an isolated route.
+        let depth_approval = load_approval_artifact(workspace_root, &args.approval)
+            .ok()
+            .is_some_and(|a| a.support_depth_version.is_some());
+        if !depth_approval
+            || crate::isolated_maintenance::route(workspace_root)
+                .map_err(Error::Validation)?
+                .is_none()
+        {
+            xtask::depth_routes::refuse_workspace(workspace_root, "runtime_follow_on")
+                .map_err(Error::Validation)?;
+        }
     }
     validate_args(&args, workspace_root)?;
     let context = build_context(workspace_root, &args)?;
@@ -180,6 +192,16 @@ pub fn run_in_workspace<W: Write>(
     let prior_contract =
         load_json::<InputContract>(&context.run_dir.join(INPUT_CONTRACT_FILE_NAME))?;
     let prompt = read_string(&context.run_dir.join(PROMPT_FILE_NAME))?;
+    if context.approval.support_depth_version.is_some() {
+        return depth_candidate::execute(
+            workspace_root,
+            &context,
+            &args,
+            &prior_contract,
+            &prompt,
+            writer,
+        );
+    }
     let codex_execution = execute_codex_write(workspace_root, &context, &args, &prompt)?;
     write_json(
         &context.run_dir.join(CODEX_EXECUTION_FILE_NAME),
@@ -262,8 +284,23 @@ fn validate_args(args: &Args, workspace_root: &Path) -> Result<(), Error> {
 fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, Error> {
     let approval =
         load_approval_artifact(workspace_root, &args.approval).map_err(map_approval_error)?;
-    let registry =
-        AgentRegistry::load(workspace_root).map_err(|err| Error::Validation(err.to_string()))?;
+    if approval.support_depth_version.is_some() {
+        if let Some(run_id) = &args.run_id {
+            crate::runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
+        }
+    }
+    let registry = if approval.support_depth_version.is_some() {
+        crate::isolated_maintenance::route(workspace_root)
+            .map_err(Error::Validation)?
+            .ok_or_else(|| {
+                Error::Validation("onboarding depth execution requires an isolated route".into())
+            })?
+            .registry(workspace_root)
+            .map_err(Error::Validation)?
+            .clone()
+    } else {
+        AgentRegistry::load(workspace_root).map_err(|err| Error::Validation(err.to_string()))?
+    };
     let registry_entry = registry
         .find(&approval.descriptor.agent_id)
         .cloned()
@@ -289,7 +326,7 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
         })
         .transpose()?;
     let required_agent_api_test = required_agent_api_test(&approval.descriptor.agent_id);
-    let input_contract = InputContract {
+    let mut input_contract = InputContract {
         workflow_version: WORKFLOW_VERSION.to_string(),
         generated_at: now_rfc3339()?,
         run_id: run_id.clone(),
@@ -321,6 +358,11 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, E
         baseline: snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?,
     };
 
+    if approval.support_depth_version.is_some() {
+        input_contract
+            .allowed_write_paths
+            .retain(|p| p != &format!("{}/snapshots/**", approval.descriptor.manifest_root));
+    }
     Ok(RuntimeContext {
         approval,
         input_contract,
@@ -338,10 +380,12 @@ fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
         &context.run_dir.join(INPUT_CONTRACT_FILE_NAME),
         &context.input_contract,
     )?;
-    write_string(
-        &context.run_dir.join(PROMPT_FILE_NAME),
-        &render_prompt(context),
-    )?;
+    let prompt = if context.approval.support_depth_version.is_some() {
+        depth_candidate::render_depth_prompt(context)
+    } else {
+        render_prompt(context)
+    };
+    write_string(&context.run_dir.join(PROMPT_FILE_NAME), &prompt)?;
     write_json(
         &context.run_dir.join(RUN_STATUS_FILE_NAME),
         &render_run_status(
@@ -406,6 +450,22 @@ fn validate_write_mode(
 ) -> Result<(ValidationReport, Vec<String>), Error> {
     let current_snapshot = snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?;
     let changed_paths = diff_snapshots(&prior_contract.baseline, &current_snapshot);
+    validate_observed_write_mode(
+        workspace_root,
+        context,
+        prior_contract,
+        codex_execution,
+        changed_paths,
+    )
+}
+
+fn validate_observed_write_mode(
+    workspace_root: &Path,
+    context: &RuntimeContext,
+    prior_contract: &InputContract,
+    codex_execution: &CodexExecutionEvidence,
+    changed_paths: Vec<String>,
+) -> Result<(ValidationReport, Vec<String>), Error> {
     let mut checks = Vec::new();
     let mut errors = Vec::new();
 
