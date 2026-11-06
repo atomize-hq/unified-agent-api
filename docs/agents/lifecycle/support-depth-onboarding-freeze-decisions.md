@@ -319,7 +319,8 @@ only.
    - Write scope: `agent_lifecycle.rs`, `agent_lifecycle/storage.rs`,
      `depth_record.rs`/`depth_record/`, and the `manifest_validate/depth/` check.
 3. **Neutral candidate execution and the create-lane boundary (OF-P9, and OF-P4's `snapshots/**`
-   drop).**
+   drop).** Slice 3 implemented: shared candidate boundary, isolated create-lane adapter,
+   snapshots refusal, and lifecycle-bound written-paths publication check; production stays disabled.
    - Extract the candidate, tree, finalization and delivery pieces from
      `agent_maintenance/execute/` into a neutral module that both MA4 and the create lane call. MA4
      must stay byte-identical in behavior and keep its tests.
@@ -331,7 +332,9 @@ only.
      (coordinated with that module's current owner), `runtime_follow_on.rs`,
      `runtime_follow_on/{codex_exec,lifecycle}.rs`, and `prepare_publication/runtime_evidence.rs`.
    - Depends on slice 2 for the protected lifecycle object.
-4. **Input contract identity (OF-P8).**
+4. **Input contract identity (OF-P8).** Slice 4 implemented: optional version/P/O identity,
+   workflow v2, pre-execution and candidate-observation cross-checks, and repair identity copying;
+   historical non-depth contracts remain readable and production depth stays disabled.
    - Add the optional field, bump `workflow_version`, add the pre- and post-execution checks, and
      make `repair-runtime-evidence` copy the identities.
    - Write scope: `runtime_follow_on/models.rs`, `runtime_follow_on.rs` and
@@ -339,6 +342,15 @@ only.
    - Depends on slice 2, which provides the typed object it copies, and on slice 3, because the
      post-execution check runs in its observation phase.
 5. **Dry-run freeze core (OF-P1, OF-P4 to OF-P7).**
+   Slice 5 implemented: the private installed-synthetic-route dry run checks charter rules 3/4,
+   persists P, the record and lifecycle object with the OF-P8 packet identity, admits the shared
+   O derivation only with the integration-tip acquisition statement and identical bound inputs,
+   and refuses incomplete unions and post-integration re-freezes. Its narrow non-runtime approval
+   projection is private to that dry run; the production approval loader and public ON2 refusal
+   are unchanged. End-to-end fixture coverage includes deferred maintenance and refusal rollback.
+   Review fixes: statement enumeration, statement blobs and bound inputs use the same hardened
+   Git view pinned to the authenticated integration tip; rule 4 admits targets covered by that
+   tip's version record, with replacement-ref, graft, alternate and environment regressions.
    - A private, isolated-route-only dry-run path: resolve rule 3, check rule 4, write P, the
      record and the object, read the named integration ref and the acquisition statement there,
      require every bound input to equal both, and call the shared `derive`.

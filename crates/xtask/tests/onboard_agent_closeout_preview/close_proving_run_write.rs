@@ -340,3 +340,52 @@ fn close_proving_run_rejects_unresolved_placeholders_in_prepared_draft() {
         "Gemini CLI packet scaffold.\n"
     );
 }
+
+/// ON5: `close-proving-run` keeps the lifecycle state's `support_depth` object byte for byte
+/// (OF-P2).
+#[test]
+fn close_proving_run_preserves_the_lifecycle_depth_object() {
+    let fixture = fixture_root("close-proving-run-depth-object");
+    seed_release_touchpoints(&fixture);
+    seed_green_publication_surfaces(&fixture);
+    let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
+    let approval_path =
+        seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
+    seed_published_baseline(&fixture, &approval_path);
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let closeout_path = fixture
+        .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
+    write_text(
+        &closeout_path,
+        &serde_json::to_string_pretty(&json!({
+            "state": "closed",
+            "approval_ref": approval_rel,
+            "approval_sha256": sha256_hex(&fixture.join(&approval_path)),
+            "approval_source": "governance-review",
+            "manual_control_plane_edits": 0,
+            "partial_write_incidents": 0,
+            "ambiguous_ownership_incidents": 0,
+            "duration_seconds": 17,
+            "residual_friction": ["Manual review step still took coordination."],
+            "preflight_passed": true,
+            "recorded_at": "2026-04-21T11:23:09Z",
+            "commit": "6b7d5f6e9cf2bf54933659f5700bb59d1f8a95e8"
+        }))
+        .expect("serialize closeout"),
+    );
+    let args = [
+        "xtask",
+        "close-proving-run",
+        "--approval",
+        &approval_path,
+        "--closeout",
+        "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
+    ];
+    let object = super::lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let output = run_cli(args, &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let lifecycle = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
+    assert!(lifecycle.contains("\"lifecycle_stage\": \"closed_baseline\""));
+    super::lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
+}

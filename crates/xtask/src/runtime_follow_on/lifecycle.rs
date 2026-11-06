@@ -102,6 +102,20 @@ pub(super) fn persist_successful_runtime_integration(
     prior_contract: &InputContract,
     written_paths: &[String],
 ) -> Result<(), Error> {
+    let lifecycle_state = successful_runtime_state(context, prior_contract, written_paths)?;
+    write_lifecycle_state(
+        workspace_root,
+        &context.lifecycle_state_path,
+        &lifecycle_state,
+    )
+    .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+}
+
+pub(super) fn successful_runtime_state(
+    context: &RuntimeContext,
+    prior_contract: &InputContract,
+    written_paths: &[String],
+) -> Result<LifecycleState, Error> {
     let mut lifecycle_state = context.lifecycle_state.clone();
     lifecycle_state.lifecycle_stage = LifecycleStage::RuntimeIntegrated;
     lifecycle_state.support_tier = SupportTier::BaselineRuntime;
@@ -130,12 +144,7 @@ pub(super) fn persist_successful_runtime_integration(
     lifecycle_state.publication_packet_path = None;
     lifecycle_state.publication_packet_sha256 = None;
 
-    write_lifecycle_state(
-        workspace_root,
-        &context.lifecycle_state_path,
-        &lifecycle_state,
-    )
-    .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+    Ok(lifecycle_state)
 }
 
 pub(super) fn persist_failed_runtime_integration(

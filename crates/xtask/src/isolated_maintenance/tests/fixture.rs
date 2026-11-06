@@ -289,3 +289,13 @@ pub(super) fn install(make: Installer) -> Installed {
     INSTALLED.with(|i| *i.borrow_mut() = Some(make));
     Installed
 }
+
+#[cfg(unix)]
+#[path = "create_candidate.rs"]
+mod create_candidate;
+
+#[path = "../../runtime_follow_on/depth/policy_tests.rs"]
+mod runtime_follow_on_policy;
+
+#[path = "runtime_follow_on.rs"]
+mod runtime_follow_on;

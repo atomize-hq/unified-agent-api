@@ -19,6 +19,8 @@ use xtask::{
 #[allow(dead_code)]
 #[path = "../src/historical_lifecycle_backfill.rs"]
 mod historical_lifecycle_backfill;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
@@ -369,4 +371,212 @@ fn sha256_pretty_json<T: serde::Serialize>(value: &T) -> String {
     let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
     bytes.push(b'\n');
     hex::encode(Sha256::digest(bytes))
+}
+
+/// NE7: `historical-lifecycle-backfill` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn historical_lifecycle_backfill_preserves_the_lifecycle_depth_object() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-object");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
+}
+
+/// NE7: a lifecycle state whose depth members cannot be read is refused before backfill writes
+/// anything, so no runtime evidence, packet or closeout is left half written.
+#[test]
+fn historical_lifecycle_backfill_refuses_an_unreadable_depth_object_before_writing() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-refused");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let text = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
+    let repeated = text.replacen(
+        "\"support_depth\":",
+        &format!("\"support_depth\": {object},\n  \"support\\u005fdepth\":"),
+        1,
+    );
+    fs::write(&lifecycle_path, repeated).expect("write lifecycle state");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(
+        output.stderr.contains("duplicate field"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+}
+
+/// NE7: a depth object that reads but does not validate, such as one whose P identity is not a
+/// digest, is refused while backfill is still preparing, before it writes runtime evidence, a
+/// packet, a closeout or any directory.
+#[test]
+fn historical_lifecycle_backfill_refuses_an_invalid_depth_digest_before_writing() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-depth-invalid");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    lifecycle_depth::inject_depth_object(&lifecycle_path);
+    let text = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
+    let invalid = text.replacen(
+        &format!("\"policy_identity\": \"{}\"", "a".repeat(64)),
+        "\"policy_identity\": \"invalid\"",
+        1,
+    );
+    assert_ne!(invalid, text);
+    fs::write(&lifecycle_path, invalid).expect("write lifecycle state");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(
+        output.stderr.contains("support_depth.policy_identity"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+}
+
+/// NE7: every selected agent is prepared before any is written, so an agent that cannot be
+/// backfilled leaves an earlier, valid agent unwritten too.
+#[test]
+fn historical_lifecycle_backfill_writes_no_agent_until_every_agent_is_prepared() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-all-or-nothing");
+    // A directory of the caller's at the name an earlier scratch check used, with this process's
+    // id, is not backfill's to create, change or remove.
+    let foreign = fixture.join(format!(
+        "docs/agents/.uaa-temp/runtime-follow-on/runs/.check-historical-gemini_cli-runtime-follow-on-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&foreign).expect("create caller directory");
+    fs::write(foreign.join("keep.txt"), "the caller's\n").expect("write caller file");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+            "--agent",
+            "codex",
+        ],
+        &fixture,
+    );
+    assert_ne!(output.exit_code, 0, "stdout:\n{}", output.stdout);
+    assert!(!output.stdout.contains("gemini_cli"), "{}", output.stdout);
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+
+    // Alone, the valid agent backfills, and the caller's directory is still untouched.
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    assert_eq!(
+        fs::read_to_string(foreign.join("keep.txt")).expect("caller file"),
+        "the caller's\n"
+    );
+}
+
+fn gemini_args() -> historical_lifecycle_backfill::Args {
+    historical_lifecycle_backfill::Args::try_parse_from(["backfill", "--agent", "gemini_cli"])
+        .expect("args")
+}
+
+/// NE7: backfill prepares in a scratch directory outside the workspace. A temporary directory
+/// inside the workspace (as a TMPDIR there would give) is refused before anything is written.
+#[test]
+fn historical_lifecycle_backfill_refuses_a_scratch_parent_inside_the_workspace() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-scratch-inside");
+    let inside = fixture.join("docs/agents/.uaa-temp/tmp");
+    fs::create_dir_all(&inside).expect("create temp parent");
+    let before = lifecycle_depth::snapshot(&fixture);
+    let mut stdout = Vec::new();
+    let err = historical_lifecycle_backfill::run_in_workspace_with_scratch(
+        &fixture,
+        gemini_args(),
+        &mut stdout,
+        &inside,
+    )
+    .expect_err("a scratch parent inside the workspace is refused");
+    assert!(err.to_string().contains("inside the workspace"), "{err}");
+    assert_eq!(lifecycle_depth::snapshot(&fixture), before);
+
+    // A parent outside the workspace is used, and nothing is left in it.
+    let outside = tempfile::tempdir().expect("outside parent");
+    historical_lifecycle_backfill::run_in_workspace_with_scratch(
+        &fixture,
+        gemini_args(),
+        &mut stdout,
+        outside.path(),
+    )
+    .expect("backfill with an outside scratch parent");
+    assert_eq!(fs::read_dir(outside.path()).expect("read").count(), 0);
+}
+
+/// NE7: the runtime evidence written is exactly the bundle validated while preparing. An input
+/// that changes between preparing and writing does not change what is written.
+#[test]
+fn historical_lifecycle_backfill_writes_the_bundle_it_prepared() {
+    let (fixture, _) = prepare_fixture("historical-lifecycle-backfill-retained");
+    let scratch = tempfile::tempdir().expect("scratch parent");
+    let prepared =
+        historical_lifecycle_backfill::prepare_backfill(&fixture, &gemini_args(), scratch.path())
+            .expect("prepare");
+
+    // A runtime-owned output appears after preparing; deriving the bundle now would list it.
+    let late = "crates/agent_api/src/backends/gemini_cli/late.rs";
+    fs::write(fixture.join(late), "// late\n").expect("write late output");
+    let mut stdout = Vec::new();
+    historical_lifecycle_backfill::write_prepared(&fixture, prepared, &mut stdout).expect("write");
+    let written_paths = fixture.join(
+        "docs/agents/.uaa-temp/runtime-follow-on/runs/historical-gemini_cli-runtime-follow-on/written-paths.json",
+    );
+    let written = fs::read_to_string(&written_paths).expect("read written paths");
+    assert!(!written.contains("late.rs"), "{written}");
+
+    // Preparing again does list it, so the input mattered.
+    let output = run_cli(
+        [
+            "xtask",
+            "historical-lifecycle-backfill",
+            "--agent",
+            "gemini_cli",
+        ],
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let rewritten = fs::read_to_string(&written_paths).expect("read written paths");
+    assert!(rewritten.contains("late.rs"), "{rewritten}");
 }

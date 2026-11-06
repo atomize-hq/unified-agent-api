@@ -1,13 +1,9 @@
 #[path = "execute/candidate.rs"]
 mod candidate;
-#[path = "execute/candidate_git.rs"]
-mod candidate_git;
 #[path = "execute/delivery_index.rs"]
 mod delivery_index;
 #[path = "execute/guarded.rs"]
 mod guarded;
-#[path = "execute/index_lock.rs"]
-mod index_lock;
 #[path = "execute/packet.rs"]
 mod packet;
 #[path = "execute/runtime.rs"]

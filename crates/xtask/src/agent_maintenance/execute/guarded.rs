@@ -37,12 +37,14 @@ pub(super) fn execute_write_mode<W: Write>(
     candidate.staged_evidence = staged.as_ref().map(|s| s.files().clone());
     let mut output = Vec::new();
     // No `?` escapes between possible execution and observation/finalization.
-    let execution =
-        workflow::execute_candidate_write(&candidate.root, &candidate.context, &mut output);
-    // The executor spawn revoked the channel when the executor exited; its bundle ends here.
-    drop(staged);
+    let (execution, observation) = candidate.execute_observed(|| {
+        let result =
+            workflow::execute_candidate_write(&candidate.root, &candidate.context, &mut output);
+        // The executor spawn revoked the channel; end its bundle before observation.
+        drop(staged);
+        result
+    });
     candidate.context.evidence_channel = None;
-    let observation = candidate.observe();
     let guard = observation
         .as_ref()
         .map_err(|e| Error::Validation(e.to_string()))
@@ -118,12 +120,12 @@ pub(super) fn execute_write_mode<W: Write>(
         vec![]
     };
     let diagnostics = persist_diagnostics(&candidate, &report, passed, &written)?;
-    let mut delivery = if passed {
-        observation.unwrap_or_default()
-    } else {
-        candidate.before.clone()
-    };
-    delivery.extend(diagnostics);
+    let delivery = crate::candidate_execution::finalized_tree(
+        &candidate.before,
+        observation.as_ref().ok(),
+        passed,
+        diagnostics,
+    );
     // Re-authenticate the captured isolated route before anything reaches the caller.
     let copied = match context
         .registry

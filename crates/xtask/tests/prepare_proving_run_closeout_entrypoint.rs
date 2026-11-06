@@ -6,6 +6,8 @@ use xtask::{agent_lifecycle, prepare_proving_run_closeout};
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 use harness::{fixture_root, seed_gemini_approval_artifact, sha256_hex, write_text, HarnessOutput};
 
@@ -480,4 +482,18 @@ fn prepare_proving_run_closeout_rejects_non_published_lifecycle_state_without_wr
         fs::read_to_string(fixture.join(HANDOFF_PATH)).expect("read HANDOFF"),
         "sentinel handoff\n"
     );
+}
+
+/// `prepare-proving-run-closeout --write` writes the lifecycle state in its own batch, and keeps a
+/// depth object in whatever form it was written in byte for byte (OF-P2).
+#[test]
+fn prepare_proving_run_closeout_write_preserves_the_lifecycle_depth_object() {
+    let fixture = prepare_published_fixture("prepare-closeout-depth-object");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let output = run_cli(prepare_args("--write"), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
 }
