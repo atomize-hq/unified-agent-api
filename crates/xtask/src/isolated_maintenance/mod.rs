@@ -519,13 +519,22 @@ fn inspect_git_namespace(path: &Path, depth: usize, remaining: &mut usize) -> Re
         return Err("isolated Git metadata inventory exceeds bound".into());
     }
     *remaining -= 1;
-    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    // An entry that vanishes mid-walk (for example Git's detached auto-maintenance lock) means
+    // the metadata changed under the observation; refuse as a change, still failing closed.
+    let changed = |error: std::io::Error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            "isolated caller workspace or Git ownership changed".to_string()
+        } else {
+            error.to_string()
+        }
+    };
+    let metadata = fs::symlink_metadata(path).map_err(changed)?;
     if metadata.file_type().is_symlink() {
         return Err("shared symlinked isolated Git metadata descendant".into());
     }
     if metadata.is_dir() {
-        for entry in fs::read_dir(path).map_err(|error| error.to_string())? {
-            let entry = entry.map_err(|error| error.to_string())?;
+        for entry in fs::read_dir(path).map_err(changed)? {
+            let entry = entry.map_err(changed)?;
             inspect_git_namespace(&entry.path(), depth + 1, remaining)?;
         }
     } else if !metadata.is_file() {
