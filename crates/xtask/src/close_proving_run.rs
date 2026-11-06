@@ -1,3 +1,8 @@
+#[cfg(test)]
+#[allow(clippy::duplicate_mod)]
+#[path = "prepare_publication/isolated_entrypoint.rs"]
+pub(crate) mod isolated;
+
 #[path = "close_proving_run/render.rs"]
 mod render;
 
@@ -15,6 +20,7 @@ use self::render::{
 };
 use clap::Parser;
 use thiserror::Error;
+use xtask::prepare_publication::acquired_inputs;
 use xtask::workspace_mutation::{
     apply_mutations, plan_create_or_replace, WorkspaceMutationError, WorkspacePathJail,
 };
@@ -92,15 +98,19 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
-    if true {
-        xtask::depth_routes::refuse_workspace(workspace_root, "close_proving_run")
-            .map_err(Error::Validation)?;
-    }
+    xtask::depth_routes::refuse_workspace(workspace_root, "close_proving_run")
+        .map_err(Error::Validation)?;
+    run_body(workspace_root, args, writer)
+}
+
+fn run_body<W: Write>(workspace_root: &Path, args: Args, writer: &mut W) -> Result<(), Error> {
     let approval_path = normalize_repo_relative_path(workspace_root, &args.approval, "--approval")?;
     let closeout_path = normalize_repo_relative_path(workspace_root, &args.closeout, "--closeout")?;
     let onboarding_pack_prefix = onboarding_pack_prefix_from_closeout_path(&closeout_path)?;
     let jail = WorkspacePathJail::new(workspace_root)?;
     let resolved_closeout_path = jail.resolve(&closeout_path)?;
+    acquired_inputs::check(workspace_root, &approval_path.to_string_lossy())
+        .map_err(Error::Validation)?;
     let approval = load_approval_artifact(workspace_root, &approval_path.display().to_string())
         .map_err(map_approval_error)?;
     let closeout = load_validated_closeout(

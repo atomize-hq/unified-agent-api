@@ -319,8 +319,26 @@ fn refresh_publication_help_text_includes_required_surface() {
 
 #[test]
 fn refresh_publication_write_advances_to_closeout_and_refreshes_outputs() {
-    let fixture =
-        prepare_publication_ready_fixture("refresh-publication-success", SUPPORT_AND_CAPABILITY);
+    assert_refresh_publication_write(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn refresh_publication_write_accepts_non_depth_approval_symlink() {
+    assert_refresh_publication_write(true);
+}
+
+fn assert_refresh_publication_write(approval_symlink: bool) {
+    let fixture = prepare_publication_ready_fixture(
+        &format!("refresh-publication-success-{approval_symlink}"),
+        SUPPORT_AND_CAPABILITY,
+    );
+    #[cfg(unix)]
+    if approval_symlink {
+        let path = fixture.join(APPROVAL_PATH);
+        fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+        std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    }
     seed_publication_output_state(&fixture, SUPPORT_AND_CAPABILITY);
     write_preflight_makefile(&fixture, true);
 
@@ -653,9 +671,9 @@ fn refresh_publication_rejects_rerun_after_published_handoff_is_set() {
     }
 }
 
-/// ON4: `refresh-publication --write` keeps the `support_depth` object byte for byte (OF-P2).
+/// ON4: an orphaned lifecycle depth object refuses, preserving all bytes (OF-P2/OF-P6).
 #[test]
-fn refresh_publication_write_preserves_the_lifecycle_depth_object() {
+fn refresh_publication_write_refuses_an_orphaned_lifecycle_depth_object() {
     let fixture = prepare_publication_ready_fixture(
         "refresh-publication-depth-object",
         SUPPORT_AND_CAPABILITY,
@@ -678,10 +696,10 @@ fn refresh_publication_write_preserves_the_lifecycle_depth_object() {
     };
     let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
     rebind(&fixture);
-
+    let before = lifecycle_depth::snapshot(&fixture);
     let output = run_cli(refresh_args("--write"), &fixture);
-    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
-    let state = read_json(&lifecycle_state_path(&fixture));
-    assert_eq!(state["lifecycle_stage"], "published");
+    assert_eq!(output.exit_code, 2, "stderr:\n{}", output.stderr);
+    assert!(output.stderr.contains("DEPTH_LIFECYCLE_BINDING_ORPHANED"));
+    assert_eq!(before, lifecycle_depth::snapshot(&fixture));
     lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
 }

@@ -72,13 +72,29 @@ fn onboard_agent_write_does_not_rewrite_packet_files_when_closeout_is_invalid() 
 
 #[test]
 fn close_proving_run_validates_and_refreshes_packet_docs() {
-    let fixture = fixture_root("close-proving-run-pass");
+    assert_close_proving_run_write(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn close_proving_run_write_accepts_non_depth_approval_symlink() {
+    assert_close_proving_run_write(true);
+}
+
+fn assert_close_proving_run_write(approval_symlink: bool) {
+    let fixture = fixture_root(&format!("close-proving-run-pass-{approval_symlink}"));
     seed_release_touchpoints(&fixture);
     seed_green_publication_surfaces(&fixture);
     let approval_rel = "docs/agents/lifecycle/gemini-cli-onboarding/governance/approved-agent.toml";
     let approval_path =
         seed_gemini_approval_artifact(&fixture, approval_rel, "gemini-cli-onboarding");
     seed_published_baseline(&fixture, &approval_path);
+    #[cfg(unix)]
+    if approval_symlink {
+        let path = fixture.join(&approval_path);
+        fs::rename(&path, path.with_file_name("approval-target.toml")).unwrap();
+        std::os::unix::fs::symlink("approval-target.toml", &path).unwrap();
+    }
     let approval_sha256 = sha256_hex(&fixture.join(&approval_path));
     let closeout_path = fixture
         .join("docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json");
@@ -341,10 +357,9 @@ fn close_proving_run_rejects_unresolved_placeholders_in_prepared_draft() {
     );
 }
 
-/// ON5: `close-proving-run` keeps the lifecycle state's `support_depth` object byte for byte
-/// (OF-P2).
+/// ON5: an orphaned lifecycle depth object refuses, preserving all bytes (OF-P2/OF-P6).
 #[test]
-fn close_proving_run_preserves_the_lifecycle_depth_object() {
+fn close_proving_run_refuses_an_orphaned_lifecycle_depth_object() {
     let fixture = fixture_root("close-proving-run-depth-object");
     seed_release_touchpoints(&fixture);
     seed_green_publication_surfaces(&fixture);
@@ -383,9 +398,10 @@ fn close_proving_run_preserves_the_lifecycle_depth_object() {
         "docs/agents/lifecycle/gemini-cli-onboarding/governance/proving-run-closeout.json",
     ];
     let object = super::lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let before = super::lifecycle_depth::snapshot(&fixture);
     let output = run_cli(args, &fixture);
-    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
-    let lifecycle = fs::read_to_string(&lifecycle_path).expect("read lifecycle state");
-    assert!(lifecycle.contains("\"lifecycle_stage\": \"closed_baseline\""));
+    assert_eq!(output.exit_code, 2, "stderr:\n{}", output.stderr);
+    assert!(output.stderr.contains("DEPTH_LIFECYCLE_BINDING_ORPHANED"));
+    assert_eq!(before, super::lifecycle_depth::snapshot(&fixture));
     super::lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
 }

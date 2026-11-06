@@ -1,3 +1,9 @@
+#[cfg(test)]
+#[allow(clippy::duplicate_mod)]
+#[path = "prepare_publication/isolated_entrypoint.rs"]
+pub(crate) mod isolated;
+
+pub mod acquired_inputs;
 mod runtime_evidence;
 
 use std::{
@@ -105,6 +111,10 @@ pub fn run_in_workspace<W: Write>(
         xtask::depth_routes::refuse_workspace(workspace_root, "prepare_publication")
             .map_err(Error::Validation)?;
     }
+    run_body(workspace_root, args, writer)
+}
+
+fn run_body<W: Write>(workspace_root: &Path, args: Args, writer: &mut W) -> Result<(), Error> {
     let context = build_context(workspace_root, &args)?;
     write_header(writer, &context, args.write)?;
 
@@ -232,6 +242,7 @@ pub fn validate_runtime_evidence_directory_for_approval(
 }
 
 fn build_context(workspace_root: &Path, args: &Args) -> Result<PublicationContext, Error> {
+    acquired_inputs::check(workspace_root, &args.approval).map_err(Error::Validation)?;
     let approval =
         load_approval_artifact(workspace_root, &args.approval).map_err(map_approval_error)?;
     let registry =
