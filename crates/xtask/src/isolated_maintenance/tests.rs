@@ -3,10 +3,12 @@ use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use serde_json::json;
 use std::{collections::BTreeMap, fs};
 
+mod authority;
 mod authority_gaps;
-mod fixture;
+pub(super) mod fixture;
 #[cfg(unix)]
 mod git_metadata;
+mod in1_integration;
 mod ma2_routes;
 // The connected evidence chain needs the Linux channel peer anchor; other platforms refuse it
 // (see `depth_evidence::staged::non_linux_tests`).
@@ -14,22 +16,17 @@ mod ma2_routes;
 mod ma4_evidence;
 #[cfg(unix)]
 mod ma4_route;
+mod ma5_closeout;
+mod ma6_promotion;
 mod onboarding_scope;
 mod prepare;
 mod registry_tables;
 mod subject;
 #[cfg(unix)]
 mod unsupported_routes;
+mod view;
 use fixture::{declaration, git, write, Fake, Fixture};
 
-pub(super) use fixture::installed;
-
-#[test]
-fn matching_authenticated_private_scope_resolves_without_admission() {
-    let f = Fixture::new();
-    let context = f.resolve().unwrap();
-    context.recheck(f.root.path()).unwrap();
-}
 #[test]
 fn absent_profile_never_reads_host() {
     let root = tempfile::tempdir().unwrap();

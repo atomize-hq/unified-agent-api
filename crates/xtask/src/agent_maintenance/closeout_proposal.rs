@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 // Closeout validation reads governance, registry, acquisition and implementation inputs. Keep the
@@ -30,7 +31,7 @@ struct Snapshot {
 
 pub struct Proposal {
     before: Snapshot,
-    isolated: Option<crate::isolated_maintenance::Context>,
+    isolated: Option<Arc<crate::isolated_maintenance::Route>>,
 }
 impl Proposal {
     pub fn capture(root: &Path) -> Result<Self, String> {
@@ -40,9 +41,22 @@ impl Proposal {
         })
     }
 
+    /// The captured context's authenticated preflight repository; grants no admission authority.
+    pub fn preflight_repository(&self, root: &Path) -> Result<Option<&'static str>, String> {
+        self.isolated
+            .as_ref()
+            .map(|route| {
+                route
+                    .context()
+                    .evidence_host(root)
+                    .map(|host| host.repository())
+            })
+            .transpose()
+    }
+
     pub(crate) fn capture_isolated(
         root: &Path,
-        context: crate::isolated_maintenance::Context,
+        context: Arc<crate::isolated_maintenance::Route>,
     ) -> Result<Self, String> {
         context.recheck(root)?;
         let proposal = Self {
@@ -51,6 +65,14 @@ impl Proposal {
         };
         proposal.verify_current(root)?;
         Ok(proposal)
+    }
+
+    /// Authenticated protected tip of this proposal's captured route, with a freshness recheck.
+    pub(crate) fn protected_tip(&self, root: &Path) -> Result<Option<&str>, String> {
+        self.isolated
+            .as_ref()
+            .map(|route| route.context().protected_tip(root))
+            .transpose()
     }
 
     fn recheck_binding(&self, root: &Path) -> Result<(), String> {
@@ -71,7 +93,6 @@ impl Proposal {
     }
 
     /// A scratch view borrows the original caller's context; copying its files supplies no authority.
-    #[allow(dead_code)]
     pub(crate) fn isolated_view(
         &self,
         root: &Path,
@@ -103,12 +124,29 @@ impl Proposal {
         self.plan(root, files.to_vec()).map(drop)
     }
 
+    /// The owning authority this proposal admits under (CP-P1): the isolated context it was
+    /// captured with, else production. Only [`Proposal::capture_isolated`] binds a context.
+    pub(crate) fn authority(&self) -> crate::depth_acceptance::Authority<'_> {
+        match &self.isolated {
+            Some(context) => crate::depth_acceptance::Authority::Isolated(context.context()),
+            None => crate::depth_acceptance::Authority::Production,
+        }
+    }
+
     pub(crate) fn plan(
         &self,
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,
     ) -> Result<Vec<PlannedMutation>, String> {
-        self.plan_with(root, files, crate::depth_acceptance::plan_manual_closeout)
+        self.plan_with(root, files, |root, before, after, written| {
+            crate::depth_acceptance::plan_manual_closeout(
+                self.authority(),
+                root,
+                before,
+                after,
+                written,
+            )
+        })
     }
 
     pub(crate) fn plan_with(
@@ -222,7 +260,15 @@ impl Proposal {
         root: &Path,
         files: Vec<(PathBuf, Vec<u8>)>,
     ) -> Result<ApplySummary, String> {
-        self.apply_with(root, files, crate::depth_acceptance::plan_manual_closeout)
+        self.apply_with(root, files, |root, before, after, written| {
+            crate::depth_acceptance::plan_manual_closeout(
+                self.authority(),
+                root,
+                before,
+                after,
+                written,
+            )
+        })
     }
 
     pub(crate) fn apply_with(
@@ -244,15 +290,30 @@ impl Proposal {
     }
 }
 /// Read-only view with borrowed, non-serializable original-caller freshness, never write authority.
-#[allow(dead_code)]
 pub(crate) struct IsolatedView<'a> {
     proposal: &'a Proposal,
     caller: PathBuf,
     destination: PathBuf,
     destination_identity: crate::isolated_maintenance::FileIdentity,
 }
-#[allow(dead_code)]
 impl IsolatedView<'_> {
+    /// Attest this view against the captured registry's caller, returning its root and the
+    /// attested identity and proposal's original registry bytes. These observations grant no
+    /// evidence authority.
+    pub(crate) fn registry_binding(
+        &self,
+        caller: &Path,
+    ) -> Result<(&Path, crate::isolated_maintenance::FileIdentity, Vec<u8>), String> {
+        if caller != self.caller {
+            return Err("isolated scratch belongs to another caller".into());
+        }
+        let bytes = self
+            .source()?
+            .optional_bytes(crate::agent_registry::REGISTRY_RELATIVE_PATH)?
+            .ok_or("isolated proposal has no captured registry bytes")?;
+        Ok((&self.destination, self.destination_identity.clone(), bytes))
+    }
+
     pub(crate) fn source(&self) -> Result<Source, String> {
         self.proposal.verify_current(&self.caller)?;
         if crate::isolated_maintenance::FileIdentity::read(&self.destination)?

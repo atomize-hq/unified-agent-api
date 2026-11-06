@@ -8,9 +8,9 @@
 //!
 //! The policy is therefore declared here rather than left to whatever the API happened to return.
 //!
-//! - **Canonical repository, not the local remote.** Governance evidence comes from
-//!   [`EVIDENCE_REPO`], never from `git remote get-url origin`. A checkout pointed at a fork would
-//!   otherwise resolve a fork's CI into this repository's governance record.
+//! - **Authenticated repository.** Production governance evidence comes from [`EVIDENCE_REPO`].
+//!   Isolated preparation uses the repository read from its captured proposal (CP-P4).
+//!   Neither a flag nor `git remote get-url origin` chooses the repository.
 //! - **Selection.** Workflow runs whose `head_sha` equals the requested commit exactly, narrowed to
 //!   [`PREFLIGHT_WORKFLOW_PATH`]. The query filters server-side; both fields are re-checked here,
 //!   because a filter that silently stops filtering is indistinguishable from one that matched.
@@ -70,6 +70,20 @@ pub struct ResolvedPreflight {
     pub runs: Vec<EvidenceRun>,
 }
 
+impl ResolvedPreflight {
+    /// The caller takes the repository from its captured proposal (CP-P4).
+    pub(crate) fn resolve_in_repository<F>(
+        commit: &str,
+        repository: &str,
+        fetch: F,
+    ) -> Result<Self, MaintenanceCloseoutError>
+    where
+        F: FnMut(&str) -> Result<String, MaintenanceCloseoutError>,
+    {
+        resolve_in_repository(commit, repository, fetch)
+    }
+}
+
 #[derive(Deserialize)]
 struct RunsPage {
     #[serde(default)]
@@ -108,6 +122,17 @@ pub fn resolve_preflight(
 /// The network-free half, so the policy above is testable against frozen API responses.
 pub fn resolve_preflight_with_fetcher<F>(
     commit: &str,
+    fetch: F,
+) -> Result<ResolvedPreflight, MaintenanceCloseoutError>
+where
+    F: FnMut(&str) -> Result<String, MaintenanceCloseoutError>,
+{
+    resolve_in_repository(commit, EVIDENCE_REPO, fetch)
+}
+
+fn resolve_in_repository<F>(
+    commit: &str,
+    repository: &str,
     mut fetch: F,
 ) -> Result<ResolvedPreflight, MaintenanceCloseoutError>
 where
@@ -120,7 +145,7 @@ where
     let mut page = 1usize;
     loop {
         let url = format!(
-            "https://api.github.com/repos/{EVIDENCE_REPO}/actions/runs\
+            "https://api.github.com/repos/{repository}/actions/runs\
              ?head_sha={commit}&per_page={PAGE_SIZE}&page={page}"
         );
         let body = fetch(&url)?;
@@ -173,7 +198,7 @@ where
 
     if candidates.is_empty() {
         return Err(MaintenanceCloseoutError::Validation(format!(
-            "no {PREFLIGHT_WORKFLOW_PATH} run is associated with `{commit}` in {EVIDENCE_REPO}. \
+            "no {PREFLIGHT_WORKFLOW_PATH} run is associated with `{commit}` in {repository}. \
              Check runs attach to the packet-branch head, so this is what a merge commit, a \
              force-pushed-away head, or a commit CI never observed all look like."
         )));

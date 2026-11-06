@@ -54,6 +54,7 @@ pub fn record_files(root: &Path) -> Vec<(String, PathBuf)> {
 /// SHA-256 identities of evidence held as regular stage-0 files with matching working bytes.
 /// Missing paths have no identity. Unsafe, untracked, conflicted or divergent inputs refuse;
 /// a working file cannot confer an identity the index does not hold. No proof is admitted here.
+/// A bound scratch view instead compares its working files to the caller's pinned commit objects.
 pub fn bound_evidence<'a>(
     workspace: &Path,
     records: impl IntoIterator<Item = &'a DepthRecord>,
@@ -68,7 +69,7 @@ pub fn bound_evidence<'a>(
     if paths.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let mut inputs = crate::git_inputs::GitInputs::new(workspace)?;
+    let mut inputs = crate::git_inputs::GitInputs::for_bound_evidence(workspace)?;
     let mut identities = BTreeMap::new();
     for path in paths {
         if inputs.optional(path)?.is_some() {

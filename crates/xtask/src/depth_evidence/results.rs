@@ -17,6 +17,17 @@ pub struct EvidenceVerdicts {
     results: BTreeMap<ObligationRef, DepthResult>,
 }
 impl EvidenceVerdicts {
+    /// Host-taking evaluation (CP-P1): authenticate the complete population for exactly `record`
+    /// through the caller's borrowed evidence host. It never resolves a binding from `workspace`,
+    /// never trusts E labels, and seals the verdicts to `record` alone, so an entry appended
+    /// later reads unverified until evaluated again.
+    pub(crate) fn authenticate(
+        workspace: &std::path::Path,
+        record: &DepthRecord,
+        host: &crate::isolated_maintenance::EvidenceHost,
+    ) -> Result<Self, String> {
+        super::verdict::isolated_record_results(workspace, record, Some(host))
+    }
     pub(crate) fn result(&self, record: &DepthRecord, obligation: &ObligationRef) -> DepthResult {
         if seal(record).ok().as_ref() != self.record_seal.as_ref() {
             return DepthResult::Unverified;
@@ -67,7 +78,7 @@ pub fn evaluate_isolated_record(
     workspace: &std::path::Path,
     record: &DepthRecord,
 ) -> Result<EvidenceVerdicts, String> {
-    super::verdict::isolated_record_results(workspace, record)
+    super::verdict::isolated_record_results(workspace, record, None)
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use xtask::{
     agent_lifecycle,
-    agent_registry::{AgentRegistry, AgentRegistryEntry},
+    agent_registry::AgentRegistryEntry,
     approval_artifact,
     depth_record::{DepthRecord, Event, DEPTH_RECORD_FILE_NAME},
 };
@@ -44,14 +44,31 @@ pub(in crate::manifest_validate) fn validate(
     if let Err(error) = xtask::depth_acceptance::check_integration(&workspace, tip.commit()) {
         emit(violations, "DEPTH_ADMISSION_REFUSED", root.clone(), error);
     }
-    let registry = AgentRegistry::load(&workspace).ok();
+    let registry = match xtask::isolated_maintenance::registry(&workspace) {
+        Ok(registry) => Some(registry),
+        Err(xtask::isolated_maintenance::RegistryError::Production(_)) => None,
+        Err(error) => {
+            emit(violations, "DEPTH_ROUTE_REFUSED", root, error.to_string());
+            return;
+        }
+    };
+    let route = match xtask::isolated_maintenance::route(&workspace) {
+        Ok(route) => route,
+        Err(error) => {
+            emit(violations, "DEPTH_ROUTE_REFUSED", root, error);
+            return;
+        }
+    };
     let entry = registry
         .as_ref()
         .and_then(|r| r.agents.iter().find(|e| e.manifest_root == root));
     // Keep the named root anchored to the tip even if the candidate replaces it with a symlink
     // or moves its registry entry. A convenience symlink outside the registered path still
     // resolves through the canonical root, as ordinary one-tree validation does.
-    let earlier_registry = match tip.registry() {
+    let earlier_registry = match route.as_ref().map_or_else(
+        || tip.registry(),
+        |route| route.integration_registry(&workspace, tip.commit()),
+    ) {
         Ok(registry) => registry,
         Err(error) => {
             emit(violations, "DEPTH_TIP_UNREADABLE", root, error);
@@ -154,7 +171,11 @@ pub(in crate::manifest_validate) fn validate(
         return;
     };
     if !versions.is_empty() {
-        match xtask::depth_acceptance::compare(&workspace, tip.commit(), &anchor.agent_id) {
+        let comparison = route.as_ref().map_or_else(
+            || xtask::depth_acceptance::compare(&workspace, tip.commit(), &anchor.agent_id),
+            |route| route.integration_comparison(&workspace, tip.commit(), &anchor.agent_id),
+        );
+        match comparison {
             Ok(report) => {
                 for error in report.input_issues {
                     emit(
