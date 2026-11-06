@@ -1,12 +1,48 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{agent_lifecycle::LifecycleState, approval_artifact::ApprovalArtifact};
+use crate::{
+    agent_lifecycle::{LifecycleDepth, LifecycleState},
+    approval_artifact::ApprovalArtifact,
+};
+
+/// Reporting cross-check of the approval's version and the lifecycle state's frozen identities.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SupportDepthContract {
+    pub(crate) version: String,
+    pub(crate) policy_identity: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) obligations_identity: Option<String>,
+}
+
+impl SupportDepthContract {
+    /// Copy P/O from the lifecycle object; neither the contract nor repair freezes identities.
+    pub(crate) fn copy_from(
+        approval: &ApprovalArtifact,
+        state: &LifecycleState,
+    ) -> Result<Option<Self>, String> {
+        let Some(version) = &approval.support_depth_version else {
+            return Ok(None);
+        };
+        let object = state.support_depth.as_ref().ok_or_else(|| {
+            "depth input contract requires the frozen lifecycle support_depth object; depth identity is not decided yet".to_string()
+        })?;
+        object.validate()?;
+        Ok(Some(Self {
+            version: version.clone(),
+            policy_identity: object.policy_identity.clone(),
+            obligations_identity: object.obligations_identity.clone(),
+        }))
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct InputContract {
     pub(super) workflow_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) support_depth: Option<SupportDepthContract>,
     pub(super) generated_at: String,
     pub(super) run_id: String,
     pub(super) approval_artifact_path: String,
@@ -35,6 +71,64 @@ pub(super) struct InputContract {
     pub(super) allowed_write_paths: Vec<String>,
     pub(super) ignored_diff_roots: Vec<String>,
     pub(super) baseline: WorkspaceSnapshot,
+}
+
+impl InputContract {
+    pub(super) fn check_support_depth(
+        &self,
+        workspace: &Path,
+        approval: &ApprovalArtifact,
+        state: &LifecycleState,
+    ) -> Result<(), super::Error> {
+        use super::{io::read_string, Error, WORKFLOW_VERSION};
+        if self.workflow_version != WORKFLOW_VERSION
+            && !(self.workflow_version == "runtime_follow_on_v1" && self.support_depth.is_none())
+        {
+            return Err(Error::Validation(format!(
+                "input contract workflow_version `{}` is unsupported for its support_depth identity",
+                self.workflow_version
+            )));
+        }
+        let expected =
+            SupportDepthContract::copy_from(approval, state).map_err(Error::Validation)?;
+        if self.support_depth != expected {
+            return Err(Error::Validation(
+                "input contract support_depth differs from the approval version or lifecycle support_depth object".into(),
+            ));
+        }
+        let Some(depth) = &self.support_depth else {
+            return Ok(());
+        };
+        let record = crate::depth_record::DepthRecord::parse(
+            &read_string(&workspace.join(format!(
+                "{}/reports/{}/depth-record.json",
+                approval.descriptor.manifest_root, depth.version
+            )))?,
+            &approval.descriptor.agent_id,
+            &depth.version,
+        )
+        .map_err(Error::Validation)?;
+        let current_approval = crate::depth_record::onboarding::OnboardingApproval::parse(
+            &read_string(&workspace.join(&approval.relative_path))?,
+            &approval.relative_path,
+        )
+        .map_err(Error::Validation)?;
+        if current_approval.support_depth_version.as_ref() != Some(&depth.version) {
+            return Err(Error::Validation(
+                "input contract support_depth version differs from the approval's [support_depth] table".into(),
+            ));
+        }
+        let identities = LifecycleDepth {
+            policy_identity: depth.policy_identity.clone(),
+            obligations_identity: depth.obligations_identity.clone(),
+        };
+        if let Some(why) = record.request_mismatch(&identities.binding(current_approval.event)) {
+            return Err(Error::Validation(format!(
+                "input contract support_depth: {why}"
+            )));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -5,6 +5,8 @@ use serde_json::Value;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 #[path = "support/runtime_follow_on_harness.rs"]
 mod runtime_harness;
 
@@ -73,6 +75,8 @@ fn runtime_follow_on_dry_run_writes_full_packet_without_touching_other_paths() {
     }
     let prompt = fs::read_to_string(run_dir.join("codex-prompt.md")).expect("read prompt");
     let input_contract = read_json(&run_dir.join("input-contract.json"));
+    assert_eq!(input_contract["workflow_version"], "runtime_follow_on_v2");
+    assert!(input_contract.get("support_depth").is_none());
     assert!(prompt.contains("Do not edit generated `cli_manifests/cursor/wrapper_coverage.json`."));
     assert!(prompt.contains("crates/agent_api/tests/c1_cursor_runtime_follow_on.rs"));
     assert!(prompt.contains("canonical targets:"));
@@ -521,4 +525,104 @@ fn runtime_follow_on_write_marks_blocked_when_handoff_reports_exact_blockers() {
         .expect("blocking_issues array")
         .iter()
         .any(|value| value.as_str() == Some("Upstream runtime dependency is not yet available.")));
+}
+
+/// ON2: the write run keeps the lifecycle state's `support_depth` object byte for byte (OF-P2).
+#[test]
+fn runtime_follow_on_write_preserves_the_lifecycle_depth_object() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-follow-on-depth-object");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_state_path(&fixture));
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "stderr:\n{}", dry_run.stderr);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
+    write_fake_codex_scenario(&fixture, "success");
+    let binary = fake_codex_binary_with_exact_commands(&fixture);
+    let output = run_cli(
+        runtime_args_with_binary("--write", &approval_path, &binary),
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    let state = read_json(&lifecycle_state_path(&fixture));
+    assert_eq!(state["lifecycle_stage"], "runtime_integrated");
+    lifecycle_depth::assert_depth_preserved(&lifecycle_state_path(&fixture), &object);
+}
+
+#[test]
+fn runtime_follow_on_refuses_depth_identity_on_non_depth_contract_before_execution() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-input-depth-forgery");
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "{}", dry_run.stderr);
+    let path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(WRITE_RUN_ID)
+        .join("input-contract.json");
+    let mut contract = read_json(&path);
+    contract["support_depth"] = serde_json::json!({
+        "version": "1.2.3", "policy_identity": "a".repeat(64)
+    });
+    write_json(&path, &contract);
+    write_fake_codex_scenario(&fixture, "success");
+    let output = run_cli(runtime_args("--write", &approval_path, &fixture), &fixture);
+    assert_eq!(output.exit_code, 2, "{}", output.stderr);
+    assert!(output.stderr.contains("support_depth"), "{}", output.stderr);
+    assert!(!fixture.join(FAKE_CODEX_LOG_FILE).exists());
+}
+
+#[test]
+fn runtime_follow_on_write_accepts_a_historical_non_depth_v1_contract() {
+    let (fixture, approval_path) = prepare_runtime_fixture("runtime-input-historical-v1");
+    let dry_run = run_cli(
+        [
+            "xtask",
+            "runtime-follow-on",
+            "--dry-run",
+            "--approval",
+            &approval_path,
+            "--run-id",
+            WRITE_RUN_ID,
+        ],
+        &fixture,
+    );
+    assert_eq!(dry_run.exit_code, 0, "{}", dry_run.stderr);
+    let path = fixture
+        .join(RUNTIME_RUNS_ROOT)
+        .join(WRITE_RUN_ID)
+        .join("input-contract.json");
+    let mut contract = read_json(&path);
+    contract["workflow_version"] = "runtime_follow_on_v1".into();
+    contract.as_object_mut().unwrap().remove("support_depth");
+    write_json(&path, &contract);
+    write_fake_codex_scenario(&fixture, "success");
+    let binary = fake_codex_binary_with_exact_commands(&fixture);
+    let output = run_cli(
+        runtime_args_with_binary("--write", &approval_path, &binary),
+        &fixture,
+    );
+    assert_eq!(output.exit_code, 0, "{}", output.stderr);
+    assert_eq!(
+        read_json(&lifecycle_state_path(&fixture))["lifecycle_stage"],
+        "runtime_integrated"
+    );
 }

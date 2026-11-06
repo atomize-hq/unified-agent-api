@@ -88,15 +88,17 @@ fn approval(workspace: &Path, version: &str) -> String {
 #[test]
 fn onboarding_creation_requires_a_loadable_agent_root_and_version_approval() {
     let (temp, root, tip) = baseline(None);
-    let mut rec = record();
-    rec["event"] = json!({ "lifecycle_path": "onboarding", "approval_commit": COMMIT, "approval_recorded_at": RECORDED_AT });
-    rec["policy"]["selection"]["enrollment"]["lifecycle_path"] = json!("onboarding");
-    seal(&mut rec);
+    // The approval's own Event, so that the lifecycle object of OF-P2 can state the record.
+    let rec = onboarding::onboarding_record();
     write_record(&root, &rec);
     fails(&root, &tip, "DEPTH_RECORD_WITHOUT_FREEZE");
     let path = temp.path().join(GOVERNANCE).join("approved-agent.toml");
     let text = approval(temp.path(), VERSION);
     write_text(&path, &text);
+    onboarding::bind_lifecycle(
+        temp.path(),
+        Some(json!({ "policy_identity": rec["policy"]["identity"] })),
+    );
     let (status, report) = compare(&root, &tip);
     assert_eq!(status, 0, "{report}");
     for bad in [
@@ -127,8 +129,15 @@ fn an_unchanged_onboarding_statement_needs_no_surviving_approval() {
     git(temp.path(), &["commit", "-qm", "onboarding record"]);
     let tip = git(temp.path(), &["rev-parse", "HEAD"]);
     write_record(&root, &rec);
+    // The merge check asks no freeze of the unchanged record. The tree check of OF-P2 still
+    // refuses an onboarding record that no lifecycle object states, here with no lifecycle state.
     let (status, report) = compare(&root, &tip);
-    assert_eq!(status, 0, "{report}");
+    assert_eq!(status, 2, "{report}");
+    assert!(!report.contains("DEPTH_RECORD_WITHOUT_FREEZE"), "{report}");
+    assert!(
+        report.contains("DEPTH_LIFECYCLE_BINDING_MISSING"),
+        "{report}"
+    );
 }
 
 #[test]

@@ -193,3 +193,70 @@ fn resolve_codex_binary(args: &Args) -> String {
         .or_else(|| std::env::var(CODEX_BINARY_ENV).ok())
         .unwrap_or_else(|| "codex".to_string())
 }
+
+/// Depth execution captures streams in host-owned files. No candidate output is written here;
+/// observation must precede controller diagnostics.
+pub(super) fn capture_depth_execution(
+    caller: &Path,
+    candidate: &Path,
+    context: &RuntimeContext,
+    args: &Args,
+    prompt: &str,
+) -> Result<(CodexExecutionEvidence, std::process::Output), Error> {
+    let configured = resolve_codex_binary(args);
+    let binary = if configured.contains(['/', '\\']) {
+        let full = if Path::new(&configured).is_absolute() {
+            PathBuf::from(&configured)
+        } else {
+            caller.join(&configured)
+        };
+        full.strip_prefix(caller)
+            .map(|p| candidate.join(p))
+            .unwrap_or(full)
+            .to_string_lossy()
+            .into_owned()
+    } else {
+        configured
+    };
+    let (argv, output) = crate::candidate_execution::process::spawn(
+        &binary,
+        candidate,
+        prompt,
+        &[],
+        None,
+        |child| {
+            child.wait().map_err(|e| {
+                let _ = child.kill();
+                let _ = child.wait();
+                crate::candidate_execution::Error::Internal(format!("wait for codex exec: {e}"))
+            })
+        },
+    )
+    .map_err(super::depth_candidate::candidate_error)?;
+    Ok((
+        CodexExecutionEvidence {
+            workflow_version: WORKFLOW_VERSION.into(),
+            generated_at: now_rfc3339()?,
+            run_id: context.run_id.clone(),
+            binary,
+            argv,
+            prompt_path: context
+                .run_dir
+                .join(PROMPT_FILE_NAME)
+                .to_string_lossy()
+                .into_owned(),
+            stdout_path: context
+                .run_dir
+                .join(CODEX_STDOUT_FILE_NAME)
+                .to_string_lossy()
+                .into_owned(),
+            stderr_path: context
+                .run_dir
+                .join(CODEX_STDERR_FILE_NAME)
+                .to_string_lossy()
+                .into_owned(),
+            exit_code: output.status.code().unwrap_or(1),
+        },
+        output,
+    ))
+}

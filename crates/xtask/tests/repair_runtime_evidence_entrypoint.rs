@@ -12,6 +12,8 @@ use xtask::{
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;
+#[path = "support/lifecycle_depth.rs"]
+mod lifecycle_depth;
 
 use harness::{fixture_root, seed_gemini_approval_artifact, sha256_hex, write_text, HarnessOutput};
 
@@ -507,4 +509,73 @@ fn write_json(path: &Path, value: &Value) {
     let mut bytes = serde_json::to_vec_pretty(value).expect("serialize json");
     bytes.push(b'\n');
     fs::write(path, bytes).expect("write json");
+}
+
+/// ON2: `repair-runtime-evidence --write` keeps the `support_depth` object byte for byte (OF-P2).
+#[test]
+fn repair_runtime_evidence_write_preserves_the_lifecycle_depth_object() {
+    let (fixture, approval_path) = prepare_fixture("repair-runtime-evidence-depth-object");
+    let lifecycle_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&lifecycle_path);
+    let output = run_cli(repair_args("--write", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 0, "stderr:\n{}", output.stderr);
+    lifecycle_depth::assert_depth_preserved(&lifecycle_path, &object);
+}
+
+#[test]
+fn repair_runtime_evidence_check_copies_lifecycle_identities_into_the_staged_contract() {
+    fn inspect_contract(run_root: &Path) -> Result<(), String> {
+        let contract = read_json(&run_root.join("input-contract.json"));
+        assert_eq!(contract["workflow_version"], "runtime_follow_on_v2");
+        assert_eq!(
+            contract["support_depth"],
+            serde_json::json!({
+                "version": "1.2.3",
+                "policy_identity": "a".repeat(64),
+                "obligations_identity": "b".repeat(64),
+            })
+        );
+        // Stop after inspecting the staged bundle; this grants no depth publication authority.
+        Err("inspected copied depth identities".into())
+    }
+    let (fixture, approval_path) = prepare_fixture("repair-staged-depth-identity");
+    let mut approval = fs::read_to_string(fixture.join(&approval_path)).unwrap();
+    approval.push_str("\n[support_depth]\nversion = \"1.2.3\"\n");
+    fs::write(fixture.join(&approval_path), approval).unwrap();
+    let state_path =
+        fixture.join("docs/agents/lifecycle/gemini-cli-onboarding/governance/lifecycle-state.json");
+    let mut state = read_json(&state_path);
+    state["approval_artifact_sha256"] = sha256_hex(&fixture.join(&approval_path)).into();
+    write_json(&state_path, &state);
+    let object = lifecycle_depth::inject_noncanonical_depth_object(&state_path);
+    fs::create_dir_all(fixture.join(xtask::runtime_evidence_run::RUNTIME_RUNS_ROOT)).unwrap();
+    let before = lifecycle_depth::snapshot(&fixture);
+    repair_runtime_evidence::set_test_stage_mutator(Some(inspect_contract));
+    let output = run_cli(repair_args("--check", &approval_path), &fixture);
+    repair_runtime_evidence::set_test_stage_mutator(None);
+    assert!(
+        output.stderr.contains("inspected copied depth identities"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(before, lifecycle_depth::snapshot(&fixture));
+    lifecycle_depth::assert_depth_preserved(&state_path, &object);
+}
+
+#[test]
+fn repair_runtime_evidence_refuses_undecided_depth_identity_before_staging() {
+    let (fixture, approval_path) = prepare_fixture("repair-missing-depth-identity");
+    let mut approval = fs::read_to_string(fixture.join(&approval_path)).unwrap();
+    approval.push_str("\n[support_depth]\nversion = \"1.2.3\"\n");
+    fs::write(fixture.join(&approval_path), approval).unwrap();
+    let before = lifecycle_depth::snapshot(&fixture);
+    let output = run_cli(repair_args("--check", &approval_path), &fixture);
+    assert_eq!(output.exit_code, 2);
+    assert!(
+        output.stderr.contains("depth identity is not decided yet"),
+        "{}",
+        output.stderr
+    );
+    assert_eq!(before, lifecycle_depth::snapshot(&fixture));
 }

@@ -9,10 +9,10 @@
 #   executable that the snapshot ran;
 # - replace each {{SHA256}} with the SHA-256 of that path's bytes at the integration tip.
 #
-# Non-normative until the charter revision (slice 1) defines the statement's fields, and no reader
-# exists until slice 2. The inputs are exactly the set the shared O derivation binds (OF-P6) for a
+# The slice 2 reader validates this schema. The inputs are exactly the set the shared O derivation binds (OF-P6) for a
 # complete single-target acquisition (OF-P7). A statement grants nothing by itself.
-agent = "depth_fixture"
+schema_version = 1
+agent_id = "depth_fixture"
 version = "0.2.0"
 
 [[inputs]]
