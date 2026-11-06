@@ -25,6 +25,15 @@ pub(super) trait Host {
         record: &DepthRecord,
     ) -> Result<(PolicyPart, ObligationsPart), String>;
     fn evidence(&self, root: &Path, record: &DepthRecord) -> Result<EvidenceVerdicts, String>;
+    /// The integration tip this predicate binds to. `local` reads the local integration ref; a
+    /// host may only narrow it (the isolated host requires it to equal the authenticated tip).
+    fn integration_tip(
+        &self,
+        root: &Path,
+        local: fn(&Path) -> Result<String, String>,
+    ) -> Result<String, String> {
+        local(root)
+    }
 }
 pub(super) struct Production;
 impl Host for Production {
@@ -47,7 +56,7 @@ pub(super) fn plan(
 ) -> Result<BTreeMap<String, Vec<u8>>, String> {
     plan_with(root, before, after, written, &Production)
 }
-fn plan_with(
+pub(super) fn plan_with(
     root: &Path,
     before: Source,
     after: Source,
@@ -115,7 +124,9 @@ fn plan_with(
                 .records
                 .get(&version)
                 .ok_or("selected closeout destination has no depth record")?;
-            let tip = integration.get_or_insert(integration_tip(root)?).clone();
+            let tip = integration
+                .get_or_insert(host.integration_tip(root, integration_tip)?)
+                .clone();
             let acceptance = acceptance(root, &new, record, &Source::tip(root, &tip)?, host)?;
             let mut accepted = record.clone();
             if !accepted.acceptance_entries.contains(&acceptance) {
@@ -133,7 +144,7 @@ fn plan_with(
         }
     }
     if let Some(tip) = integration {
-        if integration_tip(root)? != tip {
+        if host.integration_tip(root, integration_tip)? != tip {
             return Err("integration tip moved during closeout admission".into());
         }
     }
