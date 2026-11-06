@@ -59,8 +59,26 @@ pub(super) fn validate_onboarding_binding(
             return;
         }
     }
-    let state = match agent_lifecycle::load_lifecycle_state(workspace, &lifecycle) {
-        Ok(state) => state,
+    // Read the typed state before following workspace links. A non-depth scaffold may name an
+    // approval that has not been installed yet. Local form errors still fail: unreadable or
+    // malformed depth fields cannot be treated as absence. With any record file or an object,
+    // retain the full loader's path, digest and linked-artifact checks.
+    let state = fs::read(&lifecycle_path)
+        .map_err(|err| err.to_string())
+        .and_then(|bytes| {
+            let state: agent_lifecycle::LifecycleState =
+                serde_json::from_slice(&bytes).map_err(|err| err.to_string())?;
+            state.validate().map_err(|err| err.to_string())?;
+            if !check_10_reports && state.support_depth.is_none() {
+                return Ok(None);
+            }
+            agent_lifecycle::load_lifecycle_state(workspace, &lifecycle)
+                .map(Some)
+                .map_err(|err| err.to_string())
+        });
+    let state = match state {
+        Ok(Some(state)) => state,
+        Ok(None) => return,
         Err(err) => {
             if !check_10_reports {
                 let message = format!("{err}; the lifecycle state may state a depth object");

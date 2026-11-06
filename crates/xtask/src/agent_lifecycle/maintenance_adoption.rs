@@ -9,7 +9,7 @@ use super::{
     },
     EvidenceId, LifecycleError, LifecycleStage, LifecycleState,
 };
-use crate::agent_registry::{normalized_release_watch_sha256, AgentRegistry};
+use crate::agent_registry::normalized_release_watch_sha256;
 
 // This exact Claude approval was backfilled before maintenance settlement existed.
 // The old approval, proving-run closeout, and publication packet stay immutable.
@@ -169,7 +169,7 @@ pub(super) fn validate(
         LifecycleError::Validation(format!("invalid historical closeout recorded_at: {err}"))
     })?;
 
-    let registry = AgentRegistry::load(workspace_root)
+    let registry = xtask::isolated_maintenance::registry(workspace_root)
         .map_err(|err| LifecycleError::Validation(format!("load adoption registry: {err}")))?;
     let entry = registry.find(&state.agent_id).ok_or_else(|| {
         LifecycleError::Validation("adoption agent is absent from registry".to_string())

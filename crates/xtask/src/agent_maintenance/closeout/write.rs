@@ -1,10 +1,7 @@
 use std::path::Path;
 
+use crate::agent_lifecycle::{self, load_lifecycle_state, EvidenceId, SideState};
 use crate::workspace_mutation::{ApplySummary, WorkspacePathJail};
-use crate::{
-    agent_lifecycle::{self, load_lifecycle_state, EvidenceId, SideState},
-    agent_registry::AgentRegistry,
-};
 
 use super::{
     render::{
@@ -36,8 +33,8 @@ pub fn plan_closeout_mutations(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
 ) -> Result<CloseoutPlan, MaintenanceCloseoutError> {
-    let proposal = super::super::closeout_proposal::Proposal::capture(workspace_root)
-        .map_err(MaintenanceCloseoutError::Validation)?;
+    let proposal =
+        capture_proposal(workspace_root).map_err(MaintenanceCloseoutError::Validation)?;
     let files = closeout_files(workspace_root, linked)?;
     proposal
         .check(workspace_root, &files)
@@ -79,8 +76,8 @@ pub fn write_closeout_outputs(
     request_path: &Path,
     closeout_path: &Path,
 ) -> Result<CloseoutWriteSummary, MaintenanceCloseoutError> {
-    let proposal = super::super::closeout_proposal::Proposal::capture(workspace_root)
-        .map_err(MaintenanceCloseoutError::Validation)?;
+    let proposal =
+        capture_proposal(workspace_root).map_err(MaintenanceCloseoutError::Validation)?;
     let linked = super::load_linked_closeout(workspace_root, request_path, closeout_path)?;
     let mut files = closeout_files(workspace_root, &linked)?;
     if let Some(file) = plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)? {
@@ -100,7 +97,7 @@ fn plan_lifecycle_state_after_maintenance_closeout(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
 ) -> Result<Option<(std::path::PathBuf, Vec<u8>)>, MaintenanceCloseoutError> {
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| {
+    let registry = xtask::isolated_maintenance::registry(workspace_root).map_err(|err| {
         MaintenanceCloseoutError::Validation(format!("load agent registry: {err}"))
     })?;
     let Some(entry) = registry.find(&linked.request.agent_id) else {
@@ -145,4 +142,15 @@ fn plan_lifecycle_state_after_maintenance_closeout(
     bytes.push(b'\n');
     WorkspacePathJail::new(workspace_root)?.resolve(Path::new(&lifecycle_state_path))?;
     Ok(Some((lifecycle_state_path.into(), bytes)))
+}
+
+/// Capture the command's authority before reading or rendering its prospective outputs. A failed
+/// installed route refuses; only an absent route retains the production proposal.
+pub(super) fn capture_proposal(
+    workspace_root: &Path,
+) -> Result<super::super::closeout_proposal::Proposal, String> {
+    match xtask::isolated_maintenance::route(workspace_root)? {
+        Some(route) => route.proposal(workspace_root),
+        None => super::super::closeout_proposal::Proposal::capture(workspace_root),
+    }
 }

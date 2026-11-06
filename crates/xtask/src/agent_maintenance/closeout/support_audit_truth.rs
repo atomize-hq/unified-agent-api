@@ -20,8 +20,6 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::agent_registry::AgentRegistry;
-
 use super::super::{
     request,
     support_audit::{derive_support_surface_audit, wrapper_only_baseline, SurfaceIdentity},
@@ -273,7 +271,7 @@ pub(crate) fn validate_live_support_audit_truth(
         );
     };
 
-    let registry = AgentRegistry::load(workspace_root).map_err(|err| {
+    let registry = xtask::isolated_maintenance::registry(workspace_root).map_err(|err| {
         MaintenanceCloseoutError::Internal(format!(
             "{}: load agent registry: {err}",
             closeout_path.display()

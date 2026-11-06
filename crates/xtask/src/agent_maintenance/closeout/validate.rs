@@ -134,8 +134,14 @@ pub fn load_request_artifact(
     request_path: &Path,
 ) -> Result<LoadedMaintenanceRequest, MaintenanceCloseoutError> {
     let request_path = validate_repo_relative_path(request_path, "request path")?;
-    let request = request::load_request(workspace_root, &request_path)
-        .map_err(|err| map_request_error(&request_path, err))?;
+    let request = request::load_request_envelope_routed(
+        workspace_root,
+        &request_path,
+        request::AuditDriftPolicy::Reject,
+    )
+    .map_err(|err| map_request_error(&request_path, err))?
+    .envelope
+    .request;
     let maintenance_pack_prefix = request.maintenance_pack_prefix.clone();
     let maintenance_pack_root = PathBuf::from(&request.maintenance_root);
     let raw_detected_release = request.detected_release.clone();
