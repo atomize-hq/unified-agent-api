@@ -237,7 +237,7 @@ fn nullable_members_are_required_and_explicit_null_is_preserved() {
     assert!(serde_json::from_value::<CaseContext>(omitted["cases"][0].clone()).is_err());
     let config = serde_json::json!({
         "model_gpt5":true,"provider_openai":true,"approval":null,"sandbox":null,
-        "origins_present":false,"layers_complete":false,"requirements_empty":true
+        "origins_present":false,"layers":null,"requirements_empty":true
     });
     assert!(serde_json::from_value::<Config>(config.clone()).is_ok());
     for member in ["approval", "sandbox"] {
@@ -318,4 +318,110 @@ fn partial_child_context_is_content_bound_and_all_nullable_members_are_required(
             .validate(&expected, &cases, &results, &inputs, &"f".repeat(64))
             .is_err());
     }
+}
+fn layer(class: LayerClass) -> Layer {
+    Layer {
+        class,
+        enabled: true,
+        empty: false,
+        role_matches: true,
+    }
+}
+fn eligible_layers() -> Layers {
+    Layers {
+        entries: vec![
+            layer(LayerClass::SessionFlags),
+            Layer {
+                enabled: false,
+                ..layer(LayerClass::Project)
+            },
+            layer(LayerClass::User),
+            Layer {
+                empty: true,
+                ..layer(LayerClass::System)
+            },
+        ],
+        origin_classes: vec![LayerClass::User, LayerClass::SessionFlags],
+        origins_enabled: true,
+    }
+}
+#[test]
+fn layer_stack_admits_only_reviewed_local_classes_at_roles_in_native_order() {
+    assert!(layers_eligible(&eligible_layers()));
+    // Minimal caller stack: required user and system layers only.
+    let minimal = Layers {
+        entries: vec![layer(LayerClass::User), layer(LayerClass::System)],
+        origin_classes: vec![],
+        origins_enabled: true,
+    };
+    assert!(layers_eligible(&minimal));
+    for class in [
+        LayerClass::EnterpriseManaged,
+        LayerClass::Mdm,
+        LayerClass::LegacyManagedFile,
+        LayerClass::LegacyManagedMdm,
+        LayerClass::PackagedDefaults,
+        LayerClass::Unknown,
+    ] {
+        let mut managed = eligible_layers();
+        managed.entries.insert(0, layer(class));
+        assert!(!layers_eligible(&managed), "{class:?} layer");
+        let mut origin = eligible_layers();
+        origin.origin_classes.push(class);
+        origin.origin_classes.sort();
+        assert!(!layers_eligible(&origin), "{class:?} origin");
+    }
+    for attack in 0..8 {
+        let mut l = eligible_layers();
+        match attack {
+            0 => l.entries[2].role_matches = false,
+            1 => l.entries[1].role_matches = false,
+            2 => l.entries.swap(0, 2),
+            3 => l.origins_enabled = false,
+            4 => l.entries.remove(3).enabled.then_some(()).unwrap(),
+            5 => l.entries.insert(2, layer(LayerClass::User)),
+            6 => l.origin_classes.reverse(),
+            _ => l.entries.clear(),
+        }
+        assert!(!layers_eligible(&l), "attack {attack}");
+    }
+}
+#[test]
+fn present_config_requires_an_observed_eligible_layer_stack() {
+    let (mut obs, mut e, cases, results, inputs) = fixture();
+    let config = Config {
+        model_gpt5: true,
+        provider_openai: true,
+        approval: Some(Approval::OnRequest),
+        sandbox: Some(Sandbox::WorkspaceWrite),
+        origins_present: true,
+        layers: Some(eligible_layers()),
+        requirements_empty: true,
+    };
+    obs.cases[0].config = Some(config.clone());
+    e.cases[0].config = Some(config.clone());
+    let binary = "f".repeat(64);
+    assert!(obs.validate(&e, &cases, &results, &inputs, &binary).is_ok());
+    let mut ineligible = config.clone();
+    ineligible.layers.as_mut().unwrap().entries[0].class = LayerClass::EnterpriseManaged;
+    for layers in [None, ineligible.layers] {
+        let config = Config {
+            layers,
+            ..config.clone()
+        };
+        // Even a matching source-owned expectation cannot admit an unobserved or foreign stack.
+        obs.cases[0].config = Some(config.clone());
+        e.cases[0].config = Some(config);
+        assert!(obs
+            .validate(&e, &cases, &results, &inputs, &binary)
+            .is_err());
+    }
+    // An eligible stack that differs from the reviewed expectation also refuses.
+    let mut other = config.clone();
+    other.layers.as_mut().unwrap().entries.remove(1);
+    obs.cases[0].config = Some(other);
+    e.cases[0].config = Some(config);
+    assert!(obs
+        .validate(&e, &cases, &results, &inputs, &binary)
+        .is_err());
 }

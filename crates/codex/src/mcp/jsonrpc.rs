@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ffi::OsString,
     future::poll_fn,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -69,11 +70,20 @@ pub(super) struct JsonRpcTransport {
     startup_timeout: Duration,
     is_app: bool,
     diagnostic_owner: u64,
+    diagnostic_home: Option<PathBuf>,
+    /// Captured at spawn: this transport belongs to the producer's exclusive subscriber.
+    diagnostic_producer: bool,
 }
 
 impl JsonRpcTransport {
     pub(super) fn diagnostic_owner(&self) -> u64 {
         self.diagnostic_owner
+    }
+    pub(super) fn diagnostic_home(&self) -> Option<&Path> {
+        self.diagnostic_home.as_deref()
+    }
+    pub(super) fn diagnostic_producer(&self) -> bool {
+        self.diagnostic_producer
     }
     pub(super) async fn spawn_mcp(config: StdioServerConfig) -> Result<Self, McpError> {
         let hook = NotificationHook::Codex {
@@ -163,6 +173,12 @@ impl JsonRpcTransport {
             command.env(key, value);
         }
 
+        let diagnostic_producer = diagnostic_owner != 0 && crate::native_context::producer_active();
+        let diagnostic_home = if diagnostic_owner == 0 {
+            None
+        } else {
+            crate::native_context::native_home(&command)
+        };
         if subcommand == "app-server" {
             if let Some(cwd) = config.current_dir.as_deref() {
                 crate::native_context::launch(
@@ -255,6 +271,8 @@ impl JsonRpcTransport {
 
         Ok(Self {
             diagnostic_owner,
+            diagnostic_home,
+            diagnostic_producer,
             writer: writer_tx,
             pending,
             notification_hook,
@@ -515,6 +533,7 @@ pub(super) fn map_app_response(
     method: &str,
     owner: u64,
     roles: Option<crate::native_context::ReplyRoles>,
+    strip_layers: bool,
 ) -> oneshot::Receiver<Result<Value, McpError>> {
     let read = match method {
         "config/read" => 1,
@@ -527,10 +546,19 @@ pub(super) fn map_app_response(
     };
     let (tx, mapped) = oneshot::channel();
     tokio::spawn(async move {
-        let result = rx.await.unwrap_or(Err(McpError::ChannelClosed));
-        if let Ok(value) = &result {
+        let mut result = rx.await.unwrap_or(Err(McpError::ChannelClosed));
+        if let Ok(value) = &mut result {
             match read {
-                1 => crate::native_context::config_reply(value, owner),
+                1 => {
+                    crate::native_context::config_reply(value, roles.as_ref(), owner);
+                    // Layers are requested only for the producer; pinned native omits the
+                    // member when not requested, so the caller sees the ordinary reply.
+                    if strip_layers {
+                        if let Some(object) = value.as_object_mut() {
+                            object.remove("layers");
+                        }
+                    }
+                }
                 2 => crate::native_context::requirements_reply(value, owner),
                 3..=5 => {
                     use crate::native_context::ThreadOperation;

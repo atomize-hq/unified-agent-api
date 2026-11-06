@@ -2,6 +2,7 @@
 mod projection;
 mod replies;
 pub(crate) use projection::*;
+use replies::layers;
 pub(crate) use replies::{thread_reply, turn_reply, ReplyRoles};
 use serde::Serialize;
 use std::{collections::BTreeMap, ffi::OsString, path::Path};
@@ -68,7 +69,29 @@ fn emit(kind: &'static str, value: &impl Serialize, owner: u64) {
 #[cfg(test)]
 mod tests;
 
-pub(crate) fn config_reply(value: &serde_json::Value, owner: u64) {
+/// Never enabled by the producer's exclusive subscriber; any broad subscriber enables it too.
+pub(crate) const CONTROL: &str = "uaa_native_context_control";
+/// Non-passive diagnostics (the layer request) need the producer's exclusive subscriber:
+/// the private target enabled and the control target not. Tracing interest alone, such as an
+/// all-target TRACE subscriber, keeps ordinary requests unchanged.
+pub(crate) fn producer_active() -> bool {
+    tracing::enabled!(target: TARGET, tracing::Level::TRACE)
+        && !tracing::enabled!(target: CONTROL, tracing::Level::TRACE)
+}
+/// Native home as the pinned resolver selects it from the child's effective environment.
+pub(crate) fn native_home(command: &Command) -> Option<std::path::PathBuf> {
+    if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
+        return None;
+    }
+    let env = effective_environment(command);
+    env.get(std::ffi::OsStr::new("CODEX_HOME"))
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            env.get(std::ffi::OsStr::new("HOME"))
+                .map(|h| Path::new(h).join(".codex"))
+        })
+}
+pub(crate) fn config_reply(value: &serde_json::Value, roles: Option<&ReplyRoles>, owner: u64) {
     if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
         return;
     }
@@ -90,7 +113,7 @@ pub(crate) fn config_reply(value: &serde_json::Value, owner: u64) {
             _ => None,
         },
         origins_present: value["origins"].is_object(),
-        layers_complete: false,
+        layers: layers(value, roles),
         requirements_empty: false,
     };
     emit("config", &projection, owner);
