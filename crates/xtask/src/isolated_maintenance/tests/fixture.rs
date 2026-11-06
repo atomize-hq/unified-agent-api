@@ -87,6 +87,10 @@ impl Fixture {
             &["config", "user.email", "binding@example.invalid"],
         );
         git(root.path(), &["config", "user.name", "Binding Fixture"]);
+        // A commit's detached auto-maintenance can add and remove `.git/objects` entries while
+        // a freshness walk runs; keep fixture Git metadata still between explicit commands.
+        git(root.path(), &["config", "maintenance.auto", "false"]);
+        git(root.path(), &["config", "gc.auto", "0"]);
         git(
             root.path(),
             &[
