@@ -342,6 +342,15 @@ only.
    - Depends on slice 2, which provides the typed object it copies, and on slice 3, because the
      post-execution check runs in its observation phase.
 5. **Dry-run freeze core (OF-P1, OF-P4 to OF-P7).**
+   Slice 5 implemented: the private installed-synthetic-route dry run checks charter rules 3/4,
+   persists P, the record and lifecycle object with the OF-P8 packet identity, admits the shared
+   O derivation only with the integration-tip acquisition statement and identical bound inputs,
+   and refuses incomplete unions and post-integration re-freezes. Its narrow non-runtime approval
+   projection is private to that dry run; the production approval loader and public ON2 refusal
+   are unchanged. End-to-end fixture coverage includes deferred maintenance and refusal rollback.
+   Review fixes: statement enumeration, statement blobs and bound inputs use the same hardened
+   Git view pinned to the authenticated integration tip; rule 4 admits targets covered by that
+   tip's version record, with replacement-ref, graft, alternate and environment regressions.
    - A private, isolated-route-only dry-run path: resolve rule 3, check rule 4, write P, the
      record and the object, read the named integration ref and the acquisition statement there,
      require every bound input to equal both, and call the shared `derive`.

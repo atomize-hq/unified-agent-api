@@ -5,7 +5,7 @@
 # exactly 0.2.0 and states `explicitly_deferred`, so the agent has no `maintenance.release_watch`
 # (see ../registry-entry-deferred.toml). The descriptor omits `backend_module` because the subject
 # is a non-runtime entry (SA-P2); today's full approval loader still requires that field, so it
-# refuses this template (an open question for a later slice).
+# refuses this template. Slice 5 uses a narrow private reader only for this isolated dry run.
 artifact_version = "1"
 comparison_ref = "docs/agents/selection/cli-agent-selection-packet.md"
 selection_mode = "factory_validation"

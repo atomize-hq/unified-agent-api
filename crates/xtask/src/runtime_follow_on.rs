@@ -10,6 +10,17 @@ use serde::{Deserialize, Serialize};
 use crate::{agent_registry::AgentRegistry, approval_artifact::load_approval_artifact};
 
 mod codex_exec;
+// Private until roadmap E.6 installs ON2. There is no CLI selector for this path.
+#[allow(dead_code)]
+mod depth;
+#[cfg(test)]
+pub(crate) fn isolated_depth_dry_run(
+    workspace: &Path,
+    args: Args,
+    writer: &mut impl Write,
+) -> Result<(), Error> {
+    depth::dry_run(workspace, args, writer)
+}
 #[path = "candidate_execution/create_lane.rs"]
 mod depth_candidate;
 mod io;
