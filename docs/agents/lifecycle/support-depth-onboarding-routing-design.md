@@ -372,6 +372,8 @@ its Annex A forward/backward rows and test references in that same PR; slice 13 
 against the final enforcement revision. No slice installs a live profile or production declaration.
 
 - **Slice 0 — Normative decisions.**
+  - Implemented in this PR: normative amendments and pending validation cases only; no behavior,
+    profile, registry declaration or path enablement is installed.
   - Content: implement the recorded decisions; amend the evidence contract for bootstrap and the finite
     onboarding producer variant; amend the charter for wrapper-only proof interpretation and ON3
     E/reporting-publication delivery and freeze reporting coherence. Define explicit read-only gate
