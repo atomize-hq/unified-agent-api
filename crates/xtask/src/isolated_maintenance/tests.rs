@@ -25,6 +25,7 @@ mod subject;
 #[cfg(unix)]
 mod unsupported_routes;
 mod view;
+mod view_eval;
 use fixture::{declaration, git, write, Fake, Fixture};
 
 #[test]

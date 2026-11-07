@@ -10,7 +10,10 @@ pub(super) mod adoption;
 mod artifact;
 pub(super) mod assembly;
 mod profile;
+#[path = "readonly_transport.rs"]
 pub(super) mod transport;
+#[path = "transport.rs"]
+mod transport_impl;
 use transport::*;
 
 #[derive(Debug)]
@@ -42,6 +45,15 @@ fn resolve_profile_in(
     p: Profile,
     host: Option<&crate::isolated_maintenance::EvidenceHost>,
 ) -> Result<Resolved, String> {
+    resolve_profile_inputs(api, root, p, host, None)
+}
+fn resolve_profile_inputs(
+    api: &impl Api,
+    root: &Path,
+    p: Profile,
+    host: Option<&crate::isolated_maintenance::EvidenceHost>,
+    borrowed: Option<&mut GitInputs>,
+) -> Result<Resolved, String> {
     let ir_p3 = match (p, host) {
         (Profile::Synthetic, Some(h))
             if api.repository() == h.repository() && h.repository() != depth_ci::REPOSITORY =>
@@ -67,7 +79,14 @@ fn resolve_profile_in(
         }
     };
     same_host()?;
-    let mut view = GitInputs::new(root)?;
+    let mut owned;
+    let view = match borrowed {
+        Some(view) => view,
+        None => {
+            owned = GitInputs::new(root)?;
+            &mut owned
+        }
+    };
     let original =
         p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;
     let definition = depth_ci::reference("", &view.required(p.contract())?).sha256;
@@ -563,6 +582,21 @@ impl Resolved {
         ),
         String,
     > {
+        self.decisions_with(record, |selected, current| {
+            evaluate(root, selected, current, self)
+        })
+    }
+    fn decisions_with(
+        &self,
+        record: &DepthRecord,
+        mut evaluate_selected: impl FnMut(&FileRef, &Evaluation) -> Result<Verdict, String>,
+    ) -> Result<
+        (
+            super::super::EvidenceVerdicts,
+            std::collections::BTreeMap<ObligationRef, Verdict>,
+        ),
+        String,
+    > {
         let first = self.runs.first().ok_or("empty authenticated population")?;
         let mut results = std::collections::BTreeMap::new();
         let mut decisions = std::collections::BTreeMap::new();
@@ -581,7 +615,7 @@ impl Resolved {
             let mut outcomes = vec![];
             if let Some(row) = row {
                 for selected in &row.evidence {
-                    outcomes.push(evaluate(root, selected, &current, self)?);
+                    outcomes.push(evaluate_selected(selected, &current)?);
                 }
             }
             let result =
@@ -661,4 +695,27 @@ pub(crate) fn isolated_assembly(
 ) -> Result<assembly::Assembly, String> {
     let resolved = resolve_profile_in(&Isolated::new(host), root, Profile::Synthetic, Some(host))?;
     assembly::assemble(&resolved)
+}
+
+/// CP-P3: all proposed file reads use the bound view, while all immutable host provenance
+/// resolves through the caller's object store. Never resolve an evidence host from either root.
+pub(super) fn view_record_results(
+    inputs: &mut GitInputs,
+    record: &DepthRecord,
+    host: &crate::isolated_maintenance::EvidenceHost,
+) -> Result<super::super::EvidenceVerdicts, String> {
+    let p = Profile::Synthetic;
+    let selection = &record.policy.selection;
+    if selection.agent_id != p.agent_id() || selection.enrollment.version != p.version() {
+        return Err("a borrowed isolated evidence host evaluates only its compiled profile".into());
+    }
+    let _read_only = transport::read_only(inputs)?;
+    let caller = inputs.object_root().to_path_buf();
+    let resolved =
+        resolve_profile_inputs(&Isolated::new(host), &caller, p, Some(host), Some(inputs))?;
+    let (results, _) = resolved.decisions_with(record, |selected, current| {
+        evaluate_inputs(&caller, inputs, selected, current, &resolved)
+    })?;
+    inputs.verify()?;
+    Ok(results)
 }
