@@ -48,6 +48,7 @@ pub(super) fn plan_with(
     }
     let registry = AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?;
     let mut outputs = BTreeMap::new();
+    let mut accepted_records = Vec::new();
     let tip = host.integration_tip(root, integration_tip)?;
     for entry in &registry.agents {
         let old = View::with_registry(before.clone(), &registry, &entry.agent_id)?;
@@ -96,6 +97,7 @@ pub(super) fn plan_with(
             if !accepted.acceptance_entries.contains(&own) {
                 accepted.acceptance_entries.push(own);
             }
+            accepted_records.push(accepted.clone());
             let mut bytes = serde_json::to_vec_pretty(&accepted).map_err(|e| e.to_string())?;
             bytes.push(b'\n');
             outputs.insert(
@@ -106,6 +108,9 @@ pub(super) fn plan_with(
                 bytes,
             );
         }
+    }
+    if written.contains(crate::support_matrix::JSON_OUTPUT_PATH) {
+        super::publication::validate_promoted(root, &after, &accepted_records, host)?;
     }
     if host.integration_tip(root, integration_tip)? != tip {
         return Err("integration tip moved during promotion admission".into());

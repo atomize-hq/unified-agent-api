@@ -374,6 +374,7 @@ mod connected {
         }
         f.commit();
         host.staging(&git(root, &["rev-parse", "HEAD"]));
+        super::super::publication::refresh(&f, &host);
         (f, host)
     }
 
@@ -520,15 +521,7 @@ mod connected {
         advance(f, host);
     }
     fn validate(root: &Path, parent: &str) -> i32 {
-        crate::manifest_validate::run(crate::manifest_validate::Args {
-            root: Some(root.join("cli_manifests/depth_fixture")),
-            rules: None,
-            schema: None,
-            version_schema: None,
-            mode: crate::manifest_validate::Mode::Check,
-            json: true,
-            tip: Some(parent.into()),
-        })
+        super::super::publication::validate_candidate(root, parent)
     }
     fn admit_and_observe(writer: fn(&Path) -> Result<(), String>, authored: bool) {
         let (f, host) = ready();
@@ -543,6 +536,7 @@ mod connected {
         let reporting = record(root);
         assert!(reporting.acceptance_entries.is_empty());
         writer(root).unwrap();
+        super::super::publication::assert_qualified(root);
         let closed = record(root);
         assert_eq!(
             closed.stated_sha256().unwrap(),
@@ -614,6 +608,7 @@ mod connected {
                 let err = check_integration(root, &parent).unwrap_err();
                 assert!(
                     err.contains("exact current entry")
+                        || err.contains("exact new current entry")
                         || err.contains("describe the current record"),
                     "{err}"
                 );

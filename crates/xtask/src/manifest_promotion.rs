@@ -31,6 +31,10 @@ pub struct Args {
     pub write: bool,
 }
 
+/// Opaque captured registry for the separately compiled public closeout writers. Only a
+/// resolved Route constructs this handle; it grants no unchecked mutation or evidence access.
+pub struct CloseoutPublicationContext(pub(crate) CapturedRegistry);
+
 pub struct PromotionPlan {
     root: PathBuf,
     observation: Proposal,
@@ -282,44 +286,77 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
             fs::remove_file(full).map_err(|e| e.to_string())?;
         }
     }
-    let bundle = crate::support_matrix::generate_publication_artifacts(scratch.path())?;
-    for (p, b) in [
-        (crate::support_matrix::JSON_OUTPUT_PATH, bundle.json),
-        (crate::support_matrix::MARKDOWN_OUTPUT_PATH, bundle.markdown),
-        (
-            crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
-            bundle.runtime_support_data,
-        ),
-        (
-            crate::capability_matrix::DEFAULT_OUT_PATH,
-            crate::capability_matrix::generate_markdown_for_workspace(scratch.path())?,
-        ),
-    ] {
-        files.insert(p.into(), Some(b.into_bytes()));
-    }
-    // The final candidate, including all publication outputs, passes the canonical validator
-    // before any caller bytes are changed. Scratch is a rendering view, never delivery.
-    for (path, bytes) in &files {
-        if let Some(bytes) = bytes {
+    if captured.is_some() {
+        // Admit the semantic proposal first. Its exact own entry is present before evaluation.
+        let mut entries = BTreeMap::new();
+        observation.plan_changes(
+            root,
+            files.iter().map(|(p, b)| (p.into(), b.clone())).collect(),
+            |root, before, after, written| {
+                entries = admit_promotion(&observation, root, before, after, written)?;
+                Ok(entries.clone())
+            },
+        )?;
+        for (path, bytes) in entries {
             let full = scratch_jail
-                .resolve(Path::new(path))
-                .map_err(|e| e.to_string())?;
-            fs::create_dir_all(full.parent().ok_or("invalid output parent")?)
+                .resolve(Path::new(&path))
                 .map_err(|e| e.to_string())?;
             fs::write(full, bytes).map_err(|e| e.to_string())?;
         }
     }
-    if crate::manifest_validate::run(crate::manifest_validate::Args {
-        root: Some(scratch.path().join(base)),
-        rules: None,
-        schema: None,
-        version_schema: None,
-        mode: crate::manifest_validate::Mode::Check,
-        json: false,
-        tip: None,
-    }) != 0
-    {
-        return Err("promotion candidate fails canonical manifest validation".into());
+    let mut render = || -> Result<(), String> {
+        let bundle = crate::support_matrix::generate_publication_artifacts(scratch.path())?;
+        for (p, b) in [
+            (crate::support_matrix::JSON_OUTPUT_PATH, bundle.json),
+            (crate::support_matrix::MARKDOWN_OUTPUT_PATH, bundle.markdown),
+            (
+                crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+                bundle.runtime_support_data,
+            ),
+            (
+                crate::capability_matrix::DEFAULT_OUT_PATH,
+                crate::capability_matrix::generate_markdown_for_workspace(scratch.path())?,
+            ),
+        ] {
+            files.insert(p.into(), Some(b.into_bytes()));
+        }
+        // The final candidate, including all publication outputs, passes the canonical validator
+        // before any caller bytes are changed. Scratch is a rendering view, never delivery.
+        for (path, bytes) in &files {
+            if let Some(bytes) = bytes {
+                let full = scratch_jail
+                    .resolve(Path::new(path))
+                    .map_err(|e| e.to_string())?;
+                fs::create_dir_all(full.parent().ok_or("invalid output parent")?)
+                    .map_err(|e| e.to_string())?;
+                fs::write(full, bytes).map_err(|e| e.to_string())?;
+            }
+        }
+        if crate::manifest_validate::run(crate::manifest_validate::Args {
+            root: Some(scratch.path().join(base)),
+            rules: None,
+            schema: None,
+            version_schema: None,
+            mode: crate::manifest_validate::Mode::Check,
+            json: false,
+            tip: None,
+        }) != 0
+        {
+            return Err("promotion candidate fails canonical manifest validation".into());
+        }
+        Ok(())
+    };
+    if let Some((captured, view)) = captured.as_ref().zip(view.as_ref()) {
+        crate::depth_evidence::EvidenceVerdicts::with_publication_view(
+            root,
+            scratch.path(),
+            &observation,
+            captured,
+            view,
+            render,
+        )?;
+    } else {
+        render()?;
     }
     let files = files
         .into_iter()

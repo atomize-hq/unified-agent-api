@@ -95,7 +95,7 @@ fn frozen(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
     (f, host)
 }
 
-fn delivered(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
+fn delivered(classified: bool, channel: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
     let (f, host) = frozen(classified);
     let root = f.root.path();
     let bin = tempfile::tempdir().unwrap();
@@ -104,10 +104,15 @@ fn delivered(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost
         let _installed = f.install();
         let _reader = host.install();
         let _gates = execute::gate_stub::stub();
-        run_as(root, &binary, "authority").unwrap();
+        if channel {
+            run_as(root, &binary, "authority").unwrap();
+        } else {
+            super::publication::assemble(&f);
+        }
     }
     f.commit();
     host.staging(&git(root, &["rev-parse", "HEAD"]));
+    super::publication::refresh(&f, &host);
     (f, host)
 }
 
@@ -151,7 +156,7 @@ fn digest(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-fn record(root: &Path) -> DepthRecord {
+pub(super) fn record(root: &Path) -> DepthRecord {
     DepthRecord::parse(
         &fs::read_to_string(root.join(RECORD)).unwrap(),
         "depth_fixture",
@@ -159,7 +164,7 @@ fn record(root: &Path) -> DepthRecord {
     )
     .unwrap()
 }
-fn advance(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) -> String {
+pub(super) fn advance(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) -> String {
     f.commit();
     let tip = git(f.root.path(), &["rev-parse", "HEAD"]);
     host.staging(&tip);
@@ -167,7 +172,13 @@ fn advance(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) -> String {
     tip
 }
 fn ready() -> (Fixture, crate::depth_evidence::SyntheticHost) {
-    let (f, host) = delivered(true);
+    ready_channel(true)
+}
+pub(super) fn publication_ready() -> (Fixture, crate::depth_evidence::SyntheticHost) {
+    ready_channel(false)
+}
+fn ready_channel(channel: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
+    let (f, host) = delivered(true, channel);
     let root = f.root.path();
     let crate::depth_record::Event::Maintenance {
         request_recorded_at,
@@ -200,7 +211,7 @@ fn preflight(commit: &str, status: &str, conclusion: &str) -> String {
         "path":".github/workflows/ci.yml","status":status,"conclusion":conclusion}]})
     .to_string()
 }
-fn prepare(root: &Path) -> Result<(), String> {
+pub(super) fn prepare(root: &Path) -> Result<(), String> {
     let args = prepare_args(root, true);
     let commit = args.commit.clone();
     prepare_closeout::run_in_workspace_with_fetcher(root, args, &mut Vec::new(), |url| {
@@ -208,7 +219,7 @@ fn prepare(root: &Path) -> Result<(), String> {
         Ok(preflight(&commit, "completed", "success"))
     }).map_err(|e| e.to_string())
 }
-fn close(root: &Path) -> Result<(), String> {
+pub(super) fn close(root: &Path) -> Result<(), String> {
     closeout::run_in_workspace(
         root,
         closeout::Args {
@@ -220,7 +231,7 @@ fn close(root: &Path) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 /// A maintainer-authored closeout, committed before the writer captures its clean route.
-fn author(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) {
+pub(super) fn author(f: &Fixture, host: &crate::depth_evidence::SyntheticHost) {
     let root = f.root.path();
     let findings = closeout::derive_findings(root, "depth_fixture", "0.2.0").unwrap();
     let closeout = closeout::MaintenanceCloseout {
@@ -273,13 +284,13 @@ fn audit(root: &Path) {
     );
 }
 #[derive(Debug, PartialEq, Eq)]
-struct Snapshot {
+pub(super) struct Snapshot {
     head: String,
     status: String,
     index: Vec<u8>,
     files: Vec<(String, Vec<u8>)>,
 }
-fn snapshot(root: &Path) -> Snapshot {
+pub(super) fn snapshot(root: &Path) -> Snapshot {
     let files = git(root, &["ls-files"]);
     Snapshot {
         head: git(root, &["rev-parse", "HEAD"]),
@@ -326,6 +337,8 @@ fn assert_owned_outputs(root: &Path) {
         assert!(
             [
                 RECORD,
+                crate::support_matrix::JSON_OUTPUT_PATH,
+                crate::support_matrix::MARKDOWN_OUTPUT_PATH,
                 CLOSEOUT,
                 "docs/agents/lifecycle/depth_fixture-maintenance/HANDOFF.md",
                 "docs/agents/lifecycle/depth_fixture-maintenance/governance/remediation-log.md",
@@ -354,7 +367,7 @@ fn ma5_closeout_writer_completes_connected_chain() {
     )
     .unwrap()
     .contains("generated-by: xtask close-agent-maintenance"));
-    // Qualified publication is not exercised until B.7b.
+    super::publication::assert_qualified(root);
 }
 #[test]
 fn ma5_prepare_writer_completes_connected_chain_from_isolated_preflight() {
@@ -369,6 +382,7 @@ fn ma5_prepare_writer_completes_connected_chain_from_isolated_preflight() {
     assert!(f.api.2.load(std::sync::atomic::Ordering::SeqCst) > reads);
     assert_entry(root, &before);
     assert_owned_outputs(root);
+    super::publication::assert_qualified(root);
 }
 
 #[test]
