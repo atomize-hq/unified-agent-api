@@ -8,6 +8,7 @@ use crate::{
 use std::{collections::BTreeSet, path::Path};
 
 mod binding;
+mod bootstrap;
 mod generation;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
@@ -15,21 +16,70 @@ pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     let Some(route) = crate::isolated_maintenance::route(root)? else {
         return check_with(root, revision, &manual::Production, &promotion::Production);
     };
-    // The existing proposal adapter exposes only its captured authority, never a caller-built
-    // context. No proposal is planned or delivered by this read-only check.
-    let proposal = route.proposal(root)?;
-    let authority = proposal.authority();
-    let super::Authority::Isolated(context) = authority else {
-        return Err("isolated IN1 binding lost its captured authority".into());
-    };
-    let binding = binding::capture(root, revision, context)?;
-    admit_all(
-        root,
-        &binding.parent,
-        &super::isolated::Host::closeout(context),
-        &super::isolated::Host::promotion(context),
-    )?;
-    binding.recheck(root, context)
+    route.with_admitted_publication(root, revision, || Ok(()))
+}
+
+impl crate::isolated_maintenance::Route {
+    /// The public --tip consistency boundary and check_integration share authenticated IN1
+    /// admission and fresh B.7a evaluation under the same captured caller authority.
+    pub(crate) fn with_admitted_publication<T>(
+        self,
+        root: &Path,
+        revision: &str,
+        validate: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        // Only bootstrap lacks a resolved enrollment. Existing routes must retain their
+        // capture -> proposal -> binding error order, including competing input failures.
+        if self.context().bootstrap_pending()? {
+            let initial = binding::capture(root, revision, self.context())?;
+            if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
+                if checkpoint.publication_changed {
+                    checkpoint
+                        .with_view(root, |view| bootstrap::publication(view, &initial.parent))?;
+                }
+                let outcome = checkpoint.with_registry(root, validate);
+                initial.recheck(root, self.context())?;
+                return outcome;
+            }
+        }
+        let captured = self.capture(root)?;
+        let proposal = captured.proposal(root)?;
+        let super::Authority::Isolated(context) = proposal.authority() else {
+            return Err("isolated IN1 binding lost its captured authority".into());
+        };
+        let binding = binding::capture(root, revision, context)?;
+        // Only onboarding can observe a first declaration. Maintenance keeps its existing
+        // admission even when its parent lacks the subject entry or depth table.
+        let checkpoint = if context.bootstrap_declared_onboarding() {
+            context.bootstrap_checkpoint(root, &binding.parent)?
+        } else {
+            None
+        };
+        if let Some(checkpoint) = checkpoint {
+            if checkpoint.publication_changed {
+                checkpoint.with_view(root, |view| bootstrap::publication(view, &binding.parent))?;
+            }
+            let outcome = checkpoint.with_registry(root, validate);
+            binding.recheck(root, context)?;
+            return outcome;
+        }
+        let outcome = crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
+            root,
+            &captured,
+            || {
+                admit_all(
+                    root,
+                    &binding.parent,
+                    &super::isolated::Host::closeout(context),
+                    &super::isolated::Host::promotion(context),
+                    |view| super::publication::validate_current(root, view),
+                )?;
+                validate()
+            },
+        );
+        binding.recheck(root, context)?;
+        outcome
+    }
 }
 
 // Per-root IN1 readers borrow the same routed scope instead of re-entering production-only
@@ -49,23 +99,29 @@ impl crate::isolated_maintenance::Route {
     }
 
     pub(crate) fn integration_comparison(
-        &self,
+        self,
         root: &Path,
         revision: &str,
         agent: &str,
     ) -> Result<super::Comparison, String> {
-        let registry = self.registry(root)?;
+        let registry = self.registry(root)?.clone();
         let earlier = self.integration_registry(root, revision)?;
         let before = View::with_registry(Source::tip(root, revision)?, &earlier, agent)?;
-        let after = View::with_registry(Source::workspace(root)?, registry, agent)?;
+        let after = View::with_registry(Source::workspace(root)?, &registry, agent)?;
         let mut comparison = super::compare_views(&before, &after)?;
+        let captured = self.capture(root)?;
         if !before.records.is_empty() || !after.records.is_empty() {
-            comparison.input_issues = super::publication::validate_current(root, &after)
+            comparison.input_issues =
+                crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
+                    root,
+                    &captured,
+                    || super::publication::validate_current(root, &after),
+                )
                 .err()
                 .into_iter()
                 .collect();
         }
-        self.recheck(root)?;
+        captured.recheck(root)?;
         Ok(comparison)
     }
 }
@@ -78,7 +134,9 @@ pub(super) fn check_with(
 ) -> Result<(), String> {
     let tip = resolve(root, revision)?;
     let head = resolve(root, "HEAD")?;
-    admit_all(root, &tip, closeout_host, promotion_host)?;
+    admit_all(root, &tip, closeout_host, promotion_host, |view| {
+        super::publication::validate_current(root, view)
+    })?;
     if resolve(root, revision)? != tip || resolve(root, "HEAD")? != head {
         return Err("integration revision moved during admission".into());
     }
@@ -92,6 +150,7 @@ fn admit_all(
     parent: &str,
     closeout_host: &impl manual::Host,
     promotion_host: &impl manual::Host,
+    validate_publication: impl FnOnce(&View) -> Result<(), String>,
 ) -> Result<(), String> {
     let before = Source::tip(root, parent)?;
     let after = Source::workspace(root)?;
@@ -151,7 +210,7 @@ fn admit_all(
         publication = Some(new);
     }
     if let Some(view) = publication {
-        super::publication::validate_current(root, &view)?;
+        validate_publication(&view)?;
     }
     Ok(())
 }
@@ -184,6 +243,7 @@ pub(super) fn admit(
 ) -> Result<(), String> {
     let comparison = super::compare_views(old, new)?;
     let qualifications = super::publication::qualifications(new)?;
+    let candidate_promotion = candidate_has_promotion(old, new)?;
     for (version, prior) in &old.records {
         let record = new
             .records
@@ -241,9 +301,10 @@ pub(super) fn admit(
             "docs/agents/lifecycle/{}-maintenance/governance/maintenance-closeout.json",
             new.entry.agent_id
         );
-        let mut closeout = added
-            .iter()
-            .any(|e| matches!(e, AcceptanceEntry::MaintenanceCloseout { .. }));
+        let new_closeout = added.iter().any(|e| {
+            matches!(e, AcceptanceEntry::MaintenanceCloseout { .. }) && !previous.contains(e)
+        });
+        let mut closeout = new_closeout;
         let mut promote = added
             .iter()
             .any(|e| matches!(e, AcceptanceEntry::Promotion { .. }));
@@ -260,13 +321,18 @@ pub(super) fn admit(
                     }
                     closeout = true;
                 }
+                _ if super::publication::is_qualification(e)
+                    && new_closeout
+                    && !candidate_promotion => {}
                 _ => promote = true,
             }
         }
         let manual_entry = if closeout {
             let entry = manual::acceptance(root, new, record, tip, closeout_host)?;
-            if !record.acceptance_entries.contains(&entry) {
-                return Err("integration closeout lacks its exact current entry".into());
+            if !record.acceptance_entries.contains(&entry)
+                || (new_closeout && (!added.contains(&entry) || previous.contains(&entry)))
+            {
+                return Err("integration closeout lacks its exact new current entry".into());
             }
             Some(entry)
         } else {
@@ -297,4 +363,50 @@ pub(super) fn admit(
         }
     }
     Ok(())
+}
+
+// Qualification alone is attributed below. Every other accepting effect (or new Promotion
+// entry), anywhere in the candidate, prevents borrowing closeout authority for qualification.
+fn candidate_has_promotion(old: &View, new: &View) -> Result<bool, String> {
+    for entry in old.registry.agents.iter().chain(&new.registry.agents) {
+        let registry = if new.registry.find(&entry.agent_id).is_some() {
+            &new.registry
+        } else {
+            &old.registry
+        };
+        let prior_registry = if old.registry.find(&entry.agent_id).is_some() {
+            &old.registry
+        } else {
+            &new.registry
+        };
+        let before = View::with_registry(old.source.clone(), prior_registry, &entry.agent_id)?;
+        let after = View::with_registry(new.source.clone(), registry, &entry.agent_id)?;
+        if after.records.iter().any(|(version, record)| {
+            record.acceptance_entries.iter().any(|e| {
+                matches!(e, AcceptanceEntry::Promotion { .. })
+                    && !before
+                        .records
+                        .get(version)
+                        .is_some_and(|r| r.acceptance_entries.contains(e))
+            })
+        }) {
+            return Ok(true);
+        }
+        if super::compare_views(&before, &after)?
+            .effects
+            .iter()
+            .any(|e| {
+                !super::publication::is_qualification(e)
+                    && !matches!(
+                        e.kind.as_str(),
+                        "closeout semantic change"
+                            | "maintenance_closeout_written"
+                            | "absence_of_drifted"
+                    )
+            })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

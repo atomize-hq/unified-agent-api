@@ -171,7 +171,7 @@ pub(in crate::manifest_validate) fn validate(
         return;
     };
     if !versions.is_empty() {
-        let comparison = route.as_ref().map_or_else(
+        let comparison = route.map_or_else(
             || xtask::depth_acceptance::compare(&workspace, tip.commit(), &anchor.agent_id),
             |route| route.integration_comparison(&workspace, tip.commit(), &anchor.agent_id),
         );

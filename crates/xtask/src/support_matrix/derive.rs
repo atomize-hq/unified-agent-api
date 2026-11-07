@@ -397,7 +397,9 @@ pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, Strin
     let verdicts = records
         .iter()
         .map(|(version, record)| {
-            crate::depth_evidence::production_results(&root.workspace, record)
+            // Production unless an owning publication/IN1 invocation explicitly supplied
+            // fresh, record-sealed verdicts for this exact root. A route alone supplies none.
+            crate::depth_evidence::EvidenceVerdicts::publication_results(&root.workspace, record)
                 .map(|v| (version.clone(), v))
         })
         .collect::<Result<BTreeMap<_, _>, _>>()?;

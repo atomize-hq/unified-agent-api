@@ -262,6 +262,134 @@ Must be refused:
 - **Forged written paths (OF-P9).** Publication refuses a non-empty `written-paths.json` whose
   SHA-256 does not match the lifecycle state (check (i)).
 
+## Onboarding routing cases (pending)
+
+OR-P1–OR-P14 of the
+[routing design, "Maintainer decisions"](support-depth-onboarding-routing-design.md#maintainer-decisions),
+["Proving evidence and refusal coverage"](support-depth-onboarding-routing-design.md#proving-evidence-and-refusal-coverage)
+and ["Implementation slices"](support-depth-onboarding-routing-design.md#implementation-slices)
+require the following additional cases. **All are pending**; slice 0 specifies them and implements
+no behavior or tests. They extend the freeze cases without changing OF-P1–P9 or CP-P1–P6.
+The connected installed-route chain is credential-free and in-process; the independent phase C
+protected-host run remains separately required and is not authorized by this list.
+
+Must pass:
+
+- **Actual ON1 bootstrap (OR-P1, OR-P2).** Start with compiled fixture CLI/source/templates but
+  no synthetic registry entry, manifest root or lifecycle outputs. The existing public form
+  writes the actual ordinary scaffold, with no depth table, invented metadata or acceptance.
+  Check the exact compiled descriptor/approval and full canonical manifest validation of the
+  actual outputs after governing adoption/acquisition; a preseeded record is not this proof.
+- **Record-free preparation checkpoints (OR-P1).** Reviewed Annex-B adoption, actual direct
+  fixture snapshot/union/coverage/report generation and truthful ordinary NE3 `snapshotted`
+  metadata precede declaration. Each checkpoint preserves the exact scaffold entry/approval,
+  carries no depth table/record/entry/acceptance, receives IN1 admission before tip advance, then
+  post-tip observation. Use the built B.1 binary, not a handwritten shard.
+- **First declaration admission and readback (OR-P14).** A separate maintainer commit adds
+  exactly the approval version's onboarding table, reviewed CORE classifications, protected
+  integration acquisition statement and coherent reporting publication, without record/entry/
+  acceptance. IN1 admits it before tip advance; readback captures the declared registry and
+  restores protected-registry equality.
+- **Connected public freeze and write (OR-P2, OR-P3, OR-P6).** Consume those ON1/declaration
+  outputs through public ON2 P/O freeze, executable wrapper-only packet/prompt and a subprocess
+  fake executor doing substantive wrapper work. Deliver coherent reporting publication without
+  qualification. Preserve all OF regressions, protected record and ordinary/maintenance controls;
+  admit and observe freeze and committed implementation checkpoints at IN1.
+- **Repair sibling checkpoint (OR-P2, OR-P3, OR-P6).** Repair selects valid runtime evidence,
+  keeps the lifecycle written-path digest and exact P/O/object/entries, and reaches the same
+  ON3 handoff without manufacturing verified depth E or reopening the freeze window.
+- **Onboarding eleven-obligation producer (OR-P5).** Authenticate the actual approval-linked PR,
+  onboarding Event/P/O fixture/witness and fresh adoption of every mapping through the fake
+  authenticated host. Check all attempts, source/dependency/currentness and unchanged maintenance
+  producer behavior; no receipt relabeling.
+- **Later-run producer terminality (OR-P5, Inspection A).**
+  `onboarding_same_generation_later_runs_wait_for_producer_not_workflow` includes initial ON2
+  and later publication/proving runs and every retry, including other-PR/no-witness runs. Same-run
+  IN1 can pass after terminal producer binding while its workflow runs. Missing/unfinished/
+  aborted producers and changing populations refuse; failed attempts remain observable. Check
+  the actual producer/consumer invocation and `needs` graph before phase C, including recursive
+  tests: producer neither invokes nor waits for its own packet admission; CP-P5 ordering remains.
+- **Controller-owned ON3 reporting (OR-P4, OR-P6, OR-P8).** Consume committed ON2 producer
+  evidence; assemble and deliver real bound E/receipt/payload files, coherent reporting
+  publication, exact selected-runtime packet and `publication_ready` together. Re-authenticate
+  the reporting checkpoint at IN1 with no entry or qualification. Exercise active-run and
+  repaired-run selection, without manually prefilling E.
+- **Owning publication/proving chain (OR-P4, OR-P7, OR-P8).** ON4 adds exactly its current
+  `Publication` entry and packet-bound `published` assertion with a qualified synthetic wrapper
+  promise. Prepared ON5 keeps `published`; bounded human metrics precede final exact `closed`
+  bytes, `ProvingRunCloseout`, proving evidence id and `closed_baseline`. After each entry,
+  freshly evaluate that record, render, re-admit and deliver together. Local/IN1 results agree;
+  each committed transition is admitted before tip advance and observed afterwards. Pointers
+  stay `none`, metadata `snapshotted` with no passed outcomes, no runtime backend/capability;
+  deferred and release-watch settlement variants confer no maintenance depth ownership.
+- **Real gate composition, both phases (OR-P13).** Execute the shared checking implementations,
+  including `runtime-advertising-model --check`, scoped against exact proposed record bytes and
+  independently as unchanged commands over the authenticated clean committed candidate.
+  Inventory every fixed-command leaf and run the full recursive `make preflight` test leg over
+  a depth-declared fixture checkout. Preserve production-parser control assertions in hermetic
+  undeclared fixtures and actual-candidate assertions in routed readers. Distinguish parent-only
+  scope absent in a child, a separately initialized test-owned child using fake authority with
+  real checks, and an ordinary child refusing. Harmless changes may pass fresh checks; local
+  success alone never advances protected acceptance. Keep generation and NE8 write controls.
+- **Independent proof boundary (OR-P12).** Complete the connected in-process chain from actual
+  preceding outputs, then separately prove the disposable-repository chain with full-schema
+  artifacts, canonical workflows, real subprocess checks, producer terminality and native queue
+  admission/readback under phase C authorization. Label fake hosts/gates and limits; wrapper
+  success proves no shared advertising, second-agent acceptance or runtime adapter positive.
+
+Must fail:
+
+- **Bootstrap/identity escape (OR-P1, OR-P2, OR-P14).** Missing route, foreign subject/version/
+  target, unknown/misplaced approval fields, fake backend, undeclared approval version,
+  preexisting retained record, ON1 replay resetting a binding or ON1 writing a table. Refuse
+  missing Annex-B adoption and metadata claiming unacquired input. Reject extra registry delta,
+  table, record, entry or acceptance in a preparation/declaration checkpoint; tip-first readback
+  cannot substitute for admission. No installed-route error falls back to production.
+- **Execution/repair escape (OR-P2, OR-P3, OR-P6).** Forged serialized baseline, edits to
+  protected inputs/snapshots/controller outputs, interruption, failure or fake nonempty written
+  paths. Repair cannot alter P/O, heal an orphan binding, lose the written-path digest or supply
+  verified depth E. Failed ON2 delivers only its separately asserted trusted attempt/diagnostics.
+- **Evidence substitution or staleness (OR-P5, OR-P6).** Maintenance receipts, another approval
+  Event, wrong P/O, unadopted or revoked mapping, missing obligation, omitted/partial attempt
+  populations, failed/nonterminal attempts, hidden retries, changed producer source, dependency-only
+  invalidation,
+  stale/missing runtime evidence or stale pre-entry verdict. Never qualify from an asserted label.
+- **Inadequate or wrong-owner acceptance (OR-P4, OR-P7, OR-P8).** Missing/inconsistent P/O/E,
+  classification-required or carried work, debt grants/renewals/retirements or baseline/inventory
+  drift, wrong path, forged/unmatched entry, effect without entry, entry/artifact/current-record
+  digest mismatch or one artifact's entry used for unrelated aggregate effects. Refuse semantic/
+  timestamp changes to `closed`, same-path lifecycle retargeting and every forbidden pointer/
+  passed-target/status/marker/maintenance drift-clearance effect. Prepared ON5 is no exemption.
+- **Acquisition or freeze drift (OR-P9).** Changed/deleted O inputs, including regenerated wrapper
+  coverage, changed P, incomplete union, missing/branch-only/extra/mismatched statement entries,
+  post-`runtime_integrated` re-freeze, earlier approval or deleted record/object. Retain hardened
+  Git replacement/graft/alternate/environment regressions; gates cannot rewrite frozen inputs.
+- **Handoff shortcut (OR-P10).** Same-version retained path transfer, overlap, automatic transfer
+  at closeout, release-watch readiness used as depth authority, record deletion or Event rewrite.
+  ON5 `closed` must be integrated first; the transition itself still refuses pending design.
+  Later ordinary displacement preserves the earlier record/work; an extra isolated depth
+  version refuses.
+- **Scope/route bypass (OR-P8, OR-P11).** Aggregate acceptance on another agent/target/version,
+  ordinary requested scope displacing a retained tuple, omitted/disabled declaration, removed
+  record, nested/enclosing roots or proposed destinations. Execute every NE command/alias, both
+  ON5 entries, public LW1 batch/lifecycle/packet storage and every new admitted caller, across
+  onboarding declared/retained/proposed cases. MA1–MA6 refuse onboarding acceptance; ON routes
+  refuse maintenance ownership; existing admitted reporting-only maintenance behavior survives.
+- **IN1 and delivery race (OR-P3, OR-P8, OR-P13).** Wrong/stale parent, moved tip, invalid
+  admission/observation binding, other-root changes, unchanged stale qualification, hand-built
+  freezes/E/entries, gate failure or scratch Git/registry/identity changes. Concurrent caller or
+  output edits/removal/mode/link changes survive refusal/restoration; no unauthorized acceptance
+  is delivered. A later failure leaves the candidate unintegrated and cannot restore over new
+  caller/protected state.
+- **Local-pass laundering (OR-P13).** After a real proposal-phase pass, change an approval,
+  acquisition, evidence, record or accepting-artifact input relevant to admission, or another gate invariant
+  in the committed candidate. Independent evaluation must fail before protected ref advance;
+  neither earlier pass nor post-tip observation supplies authority. Refuse wrong-record/stale
+  evaluation, child inheritance assumptions and serialized verdict/environment-token bypasses.
+- **Production control (OR-P2, OR-P11, OR-P12, OR-P13).** With no route, keep production depth
+  refusal, ordinary behavior and unverified production results. Neither tests nor this amendment
+  install a live profile, production table, path enablement or credential requirement for CI.
+
 ## Support publication cases
 
 The [support matrix spec](../../specs/unified-agent-api/support-matrix.md#support-depth) states
@@ -593,6 +721,10 @@ Must fail, each one leaving caller state byte for byte unchanged:
   Also open: whether version metadata for charter rule 4 is written before the declaration or
   only by a later writer, since `manifest-version-metadata` refuses a depth manifest, and whether
   candidate execution later applies to write runs that are not depth-enrolled (OF-P9).
+  For the finite E.6–E.8 proof, OR-P1 and OR-P9 fix ordinary NE3 metadata before declaration
+  and require ON3–ON5 to preserve frozen acquired bytes, including wrapper coverage (specified,
+  not installed; [routing design, "Maintainer decisions"](support-depth-onboarding-routing-design.md#maintainer-decisions)).
+  This bounded resolution changes no OF decision or partial-target policy.
 - Decided by charter rule 7 (OF-P2): the `support_depth` object of the onboarding pack's
   committed `lifecycle-state.json` states the P and O identities beside the depth record. The dry
   run writes it with the record, and every other lifecycle writer preserves it. A run's input
@@ -605,6 +737,10 @@ Must fail, each one leaving caller state byte for byte unchanged:
   say what the agent needs for that path. Decide whether the move needs anything else. The question
   above on a declaration moved to another lifecycle path covers what owns the enrollment between
   the move and the first maintenance freeze.
+  OR-P10 requires E.6–E.8 to refuse that same-version retained transfer pending a separate
+  transition design, after ON5 `closed` is integrated; release-watch readiness transfers no
+  authority (specified, not installed;
+  [routing design, "Maintainer decisions"](support-depth-onboarding-routing-design.md#maintainer-decisions)).
 - An approval artifact is committed before `onboard-agent` appends the registry entry, and the
   charter has it state only the exact upstream version. An approval has been amended in place
   before, with its `approval_commit` and `approval_recorded_at` unchanged. Decide whether an

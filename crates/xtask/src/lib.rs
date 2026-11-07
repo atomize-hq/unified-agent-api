@@ -11,6 +11,8 @@ pub mod capability_matrix;
 pub mod capability_projection;
 pub mod capability_publication;
 pub mod depth_evidence;
+pub mod depth_fixture_snapshot;
+pub mod depth_fixture_wrapper_coverage;
 pub mod depth_record;
 mod git_inputs;
 pub mod isolated_maintenance;
@@ -34,6 +36,7 @@ pub mod runtime_follow_on;
 pub mod support_depth;
 pub mod support_matrix;
 pub mod workspace_mutation;
+mod wrapper_coverage_shared;
 pub mod wrapper_scaffold;
 
 pub mod depth_acceptance;

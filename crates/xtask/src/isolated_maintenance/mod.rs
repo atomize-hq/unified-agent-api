@@ -2,6 +2,7 @@
 // The foundation deliberately has no installed profile or production bound-Proposal caller.
 #![allow(dead_code)]
 mod host;
+pub(crate) mod onboarding;
 mod scope;
 mod view;
 

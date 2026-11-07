@@ -13,31 +13,9 @@ const VERSION: &str = match option_env!("DEPTH_FIXTURE_UPSTREAM_VERSION") {
     None => "0.1.0",
 };
 
-const ROOT_HELP: &str = "depth_fixture - synthetic CLI for the support-depth machinery proof
-
-Usage: depth_fixture [OPTIONS] <COMMAND>
-
-Commands:
-  run  Run one prompt
-
-Options:
-      --surface-json  Print the command surface as JSON
-  -h, --help          Print help
-  -V, --version       Print version
-";
-
-const RUN_HELP: &str = "Run one prompt
-
-Usage: depth_fixture run [OPTIONS] [--] <PROMPT>
-
-Arguments:
-  <PROMPT>  The prompt
-
-Options:
-      --json          Emit JSON Lines events
-      --model <NAME>  Model name
-  -h, --help          Print help
-";
+#[path = "depth_fixture/help.rs"]
+mod help;
+use help::{ROOT_HELP, RUN_HELP};
 
 const SURFACE: &str = r#"[
   {"path":[],"about":"synthetic CLI for the support-depth machinery proof","flags":[

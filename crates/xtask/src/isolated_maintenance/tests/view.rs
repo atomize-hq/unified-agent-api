@@ -460,7 +460,8 @@ fn scratch_render_and_manifest_validation_borrow_git_inputs_for_delivered_ma4_ev
     let mut with_tip = validate_args(scratch.path());
     with_tip.tip = Some(git(root, &["rev-parse", "HEAD"]));
     let codes = crate::manifest_validate::violation_codes(with_tip).unwrap();
-    assert_eq!(codes, ["DEPTH_TIP_UNREADABLE"]);
+    // With --tip the scratch tree also cannot resolve a route of its own; both refuse.
+    assert_eq!(codes, ["DEPTH_ROUTE_REFUSED", "DEPTH_TIP_UNREADABLE"]);
     assert!(route(scratch.path()).is_err());
     assert!(evidence_host(scratch.path()).is_err());
     assert!(!scratch.path().join(".git").exists());

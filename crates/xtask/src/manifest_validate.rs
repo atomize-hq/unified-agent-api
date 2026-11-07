@@ -19,6 +19,7 @@ mod fix_mode;
 mod models;
 mod pointer_consistency;
 mod pointers;
+pub(crate) use pointers::parse_pointer_content;
 mod report_invariants;
 mod schema;
 mod versions;
@@ -342,7 +343,12 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
     );
 
     // 7) Support-matrix publication drift checks reuse the shared support-matrix policy.
-    validate_support_matrix_publication(&ctx, &mut violations);
+    depth::validate_support_matrix_publication(
+        &ctx,
+        args.tip.as_deref(),
+        &mut violations,
+        validate_support_matrix_publication,
+    );
 
     // 8) Depth records.
     depth::validate_depth_records(&ctx, &mut violations);
