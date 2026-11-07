@@ -205,12 +205,29 @@ Canonical lifecycle record:
    - “live event before completion”
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
+   - Specified, not installed: for the finite non-runtime, capability-free synthetic onboarding
+     subject only, items 3 and 5 and runtime-follow-on implementation/evidence/handoff checks
+     mean the wrapper work actually due under `wrapper_only` (OR-P2,
+     [routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
+     No adapter M obligation, fake backend or fake `agent_api` test is required or admitted as
+     proof. Existing lifecycle stages and record/packet kinds remain; this proves no adapter
+     qualification and relaxes no production approval loader.
 6) Run `prepare-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after committed runtime evidence exists:
    - validate approval SHA continuity, implementation-summary completeness, capability publication continuity, and the exact runtime-evidence bundle selected by `active_runtime_evidence_run_id`
-   - write only `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`
+   - write only `docs/agents/lifecycle/<onboarding_pack_prefix>/governance/publication-ready.json`,
+     subject to the specified depth reporting extension below
    - advance the committed lifecycle record to `publication_ready`, the pre-refresh-only stage in the canonical path `publication_ready -> published -> closed_baseline`
    - clear `active_runtime_evidence_run_id` as part of that stage transition
    - the next command template remains `refresh-publication --approval <path> --write`
+   - Specified, not installed: routed depth ON3's controller also assembles and delivers reporting
+     E, its bound receipt/payload files and coherent reporting publication in the same checked
+     proposal as the packet and `publication_ready`, after committed ON2 implementation has
+     producer evidence (OR-P6,
+     [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+     It MUST preserve Event/P/O, the lifecycle depth object and every entry, and MUST add no
+     qualification, entry or other acceptance/retargeting effect. Assembly grants no admission;
+     every consumer re-authenticates. The executor cannot edit its protected record, and repair
+     continues to repair runtime evidence only, never to manufacture verified depth E.
 7) `refresh-publication --approval <path> --check|--write` is the only publication consumer command; run `refresh-publication --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` to consume the committed handoff packet:
    - refresh publication outputs from the committed handoff packet
    - regenerate the library-only validated-runtime projection at `crates/agent_api/src/runtime_support_data.rs` alongside the published support surfaces when support publication is enabled
@@ -222,6 +239,35 @@ Canonical lifecycle record:
      - `make preflight`
    - on success, commit lifecycle stage `published` in `lifecycle-state.json` and record packet continuity there while leaving `publication-ready.json` as the pre-refresh handoff packet
    - the next command template after refresh remains `prepare-proving-run-closeout --approval <path> --write`
+
+   For depth-enrolled generations only, the green gate and rollback above have this specified,
+   not installed split (OR-P3, OR-P13,
+   [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)):
+   before checked local delivery, the controller MUST run the depth-reading checks behind every
+   fixed command against the proposal's scratch view through the same checking functions, inside
+   a borrowed fresh evaluation scope bound to the exact proposed record and actual inputs.
+   This includes the validator, support-matrix and `runtime-advertising-model --check` parts of
+   `make preflight`. Every registry reader they use MUST read the authenticated routed registry
+   read-only. Every leaf, including the recursive workspace test leg, MUST be accounted for in
+   both phases: production-parser controls use hermetic undeclared fixtures; checks whose purpose
+   is candidate-registry validation retain that purpose through authenticated actual-candidate
+   reads. Format, lint and build remain subprocesses before delivery; other local checks use
+   hermetic subprocesses or authenticated shared checking functions as appropriate.
+
+   After delivery, the unchanged subprocess commands MUST resolve their own installed route over
+   a clean committed candidate whose HEAD the host already holds: the pushed candidate in CI and
+   the actual integration candidate at IN1, before the protected reference advances. A successful
+   local ON4 return promises that local preparation succeeded and a branch candidate was
+   delivered. Independent committed-candidate checks, current IN1 admission and the existing
+   terminal integration gate MUST all pass for the actual integration candidate before protected
+   acceptance. Post-tip observation is no substitute. Each evaluation binds its actual inputs;
+   a local pass supplies no authority for changed bytes. A later failure leaves the candidate
+   unintegrated and authorizes no restoration over changed caller or protected state. Delivery
+   and restoration MUST preserve concurrent bytes, modes, links and removals through
+   expected-before checks. No command, file kind, lifecycle stage, reusable gate token, host
+   write for candidate authentication or cross-process scope transfer is introduced. The
+   [evidence contract](support-depth-evidence-v1.md#read-only-verdict-evaluation) bounds this
+   read-only evaluation; production verdicts and neutral write refusals are unchanged.
 8) Run `prepare-proving-run-closeout --approval docs/agents/lifecycle/<onboarding_pack_prefix>/governance/approved-agent.toml --write` after publication refresh succeeds:
    - write the canonical closeout artifact only at `docs/agents/lifecycle/<prefix>/governance/proving-run-closeout.json`
    - materialize that closeout artifact with `state = prepared`
@@ -287,6 +333,20 @@ Rules:
    [registry contract](agent-registry-contract.md#support-depth) states. `onboard-agent` appends
    the agent's entry without that table. A maintainer adds the table afterwards, as release-watch
    enrollment is added, in a change that leaves `onboarding` in `enabled_paths`.
+
+   Specified, not installed: the finite synthetic bootstrap admits only ON1's exact ordinary
+   absent-to-scaffold delta, then record-free preparation preserving the scaffold entry and
+   approval, then the maintainer's separate first-declaration reporting transition (OR-P1,
+   OR-P14, [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+   Reviewed governing adoption, actual acquisition/union/coverage/report generation and ordinary
+   NE3 `snapshotted` metadata precede declaration. Every checkpoint needs IN1 admission followed
+   by post-tip observation. The declaration transition includes only the approval version's
+   onboarding table, reviewed CORE classifications, the integration-branch acquisition statement
+   and coherent reporting publication, with no record, entry or acceptance. The
+   [evidence contract](support-depth-evidence-v1.md#synthetic-onboarding-proof-selection) bounds
+   both registry-delta exceptions; neither approval nor ON1 declares enrollment.
+   Only these named record-free bootstrap/preparation operations may proceed before rule 3
+   resolves; this bounded exception neither resolves enrollment nor authorizes ON2 freeze.
 3. An approval artifact that approves a depth enrollment states the one exact upstream version it
    approves it for. It states nothing else of the selection, and it declares nothing: the registry
    table is the declaration. While a generation is on the create lane the two bind by that version.
@@ -332,6 +392,12 @@ Rules:
    change. No other create-lane command freezes or re-freezes P or O (OF-P1). The dry run writes
    the depth record and the lifecycle object of rule 7 in the same invocation, through the
    lifecycle writer (OF-P1, OF-P2).
+
+   Specified, not installed: this dry-run proposal MUST also deliver any derived reporting
+   publication needed for coherence with the frozen record (OR-P6,
+   [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+   It MUST preserve every entry and add no qualification or other acceptance effect; it grants
+   no second writer of P/O or of the lifecycle object.
 
    Both modes of `runtime-follow-on` require the lifecycle stage `enrolled`, and a dry run of a
    depth-enrolled generation at `runtime_integrated` MUST refuse (OF-P5). A dry run after a write
@@ -461,6 +527,33 @@ Rules:
    ON5 MUST refuse where an acquired input of rule 6 differs from the O the record states, as the
    maintenance relay refuses a changed frozen input. A regenerated `wrapper_coverage.json` is such
    a change (OF-P6). Under rule 5 no re-freeze is then left to the generation (OF-P5, OF-P6).
+
+   Specified, not installed: ON4 owns only its generation's exact
+   `Publication { packet, record_sha256 }` entry, packet-bound `published` assertion and supported
+   qualification/advertising effects. Final ON5 owns only its exact
+   `ProvingRunCloseout { closeout, record_sha256 }` entry, `closed` closeout, `closed_baseline`
+   assertion and proving evidence id (OR-P4,
+   [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
+   ON3 and prepared ON5 are reporting-only and MUST refuse detected acceptance or retargeting;
+   `prepared` alone exempts no replacement of an accepting packet, retained closed closeout or
+   lifecycle assertion. Neither accepting route gains pointer, passed-target, `validated` or
+   `supported` status, marker retirement or maintenance drift-clearance authority. A depth ON5
+   with `drifted` MUST refuse rather than clear it.
+
+   These onboarding predicates MUST independently bind the exact approval Event, lifecycle
+   object, registry policy, frozen O acquisition and candidate bytes, and check every due
+   obligation, classification and carried work (OR-P7, OR-P8, same design sections). Empty
+   onboarding acceptance work waives nothing. The synthetic positive is debt-free; onboarding
+   debt grants/retirements or baseline/inventory drift MUST refuse until corroboration is
+   designed. Admission derives the exact entry from final packet/closeout bytes; the post-entry
+   record MUST then be evaluated freshly, rendered and re-admitted with the entire proposal.
+   An entry for one artifact authorizes no unrelated aggregate effect. IN1 MUST independently
+   re-establish reporting freezes/E and owning acceptance, dispatching by retained owning path
+   and actual effects, matching every new entry to the independently admitted exact artifact and
+   current record digest, and re-evaluating unchanged qualifications. Maintenance authority and
+   CP-P3 attribution cannot authorize onboarding effects. OR-P9 (same design sections) retains
+   OF-P4–P7: ON3–ON5 reuse frozen acquired bytes, use generators only in check/planning form and
+   re-observe after gates; changed inputs, including wrapper coverage, refuse without re-freeze.
 10. The create lane has no packet freeze, because no automation replaces a create-lane branch. An
     onboarding generation is committed from the time the integration branch holds its depth
     record, as the support-depth contract's depth enrollment rule 7 states.
@@ -472,6 +565,16 @@ Rules:
     generation of the version reaches promotion.
     [Multi-target parity acquisition](#multi-target-parity-acquisition-when-a-new-agent-joins-it)
     says what the agent needs in order to be on that path.
+
+    E.6–E.8 specify refusal of same-version retained path transfer until a separate transition
+    design resolves its ownership and binding rules (OR-P10,
+    [routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
+    ON5 `closed` MUST first be integrated; that prerequisite and release-watch readiness do not
+    transfer depth authority. Closing MUST NOT auto-transfer the declaration, overlap both paths,
+    delete the retained record or change its Event to fit maintenance. The handoff described
+    above is not installed or promised by these slices. A later ordinary version may displace
+    reporting state only under the contract's Later versions rules while preserving the earlier
+    record/work; the fixed isolated subject still refuses an extra depth version.
 12. The surface a dry run freezes O from is acquired by the support-depth contract's input-only
     writers, run directly: the agent's snapshot command, then `manifest-union`, the
     wrapper-coverage generator and `manifest-report` (OF-P3). This holds whether the approval
@@ -526,7 +629,18 @@ executor can write (OF-P9).
 
 ### Present behavior
 
-Only the approval loader's reading of rule 3 is implemented. Rules 5 to 9 and 12 to 14 state
+The OR-P1–OR-P14 routing amendments above are specified, not installed (the
+[routing design, "Implementation slices"](../agents/lifecycle/support-depth-onboarding-routing-design.md#implementation-slices),
+slice 0). Production still refuses depth; this amendment installs no profile, registry table or
+path enablement. The credential-free connected in-process synthetic chain required by OR-P12
+does not replace the later independent disposable-repository run under phase C's protected
+integration/CI conditions, or authorize that host run. Stubbed hosts/gates MUST be labeled as
+such and cannot prove native queue execution, capability advertising or a real runtime agent.
+The following source inventory retains its stated baseline; it does not describe installation
+of these amendments.
+
+At the historical source baseline below, only the approval loader's reading of rule 3 is
+implemented. Rules 5 to 9 and 12 to 14 state
 the create-lane depth path that the
 [onboarding freeze decisions](../agents/lifecycle/support-depth-onboarding-freeze-decisions.md#implementation-slices)
 plan in later slices; none of it is installed. Every create-lane entry still refuses a depth
