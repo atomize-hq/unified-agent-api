@@ -126,6 +126,7 @@ fn delivered(classified: bool, channel: bool) -> (Fixture, crate::depth_evidence
     }
     f.commit();
     host.staging(&git(root, &["rev-parse", "HEAD"]));
+    super::publication::refresh(&f, &host);
     (f, host)
 }
 

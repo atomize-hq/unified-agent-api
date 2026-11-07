@@ -273,6 +273,7 @@ mod connected {
         }
         f.commit();
         host.staging(&git(root, &["rev-parse", "HEAD"]));
+        super::super::publication::refresh(&f, &host);
         (f, host)
     }
 
@@ -565,10 +566,10 @@ mod connected {
             .unwrap()
             .promises
             .iter()
-            .all(|p| !p.qualified
+            .all(|p| p.qualified
                 && p.obligations
                     .iter()
-                    .all(|o| o.result == DepthResult::Unverified)));
+                    .all(|o| o.result == DepthResult::Verified)));
         admit_and_observe(f, host);
     }
     #[test]
@@ -609,6 +610,11 @@ mod connected {
             stand_down::render_marker_toml("depth_fixture", "0.3.0", &next.request_recorded_at),
         );
         advance(f, host);
+        // MA5 published qualified 0.2.0 rows, but this ordinary generation derives
+        // publication with production verdicts. Refresh before claiming that drift
+        // resolved; the retained closeout entry stays intact for the first MA6.
+        super::super::publication::refresh_installed(f, host);
+        set_local(root, &git(root, &["rev-parse", "HEAD"]));
         prepare(root).unwrap();
         advance(f, host);
         let replaced = fs::read_to_string(root.join(&request)).unwrap();

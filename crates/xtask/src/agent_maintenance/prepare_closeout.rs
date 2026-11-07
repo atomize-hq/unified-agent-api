@@ -107,15 +107,21 @@ where
     let proposal = match xtask::isolated_maintenance::route(workspace_root)
         .map_err(MaintenanceCloseoutError::Validation)?
     {
-        Some(route) => Some(route.proposal(workspace_root)),
-        None if args.write => Some(super::closeout_proposal::Proposal::capture(workspace_root)),
+        Some(route) => Some(
+            route
+                .closeout_publication(workspace_root)
+                .map(|(proposal, captured)| (proposal, Some(captured))),
+        ),
+        None if args.write => {
+            Some(super::closeout_proposal::Proposal::capture(workspace_root).map(|p| (p, None)))
+        }
         None => None,
     }
     .transpose()
     .map_err(MaintenanceCloseoutError::Validation)?;
     let repository = proposal
         .as_ref()
-        .map(|proposal| proposal.preflight_repository(workspace_root))
+        .map(|(proposal, _)| proposal.preflight_repository(workspace_root))
         .transpose()
         .map_err(MaintenanceCloseoutError::Validation)?
         .flatten();
@@ -290,7 +296,10 @@ fn write_and_verify(
     request_path: &Path,
     prepared: &PreparedCloseout,
     bytes: Vec<u8>,
-    proposal: super::closeout_proposal::Proposal,
+    proposal: (
+        super::closeout_proposal::Proposal,
+        Option<xtask::manifest_promotion::CloseoutPublicationContext>,
+    ),
 ) -> Result<(), MaintenanceCloseoutError> {
     super::closeout::load_linked_closeout_bytes(
         workspace_root,
@@ -299,8 +308,10 @@ fn write_and_verify(
         &bytes,
     )?;
     proposal
-        .apply(
+        .0
+        .apply_closeout_publication(
             workspace_root,
+            proposal.1.as_ref(),
             vec![(prepared.closeout_path.clone(), bytes)],
         )
         .map_err(MaintenanceCloseoutError::Validation)?;
