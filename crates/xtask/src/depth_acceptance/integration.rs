@@ -8,6 +8,7 @@ use crate::{
 use std::{collections::BTreeSet, path::Path};
 
 mod binding;
+mod bootstrap;
 mod generation;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
@@ -27,12 +28,41 @@ impl crate::isolated_maintenance::Route {
         revision: &str,
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
+        // Only bootstrap lacks a resolved enrollment. Existing routes must retain their
+        // capture -> proposal -> binding error order, including competing input failures.
+        if self.context().bootstrap_pending()? {
+            let initial = binding::capture(root, revision, self.context())?;
+            if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
+                if checkpoint.publication_changed {
+                    checkpoint
+                        .with_view(root, |view| bootstrap::publication(view, &initial.parent))?;
+                }
+                let outcome = checkpoint.with_registry(root, validate);
+                initial.recheck(root, self.context())?;
+                return outcome;
+            }
+        }
         let captured = self.capture(root)?;
         let proposal = captured.proposal(root)?;
         let super::Authority::Isolated(context) = proposal.authority() else {
             return Err("isolated IN1 binding lost its captured authority".into());
         };
         let binding = binding::capture(root, revision, context)?;
+        // Only onboarding can observe a first declaration. Maintenance keeps its existing
+        // admission even when its parent lacks the subject entry or depth table.
+        let checkpoint = if context.bootstrap_declared_onboarding() {
+            context.bootstrap_checkpoint(root, &binding.parent)?
+        } else {
+            None
+        };
+        if let Some(checkpoint) = checkpoint {
+            if checkpoint.publication_changed {
+                checkpoint.with_view(root, |view| bootstrap::publication(view, &binding.parent))?;
+            }
+            let outcome = checkpoint.with_registry(root, validate);
+            binding.recheck(root, context)?;
+            return outcome;
+        }
         let outcome = crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
             root,
             &captured,

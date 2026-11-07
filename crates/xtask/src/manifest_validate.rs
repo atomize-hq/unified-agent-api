@@ -19,6 +19,7 @@ mod fix_mode;
 mod models;
 mod pointer_consistency;
 mod pointers;
+pub(crate) use pointers::parse_pointer_content;
 mod report_invariants;
 mod schema;
 mod versions;

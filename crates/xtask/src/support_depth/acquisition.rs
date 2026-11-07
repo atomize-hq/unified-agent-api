@@ -11,7 +11,6 @@ use crate::{
     },
     manifest_report, manifest_union,
 };
-use jsonschema::{Draft, JSONSchema};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -78,17 +77,7 @@ pub(super) fn derive_with_pilot(
     let rules: Rules = serde_json::from_slice(rules_bytes).map_err(|e| e.to_string())?;
     let mut acquired = vec![view.reference(&format!("{root}/RULES.json"))?];
     let schema_path = format!("{root}/SCHEMA.json");
-    let mut schema: Value =
-        serde_json::from_slice(&view.required(&schema_path)?).map_err(|e| e.to_string())?;
-    local_schema(&schema, true)?;
-    schema
-        .as_object_mut()
-        .ok_or("schema must be an object")?
-        .remove("$id");
-    let schema = JSONSchema::options()
-        .with_draft(Draft::Draft202012)
-        .compile(&schema)
-        .map_err(|e| e.to_string())?;
+    let schema = super::acquisition_schema::compile(&view.required(&schema_path)?)?;
     let schema_ref = view.reference(&schema_path)?;
     let rules_sha256 = acquired[0].sha256.clone();
     let schema_sha256 = schema_ref.sha256.clone();
@@ -96,12 +85,7 @@ pub(super) fn derive_with_pilot(
     let mut read = |path: &str| -> Result<Value, String> {
         let bytes = view.required(path)?;
         let value: Value = serde_json::from_slice(&bytes).map_err(|e| format!("{path}: {e}"))?;
-        if let Err(errors) = schema.validate(&value) {
-            return Err(format!(
-                "{path}: invalid acquisition schema: {}",
-                errors.map(|e| e.to_string()).collect::<Vec<_>>().join("; ")
-            ));
-        }
+        super::acquisition_schema::validate(&schema, path, &value)?;
         acquired.push(view.reference(path)?);
         Ok(value)
     };
@@ -375,35 +359,6 @@ fn observe(
                 )?;
             }
         }
-    }
-    Ok(())
-}
-
-// Compilation is offline and consumes only this bound schema. External policy/schema inputs
-// cannot be fetched invisibly; supporting them later requires binding each referenced file.
-fn local_schema(value: &Value, root: bool) -> Result<(), String> {
-    match value {
-        Value::Object(map) => {
-            for (key, value) in map {
-                if key == "$ref" && !value.as_str().is_some_and(|r| r.starts_with("#/$defs/")) {
-                    return Err("external schema references are unsupported".into());
-                }
-                if (key == "$id" && !root)
-                    || matches!(key.as_str(), "$dynamicRef" | "$recursiveRef")
-                {
-                    return Err(
-                        "nested schema identities/dynamic references are unsupported".into(),
-                    );
-                }
-                local_schema(value, false)?;
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                local_schema(item, false)?;
-            }
-        }
-        _ => {}
     }
     Ok(())
 }

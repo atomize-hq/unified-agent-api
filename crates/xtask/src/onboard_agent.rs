@@ -33,6 +33,7 @@ use self::validation::{
     validate_filesystem_conflicts, validate_registry_conflicts,
     validate_workspace_package_name_conflicts,
 };
+pub(crate) use preview::render_current_json;
 
 const OWNERSHIP_MARKER: &str = "<!-- generated-by: xtask onboard-agent; owner: control-plane -->";
 const DOCS_NEXT_ROOT: &str = "docs/agents/lifecycle";

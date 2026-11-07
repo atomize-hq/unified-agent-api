@@ -290,7 +290,7 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
             .join("current.json")
             .display()
             .to_string(),
-        Some(render_current_json(draft)),
+        Some(render_current_json(&draft.canonical_targets)),
     )];
     previews.extend(
         governing::governing_files(draft)
@@ -316,9 +316,8 @@ pub(super) fn build_manifest_preview(draft: &DraftEntry) -> Vec<(String, Option<
     previews
 }
 
-fn render_current_json(draft: &DraftEntry) -> String {
-    let targets = draft
-        .canonical_targets
+pub(crate) fn render_current_json(canonical_targets: &[String]) -> String {
+    let targets = canonical_targets
         .iter()
         .map(|target| format!("    \"{target}\""))
         .collect::<Vec<_>>()

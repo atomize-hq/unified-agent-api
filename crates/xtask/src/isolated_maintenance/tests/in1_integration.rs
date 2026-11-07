@@ -2,6 +2,7 @@
 use super::*;
 use crate::depth_acceptance::check_integration;
 
+mod maintenance_observation;
 mod regressions;
 
 // Moved from tests.rs to keep its module declarations within the code-line cap.

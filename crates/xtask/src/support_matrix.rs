@@ -187,19 +187,36 @@ pub fn generate_publication_bundle(workspace_root: &Path) -> Result<PublicationB
 }
 
 pub fn generate_publication_artifacts(workspace_root: &Path) -> Result<PublicationBundle, String> {
+    generate_publication_artifacts_with(workspace_root, || {
+        let existing_markdown = fs::read_to_string(workspace_root.join(MARKDOWN_OUTPUT_PATH))
+            .map_err(|err| {
+                format!(
+                    "read {}: {err}",
+                    workspace_root.join(MARKDOWN_OUTPUT_PATH).display()
+                )
+            })?;
+        Ok(existing_markdown)
+    })
+}
+
+/// Derive candidate rows while preserving surrounding Markdown from an authenticated source.
+pub(crate) fn generate_publication_artifacts_from_markdown(
+    workspace_root: &Path,
+    existing_markdown: &str,
+) -> Result<PublicationBundle, String> {
+    generate_publication_artifacts_with(workspace_root, || Ok(existing_markdown.to_owned()))
+}
+
+fn generate_publication_artifacts_with(
+    workspace_root: &Path,
+    markdown: impl FnOnce() -> Result<String, String>,
+) -> Result<PublicationBundle, String> {
     let rows = derive_rows(workspace_root)?;
     if let Err(issues) = validate_publication_consistency(workspace_root, &rows) {
         return Err(format_publication_issues(&issues));
     }
-    let existing_markdown =
-        fs::read_to_string(workspace_root.join(MARKDOWN_OUTPUT_PATH)).map_err(|err| {
-            format!(
-                "read {}: {err}",
-                workspace_root.join(MARKDOWN_OUTPUT_PATH).display()
-            )
-        })?;
     render_publication_artifacts(
-        &existing_markdown,
+        &markdown()?,
         &rows,
         render_agent_api_runtime_support_data(workspace_root)?,
     )

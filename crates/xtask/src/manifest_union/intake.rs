@@ -14,29 +14,62 @@ pub(crate) fn validate(
     shards: &BTreeMap<String, Value>,
     selected_paths: &BTreeSet<Vec<String>>,
 ) -> Result<(), String> {
+    let expected = derive(rules, version, union, shards, selected_paths)?;
+    let mut actual = union.clone();
+    // Optional raw-help provenance is not consumed for O. Conflict facts themselves must match
+    // reconstructed snapshots; help strings never certify effects or classification.
+    if let Some(commands) = actual["commands"].as_array_mut() {
+        for command in commands {
+            if let Some(conflicts) = command.get_mut("conflicts").and_then(Value::as_array_mut) {
+                for conflict in conflicts {
+                    conflict
+                        .as_object_mut()
+                        .ok_or("invalid conflict")?
+                        .remove("evidence");
+                }
+            }
+        }
+    }
+    if actual != serde_json::to_value(expected).map_err(|e| e.to_string())? {
+        return Err("union does not match its per-target snapshots and current RULES".into());
+    }
+    Ok(())
+}
+
+/// Complete producer encoding for finite checkpoints; no provenance member is discarded.
+pub(crate) fn validate_bytes(
+    rules: &[u8],
+    version: &str,
+    union: &Value,
+    shards: &BTreeMap<String, Value>,
+    selected_paths: &BTreeSet<Vec<String>>,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let expected = derive(rules, version, union, shards, selected_paths)?;
+    if bytes
+        != format!(
+            "{}\n",
+            serde_json::to_string_pretty(&expected).map_err(|e| e.to_string())?
+        )
+        .as_bytes()
+    {
+        return Err("bootstrap union differs from complete producer bytes".into());
+    }
+    Ok(())
+}
+
+fn derive(
+    rules: &[u8],
+    version: &str,
+    union: &Value,
+    shards: &BTreeMap<String, Value>,
+    selected_paths: &BTreeSet<Vec<String>>,
+) -> Result<SnapshotUnionV2, String> {
     let rules: RulesFile = serde_json::from_slice(rules).map_err(|e| e.to_string())?;
     assert_supported_sorting(&rules.sorting).map_err(|e| e.to_string())?;
     assert_supported_globals(&rules.globals).map_err(|e| e.to_string())?;
     let targets = &rules.union.expected_targets;
-    let mut snapshots = BTreeMap::new();
-    for (target, value) in shards {
-        let snapshot: SnapshotV1 =
-            serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
-        if snapshot.snapshot_schema_version != 1
-            || snapshot.tool != rules.union.tool_name
-            || snapshot.binary.semantic_version.as_deref() != Some(version)
-            || snapshot.binary.target_triple != *target
-            || !targets.contains(target)
-        {
-            return Err(format!("snapshot identity/schema mismatch: {target}"));
-        }
-        validate_units(
-            &snapshot,
-            rules.globals.effective_flags_model.enabled,
-            selected_paths,
-        )?;
-        snapshots.insert(target.clone(), snapshot);
-    }
+    let snapshots = parse_shards(&rules, version, shards, selected_paths)?;
     if !snapshots.contains_key(&rules.union.required_target) {
         return Err("required target snapshot is missing".into());
     }
@@ -73,7 +106,7 @@ pub(crate) fn validate(
         &snapshots,
     );
     normalize_union_commands(&mut commands, &rules.globals.effective_flags_model);
-    let expected = SnapshotUnionV2 {
+    Ok(SnapshotUnionV2 {
         snapshot_schema_version: 2,
         tool: rules.union.tool_name,
         mode: "union".into(),
@@ -86,26 +119,47 @@ pub(crate) fn validate(
         missing_targets: (!missing.is_empty()).then_some(missing),
         inputs,
         commands,
-    };
-    let mut actual = union.clone();
-    // Optional raw-help provenance is not consumed for O. Conflict facts themselves must match
-    // reconstructed snapshots; help strings never certify effects or classification.
-    if let Some(commands) = actual["commands"].as_array_mut() {
-        for command in commands {
-            if let Some(conflicts) = command.get_mut("conflicts").and_then(Value::as_array_mut) {
-                for conflict in conflicts {
-                    conflict
-                        .as_object_mut()
-                        .ok_or("invalid conflict")?
-                        .remove("evidence");
-                }
-            }
+    })
+}
+
+/// Validate every present shard, including acquisition checkpoints without a union.
+pub(crate) fn validate_shards(
+    rules: &[u8],
+    version: &str,
+    shards: &BTreeMap<String, Value>,
+    selected_paths: &BTreeSet<Vec<String>>,
+) -> Result<(), String> {
+    let rules: RulesFile = serde_json::from_slice(rules).map_err(|e| e.to_string())?;
+    parse_shards(&rules, version, shards, selected_paths).map(|_| ())
+}
+
+fn parse_shards(
+    rules: &RulesFile,
+    version: &str,
+    shards: &BTreeMap<String, Value>,
+    selected_paths: &BTreeSet<Vec<String>>,
+) -> Result<BTreeMap<String, SnapshotV1>, String> {
+    let targets = &rules.union.expected_targets;
+    let mut snapshots = BTreeMap::new();
+    for (target, value) in shards {
+        let snapshot: SnapshotV1 =
+            serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
+        if snapshot.snapshot_schema_version != 1
+            || snapshot.tool != rules.union.tool_name
+            || snapshot.binary.semantic_version.as_deref() != Some(version)
+            || snapshot.binary.target_triple != *target
+            || !targets.contains(target)
+        {
+            return Err(format!("snapshot identity/schema mismatch: {target}"));
         }
+        validate_units(
+            &snapshot,
+            rules.globals.effective_flags_model.enabled,
+            selected_paths,
+        )?;
+        snapshots.insert(target.clone(), snapshot);
     }
-    if actual != serde_json::to_value(expected).map_err(|e| e.to_string())? {
-        return Err("union does not match its per-target snapshots and current RULES".into());
-    }
-    Ok(())
+    Ok(snapshots)
 }
 
 // Duplicate paths/names and ambiguous flag aliases cannot be hidden by the merger's maps.

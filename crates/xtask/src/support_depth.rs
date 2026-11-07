@@ -8,6 +8,8 @@
 mod acquisition;
 mod acquisition_basis;
 mod acquisition_modes;
+pub(crate) mod acquisition_schema;
+pub(crate) use acquisition_basis::{supported_shard, supported_union, supported_wrapper};
 pub mod codex_pilot;
 pub use acquisition_basis::ClassificationBasis;
 mod closeout;

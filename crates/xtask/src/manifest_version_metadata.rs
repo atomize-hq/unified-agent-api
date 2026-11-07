@@ -216,6 +216,30 @@ pub(crate) fn plan(
     args: Args,
     default_root: Option<&str>,
 ) -> Result<(PathBuf, Vec<u8>), VersionMetadataError> {
+    plan_with(
+        args,
+        default_root,
+        read_existing_metadata,
+        deterministic_rfc3339_now,
+    )
+}
+
+/// Reuse NE3 with authenticated parent metadata and the candidate's validated writer timestamp.
+pub(crate) fn plan_at(
+    args: Args,
+    existing: Option<&[u8]>,
+    updated_at: &str,
+) -> Result<(PathBuf, Vec<u8>), VersionMetadataError> {
+    let existing = existing.map(serde_json::from_slice).transpose()?;
+    plan_with(args, None, |_| Ok(existing), || updated_at.to_owned())
+}
+
+fn plan_with(
+    args: Args,
+    default_root: Option<&str>,
+    existing: impl FnOnce(&Path) -> Result<Option<VersionMetadataV1>, VersionMetadataError>,
+    updated_at: impl FnOnce() -> String,
+) -> Result<(PathBuf, Vec<u8>), VersionMetadataError> {
     let requested_root = args
         .root
         .clone()
@@ -286,11 +310,11 @@ pub(crate) fn plan(
     };
 
     let version_path = root.join("versions").join(format!("{}.json", args.version));
-    let existing = read_existing_metadata(&version_path)?;
+    let existing = existing(&version_path)?;
 
     let validation = build_validation(args.status, &args, existing.as_ref())?;
 
-    let updated_at = deterministic_rfc3339_now();
+    let updated_at = updated_at();
 
     let artifacts = Some(ArtifactsV1 {
         snapshots_dir: Some(format!("snapshots/{}", args.version)),
