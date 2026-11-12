@@ -1,7 +1,6 @@
 #![cfg(feature = "codex")]
 
-#[path = "support/cargo_profile.rs"]
-mod cargo_profile;
+include!("support/cargo_profile.rs");
 
 use std::{
     collections::BTreeMap,
@@ -26,7 +25,7 @@ const POST_EVENT_PENDING_TIMEOUT: Duration = Duration::from_millis(200);
 fn fake_codex_binary() -> PathBuf {
     // Resolve Cargo's sibling binary at runtime so the test executable has no temporary
     // target-directory literal; isolated evidence mappings bind its reproducible hash.
-    cargo_profile::cargo_profile_dir().join(format!(
+    cargo_profile_dir().join(format!(
         "fake_codex_stream_json_agent_api{}",
         std::env::consts::EXE_SUFFIX
     ))

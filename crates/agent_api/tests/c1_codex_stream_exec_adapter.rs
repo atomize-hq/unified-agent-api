@@ -1,7 +1,6 @@
 #![cfg(feature = "codex")]
 
-#[path = "support/cargo_profile.rs"]
-mod cargo_profile;
+include!("support/cargo_profile.rs");
 
 use std::{
     path::PathBuf,
@@ -54,7 +53,7 @@ async fn drain_to_none(
 fn fake_codex_binary() -> PathBuf {
     // Resolve Cargo's sibling binary at runtime so the test executable has no temporary
     // target-directory literal; isolated evidence mappings bind its reproducible hash.
-    cargo_profile::cargo_profile_dir().join(format!(
+    cargo_profile_dir().join(format!(
         "fake_codex_stream_exec_scenarios_agent_api{}",
         std::env::consts::EXE_SUFFIX
     ))

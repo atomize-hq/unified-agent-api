@@ -4,8 +4,7 @@
 mod adapter;
 #[path = "c3_explicit_cancellation.rs"]
 mod cancel;
-#[path = "support/cargo_profile.rs"]
-mod cargo_profile;
+include!("support/cargo_profile.rs");
 #[path = "c2_codex_stream_exec_parity.rs"]
 mod parity;
 #[path = "c1_codex_exec_policy.rs"]
@@ -205,7 +204,7 @@ async fn spawn_and_timeout_are_distinct() {
 }
 
 fn fixture_binary(name: &str) -> PathBuf {
-    cargo_profile::cargo_profile_dir().join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+    cargo_profile_dir().join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
 }
 
 fn marker_backend(marker: &std::path::Path) -> CodexBackend {
