@@ -1,5 +1,8 @@
 #![cfg(feature = "codex")]
 
+#[path = "support/cargo_profile.rs"]
+mod cargo_profile;
+
 use std::{collections::BTreeMap, fs, path::PathBuf, pin::Pin, time::Duration};
 
 use agent_api::{
@@ -37,16 +40,10 @@ async fn drain_to_none(
 fn fake_codex_binary() -> PathBuf {
     // Resolve Cargo's sibling binary at runtime so the test executable has no temporary
     // target-directory literal; isolated evidence mappings bind its reproducible hash.
-    std::env::current_exe()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(format!(
-            "fake_codex_stream_exec_scenarios_agent_api{}",
-            std::env::consts::EXE_SUFFIX
-        ))
+    cargo_profile::cargo_profile_dir().join(format!(
+        "fake_codex_stream_exec_scenarios_agent_api{}",
+        std::env::consts::EXE_SUFFIX
+    ))
 }
 
 fn base_env() -> BTreeMap<String, String> {
