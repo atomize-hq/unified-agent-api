@@ -10,11 +10,7 @@ fn fake_codex_binary() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    let current_exe = std::env::current_exe().expect("resolve current test binary path");
-    let target_dir = current_exe
-        .parent()
-        .and_then(|dir| dir.parent())
-        .expect("resolve target dir from current test binary");
+    let target_dir = crate::backends::test_support::cargo_profile_dir();
     let mut binary = target_dir.join("fake_codex_stream_exec_scenarios_agent_api");
     if cfg!(windows) {
         binary.set_extension("exe");
