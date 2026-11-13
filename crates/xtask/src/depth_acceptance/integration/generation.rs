@@ -37,6 +37,15 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
             return Err("request froze P without its depth record".into());
         }
     }
+    let onboarding = if new
+        .records
+        .values()
+        .any(|r| matches!(r.event, Event::Onboarding { .. }))
+    {
+        onboarding_bindings(root, old, new)?
+    } else {
+        false
+    };
     for (version, record) in &new.records {
         if old
             .records
@@ -60,6 +69,16 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
                         .is_some_and(|p| !p.is_empty())
             }),
             Event::Onboarding { .. } => {
+                if onboarding {
+                    crate::runtime_follow_on::depth::check_freeze(
+                        root,
+                        &old.source,
+                        old.records.get(version),
+                        record,
+                        &new.entry,
+                    )?;
+                    continue;
+                }
                 let path = agent_lifecycle::approval_artifact_path_for_entry(&new.entry);
                 if new.source.optional(&path)?.is_none() {
                     false
@@ -79,4 +98,57 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Implementations preserve their binding and the frozen generation's lifecycle progression.
+/// Only the installed onboarding scope gets this finite read; production dispatch is unchanged.
+fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, String> {
+    let Some(route) = crate::isolated_maintenance::route(root)? else {
+        return Ok(false);
+    };
+    if !route.context().bootstrap_declared_onboarding() {
+        return Ok(false);
+    }
+    let captured = route.capture(root)?;
+    let path = agent_lifecycle::approval_artifact_path_for_entry(&new.entry);
+    let approval = captured.onboarding_approval(
+        &new.source
+            .optional_bytes(&path)?
+            .ok_or("missing onboarding approval")?,
+        &path,
+    )?;
+    let path = agent_lifecycle::lifecycle_state_path_for_entry(&new.entry);
+    let read = |view: &View| -> Result<agent_lifecycle::LifecycleState, String> {
+        serde_json::from_str(&view.source.read(&path)?).map_err(|e| e.to_string())
+    };
+    let prior = read(old)?;
+    let next = read(new)?;
+    for (view, state) in [(old, &prior), (new, &next)] {
+        crate::depth_record::onboarding::onboarding_binding(
+            state.support_depth.as_deref(),
+            &approval,
+            &view.records,
+        )
+        .map_err(|faults| {
+            faults
+                .into_iter()
+                .map(|f| f.message)
+                .collect::<Vec<_>>()
+                .join("; ")
+        })?;
+    }
+    // The binding also closes a frozen generation across lifecycle-only changes.
+    if approval
+        .support_depth_version
+        .as_ref()
+        .and_then(|v| old.records.get(v))
+        .is_some_and(|record| record.event == approval.event)
+    {
+        crate::runtime_follow_on::depth::check_progression(
+            prior.lifecycle_stage,
+            next.lifecycle_stage,
+        )?;
+    }
+    captured.recheck(root)?;
+    Ok(true)
 }

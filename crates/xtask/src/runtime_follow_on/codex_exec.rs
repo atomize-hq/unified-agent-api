@@ -134,6 +134,11 @@ pub(super) fn approval_descriptor_view(input_contract: &InputContract) -> Approv
 }
 
 pub(super) fn is_allowed_write_path(path: &str, descriptor: &ApprovalDescriptor) -> bool {
+    // Only the finite installed projection can have no backend; production parsing still
+    // requires one. Such a wrapper has no agent_api, snapshot or manifest write scope.
+    if descriptor.backend_module.is_empty() {
+        return path.starts_with(&(descriptor.crate_path.clone() + "/"));
+    }
     let required_test = required_agent_api_test(&descriptor.agent_id);
     let runtime_test_dir = format!(
         "crates/agent_api/tests/c1_{}_runtime_follow_on/",

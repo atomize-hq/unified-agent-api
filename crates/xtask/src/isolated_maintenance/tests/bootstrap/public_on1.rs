@@ -2,7 +2,7 @@
 use super::*;
 use clap::Parser;
 
-fn approval_args() -> crate::onboard_agent::Args {
+pub(super) fn approval_args() -> crate::onboard_agent::Args {
     crate::onboard_agent::Args::parse_from(["onboard-agent", "--write", "--approval", APPROVAL])
 }
 
@@ -75,7 +75,7 @@ fn public_on1_raw_descriptor_uses_the_same_approval_bound_plan() {
     assert!(state.support_depth.is_none());
 }
 
-fn canonical_context(f: &Fixture) {
+pub(super) fn canonical_context(f: &Fixture) {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let raw = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
     let manifest: toml_edit::DocumentMut = raw.parse().unwrap();
@@ -106,8 +106,7 @@ fn validate(f: &Fixture) {
     );
 }
 
-#[test]
-fn public_on1_connected_preparation_metadata_and_first_declaration_chain() {
+pub(super) fn declared_chain() -> Fixture {
     let f = setup(false);
     canonical_context(&f);
     assert!(!f.root.path().join(ROOT).exists());
@@ -165,6 +164,13 @@ fn public_on1_connected_preparation_metadata_and_first_declaration_chain() {
         .unwrap()
         .support_depth
         .is_none());
+    f
+}
+
+#[test]
+fn public_on1_connected_preparation_metadata_and_first_declaration_chain() {
+    let f = declared_chain();
+    let _installed = f.install();
     let before = git(f.root.path(), &["status", "--porcelain=v1"]);
     for args in [approval_args(), raw_args()] {
         let error = crate::onboard_agent::run_in_workspace(f.root.path(), args, &mut Vec::new())

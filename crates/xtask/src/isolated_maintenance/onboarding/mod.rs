@@ -15,7 +15,7 @@ use crate::{
     depth_record::onboarding::OnboardingApproval,
 };
 pub(crate) use checkpoint::Checkpoint;
-pub(crate) use scaffold::Scaffold;
+pub(crate) use scaffold::{reporting_targets, Scaffold};
 
 const SCAFFOLD: &str =
     include_str!("../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-scaffold.toml");

@@ -203,6 +203,8 @@ pub(super) struct CodexExecutionEvidence {
 
 #[derive(Debug)]
 pub(super) struct RuntimeContext {
+    // Set only after the finite installed adapter validates the complete non-runtime descriptor.
+    pub(super) wrapper_only: bool,
     pub(super) approval: ApprovalArtifact,
     pub(super) input_contract: InputContract,
     pub(super) lifecycle_state: LifecycleState,

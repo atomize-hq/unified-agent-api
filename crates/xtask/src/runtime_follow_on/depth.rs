@@ -1,4 +1,4 @@
-//! Private onboarding freeze controller. No public entry calls this before roadmap E.6.
+//! Installed onboarding freeze and wrapper implementation controller.
 use super::*;
 use crate::{
     agent_lifecycle::{self, LifecycleState},
@@ -12,7 +12,11 @@ use serde_json::Value;
 
 mod approval;
 mod integration;
+pub(crate) use integration::{check_freeze, check_progression};
+mod execution;
 mod packet;
+mod reporting;
+pub(super) use execution::{check_implementation, run, wrapper_prompt};
 
 struct Freeze {
     captured: CapturedRegistry,
@@ -22,10 +26,9 @@ struct Freeze {
     state_path: String,
     state_before: Vec<u8>,
     approval: OnboardingApproval,
-    approval_sha256: String,
 }
 
-fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
+fn plan(workspace: &Path, approval_path: &str, parent: Option<&Source>) -> Result<Freeze, String> {
     let captured = crate::isolated_maintenance::route(workspace)?
         .ok_or("onboarding depth freeze requires an installed isolated route")?
         .capture(workspace)?;
@@ -33,11 +36,13 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
     let host = captured.evidence_host(workspace)?;
     // Pin every integration read to the authenticated object id through the hardened Git runner.
     // The route rejects grafts and object alternates on capture and recheck.
-    let tip = Source::tip(workspace, host.tip())?;
+    let tip = match parent {
+        Some(parent) => parent.clone(),
+        None => Source::tip(workspace, host.tip())?,
+    };
     let mut view = GitInputs::new(workspace)?;
     let raw = view.required(approval_path)?;
     let approval = approval::read(&raw, approval_path, &captured)?;
-    let approval_sha256 = view.reference(approval_path)?.sha256;
     let entry = captured
         .registry()
         .find(&approval.agent_id)
@@ -62,6 +67,17 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
     }
     if state.lifecycle_stage != agent_lifecycle::LifecycleStage::Enrolled {
         return Err(format!("runtime-follow-on requires lifecycle stage `enrolled` (found `{}`); after runtime_integrated a new approval is required", state.lifecycle_stage.as_str()));
+    }
+    // A branch-local rollback cannot reopen the same generation's protected freeze window.
+    if let Some(raw) = tip.optional(&state_path)? {
+        let prior: LifecycleState = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        if prior.support_depth.is_some() {
+            let prior_approval =
+                OnboardingApproval::parse(&tip.read(approval_path)?, approval_path)?;
+            if prior_approval.event == approval.event {
+                check_progression(prior.lifecycle_stage, state.lifecycle_stage)?;
+            }
+        }
     }
     use crate::agent_registry::support_depth::LifecyclePath;
     let declaration = entry
@@ -133,7 +149,6 @@ fn plan(workspace: &Path, approval_path: &str) -> Result<Freeze, String> {
         state_path,
         state_before,
         approval,
-        approval_sha256,
     })
 }
 
@@ -217,7 +232,7 @@ fn text(raw: &[u8]) -> Result<&str, String> {
     std::str::from_utf8(raw).map_err(|e| e.to_string())
 }
 
-/// No public dispatch calls this: ON2 remains refused until E.6. No executor is reachable here.
+/// Freeze preparation is reporting-only. No executor is reachable in dry-run mode.
 pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> Result<(), Error> {
     if !args.dry_run || args.write {
         return Err(Error::Validation(
@@ -227,7 +242,7 @@ pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> 
     validate_args(&args, workspace)?;
     let run_id = args.run_id.clone().unwrap_or_else(generate_run_id);
     crate::runtime_evidence_run::validate_run_id(&run_id).map_err(Error::Validation)?;
-    let mut freeze = plan(workspace, &args.approval).map_err(Error::Validation)?;
+    let mut freeze = plan(workspace, &args.approval, None).map_err(Error::Validation)?;
     let object = agent_lifecycle::LifecycleDepth {
         policy_identity: freeze.plan.record.policy.identity.clone(),
         obligations_identity: freeze
@@ -256,14 +271,15 @@ pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> 
     use crate::workspace_mutation::PlannedMutation;
     let record = packet::json_bytes(&freeze.plan.record)?;
     mutations.push(match &freeze.plan.previous_record {
-        Some(before) => PlannedMutation::replace(record_path, before.clone(), record),
-        None => PlannedMutation::create(record_path, record),
+        Some(before) => PlannedMutation::replace(&record_path, before.clone(), record),
+        None => PlannedMutation::create(&record_path, record),
     });
     mutations.push(PlannedMutation::replace(
         &freeze.state_path,
         freeze.state_before.clone(),
         packet::json_bytes(&freeze.state)?,
     ));
+    reporting::append(workspace, &freeze, &record_path, &mut mutations)?;
     // The owning LW1 path admits only this record/object and these reporting artifacts. The
     // production lifecycle writer remains refusing; no general depth-writing bypass is exposed.
     freeze.view.verify().map_err(Error::Validation)?;
