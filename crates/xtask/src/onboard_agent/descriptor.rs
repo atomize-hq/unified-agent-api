@@ -16,11 +16,23 @@ use super::{
 
 impl DraftDescriptorInput {
     pub(super) fn from_raw_args(args: Args) -> Result<Self, Error> {
+        Self::from_args_with_backend(args, true)
+    }
+
+    pub(super) fn from_bootstrap_args(args: Args) -> Result<Self, Error> {
+        Self::from_args_with_backend(args, false)
+    }
+
+    fn from_args_with_backend(args: Args, require_backend: bool) -> Result<Self, Error> {
         Ok(Self {
             agent_id: required_arg(args.agent_id, "--agent-id")?,
             display_name: required_arg(args.display_name, "--display-name")?,
             crate_path: required_arg(args.crate_path, "--crate-path")?,
-            backend_module: required_arg(args.backend_module, "--backend-module")?,
+            backend_module: if require_backend {
+                Some(required_arg(args.backend_module, "--backend-module")?)
+            } else {
+                args.backend_module
+            },
             manifest_root: required_arg(args.manifest_root, "--manifest-root")?,
             package_name: required_arg(args.package_name, "--package-name")?,
             canonical_targets: args.canonical_targets,
@@ -71,7 +83,7 @@ impl From<approval_artifact::ApprovalArtifact> for DraftDescriptorInput {
             agent_id: descriptor.agent_id,
             display_name: descriptor.display_name,
             crate_path: descriptor.crate_path,
-            backend_module: descriptor.backend_module,
+            backend_module: Some(descriptor.backend_module),
             manifest_root: descriptor.manifest_root,
             package_name: descriptor.package_name,
             canonical_targets: descriptor.canonical_targets,

@@ -1,8 +1,10 @@
 mod approval;
 mod descriptor;
+mod execution;
 mod lifecycle;
 mod mutation;
 pub(crate) mod preview;
+pub(crate) mod routing;
 mod validation;
 
 use std::{
@@ -173,7 +175,7 @@ struct DraftEntry {
     agent_id: String,
     display_name: String,
     crate_path: String,
-    backend_module: String,
+    backend_module: Option<String>,
     manifest_root: String,
     package_name: String,
     canonical_targets: Vec<String>,
@@ -257,7 +259,7 @@ struct DraftDescriptorInput {
     agent_id: String,
     display_name: String,
     crate_path: String,
-    backend_module: String,
+    backend_module: Option<String>,
     manifest_root: String,
     package_name: String,
     canonical_targets: Vec<String>,
@@ -306,70 +308,7 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
-    if !args.dry_run {
-        xtask::depth_routes::refuse_workspace(workspace_root, "onboard_agent")
-            .map_err(Error::Validation)?;
-    }
-    let jail = WorkspacePathJail::new(workspace_root)?;
-    let dry_run_mode = args.dry_run;
-    let registry_path = jail.resolve(Path::new(REGISTRY_RELATIVE_PATH))?;
-    let registry_text = fs::read_to_string(&registry_path)
-        .map_err(|err| Error::Internal(format!("read {REGISTRY_RELATIVE_PATH}: {err}")))?;
-    let registry = AgentRegistry::parse(&registry_text).map_err(map_registry_load_error)?;
-    let draft = DraftEntry::from_args(args, workspace_root)?;
-    preview::refuse_unscaffoldable_manifest_root(&draft)?;
-
-    validate_registry_conflicts(&registry, &draft)?;
-    validate_workspace_package_name_conflicts(&draft, &jail)?;
-    validate_filesystem_conflicts(&draft, &jail)?;
-
-    let plan = OnboardingPlan::build(workspace_root, &registry, &draft, &registry_text)?;
-
-    writeln!(
-        writer,
-        "== ONBOARD-AGENT {} ==",
-        if dry_run_mode { "DRY RUN" } else { "WRITE" }
-    )
-    .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    if dry_run_mode {
-        writeln!(
-            writer,
-            "Shared onboarding plan preview; no filesystem writes performed."
-        )
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    } else {
-        writeln!(writer, "Shared onboarding plan preview before apply.")
-            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    }
-    writeln!(writer).map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-
-    write_input_summary(writer, &draft)?;
-    write_registry_preview(writer, &plan.registry_entry_preview)?;
-    write_docs_preview(writer, &plan.docs_preview)?;
-    write_lifecycle_state_preview(writer, &plan.lifecycle_state_preview)?;
-    write_manifest_preview(writer, &plan.manifest_preview)?;
-    write_release_preview(writer, &plan.release_preview)?;
-    write_manual_follow_up(writer, &plan.manual_follow_up)?;
-
-    let apply_summary = if dry_run_mode {
-        None
-    } else {
-        Some(apply_mutations(workspace_root, &plan.mutations)?)
-    };
-
-    writeln!(writer, "== RESULT ==")
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    match apply_summary {
-        Some(summary) => write_apply_result(writer, summary)?,
-        None => {
-            writeln!(writer, "OK: onboard-agent dry-run preview complete.")
-                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-            writeln!(writer, "No files were written.")
-                .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-        }
-    }
-
-    Ok(())
+    execution::run(workspace_root, args, writer)
 }
 
 impl DraftEntry {
@@ -450,6 +389,10 @@ impl DraftEntry {
             approval_maintenance: input.approval_maintenance,
             approval_support_depth_version: input.approval_support_depth_version,
         })
+    }
+
+    fn backend_module_or_empty(&self) -> &str {
+        self.backend_module.as_deref().unwrap_or_default()
     }
 
     fn docs_pack_root(&self) -> PathBuf {

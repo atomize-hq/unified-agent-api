@@ -1,38 +1,17 @@
-//! Exercise the complete public ordinary planner/renderer; the synthetic subject has no backend.
+//! Shared bootstrap planner for fixture setup; public ON1 is exercised in `public_on1`.
 use super::*;
 use clap::Parser;
 
 pub(super) fn create(root: &Path) {
-    let temporary = tempfile::tempdir().unwrap();
-    for path in [
-        REGISTRY_RELATIVE_PATH,
-        "Cargo.toml",
-        "docs/crates-io-release.md",
-        APPROVAL,
-    ] {
-        write(temporary.path(), path, fs::read(root.join(path)).unwrap());
-    }
-    let args = args();
-    crate::onboard_agent::run_in_workspace(temporary.path(), args, &mut Vec::new()).unwrap();
-    let inventory = format!("docs/agents/lifecycle/{PACK}/governance/written-paths.json");
-    let paths: Vec<String> =
-        serde_json::from_slice(&fs::read(temporary.path().join(inventory)).unwrap()).unwrap();
-    assert!(paths.contains(&format!("{ROOT}/versions/.gitkeep")));
-    assert!(paths.contains(&format!("{ROOT}/reports/.gitkeep")));
-    for path in paths {
-        let mut bytes = fs::read(temporary.path().join(&path)).unwrap();
-        if path == REGISTRY_RELATIVE_PATH {
-            // The only descriptor projection: the compiled non-runtime entry has no backend.
-            bytes = String::from_utf8(bytes)
-                .unwrap()
-                .replace(
-                    "backend_module = \"crates/agent_api/src/backends/depth_fixture\"\n",
-                    "",
-                )
-                .into_bytes();
-        }
-        write(root, &path, bytes);
-    }
+    let scaffold = crate::isolated_maintenance::onboarding::Scaffold {
+        entry: AgentRegistry::parse_unenforced(SCAFFOLD)
+            .unwrap()
+            .agents
+            .remove(0),
+        approval_path: APPROVAL.into(),
+        approval_bytes: fs::read(root.join(APPROVAL)).unwrap(),
+    };
+    crate::onboard_agent::routing::write_scaffold(root, &scaffold).unwrap();
 }
 
 pub(super) fn args() -> crate::onboard_agent::Args {

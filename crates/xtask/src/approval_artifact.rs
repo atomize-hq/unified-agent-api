@@ -230,6 +230,20 @@ pub fn parse_approval_attribution(
     approval_scope(&document, path, &prefix).map(|(scope, _)| scope)
 }
 
+/// Parse the maintenance summary with the ordinary rules after a private reader has
+/// independently validated its complete finite descriptor. This grants no approval acceptance.
+pub(crate) fn parse_approval_maintenance(
+    text: &str,
+    relative_path: &str,
+) -> Result<ApprovalMaintenance, ApprovalArtifactError> {
+    let document = text
+        .parse::<DocumentMut>()
+        .map_err(|e| ApprovalArtifactError::Validation(e.to_string()))?;
+    let path = Path::new(relative_path);
+    let descriptor = required_table(document.as_table(), "descriptor", path)?;
+    parse_maintenance(required_table(descriptor, "maintenance", path)?, path)
+}
+
 fn parse_approval_document(
     document: DocumentMut,
     relative_path: &Path,

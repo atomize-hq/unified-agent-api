@@ -20,13 +20,21 @@ fn bootstrap_creation_replays_all_parent_filesystem_conflicts() {
         .unwrap_err()
         .to_string();
         assert!(ordinary.contains("not a directory"), "{ordinary}");
-        // Deliberately generate a candidate with the old incomplete fixture replay. The
-        // protected conflict remains present, unchanged and outside workspace.members.
+        // Deliberately render without the retained conflict, then restore it. The private
+        // replay must detect the wrapper conflict using the whole pinned parent.
+        fs::remove_file(f.root.path().join(path)).unwrap();
         create(&f);
+        write(f.root.path(), path, "protected regular file\n");
         candidate(&f, &parent);
         let _installed = f.install();
-        let error = check_integration(f.root.path(), &parent).unwrap_err();
-        assert!(error.contains("not a directory"), "{error}");
+        if path == "crates/depth_fixture" {
+            let error = check_integration(f.root.path(), &parent).unwrap_err();
+            assert!(error.contains("not a directory"), "{error}");
+        } else {
+            // This subject has no backend. Ordinary raw ON1 above still checks its
+            // declared backend; finite replay must never invent one to impose a conflict.
+            check_integration(f.root.path(), &parent).unwrap();
+        }
         assert_eq!(
             fs::read_to_string(f.root.path().join(path)).unwrap(),
             "protected regular file\n"

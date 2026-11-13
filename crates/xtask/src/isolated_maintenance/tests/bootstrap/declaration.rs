@@ -4,7 +4,7 @@ use crate::{
     support_depth::FreezePlan, support_matrix,
 };
 
-fn copy(src: &Path, dst: &Path) {
+pub(super) fn copy(src: &Path, dst: &Path) {
     if src.is_dir() {
         for entry in fs::read_dir(src).unwrap() {
             let entry = entry.unwrap();
@@ -41,7 +41,7 @@ fn prepared() -> Fixture {
     integrate(&f, &parent);
     f
 }
-fn declare(f: &Fixture) {
+pub(super) fn declare(f: &Fixture) {
     let root = f.root.path();
     let entry = AgentRegistry::parse_unenforced(DECLARED)
         .unwrap()
@@ -132,7 +132,7 @@ fn declare(f: &Fixture) {
         statement.to_string(),
     );
 }
-fn publish(f: &Fixture, parent: &str) -> String {
+pub(super) fn publish(f: &Fixture, parent: &str) -> String {
     candidate(f, parent);
     let context = f.resolve().unwrap();
     let checkpoint = context
