@@ -5,6 +5,7 @@ mod creation;
 mod encoding;
 mod inputs;
 mod raw_help;
+mod scaffold;
 mod view;
 mod wrapper;
 
@@ -14,6 +15,7 @@ use crate::{
     depth_record::onboarding::OnboardingApproval,
 };
 pub(crate) use checkpoint::Checkpoint;
+pub(crate) use scaffold::Scaffold;
 
 const SCAFFOLD: &str =
     include_str!("../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-scaffold.toml");

@@ -23,7 +23,14 @@ pub(super) fn record_free(source: &Source, adapter: &Adapter, absent: bool) -> R
         }
     }
     let root = &adapter.scaffold.manifest_root;
-    if absent && !source.paths(root)?.is_empty() {
+    // Git's recursive tree listing also returns ancestors of an absent path. Other
+    // manifest roots must not make this subject's genuinely empty root look populated.
+    if absent
+        && source
+            .paths(root)?
+            .iter()
+            .any(|p| p == root || p.starts_with(&format!("{root}/")))
+    {
         return Err("absent bootstrap subject has a preexisting manifest root".into());
     }
     if let Some(raw) = source.optional(&format!("{root}/current.json"))? {

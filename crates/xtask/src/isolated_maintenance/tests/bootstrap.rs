@@ -1,4 +1,4 @@
-//! Slice 1: credential-free scope/IN1 checkpoints; no public ON1 route or host queue proof.
+//! Credential-free scope/IN1 checkpoints and public ON1; no independent host queue proof.
 use super::*;
 use crate::{agent_lifecycle as life, depth_acceptance::check_integration};
 
@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 
 mod declaration;
 mod producer;
+mod public_on1;
 mod regressions;
 mod renderer;
 mod sweep;

@@ -20,8 +20,10 @@ pub(super) fn write_input_summary<W: Write>(
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(writer, "crate_path: {}", draft.crate_path)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
-    writeln!(writer, "backend_module: {}", draft.backend_module)
-        .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    if let Some(backend) = &draft.backend_module {
+        writeln!(writer, "backend_module: {}", backend)
+            .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
+    }
     writeln!(writer, "manifest_root: {}", draft.manifest_root)
         .map_err(|err| Error::Internal(format!("write stdout: {err}")))?;
     writeln!(writer, "package_name: {}", draft.package_name)

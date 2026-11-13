@@ -147,7 +147,9 @@ pub(super) fn render_registry_entry_preview(draft: &DraftEntry) -> String {
     writeln!(&mut out, "agent_id = {:?}", draft.agent_id).expect("write String");
     writeln!(&mut out, "display_name = {:?}", draft.display_name).expect("write String");
     writeln!(&mut out, "crate_path = {:?}", draft.crate_path).expect("write String");
-    writeln!(&mut out, "backend_module = {:?}", draft.backend_module).expect("write String");
+    if let Some(backend) = &draft.backend_module {
+        writeln!(&mut out, "backend_module = {:?}", backend).expect("write String");
+    }
     writeln!(&mut out, "manifest_root = {:?}", draft.manifest_root).expect("write String");
     writeln!(&mut out, "package_name = {:?}", draft.package_name).expect("write String");
     writeln!(
@@ -364,6 +366,14 @@ pub(super) fn build_manual_follow_up(
         }
         None => {
             let mut lines = approval_maintenance_lines;
+            if draft.backend_module.is_none() {
+                lines.extend([
+                    "Adopt reviewed governing templates, acquire the actual upstream surface and generate union, wrapper coverage and reports.".into(),
+                    "Use manifest-version-metadata for truthful snapshotted metadata before the maintainer declares onboarding depth enrollment; admit and observe every checkpoint through IN1.".into(),
+                    format!("Continue wrapper-only implementation in `{}` after declaration; no backend or adapter qualification is due.", draft.crate_path),
+                ]);
+                return lines;
+            }
             lines.extend([
                 format!(
                     "Next executable runtime step: run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.",
@@ -373,7 +383,7 @@ pub(super) fn build_manual_follow_up(
                     .to_string(),
                 format!(
                     "Implement backend/runtime details in `{}` and `{}`.",
-                    draft.crate_path, draft.backend_module
+                    draft.crate_path, draft.backend_module_or_empty()
                 ),
                 format!(
                     "Author wrapper coverage input at `{}` for binding kind `{}`.",

@@ -34,7 +34,7 @@ impl CloseoutPacketRenderInput {
             agent_id: draft.agent_id.clone(),
             display_name: draft.display_name.clone(),
             crate_path: draft.crate_path.clone(),
-            backend_module: draft.backend_module.clone(),
+            backend_module: draft.backend_module_or_empty().to_owned(),
             manifest_root: draft.manifest_root.clone(),
             package_name: draft.package_name.clone(),
             docs_release_track: draft.docs_release_track.clone(),
@@ -443,14 +443,18 @@ fn render_readme_body(
         "Closeout metadata becomes authoritative at `{closeout_path}` once the proving run closes."
     ) + &render_execution_approval_linkage(approval);
 
+    let backend_line = draft.backend_module.as_ref().map_or_else(
+        || "- Implementation scope: wrapper-only\n".to_string(),
+        |backend| format!("- Backend module: `{backend}`\n"),
+    );
     format!(
-        "# {} onboarding pack\n\n{}\n\n- Packet state: `{}`\n- Agent id: `{}`\n- Wrapper crate: `{}`\n- Backend module: `{}`\n- Manifest root: `{}`\n- {}\n",
+        "# {} onboarding pack\n\n{}\n\n- Packet state: `{}`\n- Agent id: `{}`\n- Wrapper crate: `{}`\n{}- Manifest root: `{}`\n- {}\n",
         draft.display_name,
         summary,
         packet_state,
         draft.agent_id,
         draft.crate_path,
-        draft.backend_module,
+        backend_line,
         draft.manifest_root,
         closeout_line
     )
@@ -462,30 +466,37 @@ fn render_scope_brief_body(
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
     format!(
-        "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`{}\n\nCurrent proving-run target: complete the runtime-owned wrapper/backend lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
+        "# Scope brief\n\nThis packet covers the control-plane-owned onboarding surfaces for `{}`.\n\n- Registry enrollment in `{REGISTRY_RELATIVE_PATH}`\n- Docs pack in `{docs_root_display}`\n- Manifest root in `{}`\n- Release/workspace touchpoints in `Cargo.toml` and `{RELEASE_DOC_PATH}`{}\n\nCurrent proving-run target: complete the {} lane, commit manifest evidence, regenerate publication artifacts, and close with `make preflight`.\n",
         draft.agent_id,
         draft.manifest_root,
         render_execution_scope_approval(approval),
+        if draft.backend_module.is_some() { "runtime-owned wrapper/backend" } else { "wrapper-only" },
     )
 }
 
 fn render_seam_map_body(draft: &DraftEntry, docs_root_display: &str) -> String {
+    if draft.backend_module.is_none() {
+        return format!("# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Wrapper seam: `{}`; this subject has no backend module or capability promise.\n", draft.agent_id, draft.manifest_root, draft.crate_path);
+    }
     format!(
         "# Seam map\n\n- Declaration seam: registry entry for `{}`\n- Docs seam: onboarding pack `{docs_root_display}`\n- Manifest seam: `{}`\n- Runtime seam: wrapper crate shell `{}` via `scaffold-wrapper-crate` and backend module `{}`\n",
         draft.agent_id,
         draft.manifest_root,
         draft.crate_path,
-        draft.backend_module
+        draft.backend_module_or_empty()
     )
 }
 
 fn render_threading_body(draft: &DraftEntry) -> String {
+    if draft.backend_module.is_none() {
+        return format!("# Threading\n\n1. Apply the control-plane scaffold for `{}` with `onboard-agent --write`.\n2. Adopt the reviewed governing templates, acquire the actual upstream surface and generate union, wrapper coverage and reports.\n3. Write truthful `snapshotted` metadata through `manifest-version-metadata` before the maintainer declares onboarding depth enrollment.\n4. Continue the wrapper-only implementation lane in `{}`; no backend or adapter qualification is due.\n", draft.agent_id, draft.crate_path);
+    }
     format!(
         "# Threading\n\n1. Apply the control-plane onboarding packet with `onboard-agent --write`.\n2. Run `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`; `onboard-agent` does not create the wrapper crate.\n3. Materialize the bounded runtime packet with `runtime-follow-on --dry-run`, then implement backend/runtime details in `{}` and `{}`.\n4. Keep runtime evidence inside `{}/snapshots/**` and `{}/supplement/**`, complete `runtime-follow-on --write`, then hand publication refresh and proving-run closeout to the next lane.\n",
         draft.agent_id,
         draft.crate_path,
         draft.crate_path,
-        draft.backend_module,
+        draft.backend_module_or_empty(),
         draft.manifest_root,
         draft.manifest_root
     )
@@ -509,6 +520,9 @@ fn render_handoff_body(
     release_touchpoints: &str,
     approval: Option<ApprovalRenderInput<'_>>,
 ) -> String {
+    if draft.backend_module.is_none() {
+        return format!("# Handoff\n\nThis packet captures the next onboarding step for `{}`.\n\n## Release touchpoints\n\n{release_touchpoints}\n\n{}\n## Next executable step\n\nLand reviewed governing adoption, actual acquisition and reports, then truthful NE3 `snapshotted` metadata before the maintainer declares enrollment. Admit and observe every checkpoint through IN1. Continue wrapper-only implementation in `{}` after declaration; this subject has no backend module or capability promise.\n", draft.agent_id, render_execution_handoff_approval(closeout_path, approval), draft.crate_path);
+    }
     format!(
         "# Handoff\n\nThis packet captures the next executable onboarding step for `{}`.\n\n## Release touchpoints\n\n{}\n\n{}\n## Next executable runtime step\n\nRun `cargo run -p xtask -- scaffold-wrapper-crate --agent {} --write` to create the runtime-owned wrapper crate shell at `{}`. `onboard-agent` does not create the wrapper crate.\n\n## Remaining runtime checklist\n\n- After scaffolding, materialize the bounded runtime packet with `runtime-follow-on --dry-run` for this approval artifact.\n- Implement backend/runtime details in `{}` and `{}`.\n- Author wrapper coverage input at `{}` for binding kind `{}`.\n- Populate committed runtime evidence only under `{}/snapshots/**` and `{}/supplement/**`.\n- Complete `runtime-follow-on --write`; publication refresh and proving-run closeout stay in the next lane.\n",
         draft.agent_id,
@@ -517,7 +531,7 @@ fn render_handoff_body(
         draft.agent_id,
         draft.crate_path,
         draft.crate_path,
-        draft.backend_module,
+        draft.backend_module_or_empty(),
         draft.wrapper_coverage_source_path,
         draft.wrapper_coverage_binding_kind,
         draft.manifest_root,

@@ -41,10 +41,11 @@ pub(super) fn validate_registry_conflicts(
                 draft.crate_path, entry.agent_id
             )));
         }
-        if entry.backend_module.as_deref() == Some(draft.backend_module.as_str()) {
+        if draft.backend_module.is_some() && entry.backend_module == draft.backend_module {
             return Err(Error::Validation(format!(
                 "backend_module `{}` is already owned by agent `{}`",
-                draft.backend_module, entry.agent_id
+                draft.backend_module_or_empty(),
+                entry.agent_id
             )));
         }
         if entry.manifest_root == draft.manifest_root {
@@ -106,7 +107,9 @@ pub(super) fn validate_filesystem_conflicts(
     jail: &WorkspacePathJail,
 ) -> Result<(), Error> {
     validate_runtime_owned_path_shape(jail, &draft.crate_path, "crate_path")?;
-    validate_runtime_owned_path_shape(jail, &draft.backend_module, "backend_module")?;
+    if let Some(backend) = &draft.backend_module {
+        validate_runtime_owned_path_shape(jail, backend, "backend_module")?;
+    }
 
     let docs_pack_root = draft.docs_pack_root();
     let _docs_pack_path = jail.resolve(&docs_pack_root)?;
@@ -145,10 +148,11 @@ pub(super) fn desired_registry_text(
     }
 }
 
-fn registry_entry_matches_draft(entry: &AgentRegistryEntry, draft: &DraftEntry) -> bool {
-    entry.display_name == draft.display_name
+pub(super) fn registry_entry_matches_draft(entry: &AgentRegistryEntry, draft: &DraftEntry) -> bool {
+    entry.agent_id == draft.agent_id
+        && entry.display_name == draft.display_name
         && entry.crate_path == draft.crate_path
-        && entry.backend_module.as_deref() == Some(draft.backend_module.as_str())
+        && entry.backend_module == draft.backend_module
         && entry.manifest_root == draft.manifest_root
         && entry.package_name == draft.package_name
         && entry.canonical_targets == draft.canonical_targets
