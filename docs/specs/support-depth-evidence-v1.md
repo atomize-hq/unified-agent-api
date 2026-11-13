@@ -12,6 +12,15 @@ bytes. Store it under the agent's existing `reports/<version>/` evidence files, 
 the receipt also name repository-relative regular proof files and their content identities.
 Generated executables are identified by digest, not required to be committed as binaries.
 
+**MA4 delivery containment** (approved by the maintainer on 2026-11-05). At MA4 delivery only,
+every E reference MUST lie in its own record's `<manifest_root>/reports/<version>/evidence/`, and
+every payload a receipt references MUST lie in that receipt's evidence destination. Any other
+reference refuses the whole delivery, whether or not the referenced file changed, in production
+and under an installed route. This narrows only what MA4 delivers. A file reference elsewhere
+keeps the form Annex B allows (any repository-relative path), and evaluation and every other
+consumer are unchanged. The [synthetic subject design](../agents/lifecycle/support-depth-synthetic-subject-design.md)
+states how delivery binds the evidence path class.
+
 The D1 typed reader decides **form and internal mapping identity only**. It does not establish
 producer trust, actual execution, independent adequacy, currentness, complete dependency scope,
 reuse, qualification or route admission. Parsing a self-authored receipt never verifies an
