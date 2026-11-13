@@ -170,10 +170,10 @@ pub(super) fn execute_write_mode<W: Write>(
             Error::Validation(message)
         });
     }
+    candidate.discard();
     writer
         .write_all(&output)
         .map_err(|e| Error::Internal(e.to_string()))?;
-    // Keep the independently validated candidate for diagnostics/recovery; it is never integrated.
     Ok(())
 }
 
@@ -255,10 +255,12 @@ fn persist_diagnostics(
             report.codex_execution.as_ref(),
             "write",
         )?;
-        packet::write_string(
-            &context.run_dir.join("recovery-candidate.txt"),
-            &format!("{}\n", candidate.recovery().display()),
-        )?;
+        if !passed {
+            packet::write_string(
+                &context.run_dir.join("recovery-candidate.txt"),
+                &format!("{}\n", candidate.recovery().display()),
+            )?;
+        }
         let capture = context.host_capture.lock().ok().and_then(|c| c.clone());
         if let Some(capture) = capture {
             packet::write_string(

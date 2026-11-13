@@ -178,7 +178,6 @@ pub(super) fn execute<W: Write>(
         }
         Ok(validated)
     })();
-    let internal = matches!(execution, Err(Error::Internal(_)));
     let (mut report, mut written) = match checked {
         Ok(value) => value,
         Err(e) => (
@@ -247,10 +246,31 @@ pub(super) fn execute<W: Write>(
             .map_err(candidate_error)?;
         Ok(())
     })();
+    finalize_delivery(caller, candidate, context, &mut report, &execution, outcome)?;
+    writeln!(
+        writer,
+        "OK: runtime-follow-on write validation complete.\nrun_id: {}\nvalidated_paths: {}",
+        context.run_id,
+        written.len()
+    )
+    .map_err(|e| Error::Internal(e.to_string()))
+}
+
+/// Complete both delivery outcomes before releasing a successful candidate.
+fn finalize_delivery(
+    caller: &Path,
+    candidate: Candidate,
+    context: &RuntimeContext,
+    report: &mut ValidationReport,
+    execution: &Result<(CodexExecutionEvidence, std::process::Output), Error>,
+    outcome: Result<(), Error>,
+) -> Result<(), Error> {
+    let passed = report.status == "pass";
+    let internal = matches!(execution, Err(Error::Internal(_)));
     if let Err(e) = outcome {
         report.status = "fail".into();
         report.errors.push(format!("delivery refused: {e}"));
-        let diagnostics = diagnostics(context, &candidate, &report, &[], execution.as_ref().ok())?;
+        let diagnostics = diagnostics(context, &candidate, report, &[], execution.as_ref().ok())?;
         let failed =
             candidate_execution::finalized_tree(&candidate.before, None, false, diagnostics);
         let diagnostic_error = candidate
@@ -275,13 +295,8 @@ pub(super) fn execute<W: Write>(
             Error::Validation(message)
         });
     }
-    writeln!(
-        writer,
-        "OK: runtime-follow-on write validation complete.\nrun_id: {}\nvalidated_paths: {}",
-        context.run_id,
-        written.len()
-    )
-    .map_err(|e| Error::Internal(e.to_string()))
+    candidate.discard();
+    Ok(())
 }
 
 /// The route requires its original clean tree. Temporarily undo ONLY the controller's own
@@ -437,10 +452,12 @@ fn diagnostics(
         RUN_SUMMARY_FILE_NAME,
         render_run_summary(context, report, written, execution.map(|e| &e.0)).into_bytes(),
     );
-    insert(
-        "recovery-candidate.txt",
-        format!("{}\n", candidate.root.display()).into_bytes(),
-    );
+    if !passed {
+        insert(
+            "recovery-candidate.txt",
+            format!("{}\n", candidate.root.display()).into_bytes(),
+        );
+    }
     if let Some((evidence, output)) = execution {
         insert(CODEX_EXECUTION_FILE_NAME, bytes(evidence)?);
         insert(

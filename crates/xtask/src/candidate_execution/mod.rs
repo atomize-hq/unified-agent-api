@@ -56,3 +56,20 @@ const EXECUTION_RUNS_ROOT: &str = "docs/agents/.uaa-temp/agent-maintenance/runs"
 pub(crate) fn lock_index(root: &std::path::Path) -> Result<impl Drop, Error> {
     index_lock::IndexLock::acquire(root)
 }
+
+/// Test-only ownership of a recovery copy; production candidates never clean up on drop.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct TestHolder(std::path::PathBuf);
+#[cfg(test)]
+impl TestHolder {
+    pub(crate) fn new(candidate: &std::path::Path) -> Self {
+        Self(candidate.parent().expect("candidate holder").to_path_buf())
+    }
+}
+#[cfg(test)]
+impl Drop for TestHolder {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}

@@ -316,9 +316,11 @@ fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
     for name in ["git", "bash", "mkdir", "cat", "dirname", "tr"] {
         symlink(format!("/usr/bin/{name}"), path.path().join(name)).unwrap();
     }
+    let temp = tempfile::tempdir().unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .current_dir(&fixture)
         .env("PATH", path.path())
+        .env("TMPDIR", temp.path())
         .args(execute_args("--write", Some(&binary)).into_iter().skip(1))
         .output()
         .unwrap();
@@ -334,4 +336,39 @@ fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
             .join("validation-report.json"),
     );
     assert_eq!(report["status"], "fail");
+}
+
+#[test]
+fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
+    for passed in [true, false] {
+        let fixture = prepare_execute_fixture("relay-holder-lifetime");
+        let binary = executor(&fixture, if passed { ":" } else { "exit 23" });
+        prepare(&fixture, &binary);
+        let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+        assert_eq!(out.exit_code == 0, passed, "{}", out.stderr);
+        let holders: Vec<_> = fs::read_dir(out.temp.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("uaa-relay-")
+            })
+            .collect();
+        let pointer = fixture
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID)
+            .join("recovery-candidate.txt");
+        if passed {
+            assert!(holders.is_empty(), "{holders:?}");
+            assert!(!pointer.exists());
+        } else {
+            let recovery = fs::read_to_string(pointer).unwrap();
+            let recovery = Path::new(recovery.trim());
+            assert!(recovery.join(NOTE).is_file());
+            assert!(out.stderr.contains(recovery.to_str().unwrap()));
+            assert_eq!(holders, vec![recovery.parent().unwrap().to_path_buf()]);
+        }
+    }
 }

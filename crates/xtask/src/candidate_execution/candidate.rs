@@ -11,6 +11,7 @@ use std::{
 };
 
 pub(crate) struct Candidate {
+    holder: PathBuf,
     pub root: PathBuf,
     pub before: Tree,
     pub baseline: String,
@@ -51,6 +52,7 @@ impl Candidate {
         let baseline = candidate_git::baseline(&root)?;
         let config = fs::read(root.join(".git/config")).map_err(tree::io)?;
         Ok(Self {
+            holder,
             root: root.clone(),
             before,
             baseline,
@@ -245,6 +247,11 @@ impl Candidate {
             });
         }
         Ok(paths)
+    }
+    /// Explicit, best-effort cleanup after successful delivery only. Early returns and panics
+    /// deliberately retain the independent copy for recovery.
+    pub fn discard(self) {
+        let _ = fs::remove_dir_all(self.holder);
     }
     pub fn recovery(&self) -> PathBuf {
         self.root.clone()

@@ -167,7 +167,7 @@ fn create_candidate_preparation_refuses_caller_absolute_prompt() {
 }
 
 #[test]
-fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_delivery() {
+fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
     for passed in [true, false] {
         let (root, context) = setup(true);
         let before = fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap();
@@ -184,6 +184,7 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
             vec![],
         )
         .unwrap();
+        let _holder = candidate_execution::TestHolder::new(&candidate.root);
         let (execution, observed) = candidate.execute_observed(|| {
             codex_exec::capture_depth_execution(
                 root.path(),
@@ -193,7 +194,7 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
                 &prepared_prompt(&context),
             )
         });
-        let (evidence, _) = execution.unwrap();
+        let (evidence, output) = execution.unwrap();
         assert_eq!(evidence.exit_code, if passed { 0 } else { 7 });
         let observed = observed.unwrap();
         candidate.check(&observed).unwrap();
@@ -213,21 +214,79 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
             tree::capture(root.path(), &Default::default()).unwrap(),
             candidate.before
         );
+        let mut report = ValidationReport {
+            workflow_version: WORKFLOW_VERSION.into(),
+            generated_at: now_rfc3339().unwrap(),
+            run_id: context.run_id.clone(),
+            status: if passed { "pass" } else { "fail" }.into(),
+            checks: vec![],
+            errors: if passed {
+                vec![]
+            } else {
+                vec!["executor failed".into()]
+            },
+        };
+        let execution = Ok((evidence, output));
+        let diagnostic_files =
+            diagnostics(&context, &candidate, &report, &[], execution.as_ref().ok()).unwrap();
         let delivery = candidate_execution::finalized_tree(
             &candidate.before,
             Some(&observed),
             passed,
-            Tree::new(),
+            diagnostic_files,
         );
-        candidate
+        let source_before: Tree = candidate
+            .before
+            .iter()
+            .filter(|(path, _)| !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")))
+            .map(|(p, n)| (p.clone(), n.clone()))
+            .collect();
+        let outcome = candidate
             .deliver(root.path(), &delivery, passed, None)
-            .unwrap();
+            .map(|_| ())
+            .map_err(candidate_error);
+        let recovery = candidate.recovery();
+        let result = finalize_delivery(
+            root.path(),
+            candidate,
+            &context,
+            &mut report,
+            &execution,
+            outcome,
+        );
+        let pointer = context.run_dir.join("recovery-candidate.txt");
+        assert_eq!(result.is_ok(), passed);
+        if passed {
+            assert!(!recovery.parent().unwrap().exists());
+            assert!(!pointer.exists());
+        } else {
+            assert!(recovery.is_dir());
+            let retained: Vec<_> = fs::read_dir(recovery.parent().unwrap())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(retained, vec![recovery.clone()]);
+            let source_after: Tree = tree::capture(root.path(), &Default::default())
+                .unwrap()
+                .into_iter()
+                .filter(|(path, _)| !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")))
+                .collect();
+            assert_eq!(source_after, source_before);
+            assert_eq!(
+                fs::read_to_string(pointer).unwrap().trim(),
+                recovery.to_str().unwrap()
+            );
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains(recovery.to_str().unwrap()));
+        }
         if passed {
             validate_handoff(&context.run_dir.join(HANDOFF_FILE_NAME), &context).unwrap();
         } else {
             assert_eq!(
-                tree::capture(root.path(), &Default::default()).unwrap(),
-                candidate.before
+                fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap(),
+                before
             );
         }
     }
