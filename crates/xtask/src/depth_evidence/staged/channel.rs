@@ -266,41 +266,77 @@ mod unix {
         candidate: &Path,
         nonce: &str,
     ) -> Result<Offer, String> {
-        use std::os::unix::fs::FileTypeExt;
-        let not_live = || {
-            "the MA4 invocation that staged evidence is not live; a copied bundle, path or \
+        request_after(locator, candidate, nonce, |_| {}).0
+    }
+    /// `request`, but writing only once the host's answer is already queued on the connection,
+    /// so a test reaches the host answering (and closing) before the request is written. Also
+    /// returns whether the write failed.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in super::super) fn request_after_answer(
+        locator: &Path,
+        candidate: &Path,
+        nonce: &str,
+    ) -> (Result<Offer, String>, bool) {
+        request_after(locator, candidate, nonce, |stream| {
+            let _ = stream.set_read_timeout(Some(CLIENT_DEADLINE));
+            let mut byte = [0u8; 1];
+            let _ = rustix::net::recv(stream, &mut byte, rustix::net::RecvFlags::PEEK);
+            // The host drops the connection straight after writing its answer.
+            std::thread::sleep(POLL);
+        })
+    }
+    /// Returns the answer and whether writing the request failed.
+    fn request_after(
+        locator: &Path,
+        candidate: &Path,
+        nonce: &str,
+        before_write: impl FnOnce(&UnixStream),
+    ) -> (Result<Offer, String>, bool) {
+        let mut wrote = true;
+        let answer = (|| {
+            use std::os::unix::fs::FileTypeExt;
+            let not_live = || {
+                "the MA4 invocation that staged evidence is not live; a copied bundle, path or \
              locator is not an installed route"
-                .to_string()
-        };
-        match fs::symlink_metadata(locator) {
-            Ok(m) if m.file_type().is_socket() => {}
-            _ => return Err(not_live()),
-        }
-        let deadline = Instant::now() + CLIENT_DEADLINE;
-        let mut stream = UnixStream::connect(locator).map_err(|_| not_live())?;
-        stream
-            .set_write_timeout(Some(CLIENT_DEADLINE))
-            .map_err(|e| e.to_string())?;
-        let request = Request {
-            candidate: candidate.to_owned(),
-            nonce: nonce.to_owned(),
-        };
-        writeln!(
-            stream,
-            "{}",
-            serde_json::to_string(&request).map_err(|e| e.to_string())?
-        )
-        .map_err(|_| not_live())?;
-        let line = read_line(&stream, deadline, &AtomicBool::new(false), 1_048_576)
-            .map_err(|_| not_live())?;
-        match serde_json::from_slice(&line).map_err(|_| not_live())? {
-            Response::Offer(offer) => Ok(offer),
-            Response::Refused(reason) => Err(reason),
-        }
+                    .to_string()
+            };
+            match fs::symlink_metadata(locator) {
+                Ok(m) if m.file_type().is_socket() => {}
+                _ => return Err(not_live()),
+            }
+            let deadline = Instant::now() + CLIENT_DEADLINE;
+            let mut stream = UnixStream::connect(locator).map_err(|_| not_live())?;
+            before_write(&stream);
+            stream
+                .set_write_timeout(Some(CLIENT_DEADLINE))
+                .map_err(|e| e.to_string())?;
+            let request = Request {
+                candidate: candidate.to_owned(),
+                nonce: nonce.to_owned(),
+            };
+            // The host refuses an unauthenticated peer before reading its request and closes, so
+            // the write can fail (EPIPE) while that refusal waits to be read. A failed write is
+            // therefore not itself "not live": only the absence of a well-formed answer is.
+            wrote = writeln!(
+                stream,
+                "{}",
+                serde_json::to_string(&request).map_err(|e| e.to_string())?
+            )
+            .is_ok();
+            let line = read_line(&stream, deadline, &AtomicBool::new(false), 1_048_576)
+                .map_err(|_| not_live())?;
+            match serde_json::from_slice(&line).map_err(|_| not_live())? {
+                Response::Offer(offer) => Ok(offer),
+                Response::Refused(reason) => Err(reason),
+            }
+        })();
+        (answer, !wrote)
     }
 }
 #[cfg(unix)]
 pub(super) use unix::request;
+#[cfg(all(test, target_os = "linux"))]
+pub(super) use unix::request_after_answer;
 
 #[cfg(not(unix))]
 impl Server {
