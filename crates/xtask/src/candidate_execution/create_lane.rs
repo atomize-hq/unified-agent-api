@@ -213,11 +213,13 @@ pub(super) fn execute<W: Write>(
             execution.as_ref().ok(),
         )?;
         let delivery = candidate_execution::finalized_tree(
-            &candidate.before,
+            &candidate,
+            caller,
             observation.as_ref().ok(),
             passed,
             diagnostics,
-        );
+        )
+        .map_err(candidate_error)?;
         let trusted = if passed {
             let mut state = lifecycle::successful_runtime_state(context, prepared, &written)?;
             let digest = hex::encode(Sha256::digest(bytes(&written)?));
@@ -272,7 +274,8 @@ fn finalize_delivery(
         report.errors.push(format!("delivery refused: {e}"));
         let diagnostics = diagnostics(context, &candidate, report, &[], execution.as_ref().ok())?;
         let failed =
-            candidate_execution::finalized_tree(&candidate.before, None, false, diagnostics);
+            candidate_execution::finalized_tree(&candidate, caller, None, false, diagnostics)
+                .map_err(candidate_error)?;
         let diagnostic_error = candidate
             .deliver(caller, &failed, false, None)
             .err()

@@ -203,11 +203,13 @@ fn create_candidate_observation_rechecks_changed_lifecycle_record_and_both_toget
         );
         // Refusal still finalizes a diagnostic-only tree; changed identities are never delivered.
         let finalized = candidate_execution::finalized_tree(
-            &candidate.before,
+            &candidate,
+            root.path(),
             Some(&observed),
             false,
             Tree::new(),
-        );
+        )
+        .unwrap();
         assert_eq!(finalized, candidate.before);
     }
 }

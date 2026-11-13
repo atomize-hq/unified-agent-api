@@ -168,19 +168,23 @@ fn create_candidate_preparation_refuses_caller_absolute_prompt() {
 
 #[test]
 fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
-    for (exit_code, write_recovery) in [(0, false), (7, false), (0, true)] {
+    for (exit_code, write_recovery, refuse_delivery) in [
+        (0, false, false),
+        (7, false, false),
+        (0, true, false),
+        (0, false, true),
+    ] {
         let passed = exit_code == 0 && !write_recovery;
         let (root, context) = setup(true);
         let before = fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap();
-        let host = tempfile::tempdir().unwrap();
-        let binary = host.path().join("executor.sh");
+        let binary = root.path().join("executor.sh");
         let handoff = serde_json::json!({"agent_id":"codex", "manifest_root":"cli_manifests/codex", "runtime_lane_complete":true, "publication_refresh_required":true, "required_commands":life::REQUIRED_PUBLICATION_COMMANDS, "blockers":[]});
         let recovery_write = if write_recovery {
             "printf '%s\\n' \"$PWD\" > \"$(dirname \"$target\")/recovery-candidate.txt\""
         } else {
             ":"
         };
-        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\n{recovery_write}\nexit {exit_code}\n")).unwrap();
+        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\nprintf '%s\\n' \"$PWD/$target\"\nprintf '%s\\n' \"$PWD/missing\" >&2\n{recovery_write}\nexit {exit_code}\n")).unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
         let mut args = args();
         args.codex_binary = Some(binary.to_string_lossy().into_owned());
@@ -238,24 +242,34 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
             generated_at: now_rfc3339().unwrap(),
             run_id: context.run_id.clone(),
             status: if passed { "pass" } else { "fail" }.into(),
-            checks: vec![],
+            checks: vec![ValidationCheck {
+                name: "codex_exec".into(),
+                ok: passed,
+                message: format!("codex exec completed via `{}`", evidence.binary),
+            }],
             errors,
         };
+        let original_evidence = bytes(&evidence).unwrap();
         let execution = Ok((evidence, output));
         let diagnostic_files =
             diagnostics(&context, &candidate, &report, &[], execution.as_ref().ok()).unwrap();
         let delivery = candidate_execution::finalized_tree(
-            &candidate.before,
+            &candidate,
+            root.path(),
             Some(&observed),
             passed,
             diagnostic_files,
-        );
+        )
+        .unwrap();
         let source_before: Tree = candidate
             .before
             .iter()
             .filter(|(path, _)| !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")))
             .map(|(p, n)| (p.clone(), n.clone()))
             .collect();
+        if refuse_delivery {
+            fs::write(root.path().join("concurrent.txt"), "caller change").unwrap();
+        }
         let outcome = candidate
             .deliver(root.path(), &delivery, passed, None)
             .map(|_| ())
@@ -270,11 +284,42 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
             outcome,
         );
         let pointer = context.run_dir.join("recovery-candidate.txt");
-        assert_eq!(result.is_ok(), passed);
-        if passed {
+        let delivered = passed && !refuse_delivery;
+        assert_eq!(result.is_ok(), delivered);
+        let evidence: CodexExecutionEvidence =
+            load_json(&context.run_dir.join(CODEX_EXECUTION_FILE_NAME)).unwrap();
+        if delivered {
             assert!(!recovery.parent().unwrap().exists());
             assert!(!pointer.exists());
+            for path in [
+                &evidence.prompt_path,
+                &evidence.stdout_path,
+                &evidence.stderr_path,
+                &evidence.binary,
+            ] {
+                assert!(Path::new(path).is_file(), "{path}");
+                assert!(Path::new(path).starts_with(root.path()), "{path}");
+            }
+            assert_eq!(evidence.argv.last().unwrap(), root.path().to_str().unwrap());
+            for entry in fs::read_dir(&context.run_dir).unwrap() {
+                let path = entry.unwrap().path();
+                let text = fs::read_to_string(&path).unwrap();
+                assert!(
+                    !text.contains(recovery.parent().unwrap().to_str().unwrap()),
+                    "{}: {text}",
+                    path.display()
+                );
+            }
+            assert_eq!(
+                fs::read_to_string(&evidence.stdout_path).unwrap().trim(),
+                context.run_dir.join(HANDOFF_FILE_NAME).to_str().unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(&evidence.stderr_path).unwrap().trim(),
+                "[not retained]"
+            );
         } else {
+            assert_eq!(bytes(&evidence).unwrap(), original_evidence);
             assert!(recovery.is_dir());
             let retained: Vec<_> = fs::read_dir(recovery.parent().unwrap())
                 .unwrap()
@@ -284,7 +329,9 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
             let source_after: Tree = tree::capture(root.path(), &Default::default())
                 .unwrap()
                 .into_iter()
-                .filter(|(path, _)| !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")))
+                .filter(|(path, _)| {
+                    !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")) && path != "concurrent.txt"
+                })
                 .collect();
             assert_eq!(source_after, source_before);
             assert_eq!(
@@ -296,7 +343,7 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
                 .to_string()
                 .contains(recovery.to_str().unwrap()));
         }
-        if passed {
+        if delivered {
             validate_handoff(&context.run_dir.join(HANDOFF_FILE_NAME), &context).unwrap();
         } else {
             assert_eq!(

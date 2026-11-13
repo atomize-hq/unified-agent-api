@@ -121,11 +121,12 @@ pub(super) fn execute_write_mode<W: Write>(
     };
     let diagnostics = persist_diagnostics(&candidate, &report, passed, &written)?;
     let delivery = crate::candidate_execution::finalized_tree(
-        &candidate.before,
+        &candidate,
+        caller,
         observation.as_ref().ok(),
         passed,
         diagnostics,
-    );
+    )?;
     // Re-authenticate the captured isolated route before anything reaches the caller.
     let copied = match context
         .registry

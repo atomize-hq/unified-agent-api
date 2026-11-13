@@ -294,6 +294,17 @@ fn delivery_refusal_records_failure_in_caller_and_recovery_candidate() {
     ] {
         let report = read_json(&dir.join("validation-report.json"));
         assert_eq!(report["status"], "fail");
+        let execution = read_json(&dir.join("codex-execution.json"));
+        assert_eq!(report["codex_execution"], execution);
+        for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+            let path = Path::new(execution[field].as_str().unwrap());
+            assert!(path.starts_with(recovery.trim()), "{}", path.display());
+            assert!(path.is_file(), "{}", path.display());
+        }
+        assert_eq!(
+            execution["argv"].as_array().unwrap().last().unwrap(),
+            recovery.trim()
+        );
         let status = read_json(&dir.join("run-status.json"));
         assert_eq!(status["status"], "write_failed");
         assert_eq!(status["written_paths"], serde_json::json!([]));
@@ -342,7 +353,11 @@ fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
 fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
     for passed in [true, false] {
         let fixture = prepare_execute_fixture("relay-holder-lifetime");
-        let binary = executor(&fixture, if passed { ":" } else { "exit 23" });
+        let output = "printf '%s\\n' \"$XTASK_AGENT_MAINTENANCE_RUN_DIR/codex-prompt.md\"; printf '%s\\n' \"$PWD/not-delivered\" >&2";
+        let binary = executor(
+            &fixture,
+            &format!("{output}\n    {}", if passed { ":" } else { "exit 23" }),
+        );
         prepare(&fixture, &binary);
         let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
         assert_eq!(out.exit_code == 0, passed, "{}", out.stderr);
@@ -363,12 +378,83 @@ fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
         if passed {
             assert!(holders.is_empty(), "{holders:?}");
             assert!(!pointer.exists());
+            let run_dir = pointer.parent().unwrap();
+            let execution = read_json(&run_dir.join("codex-execution.json"));
+            for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+                let path = Path::new(execution[field].as_str().unwrap());
+                assert!(path.is_file(), "{field}: {}", path.display());
+                assert!(path.starts_with(&fixture), "{}", path.display());
+            }
+            let argv = execution["argv"].as_array().unwrap();
+            assert_eq!(
+                argv.last().unwrap().as_str().unwrap(),
+                fixture.to_str().unwrap()
+            );
+            let report = read_json(&run_dir.join("validation-report.json"));
+            assert_eq!(report["codex_execution"], execution);
+            assert!(Path::new(report["preflight"]["binary"].as_str().unwrap()).is_file());
+            assert_eq!(
+                report["preflight"]["argv"]
+                    .as_array()
+                    .unwrap()
+                    .last()
+                    .unwrap(),
+                fixture.to_str().unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(execution["stdout_path"].as_str().unwrap())
+                    .unwrap()
+                    .lines()
+                    .next()
+                    .unwrap(),
+                execution["prompt_path"].as_str().unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(execution["stderr_path"].as_str().unwrap())
+                    .unwrap()
+                    .trim(),
+                "[not retained]"
+            );
+            for name in [
+                "input-contract.json",
+                "codex-prompt.md",
+                "codex-execution.json",
+                "validation-report.json",
+                "run-status.json",
+                "written-paths.json",
+                "run-summary.md",
+                "codex-stdout.log",
+                "codex-stderr.log",
+            ] {
+                let path = run_dir.join(name);
+                let text = fs::read_to_string(&path).unwrap();
+                assert!(!text.contains("uaa-relay-"), "{}: {text}", path.display());
+            }
         } else {
-            let recovery = fs::read_to_string(pointer).unwrap();
+            let recovery = fs::read_to_string(&pointer).unwrap();
             let recovery = Path::new(recovery.trim());
             assert!(recovery.join(NOTE).is_file());
             assert!(out.stderr.contains(recovery.to_str().unwrap()));
             assert_eq!(holders, vec![recovery.parent().unwrap().to_path_buf()]);
+            let run_dir = pointer.parent().unwrap();
+            let execution = read_json(&run_dir.join("codex-execution.json"));
+            for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+                let path = Path::new(execution[field].as_str().unwrap());
+                assert!(path.starts_with(recovery), "{}", path.display());
+                assert!(path.is_file(), "{}", path.display());
+            }
+            assert_eq!(
+                fs::read_to_string(run_dir.join("codex-stdout.log"))
+                    .unwrap()
+                    .trim(),
+                execution["prompt_path"].as_str().unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(run_dir.join("codex-stderr.log"))
+                    .unwrap()
+                    .trim(),
+                recovery.join("not-delivered").to_str().unwrap()
+            );
         }
     }
 }
