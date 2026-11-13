@@ -222,6 +222,32 @@ recognized live producer until the following CI adapter slice; it reports unveri
 accepting caller-supplied host assertions. It supplies no writer admission or production enrollment.
 Publisher consumption follows with that adapter, keeping existing production enrollment refusal.
 
+For depth-enrolled ON4 gates, the following bounded evaluation is specified, not installed
+(OR-P13, [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
+Before delivery, the depth-reading parts of the fixed charter checklist item 7 command inventory
+MUST run through the commands' shared checking functions in the proposal's scratch view, inside
+a borrowed fresh evaluation scope bound to the exact proposed record and actual inputs. Route
+presence alone MUST NOT make derivation trust isolated evidence. Every registry reader used by
+these checks, including both preparation and revision loading for `runtime-advertising-model
+--check`, MUST use authenticated routed reading, read-only. Default generation, neutral writes,
+NE8 write refusal and production verdicts are unchanged.
+
+After delivery, the unchanged subprocess commands MUST independently resolve their own installed
+route over a clean committed candidate whose HEAD the host already holds, in CI and at IN1 for
+the actual integration candidate before the protected ref advances (OR-P13, same design section).
+A borrowed scope does not cross a process boundary, and a scratch tree cannot resolve authority.
+Every leaf of the fixed inventory, including the recursive `make preflight` test leg, MUST have
+its proposal-phase execution and required independent committed-candidate execution accounted
+for. Registry-reading tests MUST retain their assertion purpose: production-parser controls use
+hermetic undeclared fixture registries; candidate-registry checks use authenticated routed reads
+of the actual candidate. Format, lint and build remain subprocess checks before delivery; other
+local checks use hermetic subprocesses or authenticated shared checking functions as appropriate.
+Each evaluation binds its actual inputs. A prior local pass supplies no authority for changed
+candidate bytes; an admission-relevant change MUST fail independent evaluation, while a harmless
+change may pass fresh checks. No serialized verdict, environment token, reusable gate receipt or
+candidate-hosting step is introduced. Local preparation, independent checks, current IN1 admission
+and the terminal integration gate retain the separate meanings stated by the charter.
+
 ## D2 isolated CI producer
 
 The initial live producer is deliberately limited to the isolated channel-validation source
@@ -431,6 +457,12 @@ baseline; resolving a context does not install or edit it. Source approval MUST 
 the canonical production registry to admit the isolated declaration, nor treat arbitrary
 governing-data edits as approved code.
 
+The synthetic onboarding selection below specifies the only pre-declaration exceptions to the
+protected-baseline declaration and registry-equality requirements: the exact ON1 bootstrap delta
+and the maintainer's first declaration transition (OR-P1, OR-P14,
+[routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+They are not installed. All other scope, source approval, freshness and ownership checks remain.
+
 Planning, a derived invocation-local proposal view and apply MUST retain the caller's binding and
 check freshness against independently observed host/source/tip and coherent local inputs. A copied
 scratch tree MUST NOT resolve its own authority. Reuse existing expected-before delivery checks;
@@ -558,10 +590,74 @@ installs no isolated profile, so no route exists. The production registry keeps 
 
 **Grants nothing.** The selection admits a workspace and nothing more:
 - the `synthetic-wrapper-v1` producer, receipts and verdict above stay bound to the maintenance
-  Event, and an onboarding generation's evidence stays unverified;
+  Event, and an onboarding generation's evidence stays unverified until the separately bound
+  onboarding producer variant specified below is implemented (OR-P5);
 - maintenance routes refuse an onboarding enrollment, as they do today;
 - ON1 to ON5 keep refusing depth until roadmap E.6 wires them, in the isolated workspace only;
 - the create lane gets no packet freeze, pointer, `validated` or `supported` route.
+
+**Bootstrap and first declaration (specified, not installed).** OR-P1 and OR-P14 of the
+[routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)
+extend only this source-installed synthetic route with these bounded states:
+
+Before declaration only, the one-enrollment conditions above give way to the record-free states
+below. After declaration those conditions apply in full; bootstrap grants no resolved enrollment
+or depth acceptance authority.
+
+1. Before enrollment, the subject entry/root may be absent, or the entry may be the exact
+   unenrolled scaffold. The expected descriptor comes from compiled synthetic templates and the
+   exact approval is bound; neither declares enrollment. No retained record or acceptance is
+   admitted. ON1 MUST validate its proposed registry with the ordinary parser and MUST write no
+   `support_depth` table. Bootstrap IN1 admits only the exact absent-to-scaffold registry delta,
+   independently compared with the protected registry; captured registry bytes in a scratch view
+   MUST still remain identical.
+2. Between integrated ON1 and the first declaration, record-free preparation checkpoints may
+   land reviewed Annex-B governing adoption, actual direct acquisition, union/coverage/report
+   generation and ordinary NE3 `snapshotted` metadata. Each MUST preserve the exact scaffold
+   registry entry and approval identity, add no depth table, record, entry or acceptance effect,
+   and receive IN1 admission followed by post-tip observation. Metadata MUST describe actual
+   acquisition and precede declaration; ON1 invents no metadata and NE3 gains no authority after
+   declaration.
+3. The scaffold-to-declared commit is a separate maintainer-owned reporting transition. IN1 MUST
+   admit exactly the onboarding `support_depth` table for the scaffolded entry and approval
+   version, reviewed CORE classification rows, the integration-branch acquisition statement
+   (OF-P4 B), and any coherent reporting publication changed by the declaration, with no record,
+   entry or acceptance effect. Only after admission and protected-tip integration may the route
+   capture that declared registry; protected-registry equality then holds again. Advancing the
+   tip first is not admission. Only ON1 and this transition have registry-delta exceptions. ON2
+   MUST still refuse unresolved enrollment and can freeze only after the charter's prerequisites.
+
+**Finite approval adapter (specified, not installed).** The private projection shared by routed
+ON1–ON5 and IN1 MUST validate the complete compiled synthetic descriptor and approval, rejecting
+unknown or misplaced fields and any fake backend (OR-P2,
+[routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
+Fixed subject/version/target, expected descriptor, producer case mapping and offline-executor
+selection belong in the compiled profile/private adapter. Shared orchestration and admission
+operate on validated path/Event/subject inputs; neither `depth_fixture` nor Codex identity waives
+ownership, adequacy, currentness, effect admission, integration or delivery checks. Production
+approval acceptance is unchanged; no second subject is added.
+
+**Onboarding producer binding (specified, not installed).** OR-P5 of the
+[routing design, "Maintainer decisions" and "Inspection A — producer population and CI terminality"](../agents/lifecycle/support-depth-onboarding-routing-design.md#inspection-a--producer-population-and-ci-terminality)
+adds a finite onboarding variant of `synthetic-wrapper-v1`, reusing the fake CLI, substantive
+cases, target, eleven due obligations, revision-1 receipt schema, adoption format and IR-P3
+producer terminality policy. The compiled fixture selection, collector/archive/verifier and
+fixture identities MUST change together. Its built fixture and witness MUST bind the actual
+approval Event and frozen onboarding P/O. Authentication MUST resolve the approval-linked
+generation PR and independently discover the complete applicable attempt population, then
+evaluate only matching receipts. Maintenance and onboarding Event/P/O populations remain
+separate: maintenance receipts MUST NOT be relabeled or reused for this positive; onboarding
+needs fresh evidence and independent adoption of every due mapping.
+
+Initial implementation and later publication/proving runs on the same Event/P/O, including all
+retries, remain applicable even on another PR or without a witness (OR-P5, same design section).
+Missing, unfinished or aborted producers, failed evidence steps, revoked adoption, changed source
+or dependencies and incomplete/changing populations cannot qualify. Failed attempts remain
+observable. Terminal authenticated `rust-tests` producer evidence may qualify while the enclosing
+workflow runs; whole-workflow completion and the terminal gate still precede MERGE. Collection
+uses the existing `rust-tests` job, with no new command, job or live profile. The producer MUST
+neither invoke nor wait for its own packet admission; CP-P5's consumer ordering remains unchanged.
+This can qualify only the synthetic wrapper promise, never a runtime adapter or real agent.
 
 **Templates.** `crates/xtask/tests/fixtures/depth-synthetic/onboarding/` holds the isolated
 registry-entry variant with deferred maintenance and the approval template. It also holds a
