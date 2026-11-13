@@ -266,6 +266,25 @@ mod unix {
         candidate: &Path,
         nonce: &str,
     ) -> Result<Offer, String> {
+        request_after(locator, candidate, nonce, Duration::ZERO)
+    }
+    /// `request`, pausing `pause` between connecting and writing the request, so a test can
+    /// reach the host answering (and closing) before the request is written.
+    #[cfg(test)]
+    pub(in super::super) fn request_with_pause(
+        locator: &Path,
+        candidate: &Path,
+        nonce: &str,
+        pause: Duration,
+    ) -> Result<Offer, String> {
+        request_after(locator, candidate, nonce, pause)
+    }
+    fn request_after(
+        locator: &Path,
+        candidate: &Path,
+        nonce: &str,
+        pause: Duration,
+    ) -> Result<Offer, String> {
         use std::os::unix::fs::FileTypeExt;
         let not_live = || {
             "the MA4 invocation that staged evidence is not live; a copied bundle, path or \
@@ -278,6 +297,7 @@ mod unix {
         }
         let deadline = Instant::now() + CLIENT_DEADLINE;
         let mut stream = UnixStream::connect(locator).map_err(|_| not_live())?;
+        std::thread::sleep(pause);
         stream
             .set_write_timeout(Some(CLIENT_DEADLINE))
             .map_err(|e| e.to_string())?;
@@ -285,12 +305,14 @@ mod unix {
             candidate: candidate.to_owned(),
             nonce: nonce.to_owned(),
         };
-        writeln!(
+        // The host refuses an unauthenticated peer before reading its request and closes, so
+        // the write can fail (EPIPE) while that refusal waits to be read. A failed write is
+        // therefore not itself "not live": only the absence of a well-formed answer is.
+        let _ = writeln!(
             stream,
             "{}",
             serde_json::to_string(&request).map_err(|e| e.to_string())?
-        )
-        .map_err(|_| not_live())?;
+        );
         let line = read_line(&stream, deadline, &AtomicBool::new(false), 1_048_576)
             .map_err(|_| not_live())?;
         match serde_json::from_slice(&line).map_err(|_| not_live())? {
@@ -301,6 +323,8 @@ mod unix {
 }
 #[cfg(unix)]
 pub(super) use unix::request;
+#[cfg(test)]
+pub(super) use unix::request_with_pause;
 
 #[cfg(not(unix))]
 impl Server {

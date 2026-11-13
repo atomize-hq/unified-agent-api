@@ -140,6 +140,23 @@ fn only_the_admitted_executor_with_the_nonce_and_exact_root_is_answered() {
 }
 
 #[test]
+fn a_refusal_sent_before_the_request_is_written_still_reaches_the_client() {
+    // The host refuses an unadmitted peer without reading its request and closes. A client
+    // descheduled between connecting and writing (a loaded runner) must still read that refusal,
+    // not report the live host as gone.
+    let root = candidate();
+    let dir = private_dir().unwrap();
+    let answer = publish(dir.path(), &crafted());
+    let host = serve(dir, root.path(), answer).unwrap();
+    let (locator, nonce) = (host.locator().to_owned(), host.nonce());
+    let canonical = fs::canonicalize(root.path()).unwrap();
+    let error =
+        channel::request_with_pause(&locator, &canonical, &nonce, Duration::from_millis(500))
+            .unwrap_err();
+    assert!(error.contains("no executor is running"), "{error}");
+}
+
+#[test]
 fn dropping_the_host_with_idle_and_trickling_clients_is_prompt() {
     let root = candidate();
     let host = staged(root.path(), &crafted());
