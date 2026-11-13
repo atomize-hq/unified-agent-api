@@ -2,9 +2,15 @@ use super::*;
 
 /// Exercise ON1's public dry-run and extract its ordinary renderer's exact bytes. No copy of
 /// the bootstrap JSON shape lives in this fixture, and no production visibility is widened.
+/// Runs on a fresh thread: the cfg(test) route is thread-local, so a caller's installed fixture
+/// route must not leak into this ordinary (route-absent) render, whatever the test order.
 pub(super) fn ordinary_current() -> &'static str {
     static CURRENT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    CURRENT.get_or_init(|| {
+    CURRENT.get_or_init(|| std::thread::spawn(ordinary_render).join().unwrap())
+}
+
+fn ordinary_render() -> String {
+    {
         use clap::Parser;
         let root = tempfile::tempdir().unwrap();
         write(
@@ -55,7 +61,7 @@ pub(super) fn ordinary_current() -> &'static str {
             .unwrap()
             .0
             .to_owned()
-    })
+    }
 }
 
 #[test]
