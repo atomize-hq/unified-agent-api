@@ -91,7 +91,7 @@ impl BuildEnv {
         if self.profile == profile::Profile::Core {
             c.env("CARGO_BUILD_JOBS", "2");
         }
-        if self.profile == profile::Profile::Synthetic {
+        if self.profile.synthetic() {
             // The fixture CLI reports the enrolled upstream version it is built as (A1).
             c.env("DEPTH_FIXTURE_UPSTREAM_VERSION", self.profile.version());
         }
@@ -319,6 +319,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     .trim()
     .to_owned();
     let source = Source::tip(root, &commit)?;
+    super::onboarding::check(&source, profile, &original)?;
     let mut absent = [
         ".cargo/config",
         ".cargo/config.toml",
@@ -329,7 +330,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     .to_vec();
     if profile == profile::Profile::Channel {
         absent.push("crates/wrapper_events/build.rs".into());
-    } else if profile == profile::Profile::Synthetic {
+    } else if profile.synthetic() {
         absent.push("crates/depth_fixture/build.rs".into());
     } else {
         absent.extend(
@@ -620,7 +621,7 @@ pub(super) fn environment(profile: profile::Profile) -> Environment {
             value: "2".into(),
         });
     }
-    if profile == profile::Profile::Synthetic {
+    if profile.synthetic() {
         environment.variables.push(Variable {
             name: "DEPTH_FIXTURE_UPSTREAM_VERSION".into(),
             value: profile.version().into(),
@@ -645,7 +646,9 @@ pub(super) fn collect_profile(root: &Path, profile: profile::Profile) -> Result<
     let destination = root.join(match profile {
         profile::Profile::Channel => "target/depth-ci",
         profile::Profile::Core => "target/depth-core",
-        profile::Profile::Synthetic => "target/depth-synthetic",
+        profile::Profile::Synthetic | profile::Profile::SyntheticOnboarding => {
+            "target/depth-synthetic"
+        }
     });
     fs::create_dir_all(&destination).map_err(|e| e.to_string())?;
     fs::write(destination.join("witness.json"), bytes).map_err(|e| e.to_string())?;
@@ -676,4 +679,11 @@ fn host_header() -> Result<(u64, u64, String), String> {
         positive("GITHUB_RUN_ATTEMPT")?,
         workflow,
     ))
+}
+
+/// Reuse the canonical synthetic collect/upload/bind steps for either compiled Event binding.
+pub(super) fn collect_synthetic(root: &Path) -> Result<(), String> {
+    let source = Source::tip(root, "HEAD")?;
+    let profile = profile::Profile::synthetic_in(&source)?;
+    collect_profile(root, profile)
 }

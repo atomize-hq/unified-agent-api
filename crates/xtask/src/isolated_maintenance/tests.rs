@@ -6,6 +6,8 @@ use std::{collections::BTreeMap, fs};
 mod authority;
 mod authority_gaps;
 mod bootstrap;
+#[cfg(unix)]
+pub(crate) use bootstrap::public_on2::producer_workspace as onboarding_producer_workspace;
 pub(super) mod fixture;
 #[cfg(unix)]
 mod git_metadata;

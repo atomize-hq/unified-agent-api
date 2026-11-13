@@ -1,16 +1,40 @@
-//! Three compiled isolated profiles; no receipt or environment value chooses trust.
+//! Compiled isolated producer bindings; no receipt or environment value chooses trust.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Profile {
     Channel,
     Core,
     /// `synthetic-wrapper-v1`: machinery proof on `depth_fixture` (MP-P1); qualifies no agent.
     Synthetic,
+    /// The same cases bound to committed ON2 inputs and an approval Event.
+    SyntheticOnboarding,
 }
 impl Profile {
+    pub(crate) fn synthetic(self) -> bool {
+        matches!(self, Self::Synthetic | Self::SyntheticOnboarding)
+    }
+    pub(crate) fn for_event(event: &crate::depth_record::Event) -> Self {
+        match event {
+            crate::depth_record::Event::Onboarding { .. } => Self::SyntheticOnboarding,
+            crate::depth_record::Event::Maintenance { .. } => Self::Synthetic,
+        }
+    }
+    /// Only source-installed finite bindings are candidates. No flag or environment selects one.
+    pub(crate) fn synthetic_in(
+        source: &crate::runtime_advertising::source::Source,
+    ) -> Result<Self, String> {
+        match source.optional(super::onboarding::RECORD)? {
+            Some(raw) => {
+                let record =
+                    crate::depth_record::DepthRecord::parse(&raw, "depth_fixture", "0.2.0")?;
+                Ok(Self::for_event(&record.event))
+            }
+            None => Ok(Self::Synthetic),
+        }
+    }
     pub(crate) fn agent_id(self) -> &'static str {
         match self {
             Self::Channel | Self::Core => "codex",
-            Self::Synthetic => "depth_fixture",
+            Self::Synthetic | Self::SyntheticOnboarding => "depth_fixture",
         }
     }
     /// The `rust-tests` collection, upload and binding step names use `<verb> <label> ...`.
@@ -18,7 +42,7 @@ impl Profile {
         match self {
             Self::Channel => "isolated depth",
             Self::Core => "isolated CORE depth",
-            Self::Synthetic => "isolated synthetic depth",
+            Self::Synthetic | Self::SyntheticOnboarding => "isolated synthetic depth",
         }
     }
     pub(crate) fn fixture(self) -> &'static str {
@@ -26,25 +50,30 @@ impl Profile {
             Self::Channel => super::FIXTURE,
             Self::Core => "crates/xtask/tests/fixtures/depth-core/record.json",
             Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic/record.json",
+            Self::SyntheticOnboarding => super::onboarding::RECORD,
         }
     }
     pub(crate) fn contract(self) -> &'static str {
         match self {
             Self::Channel => super::CONTRACT,
             Self::Core => "crates/xtask/tests/fixtures/depth-core/contract.md",
-            Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic/contract.md",
+            Self::Synthetic | Self::SyntheticOnboarding => {
+                "crates/xtask/tests/fixtures/depth-synthetic/contract.md"
+            }
         }
     }
     pub(crate) fn directory(self) -> &'static str {
         match self {
             Self::Channel => "crates/xtask/tests/fixtures/depth-ci",
             Self::Core => "crates/xtask/tests/fixtures/depth-core",
-            Self::Synthetic => "crates/xtask/tests/fixtures/depth-synthetic",
+            Self::Synthetic | Self::SyntheticOnboarding => {
+                "crates/xtask/tests/fixtures/depth-synthetic"
+            }
         }
     }
     pub(crate) fn requirements(self) -> Option<&'static str> {
         match self {
-            Self::Channel | Self::Synthetic => None,
+            Self::Channel | Self::Synthetic | Self::SyntheticOnboarding => None,
             Self::Core => Some("docs/specs"),
         }
     }
@@ -55,26 +84,26 @@ impl Profile {
         match self {
             Self::Channel => "0.0.0",
             Self::Core => "0.156.1",
-            Self::Synthetic => "0.2.0",
+            Self::Synthetic | Self::SyntheticOnboarding => "0.2.0",
         }
     }
     pub(crate) fn package(self) -> &'static str {
         match self {
             Self::Channel => "unified-agent-api-wrapper-events",
             Self::Core => "unified-agent-api",
-            Self::Synthetic => "unified-agent-api-depth-fixture",
+            Self::Synthetic | Self::SyntheticOnboarding => "unified-agent-api-depth-fixture",
         }
     }
     pub(crate) fn test(self) -> &'static str {
         match self {
             Self::Channel => "depth_ci_channel",
             Self::Core => "depth_ci_core",
-            Self::Synthetic => "depth_ci_synthetic",
+            Self::Synthetic | Self::SyntheticOnboarding => "depth_ci_synthetic",
         }
     }
     pub(crate) fn features(self) -> Vec<String> {
         match self {
-            Self::Channel | Self::Synthetic => vec![],
+            Self::Channel | Self::Synthetic | Self::SyntheticOnboarding => vec![],
             Self::Core => ["aider", "claude_code", "codex", "gemini_cli", "opencode"]
                 .map(str::to_owned)
                 .to_vec(),
@@ -84,21 +113,23 @@ impl Profile {
         match self {
             Self::Channel => "depth-channel-v1",
             Self::Core => "depth-codex-core-v1",
-            Self::Synthetic => "depth-synthetic-wrapper-v1",
+            Self::Synthetic | Self::SyntheticOnboarding => "depth-synthetic-wrapper-v1",
         }
     }
     pub(crate) fn executor(self) -> &'static str {
         match self {
             Self::Channel => "github-actions:rust-tests/isolated-channel-v1",
             Self::Core => "github-actions:rust-tests/isolated-codex-core-v1",
-            Self::Synthetic => "github-actions:rust-tests/isolated-synthetic-wrapper-v1",
+            Self::Synthetic | Self::SyntheticOnboarding => {
+                "github-actions:rust-tests/isolated-synthetic-wrapper-v1"
+            }
         }
     }
     pub(crate) fn trust(self) -> &'static str {
         match self {
             Self::Channel => "github-actions-channel-v1",
             Self::Core => "github-actions-codex-core-v1",
-            Self::Synthetic => "github-actions-synthetic-wrapper-v1",
+            Self::Synthetic | Self::SyntheticOnboarding => "github-actions-synthetic-wrapper-v1",
         }
     }
     pub(crate) fn evidence(self) -> String {
@@ -109,7 +140,7 @@ impl Profile {
             match self {
                 Self::Channel => "channel-v1",
                 Self::Core => "core-v1",
-                Self::Synthetic => "synthetic-wrapper-v1",
+                Self::Synthetic | Self::SyntheticOnboarding => "synthetic-wrapper-v1",
             }
         )
     }
@@ -117,7 +148,21 @@ impl Profile {
         if self == Self::Channel {
             super::record(raw)
         } else {
-            crate::depth_record::DepthRecord::parse(raw, self.agent_id(), self.version())
+            let mut record =
+                crate::depth_record::DepthRecord::parse(raw, self.agent_id(), self.version())?;
+            if self.synthetic() {
+                let onboarding =
+                    matches!(record.event, crate::depth_record::Event::Onboarding { .. });
+                if onboarding != (self == Self::SyntheticOnboarding) {
+                    return Err("synthetic producer Event differs from its compiled binding".into());
+                }
+            }
+            if self == Self::SyntheticOnboarding {
+                // Later reporting and accepting entries preserve the producer's frozen inputs.
+                record.execution = None;
+                record.acceptance_entries.clear();
+            }
+            Ok(record)
         }
     }
 }
@@ -305,5 +350,85 @@ mod tests {
         assert!(ci.contains("run: cargo run -p xtask -- depth-synthetic-collect\n"));
         let labels: std::collections::BTreeSet<_> = profiles.map(Profile::step_label).into();
         assert_eq!(labels.len(), 3);
+    }
+}
+
+#[cfg(test)]
+mod onboarding_tests {
+    use super::*;
+
+    #[test]
+    fn onboarding_reuses_canonical_collection_and_has_no_packet_admission_invocation() {
+        let p = Profile::SyntheticOnboarding;
+        let maintenance = Profile::Synthetic;
+        assert_eq!(p.test(), maintenance.test());
+        assert_eq!(p.package(), maintenance.package());
+        assert_eq!(p.directory(), maintenance.directory());
+        assert_eq!(p.contract(), maintenance.contract());
+        assert_eq!(p.artifact(), maintenance.artifact());
+        assert_eq!(p.step_label(), maintenance.step_label());
+        assert_eq!(p.executor(), maintenance.executor());
+        assert_eq!(p.trust(), maintenance.trust());
+        assert_eq!(p.evidence(), maintenance.evidence());
+        assert_ne!(p.fixture(), maintenance.fixture());
+        assert_eq!(
+            super::super::collector::environment(p),
+            super::super::collector::environment(maintenance)
+        );
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let ci = std::fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
+        let producer = ci
+            .split("\n  rust-tests:\n")
+            .nth(1)
+            .unwrap()
+            .split("\n  agent-api-all-features:")
+            .next()
+            .unwrap();
+        assert!(!producer.contains("needs:"));
+        assert!(producer.contains("cargo test --workspace --all-targets"));
+        assert!(producer.contains("run: cargo run -p xtask -- depth-synthetic-collect"));
+        assert!(producer.contains("if: ${{ always() }}"));
+        for forbidden in [
+            "make preflight",
+            "manifest-validate",
+            "staging-integration-gate",
+        ] {
+            assert!(!producer.contains(forbidden), "{forbidden}");
+        }
+        // Collector recursion stops at one fixture executable. Its local build closure contains
+        // the wrapper and event library, and has no xtask/admission dependency.
+        let build: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(root.join(p.build_profile())).unwrap())
+                .unwrap();
+        for package in build["packages"].as_array().unwrap() {
+            assert!(!package["id"].as_str().unwrap().contains("xtask"));
+        }
+        let collector = include_str!("collector.rs");
+        assert!(collector.contains("profile.package(),"));
+        assert!(collector.contains("profile.test(),"));
+        assert!(collector.contains("let executable = executable.ok_or"));
+        for forbidden in [
+            "check_integration(",
+            "depth_acceptance::",
+            "manifest-validate",
+            "make preflight",
+        ] {
+            assert!(!collector.contains(forbidden));
+            for path in [
+                "crates/depth_fixture/tests/depth_ci_synthetic.rs",
+                "crates/depth_fixture/tests/depth_ci_synthetic/run.rs",
+                "crates/depth_fixture/tests/depth_ci_synthetic/lifecycle.rs",
+            ] {
+                assert!(!std::fs::read_to_string(root.join(path))
+                    .unwrap()
+                    .contains(forbidden));
+            }
+        }
+        // Workspace unit-test consumers use fresh repositories and scoped fake hosts. They
+        // never resolve this CI run's packet. Phase C must still execute the real needs graph,
+        // failure-preserving consumers and terminal pre-MERGE gate, including this test leg.
+        let transport = include_str!("../depth_evidence/verdict/github/transport.rs");
+        assert!(transport
+            .contains("None => Err(\"no fake isolated host is installed for this test\".into())"));
     }
 }

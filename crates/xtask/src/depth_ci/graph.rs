@@ -38,14 +38,20 @@ pub(super) fn resolve(
     profile: profile::Profile,
 ) -> Result<DependencyGraph, String> {
     let mut result = resolve_for(root, view, metadata, compiled, profile.package())?;
-    for path in [
-        "Cargo.toml",
-        "Cargo.lock",
-        profile.contract(),
-        profile.fixture(),
-    ] {
+    for path in ["Cargo.toml", "Cargo.lock", profile.contract()] {
         view.required(path)?;
         result.inputs.push(view.reference(path)?);
+    }
+    if profile == profile::Profile::SyntheticOnboarding {
+        // The record and lifecycle are authenticated as Event/P/O projections, allowing ON3-ON5
+        // reporting to advance. Immutable approval and acquisition bytes remain dependencies.
+        view.required(super::onboarding::APPROVAL)?;
+        result
+            .inputs
+            .push(view.reference(super::onboarding::APPROVAL)?);
+    } else {
+        view.required(profile.fixture())?;
+        result.inputs.push(view.reference(profile.fixture())?);
     }
     result.scopes.push(profile.directory().into());
     for path in view.files_under(profile.directory())? {
