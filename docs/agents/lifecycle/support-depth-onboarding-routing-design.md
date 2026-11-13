@@ -386,6 +386,65 @@ against the final enforcement revision. No slice installs a live profile or prod
     no pointer/status authority, no maintenance-evidence substitution and retained handoff semantics.
 
 - **Slice 1 — Finite bootstrap scope and approval adapter.**
+  - Status: implemented as credential-free scope/IN1 machinery in
+    `xtask/isolated_maintenance/onboarding/` and `depth_acceptance/integration/bootstrap.rs`.
+    Tests in `isolated_maintenance/tests/bootstrap.rs` and `bootstrap/declaration.rs` admit before
+    protected-tip advance and observe afterward. Public ON1 routing remains slice 2; no live
+    profile, production parser enablement or independent host run is installed.
+  - Round-4 validation sweep: creation replays ordinary ON1 against **every regular blob of
+    the pinned parent**, with unsupported modes refused; no selected-input reconstruction.
+    Preparation shares the strict production pointer format core and requires `none\n` bytes.
+    Reviewed governing adoption and empty `current.json` now require exact expected bytes,
+    including inherited empty-current bytes. The acquisition schema compiler/validator and
+    supported-field projections are shared with the production freeze planner; selecting a
+    specific artifact definition further restricts the compiled profile schema. Production
+    behavior is unchanged by these extractions. New regressions in `bootstrap/sweep.rs` cover
+    retained crate/backend regular-file conflicts, all four pointer paths (missing newline,
+    whitespace and multiple lines), governing JSON byte drift, and inherited current byte drift.
+
+  - Round-5 validation sweep: all four publication outputs compare complete committed bytes.
+    Support Markdown uses freshly derived candidate rows and the **pinned parent's** surrounding
+    text; JSON, runtime projection and capability publication use their complete renderers.
+    Raw help is admitted only at the compiled version/target's two producer filenames, with
+    exact bytes from the snapshot producer's own writer and the help constants compiled into
+    the fixture CLI. Foreign/extra/missing files and changed bytes refuse. All bootstrap
+    acquisition positives now run the actual snapshot producer against a built fixture binary,
+    plus the real wrapper, union and report writers, rather than handwritten shards.
+    The follow-up sweep also closes metadata's candidate-retained notes/validation, duplicate
+    JSON members and non-writer encodings in acquired JSON, and declaration edits outside its
+    table. Metadata reuses NE3 with pinned-parent retained fields and a validated candidate
+    timestamp; union/report checks compare complete reconstructed producer bytes (including
+    all provenance), and shard/wrapper checks combine complete schema/semantic validation with
+    exact typed writer encoding. These stronger byte checks are confined to bootstrap admission;
+    ordinary production intake keeps its existing semantics. Regressions cover every publication
+    file in preparation and declaration, every acquired JSON output's byte drift, metadata notes,
+    duplicate members and byte drift, and unrelated declaration registry text.
+
+    Sweep paths below are relative to `crates/xtask/src/`. Creation checks exact ordinary ON1
+    output bytes (only the compiled non-runtime backend field is projected away); subsequent
+    checkpoints preserve non-admitted paths byte-for-byte and reject deletions/mode changes.
+
+    | Path class | Production writer / validator reused (`file:fn`), or stronger exact check |
+    | --- | --- |
+    | Governing approval | `depth_record/onboarding.rs:OnboardingApproval::parse,attribution_mismatch`; `isolated_maintenance/onboarding/approval.rs:read` exact compiled descriptor and preserved protected bytes |
+    | Registry entry | `agent_registry.rs:AgentRegistry::parse_unenforced`; `onboard_agent.rs:run_in_workspace` replay; `isolated_maintenance/onboarding/mod.rs:Adapter::registry_delta` exact compiled entry |
+    | Governing files | `onboard_agent/preview/governing.rs:governing_files` via ON1 replay; `isolated_maintenance/onboarding/inputs.rs:governing` exact reviewed template bytes |
+    | `current.json` | `onboard_agent/preview.rs:render_current_json` exact ordinary ON1 bootstrap bytes through creation, preparation and declaration; `isolated_maintenance/onboarding/inputs.rs:record_free` and `checkpoint.rs:check` refuse any change, including replacement by the acquired versioned union (root-pointer replacement belongs to promotion) |
+    | Versioned snapshots / shards | `support_depth/acquisition_schema.rs:compile,validate`; `support_depth/acquisition_basis.rs:supported_shard`; `manifest_union/intake.rs:validate_shards`; `isolated_maintenance/onboarding/encoding.rs:check` complete typed producer bytes |
+    | Raw help | `depth_fixture_snapshot.rs:write_raw_help` with the fixture CLI's compiled `bin/depth_fixture/help.rs` constants; `isolated_maintenance/onboarding/raw_help.rs:validate` exact complete files and bounded inventory, plus checkpoint mode checks |
+    | Union | `support_depth/acquisition_schema.rs:validate`; `support_depth/acquisition_basis.rs:supported_union`; `manifest_union/intake.rs:validate,validate_bytes` complete reconstructed producer bytes; the finite single-target profile has no cross-target conflicts |
+    | Wrapper coverage | `support_depth/acquisition_schema.rs:validate`; `support_depth/acquisition_basis.rs:supported_wrapper`; `manifest_report.rs:run` and `manifest_report/intake.rs:validate`, including wrapper-only checkpoints; `isolated_maintenance/onboarding/encoding.rs:check` complete typed writer bytes |
+    | Reports | `support_depth/acquisition_schema.rs:validate`; `manifest_report/intake.rs:validate_bytes` reconstructs the complete expected report set and compares complete writer bytes |
+    | Version metadata | `manifest_version_metadata.rs:plan_at` complete NE3 bytes with retained fields from the pinned parent and the candidate's validated RFC3339 writer timestamp |
+    | Pointer files | `manifest_validate/pointers.rs:parse_pointer_content` (extracted from `read_pointer_file`), then exact `none\n` bytes |
+    | Lifecycle docs / state | `onboard_agent/preview/render.rs:build_docs_preview` and `onboard_agent/lifecycle.rs:build_lifecycle_state_preview` exact replay; `agent_lifecycle.rs:LifecycleState::validate`; later checkpoints preserve parent bytes |
+    | Written-paths inventory | `onboard_agent.rs:written_paths_inventory` via ON1 replay, exact host-derived inventory bytes |
+    | Release changes / workspace manifest | `onboard_agent/preview/release.rs:build_release_preview` via ON1 replay against all pinned member manifests, exact bytes |
+    | Declaration table | `agent_registry.rs:AgentRegistry::parse_unenforced`; `isolated_maintenance/onboarding/mod.rs:Adapter::registry_delta` exact compiled selection; `checkpoint.rs:check` complete parent registry bytes plus the canonical declared table |
+    | Classification rows | `support_depth/freeze/onboarding.rs:FreezePlan::onboarding` → `support_depth/acquisition.rs:derive_with_pilot` checks current basis, surfaces and resolved CORE rows |
+    | Acquisition statement | `depth_record/acquisition.rs:AcquisitionStatement::parse,mismatch` against the planner's acquired input references; complete TOML parsed with unknown fields refused (maintainer-authored command strings remain attestation) |
+    | Reporting publication | `support_matrix.rs:generate_publication_artifacts_from_markdown` with pinned-parent surrounding text; `capability_matrix.rs:generate_markdown_for_workspace` complete output bytes in `depth_acceptance/integration/bootstrap.rs:publication` |
+    | `.gitkeep` files | `onboard_agent/preview.rs:build_manifest_preview` → `onboard_agent.rs:preview_writes` exact empty bytes via ON1 replay; later edits refused |
   - Content: extend the existing compiled synthetic route with the bounded ON1 creation state,
     record-free preparation checkpoints preserving the scaffold/approval with IN1 admission and
     post-tip observation, and the OR-P14 scaffold-to-declared transition (IN1 admission of exactly the declaration,

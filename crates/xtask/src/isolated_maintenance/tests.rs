@@ -5,6 +5,7 @@ use std::{collections::BTreeMap, fs};
 
 mod authority;
 mod authority_gaps;
+mod bootstrap;
 pub(super) mod fixture;
 #[cfg(unix)]
 mod git_metadata;

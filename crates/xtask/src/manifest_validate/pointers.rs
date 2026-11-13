@@ -357,28 +357,10 @@ pub(super) fn read_pointer_file(
     let content =
         std::str::from_utf8(&bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-    if !content.ends_with('\n') {
-        return Ok(PointerRead::InvalidFormat {
-            reason: "missing trailing newline",
-        });
-    }
-
-    let without_nl = &content[..content.len() - 1];
-    if without_nl.contains('\n') {
-        return Ok(PointerRead::InvalidFormat {
-            reason: "multiple lines",
-        });
-    }
-    if without_nl.contains('\r') {
-        return Ok(PointerRead::InvalidFormat {
-            reason: "contains CR character",
-        });
-    }
-    if without_nl != without_nl.trim() {
-        return Ok(PointerRead::InvalidFormat {
-            reason: "contains leading/trailing whitespace",
-        });
-    }
+    let without_nl = match parse_pointer_content(content) {
+        Ok(line) => line,
+        Err(reason) => return Ok(PointerRead::InvalidFormat { reason }),
+    };
 
     if without_nl == "none" {
         if allow_none {
@@ -395,4 +377,24 @@ pub(super) fn read_pointer_file(
         });
     };
     Ok(PointerRead::Value(PointerValue::Version(ver)))
+}
+
+/// The strict line-format core used by ordinary pointer reads and bootstrap admission.
+pub(crate) fn parse_pointer_content(content: &str) -> Result<&str, &'static str> {
+    if !content.ends_with('\n') {
+        return Err("missing trailing newline");
+    }
+
+    let without_nl = &content[..content.len() - 1];
+    if without_nl.contains('\n') {
+        return Err("multiple lines");
+    }
+    if without_nl.contains('\r') {
+        return Err("contains CR character");
+    }
+    if without_nl != without_nl.trim() {
+        return Err("contains leading/trailing whitespace");
+    }
+
+    Ok(without_nl)
 }

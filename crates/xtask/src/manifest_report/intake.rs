@@ -17,6 +17,42 @@ pub(crate) fn validate(
     version: &str,
     reports: &BTreeMap<String, Value>,
 ) -> Result<Claims, String> {
+    derive(agent, rules_bytes, union, wrapper_value, version, reports).map(|(claims, _)| claims)
+}
+
+/// Compare every committed byte with the same complete reports the production engine derives.
+pub(crate) fn validate_bytes(
+    agent: &str,
+    rules_bytes: &[u8],
+    union: &Value,
+    wrapper_value: &Value,
+    version: &str,
+    reports: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), String> {
+    let values = reports
+        .iter()
+        .map(|(p, bytes)| {
+            serde_json::from_slice(bytes)
+                .map(|value| (p.clone(), value))
+                .map_err(|e| e.to_string())
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let (_, expected) = derive(agent, rules_bytes, union, wrapper_value, version, &values)?;
+    if *reports != expected {
+        return Err("bootstrap reports differ from complete producer bytes".into());
+    }
+    Ok(())
+}
+
+type ReportBytes = BTreeMap<String, Vec<u8>>;
+fn derive(
+    agent: &str,
+    rules_bytes: &[u8],
+    union: &Value,
+    wrapper_value: &Value,
+    version: &str,
+    reports: &BTreeMap<String, Value>,
+) -> Result<(Claims, ReportBytes), String> {
     let rules: rules::RulesFile = serde_json::from_slice(rules_bytes).map_err(|e| e.to_string())?;
     let raw: Value = serde_json::from_slice(rules_bytes).map_err(|e| e.to_string())?;
     for (pointer, expected) in [
@@ -134,6 +170,7 @@ pub(crate) fn validate(
             }
         }
     }
+    let mut encoded = BTreeMap::new();
     for (file, mode, target) in filters {
         let actual = &reports[&file];
         let (filter, report_targets) = match target {
@@ -157,13 +194,21 @@ pub(crate) fn validate(
                 .ok_or("missing report generated_at")?,
         )
         .map_err(|e| e.to_string())?;
-        if *actual != serde_json::to_value(derived).map_err(|e| e.to_string())? {
+        if *actual != serde_json::to_value(&derived).map_err(|e| e.to_string())? {
             return Err(format!(
                 "report differs from acquisition and wrapper claims: {file}"
             ));
         }
+        encoded.insert(
+            file,
+            format!(
+                "{}\n",
+                serde_json::to_string_pretty(&derived).map_err(|e| e.to_string())?
+            )
+            .into_bytes(),
+        );
     }
-    Ok(claims(agent, &index))
+    Ok((claims(agent, &index), encoded))
 }
 
 // The engine indexes every level, including passthrough/unsupported and unobserved claims.

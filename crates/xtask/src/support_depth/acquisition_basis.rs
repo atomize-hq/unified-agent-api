@@ -159,7 +159,7 @@ fn rows(
     Ok(result)
 }
 
-pub(super) fn supported_shard(value: &Value) -> Result<(), String> {
+pub(crate) fn supported_shard(value: &Value) -> Result<(), String> {
     let typed: crate::manifest_snapshot_schema::SnapshotV1 =
         serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
     if serde_json::to_value(typed).map_err(|e| e.to_string())? != *value {
@@ -182,7 +182,7 @@ fn fields(value: &Value, supported: &[&str]) -> Result<(), String> {
     }
     Ok(())
 }
-pub(super) fn supported_wrapper(value: &Value) -> Result<(), String> {
+pub(crate) fn supported_wrapper(value: &Value) -> Result<(), String> {
     fields(
         value,
         &[
@@ -213,7 +213,7 @@ pub(super) fn supported_wrapper(value: &Value) -> Result<(), String> {
 // The union engine recomputes every semantic field, but deliberately ignores optional raw-help
 // provenance during equality checking. That provenance is retained in the basis, and new fields
 // there must still refuse even if a widened schema would permit them.
-pub(super) fn supported_union(value: &Value) -> Result<(), String> {
+pub(crate) fn supported_union(value: &Value) -> Result<(), String> {
     for command in value["commands"]
         .as_array()
         .ok_or("missing union commands")?

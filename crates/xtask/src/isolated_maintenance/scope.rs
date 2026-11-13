@@ -72,16 +72,30 @@ pub(super) fn load(
     let bytes = inputs.required(REGISTRY_RELATIVE_PATH)?;
     // Isolated governing data may differ from the ordinary canonical registry. It must already
     // be protected in the fixed isolated repository, and still satisfy this finite scope.
-    if super::git_blob(root, &bytes)? != protected_registry
+    let protected_bytes = protected
+        .optional_bytes(REGISTRY_RELATIVE_PATH)?
+        .ok_or("protected registry is absent")?;
+    if super::git_blob(root, &protected_bytes)? != protected_registry
         || inputs.executable(REGISTRY_RELATIVE_PATH)?
         || protected.executable(REGISTRY_RELATIVE_PATH)?
-        || protected.optional_bytes(REGISTRY_RELATIVE_PATH)?.as_ref() != Some(&bytes)
     {
         return Err("isolated governing registry differs from protected staging".into());
     }
-    // The one accepting parse: full validation, with only the compiled subject's table admitted.
     let raw = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
     let registry = AgentRegistry::parse_isolated(raw, tables).map_err(|e| e.to_string())?;
+    let old = AgentRegistry::parse_isolated(
+        std::str::from_utf8(&protected_bytes).map_err(|e| e.to_string())?,
+        tables,
+    )
+    .map_err(|e| e.to_string())?;
+    if let Some(bootstrap) =
+        super::onboarding::load(root, inputs, protected, &old, &registry, subject)?
+    {
+        return Ok(bootstrap);
+    }
+    if bytes != protected_bytes {
+        return Err("isolated governing registry differs from protected staging".into());
+    }
     let agent = registry
         .find(subject.agent_id)
         .ok_or("missing isolated subject registry entry")?;
@@ -252,6 +266,19 @@ fn walk(
         } else if !metadata.is_file() {
             return Err("unsupported isolated retained entry".into());
         }
+    }
+    Ok(())
+}
+
+/// Bootstrap admits no retained generation, including orphan and foreign roots.
+pub(super) fn no_records(root: &Path, inputs: &mut GitInputs) -> Result<(), String> {
+    let mut records = Vec::new();
+    let mut count = 0;
+    for prefix in ["cli_manifests", "reports"] {
+        walk(root, inputs, prefix, &mut records, &mut count)?;
+    }
+    if !records.is_empty() {
+        return Err("bootstrap admits no retained depth record".into());
     }
     Ok(())
 }

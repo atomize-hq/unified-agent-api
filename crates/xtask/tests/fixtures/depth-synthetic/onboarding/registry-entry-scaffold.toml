@@ -1,0 +1,27 @@
+# Exact ordinary ON1 scaffold; no enrollment or maintenance declaration.
+[[agents]]
+agent_id = "depth_fixture"
+display_name = "Depth Fixture"
+crate_path = "crates/depth_fixture"
+manifest_root = "cli_manifests/depth_fixture"
+package_name = "unified-agent-api-depth-fixture"
+canonical_targets = ["x86_64-unknown-linux-gnu"]
+
+[agents.wrapper_coverage]
+binding_kind = "generated_from_wrapper_crate"
+source_path = "crates/depth_fixture"
+
+[agents.capability_declaration]
+always_on = []
+backend_extensions = []
+
+[agents.publication]
+support_matrix_enabled = true
+capability_matrix_enabled = false
+
+[agents.release]
+docs_release_track = "unpublished"
+
+[agents.scaffold]
+onboarding_pack_prefix = "depth-fixture-cli-onboarding"
+

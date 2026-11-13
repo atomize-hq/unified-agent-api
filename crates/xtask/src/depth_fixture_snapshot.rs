@@ -128,6 +128,13 @@ pub fn run(args: Args) -> Result<(), Error> {
     Ok(())
 }
 
+/// The producer's complete raw-help inventory and writer, also used by bounded admission.
+pub(crate) fn write_raw_help(dir: &Path, help: &str, run_help: &str) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    fs::write(dir.join("help.txt"), help)?;
+    fs::write(dir.join("run.help.txt"), run_help)
+}
+
 fn invoke(binary: &Path, args: &[&str]) -> Result<String, Error> {
     let output = Command::new(binary)
         .args(args)

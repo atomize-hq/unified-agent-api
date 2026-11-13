@@ -2,6 +2,68 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(unix)]
+fn assert_proposal_error_precedes_binding(missing_tracking_ref: bool) {
+    for (subject, onboarding) in [
+        (&scope::CODEX, false),
+        (&scope::SYNTHETIC, false),
+        (&scope::SYNTHETIC, true),
+    ] {
+        for committed in [false, true] {
+            let f = Fixture::new_for(subject);
+            if onboarding {
+                let canonical = include_str!("../../../../data/agent_registry.toml");
+                let declared = include_str!("../../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml");
+                write(
+                    f.root.path(),
+                    REGISTRY_RELATIVE_PATH,
+                    format!("{canonical}\n{declared}"),
+                );
+                f.commit();
+            }
+            let _installed = f.install();
+            let tip = head(&f);
+            let link = f.root.path().join("docs/link");
+            if !committed {
+                write(f.root.path(), ".git/info/exclude", "docs/link\n");
+            }
+            std::os::unix::fs::symlink("input.txt", &link).unwrap();
+            let next = candidate(&f, &tip);
+            let parent = if missing_tracking_ref {
+                git(
+                    f.root.path(),
+                    &["update-ref", "-d", "refs/remotes/origin/staging"],
+                );
+                tip
+            } else {
+                f.host();
+                local(&f, &next);
+                next
+            };
+            let before = snapshot(f.root.path());
+            assert_eq!(
+                check_integration(f.root.path(), &parent).unwrap_err(),
+                format!("{}: source symlink is unsupported", link.display()),
+                "subject={}, onboarding={onboarding}, committed={committed}",
+                subject.agent_id,
+            );
+            assert_eq!(snapshot(f.root.path()), before);
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn in1_proposal_error_precedes_equal_head_and_parent() {
+    assert_proposal_error_precedes_binding(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn in1_proposal_error_precedes_missing_tracking_ref() {
+    assert_proposal_error_precedes_binding(true);
+}
+
 #[test]
 fn in1_local_tip_ignores_shadow_tags_and_branches() {
     for namespace in ["tags", "heads"] {
