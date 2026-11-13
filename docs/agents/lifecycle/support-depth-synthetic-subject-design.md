@@ -211,8 +211,9 @@ Each step is a reviewed PR into `staging`.
      - Containment, at MA4 delivery only: every E reference must lie in its own record's
        `<manifest_root>/reports/<version>/evidence/`, and every payload a receipt references in
        that receipt's evidence destination. Anything else refuses the delivery. Contract
-       revision 1 allows any repository-relative path, and evaluation is unchanged; whether the
-       contract should adopt this containment is an open question for the maintainer. A completely unchanged
+       revision 1 allows any repository-relative path, and evaluation is unchanged. The
+       maintainer approved keeping this containment on 2026-11-05; the
+       [evidence format](../../specs/support-depth-evidence-v1.md#boundary) states it. A completely unchanged
        MA4 rerun is still refused by the existing zero-change validator; that is unchanged. Production stages nothing, so no new E-bound
        file is ever admitted. A receipt that only the candidate made still refuses as an
        untracked bound input. `evaluate_isolated_record` now covers the
