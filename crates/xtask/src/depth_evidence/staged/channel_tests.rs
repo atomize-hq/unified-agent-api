@@ -150,10 +150,18 @@ fn a_refusal_sent_before_the_request_is_written_still_reaches_the_client() {
     let host = serve(dir, root.path(), answer).unwrap();
     let (locator, nonce) = (host.locator().to_owned(), host.nonce());
     let canonical = fs::canonicalize(root.path()).unwrap();
-    let error =
-        channel::request_with_pause(&locator, &canonical, &nonce, Duration::from_millis(500))
-            .unwrap_err();
-    assert!(error.contains("no executor is running"), "{error}");
+    // Every attempt reads the refusal; repeat until one write actually hit the closed connection.
+    let mut raced = false;
+    for _ in 0..20 {
+        let (answer, write_failed) = channel::request_after_answer(&locator, &canonical, &nonce);
+        let error = answer.unwrap_err();
+        assert!(error.contains("no executor is running"), "{error}");
+        raced |= write_failed;
+        if raced {
+            break;
+        }
+    }
+    assert!(raced, "no attempt wrote after the host closed");
 }
 
 #[test]
