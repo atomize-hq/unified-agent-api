@@ -205,21 +205,15 @@ pub(super) fn execute<W: Write>(
     // Phase 5: host-only diagnostics and expected-before delivery. The lifecycle attempt is
     // never copied out of the candidate; success is a separate trusted mutation in the same batch.
     let outcome: Result<(), Error> = (|| {
-        let diagnostics = diagnostics(
+        let delivery = finalized_diagnostics(
+            caller,
             context,
             &candidate,
+            observation.as_ref().ok(),
             &report,
             &written,
             execution.as_ref().ok(),
         )?;
-        let delivery = candidate_execution::finalized_tree(
-            &candidate,
-            caller,
-            observation.as_ref().ok(),
-            passed,
-            diagnostics,
-        )
-        .map_err(candidate_error)?;
         let trusted = if passed {
             let mut state = lifecycle::successful_runtime_state(context, prepared, &written)?;
             let digest = hex::encode(Sha256::digest(bytes(&written)?));
@@ -410,6 +404,52 @@ fn check_observed_depth_identity(
         &candidate_root.join(&context.lifecycle_state_path),
     )?;
     prepared.check_support_depth(candidate_root, &context.approval, &state)
+}
+
+/// Regenerate host prose from the delivered evidence after rebasing its structured paths.
+fn finalized_diagnostics(
+    caller: &Path,
+    context: &RuntimeContext,
+    candidate: &Candidate,
+    observed: Option<&Tree>,
+    report: &ValidationReport,
+    written: &[String],
+    execution: Option<&(CodexExecutionEvidence, std::process::Output)>,
+) -> Result<Tree, Error> {
+    let diagnostics = diagnostics(context, candidate, report, written, execution)?;
+    let mut delivery = candidate_execution::finalized_tree(
+        candidate,
+        caller,
+        observed,
+        report.status == "pass",
+        diagnostics,
+    )
+    .map_err(candidate_error)?;
+    if report.status == "pass" {
+        let evidence_path = format!("{}/{CODEX_EXECUTION_FILE_NAME}", candidate.run_dir_rel);
+        if let Some(Node::File(data, _)) = delivery.get(&evidence_path) {
+            let evidence: CodexExecutionEvidence = serde_json::from_slice(data)
+                .map_err(|e| Error::Internal(format!("host execution evidence: {e}")))?;
+            let mut delivered_report = report.clone();
+            for check in &mut delivered_report.checks {
+                if check.name == "codex_exec" && check.ok {
+                    check.message = format!("codex exec completed via `{}`", evidence.binary);
+                }
+            }
+            let summary = render_run_summary(context, &delivered_report, written, Some(&evidence));
+            for (name, data) in [
+                (VALIDATION_REPORT_FILE_NAME, bytes(&delivered_report)?),
+                (RUN_SUMMARY_FILE_NAME, summary.into_bytes()),
+            ] {
+                if let Some(Node::File(content, _)) =
+                    delivery.get_mut(&format!("{}/{name}", candidate.run_dir_rel))
+                {
+                    *content = data;
+                }
+            }
+        }
+    }
+    Ok(delivery)
 }
 
 fn diagnostics(

@@ -401,19 +401,23 @@ fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
                     .unwrap(),
                 fixture.to_str().unwrap()
             );
+            let stderr = fs::read_to_string(execution["stderr_path"].as_str().unwrap()).unwrap();
+            let original_root = Path::new(stderr.trim()).parent().unwrap();
+            assert!(!original_root.parent().unwrap().exists());
             assert_eq!(
-                fs::read_to_string(execution["stdout_path"].as_str().unwrap())
-                    .unwrap()
-                    .lines()
-                    .next()
-                    .unwrap(),
-                execution["prompt_path"].as_str().unwrap()
+                fs::read_to_string(execution["stdout_path"].as_str().unwrap()).unwrap(),
+                format!(
+                    "{}\nfake execute codex completed\n",
+                    original_root
+                        .join(EXECUTE_RUNS_ROOT)
+                        .join(EXECUTE_WRITE_RUN_ID)
+                        .join("codex-prompt.md")
+                        .display()
+                )
             );
             assert_eq!(
-                fs::read_to_string(execution["stderr_path"].as_str().unwrap())
-                    .unwrap()
-                    .trim(),
-                "[not retained]"
+                stderr,
+                format!("{}\n", original_root.join("not-delivered").display())
             );
             for name in [
                 "input-contract.json",
@@ -423,8 +427,6 @@ fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
                 "run-status.json",
                 "written-paths.json",
                 "run-summary.md",
-                "codex-stdout.log",
-                "codex-stderr.log",
             ] {
                 let path = run_dir.join(name);
                 let text = fs::read_to_string(&path).unwrap();

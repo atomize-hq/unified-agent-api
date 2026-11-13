@@ -251,14 +251,14 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
         };
         let original_evidence = bytes(&evidence).unwrap();
         let execution = Ok((evidence, output));
-        let diagnostic_files =
-            diagnostics(&context, &candidate, &report, &[], execution.as_ref().ok()).unwrap();
-        let delivery = candidate_execution::finalized_tree(
-            &candidate,
+        let delivery = finalized_diagnostics(
             root.path(),
+            &context,
+            &candidate,
             Some(&observed),
-            passed,
-            diagnostic_files,
+            &report,
+            &[],
+            execution.as_ref().ok(),
         )
         .unwrap();
         let source_before: Tree = candidate
@@ -301,22 +301,29 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
                 assert!(Path::new(path).starts_with(root.path()), "{path}");
             }
             assert_eq!(evidence.argv.last().unwrap(), root.path().to_str().unwrap());
-            for entry in fs::read_dir(&context.run_dir).unwrap() {
-                let path = entry.unwrap().path();
-                let text = fs::read_to_string(&path).unwrap();
+            for name in [
+                CODEX_EXECUTION_FILE_NAME,
+                VALIDATION_REPORT_FILE_NAME,
+                RUN_STATUS_FILE_NAME,
+                RUN_SUMMARY_FILE_NAME,
+            ] {
+                let text = fs::read_to_string(context.run_dir.join(name)).unwrap();
                 assert!(
                     !text.contains(recovery.parent().unwrap().to_str().unwrap()),
-                    "{}: {text}",
-                    path.display()
+                    "{name}: {text}"
                 );
             }
             assert_eq!(
                 fs::read_to_string(&evidence.stdout_path).unwrap().trim(),
-                context.run_dir.join(HANDOFF_FILE_NAME).to_str().unwrap()
+                recovery
+                    .join(format!("{RUNTIME_RUNS_ROOT}/{}", context.run_id))
+                    .join(HANDOFF_FILE_NAME)
+                    .to_str()
+                    .unwrap()
             );
             assert_eq!(
                 fs::read_to_string(&evidence.stderr_path).unwrap().trim(),
-                "[not retained]"
+                recovery.join("missing").to_str().unwrap()
             );
         } else {
             assert_eq!(bytes(&evidence).unwrap(), original_evidence);
@@ -359,4 +366,146 @@ fn create_candidate_non_depth_prompt_keeps_original_rendering() {
     let (_root, context) = setup(false);
     assert_eq!(prepared_prompt(&context), render_prompt(&context));
     assert!(prepared_prompt(&context).contains(&context.run_dir.to_string_lossy().to_string()));
+}
+
+#[test]
+fn create_candidate_relative_holder_name_preserves_publication_digest() {
+    let (root, context) = setup(true);
+    write(
+        root.path(),
+        &context.input_contract.required_agent_api_test,
+        "// fixture\n",
+    );
+    let candidate = Candidate::prepare(
+        root.path(),
+        &format!("{RUNTIME_RUNS_ROOT}/{RUN_ID}"),
+        vec![STATE.into()],
+    )
+    .unwrap();
+    let _holder = candidate_execution::TestHolder::new(&candidate.root);
+    let holder = candidate.root.parent().unwrap();
+    let relative = format!("crates/codex/src{}/note.txt", holder.display());
+    assert!(is_allowed_write_path(
+        &relative,
+        &context.approval.descriptor
+    ));
+    let source = format!("executor content mentions {}", holder.display());
+    let candidate_context = RuntimeContext {
+        approval: context.approval.clone(),
+        input_contract: context.input_contract.clone(),
+        lifecycle_state: context.lifecycle_state.clone(),
+        lifecycle_state_path: context.lifecycle_state_path.clone(),
+        run_id: context.run_id.clone(),
+        run_dir: candidate.root.join(&candidate.run_dir_rel),
+    };
+    let (execution, observed) = candidate.execute_observed(|| {
+        write(&candidate.root, &relative, &source);
+        write(
+            &candidate_context.run_dir,
+            HANDOFF_FILE_NAME,
+            bytes(&serde_json::json!({
+                "agent_id": "codex", "manifest_root": "cli_manifests/codex",
+                "runtime_lane_complete": true, "publication_refresh_required": true,
+                "required_commands": life::REQUIRED_PUBLICATION_COMMANDS, "blockers": [],
+            }))
+            .unwrap(),
+        );
+        Ok::<_, Error>(CodexExecutionEvidence {
+            workflow_version: WORKFLOW_VERSION.into(),
+            generated_at: now_rfc3339().unwrap(),
+            run_id: RUN_ID.into(),
+            binary: "codex".into(),
+            argv: vec!["--cd".into(), candidate.root.to_str().unwrap().into()],
+            prompt_path: candidate_context
+                .run_dir
+                .join(PROMPT_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            stdout_path: candidate_context
+                .run_dir
+                .join(CODEX_STDOUT_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            stderr_path: candidate_context
+                .run_dir
+                .join(CODEX_STDERR_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            exit_code: 0,
+        })
+    });
+    let evidence = execution.unwrap();
+    let observed = observed.unwrap();
+    candidate.check(&observed).unwrap();
+    let (mut report, written) = validate_observed_write_mode(
+        &candidate.root,
+        &candidate_context,
+        &context.input_contract,
+        &evidence,
+        vec![relative.clone()],
+    )
+    .unwrap();
+    assert_eq!(report.status, "pass", "{:?}", report.errors);
+    assert_eq!(written, vec![relative.clone()]);
+    let execution = Ok((
+        evidence,
+        std::process::Command::new("true").output().unwrap(),
+    ));
+    let delivery = finalized_diagnostics(
+        root.path(),
+        &context,
+        &candidate,
+        Some(&observed),
+        &report,
+        &written,
+        execution.as_ref().ok(),
+    )
+    .unwrap();
+    let mut state =
+        lifecycle::successful_runtime_state(&context, &context.input_contract, &written).unwrap();
+    state.written_paths_sha256 =
+        Some(life::Preserved::new(hex::encode(Sha256::digest(bytes(&written).unwrap()))).unwrap());
+    let trusted = [PlannedMutation::replace(
+        STATE,
+        fs::read(root.path().join(STATE)).unwrap(),
+        bytes(&state).unwrap(),
+    )];
+    let outcome = candidate
+        .deliver_with(root.path(), &delivery, true, None, &trusted)
+        .map(|_| ())
+        .map_err(candidate_error);
+    let holder = holder.to_owned();
+    finalize_delivery(
+        root.path(),
+        candidate,
+        &context,
+        &mut report,
+        &execution,
+        outcome,
+    )
+    .unwrap();
+    assert!(!holder.exists());
+    assert_eq!(
+        fs::read_to_string(root.path().join(&relative)).unwrap(),
+        source
+    );
+    let recorded: Vec<String> = load_json(&context.run_dir.join(WRITTEN_PATHS_FILE_NAME)).unwrap();
+    assert_eq!(recorded, written);
+    let status: serde_json::Value = load_json(&context.run_dir.join(RUN_STATUS_FILE_NAME)).unwrap();
+    assert_eq!(status["written_paths"], serde_json::json!(written));
+    assert_eq!(
+        hex::encode(Sha256::digest(
+            fs::read(context.run_dir.join(WRITTEN_PATHS_FILE_NAME)).unwrap()
+        )),
+        **state.written_paths_sha256.as_ref().unwrap()
+    );
+    crate::prepare_publication::validate_runtime_evidence_run_for_approval(
+        root.path(),
+        &context.approval,
+        RUN_ID,
+    )
+    .unwrap();
 }
