@@ -211,3 +211,449 @@ pub(super) fn validate_current(workspace: &Path, after: &View) -> Result<(), Str
         .map_err(|issues| support_matrix::format_publication_issues(&issues))?;
     Ok(())
 }
+
+// Scoped to one rendering invocation and root. Values are opaque, record-sealed verdicts;
+// neither the registry binding nor proposed E labels can manufacture them.
+thread_local! {
+    static VIEW_VERDICTS: std::cell::RefCell<Option<PublicationVerdicts>> = const { std::cell::RefCell::new(None) };
+}
+#[cfg(test)]
+thread_local! {
+    static EVALUATED_ENTRIES: std::cell::RefCell<Vec<Vec<crate::depth_record::AcceptanceEntry>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+type PublicationVerdicts = (
+    std::path::PathBuf,
+    std::collections::BTreeMap<String, crate::depth_evidence::EvidenceVerdicts>,
+);
+struct PublicationEvaluation(Option<PublicationVerdicts>);
+impl Drop for PublicationEvaluation {
+    fn drop(&mut self) {
+        VIEW_VERDICTS.with(|slot| *slot.borrow_mut() = self.0.take());
+    }
+}
+impl crate::depth_evidence::EvidenceVerdicts {
+    #[cfg(test)]
+    pub(crate) fn take_publication_evaluations() -> Vec<Vec<crate::depth_record::AcceptanceEntry>> {
+        EVALUATED_ENTRIES.with(|entries| std::mem::take(&mut *entries.borrow_mut()))
+    }
+
+    pub(crate) fn publication_results(
+        root: &Path,
+        record: &crate::depth_record::DepthRecord,
+    ) -> Result<Self, String> {
+        let bound = VIEW_VERDICTS.with(|slot| {
+            let slot = slot.borrow();
+            slot.as_ref().map(|(bound, values)| {
+                if root.canonicalize().map_err(|e| e.to_string())? != *bound {
+                    return Err("publication evaluation belongs to another view".into());
+                }
+                values
+                    .get(&serde_json::to_string(record).map_err(|e| e.to_string())?)
+                    .cloned()
+                    .ok_or_else(|| "publication record changed after evaluation".into())
+            })
+        });
+        if let Some(bound) = bound {
+            return bound;
+        }
+        // A route only supplies registry/owning authority. It must never implicitly select
+        // evidence evaluation for ordinary derivation, relay checks or independent clones.
+        crate::depth_evidence::production_results(root, record)
+    }
+
+    fn with_publication_results<T>(
+        root: &Path,
+        values: std::collections::BTreeMap<String, Self>,
+        render: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let root = root.canonicalize().map_err(|e| e.to_string())?;
+        let previous = VIEW_VERDICTS.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if slot.as_ref().is_some_and(|(bound, _)| *bound != root) {
+                return Err("nested publication evaluation belongs to another root".to_owned());
+            }
+            // An explicitly scoped full validator can invoke IN1, which independently
+            // re-evaluates the same root. Restore the outer source; never reuse its verdicts.
+            Ok(slot.replace((root, values)))
+        })?;
+        let _guard = PublicationEvaluation(previous);
+        render()
+    }
+
+    /// Evaluate a read-only post-entry view through B.7a, borrowing the route captured by
+    /// IN1. Only current owning entries select authenticated verdicts; ordinary derivation
+    /// and records without such an entry keep production behavior.
+    pub(crate) fn with_integration_publication<T>(
+        root: &Path,
+        captured: &crate::isolated_maintenance::CapturedRegistry,
+        validate: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let proposal = captured.proposal(root)?;
+        let super::Authority::Isolated(context) = proposal.authority() else {
+            return Err("integration publication lacks captured authority".into());
+        };
+        let host = captured.evidence_host(root)?;
+        let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let view = proposal.isolated_view(root, scratch.path())?;
+        let mut values = std::collections::BTreeMap::new();
+        {
+            let _binding = captured.bind_view(&view)?;
+            for entry in &captured.registry().agents {
+                for (version, path) in
+                    crate::depth_record::record_files(&scratch.path().join(&entry.manifest_root))
+                {
+                    let relative = path
+                        .strip_prefix(scratch.path())
+                        .map_err(|e| e.to_string())?
+                        .to_str()
+                        .ok_or("non-UTF8 record path")?;
+                    let record = crate::depth_record::DepthRecord::parse(
+                        &std::fs::read_to_string(&path).map_err(|e| e.to_string())?,
+                        &entry.agent_id,
+                        &version,
+                    )?;
+                    let digest = record.stated_sha256()?;
+                    let verdicts = if record.acceptance_entries.iter().any(|entry| {
+                        matches!(
+                            entry,
+                            crate::depth_record::AcceptanceEntry::MaintenanceCloseout { .. }
+                                | crate::depth_record::AcceptanceEntry::Promotion { .. }
+                        ) && entry.record_sha256() == digest
+                    }) {
+                        let (evaluated, verdicts) =
+                            Self::bind_view(&view, context, &host, relative)?.evaluate()?;
+                        if evaluated != record {
+                            return Err(
+                                "integration publication record changed during evaluation".into()
+                            );
+                        }
+                        #[cfg(test)]
+                        EVALUATED_ENTRIES.with(|entries| {
+                            entries.borrow_mut().push(evaluated.acceptance_entries)
+                        });
+                        verdicts
+                    } else {
+                        crate::depth_evidence::production_results(root, &record)?
+                    };
+                    values.insert(
+                        serde_json::to_string(&record).map_err(|e| e.to_string())?,
+                        verdicts,
+                    );
+                }
+            }
+        }
+        view.verify_current(root)?;
+        let outcome = Self::with_publication_results(root, values, validate);
+        view.verify_current(root)?;
+        captured.recheck(root)?;
+        outcome
+    }
+
+    /// Freshly evaluate the exact proposed records before invoking file-based renderers.
+    pub(crate) fn with_publication_view<T>(
+        caller: &Path,
+        root: &Path,
+        proposal: &crate::agent_maintenance::closeout_proposal::Proposal,
+        captured: &crate::isolated_maintenance::CapturedRegistry,
+        view: &crate::agent_maintenance::closeout_proposal::IsolatedView<'_>,
+        render: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let super::Authority::Isolated(context) = proposal.authority() else {
+            return Err("publication view lacks captured authority".into());
+        };
+        let host = captured.evidence_host(caller)?;
+        let mut values = std::collections::BTreeMap::new();
+        for entry in &captured.registry().agents {
+            for (_, path) in crate::depth_record::record_files(&root.join(&entry.manifest_root)) {
+                let path = path
+                    .strip_prefix(root)
+                    .map_err(|e| e.to_string())?
+                    .to_str()
+                    .ok_or("non-UTF8 record path")?;
+                let (record, verdicts) = Self::bind_view(view, context, &host, path)?.evaluate()?;
+                #[cfg(test)]
+                EVALUATED_ENTRIES
+                    .with(|entries| entries.borrow_mut().push(record.acceptance_entries.clone()));
+                values.insert(
+                    serde_json::to_string(&record).map_err(|e| e.to_string())?,
+                    verdicts,
+                );
+            }
+        }
+        let outcome = Self::with_publication_results(root, values, render);
+        view.verify_current(caller)?;
+        captured.recheck(caller)?;
+        outcome
+    }
+}
+
+impl crate::isolated_maintenance::Route {
+    /// Capture once for both the owning proposal and its post-entry publication view.
+    pub fn closeout_publication(
+        self,
+        root: &Path,
+    ) -> Result<
+        (
+            crate::agent_maintenance::closeout_proposal::Proposal,
+            crate::manifest_promotion::CloseoutPublicationContext,
+        ),
+        String,
+    > {
+        let captured = self.capture(root)?;
+        Ok((
+            captured.proposal(root)?,
+            crate::manifest_promotion::CloseoutPublicationContext(captured),
+        ))
+    }
+}
+impl crate::agent_maintenance::closeout_proposal::Proposal {
+    /// Entry admission, post-entry rendering, and rendered-output admission all precede delivery.
+    pub fn plan_closeout_publication(
+        &self,
+        root: &Path,
+        captured: Option<&crate::manifest_promotion::CloseoutPublicationContext>,
+        mut files: Vec<(std::path::PathBuf, Vec<u8>)>,
+    ) -> Result<Vec<crate::workspace_mutation::PlannedMutation>, String> {
+        let Some(captured) = captured.map(|captured| &captured.0) else {
+            return self.plan(root, files);
+        };
+        let mut entries = std::collections::BTreeMap::new();
+        self.plan_with(root, files.clone(), |root, before, after, written| {
+            entries = super::plan_manual_closeout(self.authority(), root, before, after, written)?;
+            Ok(entries.clone())
+        })?;
+        if entries.is_empty() {
+            return self.plan(root, files);
+        }
+        let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
+        let view = self.isolated_view(root, scratch.path())?;
+        // Only these known prospective outputs are materialized; scratch has no delivery authority.
+        for (path, bytes) in files
+            .iter()
+            .map(|(p, b)| (p.as_path(), b))
+            .chain(entries.iter().map(|(p, b)| (Path::new(p), b)))
+        {
+            let destination = scratch.path().join(path);
+            std::fs::create_dir_all(destination.parent().ok_or("output has no parent")?)
+                .map_err(|e| e.to_string())?;
+            std::fs::write(destination, bytes).map_err(|e| e.to_string())?;
+        }
+        let _binding = captured.bind_view(&view)?;
+        let bundle = crate::depth_evidence::EvidenceVerdicts::with_publication_view(
+            root,
+            scratch.path(),
+            self,
+            captured,
+            &view,
+            || crate::support_matrix::generate_publication_artifacts(scratch.path()),
+        )?;
+        files.extend([
+            (
+                support_matrix::JSON_OUTPUT_PATH.into(),
+                bundle.json.into_bytes(),
+            ),
+            (
+                support_matrix::MARKDOWN_OUTPUT_PATH.into(),
+                bundle.markdown.into_bytes(),
+            ),
+            (
+                support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH.into(),
+                bundle.runtime_support_data.into_bytes(),
+            ),
+        ]);
+        self.plan(root, files)
+    }
+    pub fn apply_closeout_publication(
+        &self,
+        root: &Path,
+        captured: Option<&crate::manifest_promotion::CloseoutPublicationContext>,
+        files: Vec<(std::path::PathBuf, Vec<u8>)>,
+    ) -> Result<crate::workspace_mutation::ApplySummary, String> {
+        let plans = self.plan_closeout_publication(root, captured, files)?;
+        // Re-admit at apply, retaining all expected-before input observations.
+        if let Some(captured) = captured {
+            captured.0.recheck(root)?;
+        }
+        crate::workspace_mutation::apply_admitted_mutations(root, &plans).map_err(|e| e.to_string())
+    }
+}
+
+/// MA5's aggregate write envelope is exact: only admitted own-version rows may differ.
+pub(super) fn validate_closeout(
+    root: &Path,
+    before: &crate::runtime_advertising::source::Source,
+    after: &crate::runtime_advertising::source::Source,
+    accepted: &std::collections::BTreeMap<(String, String), crate::depth_record::DepthRecord>,
+    host: &impl super::manual::Host,
+) -> Result<(), String> {
+    if accepted.len() != 1 {
+        return Err("closeout publication requires one owning agent/version".into());
+    }
+    for path in [
+        support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+        crate::capability_matrix::DEFAULT_OUT_PATH,
+    ] {
+        if before.optional_bytes(path)? != after.optional_bytes(path)? {
+            return Err("closeout cannot change runtime or capability publication".into());
+        }
+    }
+    let old: SupportMatrixArtifact =
+        serde_json::from_str(&before.read(support_matrix::JSON_OUTPUT_PATH)?)
+            .map_err(|e| e.to_string())?;
+    let new: SupportMatrixArtifact =
+        serde_json::from_str(&after.read(support_matrix::JSON_OUTPUT_PATH)?)
+            .map_err(|e| e.to_string())?;
+    if let Some(error) = new.revision_error() {
+        return Err(error);
+    }
+    let mut expected = old.rows;
+    for row in &mut expected {
+        if let Some(record) = accepted.get(&(row.agent.clone(), row.version.clone())) {
+            let verdicts = host.evidence(root, record)?;
+            // The post-entry authentication must still support everything admission relied on.
+            for obligation in crate::depth_record::due(record)? {
+                let stated = record
+                    .execution
+                    .as_ref()
+                    .and_then(|e| e.results.iter().find(|r| r.obligation == obligation))
+                    .ok_or("post-entry evaluation lost a due obligation")?;
+                if stated.result == crate::depth_record::DepthResult::Verified
+                    && verdicts.result(record, &obligation)
+                        != crate::depth_record::DepthResult::Verified
+                {
+                    return Err("post-entry evaluation disagrees with closeout admission".into());
+                }
+            }
+            let evidence = crate::depth_record::bound_evidence(root, [record])?;
+            row.depth = support_matrix::depth::derive_evaluated_depth_facts(
+                Some(record),
+                // Match committed derivation: only the record's covered modes enroll a
+                // target here; declaration-only enrollment belongs to preparation preview.
+                false,
+                &row.target,
+                &|p| evidence.get(p).cloned(),
+                &verdicts,
+            )?;
+            if row.manifest_support == support_matrix::ManifestSupportState::Supported
+                && row.backend_support == support_matrix::BackendSupportState::Supported
+                && row.evidence_notes.is_empty()
+            {
+                row.uaa_support = support_matrix::depth::apply_depth(
+                    support_matrix::UaaSupportState::Supported,
+                    row.depth.as_ref(),
+                );
+            }
+        }
+    }
+    if new.rows != expected {
+        return Err(
+            "closeout publication changed foreign rows or disagrees with its post-entry record"
+                .into(),
+        );
+    }
+    let rendered = support_matrix::render_publication_artifacts(
+        &before.read(support_matrix::MARKDOWN_OUTPUT_PATH)?,
+        &expected,
+        after.read(support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH)?,
+    )?;
+    if after.read(support_matrix::MARKDOWN_OUTPUT_PATH)? != rendered.markdown {
+        return Err("closeout Markdown disagrees with admitted publication".into());
+    }
+    Ok(())
+}
+
+pub(super) fn is_qualification(effect: &super::Effect) -> bool {
+    effect.path == support_matrix::JSON_OUTPUT_PATH
+        && (effect.kind.starts_with("promise ") || effect.kind.starts_with("capability "))
+}
+
+pub(super) fn validate_promoted(
+    root: &Path,
+    after: &crate::runtime_advertising::source::Source,
+    records: &[crate::depth_record::DepthRecord],
+    host: &impl super::manual::Host,
+) -> Result<(), String> {
+    let artifact: SupportMatrixArtifact =
+        serde_json::from_str(&after.read(support_matrix::JSON_OUTPUT_PATH)?)
+            .map_err(|e| e.to_string())?;
+    for record in records {
+        let verdicts = host.evidence(root, record)?;
+        let evidence = crate::depth_record::bound_evidence(root, [record])?;
+        for row in artifact.rows.iter().filter(|r| {
+            r.agent == record.policy.selection.agent_id
+                && r.version == record.policy.selection.enrollment.version
+        }) {
+            let expected = support_matrix::depth::derive_evaluated_depth_facts(
+                Some(record),
+                // Match committed derivation: only the record's covered modes enroll a
+                // target here; declaration-only enrollment belongs to preparation preview.
+                false,
+                &row.target,
+                &|p| evidence.get(p).cloned(),
+                &verdicts,
+            )?;
+            if row.depth != expected {
+                return Err(
+                    "promotion publication disagrees with freshly evaluated post-entry record"
+                        .into(),
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn publication_promoted_re_admission_keeps_uncovered_ordinary_target_without_depth() {
+        let root = tempfile::tempdir().unwrap();
+        let record = crate::depth_record::DepthRecord::parse(
+            include_str!("../../tests/fixtures/depth-synthetic/record.json"),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        let rows = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+            .into_iter()
+            .map(|target| {
+                let depth = support_matrix::depth::derive_depth_facts(
+                    Some(&record),
+                    false,
+                    target,
+                    &|_| None,
+                )
+                .unwrap();
+                support_matrix::SupportRow {
+                    agent: "depth_fixture".into(),
+                    version: "0.2.0".into(),
+                    target: target.into(),
+                    manifest_support: support_matrix::ManifestSupportState::Supported,
+                    backend_support: support_matrix::BackendSupportState::Supported,
+                    uaa_support: support_matrix::UaaSupportState::Supported,
+                    pointer_promotion: support_matrix::PointerPromotionState::LatestValidated,
+                    evidence_notes: vec![],
+                    depth,
+                }
+            })
+            .collect::<Vec<_>>();
+        assert!(rows[0].depth.is_some());
+        assert!(rows[1].depth.is_none());
+        let artifact = SupportMatrixArtifact {
+            schema_version: 2,
+            rows,
+        };
+        let path = root.path().join(support_matrix::JSON_OUTPUT_PATH);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, serde_json::to_vec(&artifact).unwrap()).unwrap();
+        validate_promoted(
+            root.path(),
+            &crate::runtime_advertising::source::Source::workspace(root.path()).unwrap(),
+            &[record],
+            &super::super::manual::Production,
+        )
+        .unwrap();
+    }
+}

@@ -297,6 +297,45 @@ Each step is a reviewed PR into `staging`.
        require the lead's run outside the socket sandbox.
      - Publication remains on production verdicts and unqualified throughout this slice. The
        option A ordering and qualified publication belong to B.7b; no workflow changes here.
+   - B.7b implements CP-P3 option A after the separate Annex A.1/A.2 amendment landed.
+     Both MA5 writers capture one route and deliver one expected-before batch: admit the
+     closeout entry, build its post-entry scratch view, freshly authenticate that exact record
+     through B.7a's `EvidenceVerdicts::bind_view`, render support JSON, Markdown and runtime
+     data, then re-admit the rendered outputs before delivery. An absent route keeps the
+     existing production writers and production verdicts.
+     - Ordinary support derivation keeps production verdicts even with a route installed.
+       Only the owning MA5/MA6 rendering invocation explicitly supplies view-evaluated,
+       record-sealed verdicts. Reporting, relay checks and candidate clones do not acquire
+       evidence authority from route or registry presence.
+     - MA5 admission compares the complete aggregate rows with the prior publication plus the
+       freshly derived own-agent/own-version depth facts. Other agents and versions, runtime
+       data, capability publication and Markdown outside the generated block cannot change.
+       A post-entry evaluation that disagrees with admission refuses the entire batch.
+     - IN1 attributes a new qualification to closeout only with a matching newly added current
+       `MaintenanceCloseout` entry, independently admitted for that same agent/version, and no
+       promotion effect anywhere in the candidate. Otherwise promotion authority is required.
+       Consistency explicitly supplies fresh caller evaluation of the delivered post-entry
+       closeout/promotion records through the same scoped verdict source; it never relies on
+       ambient route detection. Records without a current owning entry keep production verdicts.
+       The positive isolated `manifest-validate --tip` proof explicitly supplies that source
+       around the full validator as well. Its nested IN1 and per-root comparisons independently
+       re-evaluate the delivered records and restore the outer invocation's source on exit.
+     - MA6 first admits its own entry and materializes it in the proposed view, then evaluates
+       that post-entry record, renders support/runtime/capability publication, validates it and
+       re-admits the rendered proposal. Record-sealed verdicts are scoped to that scratch root
+       and rendering invocation; scratch never resolves its own authority.
+     - The B.5b/B.5c/B.6b chains now expect verified, qualified rows after MA5. Their fixtures
+       refresh reporting publication with production verdicts after MA4, before closeout;
+       unchanged bytes need no extra commit. MA5's fresh post-entry evaluation publishes
+       qualification. Full MA4 socket delivery still requires the lead's outside run.
+       The ordinary `0.3.0` replay also refreshes publication with production verdicts
+       before its closeout can claim publication drift resolved. It preserves the retained
+       `0.2.0` closeout entry; the later MA6 still creates that record's first `Promotion`.
+       `isolated_maintenance/tests/publication.rs` also uses B.7a's socket-free authenticated
+       assembler seam to exercise owning publication, foreign-row/runtime refusals, IN1
+       closeout attribution and MA6's post-entry publication without claiming socket delivery.
+       It also proves default production derivation under a route and in a bound scratch view
+       with neither a Git repository nor a remote.
    - Open, before the isolated run (C): green gates run as subprocesses in the candidate, so they
      see neither the route nor the bound registry. `capability-matrix --check` and
      `support-matrix --check` would then refuse the depth subject. The in-process proof stubs the

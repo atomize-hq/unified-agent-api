@@ -16,15 +16,16 @@ use super::{
 pub struct CloseoutPlan {
     proposal: super::super::closeout_proposal::Proposal,
     files: Vec<(std::path::PathBuf, Vec<u8>)>,
+    captured: Option<xtask::manifest_promotion::CloseoutPublicationContext>,
 }
 impl CloseoutPlan {
-    /// Rendered artifact/doc paths; admission may additionally extend the depth record.
+    /// Input artifact/doc paths; owning admission may also render publication and extend the record.
     pub fn paths(&self) -> impl Iterator<Item = &Path> {
         self.files.iter().map(|(path, _)| path.as_path())
     }
     pub fn apply(self, workspace_root: &Path) -> Result<ApplySummary, MaintenanceCloseoutError> {
         self.proposal
-            .apply(workspace_root, self.files)
+            .apply_closeout_publication(workspace_root, self.captured.as_ref(), self.files)
             .map_err(MaintenanceCloseoutError::Validation)
     }
 }
@@ -33,13 +34,17 @@ pub fn plan_closeout_mutations(
     workspace_root: &Path,
     linked: &LinkedMaintenanceCloseout,
 ) -> Result<CloseoutPlan, MaintenanceCloseoutError> {
-    let proposal =
+    let (proposal, captured) =
         capture_proposal(workspace_root).map_err(MaintenanceCloseoutError::Validation)?;
     let files = closeout_files(workspace_root, linked)?;
     proposal
-        .check(workspace_root, &files)
+        .plan_closeout_publication(workspace_root, captured.as_ref(), files.clone())
         .map_err(MaintenanceCloseoutError::Validation)?;
-    Ok(CloseoutPlan { proposal, files })
+    Ok(CloseoutPlan {
+        proposal,
+        captured,
+        files,
+    })
 }
 
 fn closeout_files(
@@ -76,14 +81,19 @@ pub fn write_closeout_outputs(
     request_path: &Path,
     closeout_path: &Path,
 ) -> Result<CloseoutWriteSummary, MaintenanceCloseoutError> {
-    let proposal =
+    let (proposal, captured) =
         capture_proposal(workspace_root).map_err(MaintenanceCloseoutError::Validation)?;
     let linked = super::load_linked_closeout(workspace_root, request_path, closeout_path)?;
     let mut files = closeout_files(workspace_root, &linked)?;
     if let Some(file) = plan_lifecycle_state_after_maintenance_closeout(workspace_root, &linked)? {
         files.push(file);
     }
-    let apply = CloseoutPlan { proposal, files }.apply(workspace_root)?;
+    let apply = CloseoutPlan {
+        proposal,
+        captured,
+        files,
+    }
+    .apply(workspace_root)?;
     Ok(CloseoutWriteSummary {
         agent_id: linked.request.agent_id.clone(),
         maintenance_pack_prefix: linked.maintenance_pack_prefix.clone(),
@@ -148,9 +158,21 @@ fn plan_lifecycle_state_after_maintenance_closeout(
 /// installed route refuses; only an absent route retains the production proposal.
 pub(super) fn capture_proposal(
     workspace_root: &Path,
-) -> Result<super::super::closeout_proposal::Proposal, String> {
+) -> Result<
+    (
+        super::super::closeout_proposal::Proposal,
+        Option<xtask::manifest_promotion::CloseoutPublicationContext>,
+    ),
+    String,
+> {
     match xtask::isolated_maintenance::route(workspace_root)? {
-        Some(route) => route.proposal(workspace_root),
-        None => super::super::closeout_proposal::Proposal::capture(workspace_root),
+        Some(route) => {
+            let (proposal, captured) = route.closeout_publication(workspace_root)?;
+            Ok((proposal, Some(captured)))
+        }
+        None => Ok((
+            super::super::closeout_proposal::Proposal::capture(workspace_root)?,
+            None,
+        )),
     }
 }
