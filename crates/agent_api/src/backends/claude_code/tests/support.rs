@@ -250,11 +250,8 @@ pub(super) fn fake_claude_binary() -> PathBuf {
         }
     }
 
-    let current_exe = std::env::current_exe().expect("resolve current test binary path");
-    let target_dir = current_exe
-        .parent()
-        .and_then(|dir| dir.parent())
-        .expect("resolve target dir from current test binary");
+    let target_dir = crate::backends::test_support::cargo_profile_dir();
+    let target_dir = target_dir.as_path();
     let repo_root = target_dir
         .parent()
         .and_then(|dir| dir.parent())
