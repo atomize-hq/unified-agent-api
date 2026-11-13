@@ -1,9 +1,21 @@
 //! Integration authority uses one authenticated tip, with Source's git_inputs::command runner.
 use crate::{
+    agent_lifecycle::LifecycleStage,
     depth_record::{acquisition, DepthRecord},
     runtime_advertising::source::Source,
     support_matrix::depth::covered_targets,
 };
+
+/// Callers establish the same frozen approval generation before checking its progression.
+pub(crate) fn check_progression(prior: LifecycleStage, next: LifecycleStage) -> Result<(), String> {
+    if next < prior {
+        return Err(format!(
+            "onboarding lifecycle progression cannot move backward from `{}` to `{}` within a frozen generation",
+            prior.as_str(), next.as_str()
+        ));
+    }
+    Ok(())
+}
 
 /// Keep the statement reader's complete-directory validation and shared parser, while ensuring
 /// both enumeration and blob reads use the same hardened view as bound-input comparisons.

@@ -48,10 +48,13 @@ pub(crate) fn reporting_targets(
     {
         return Ok(None);
     }
-    let adapter = Adapter::synthetic()?;
+    let mut adapter = Adapter::synthetic()?;
     if entry.agent_id != adapter.scaffold.agent_id {
         return Ok(None);
     }
+    // The captured registry authenticates this optional charter rule 12 settlement.
+    // Keep every other compiled descriptor and selection check in registry_delta.
+    adapter.declared.maintenance.release_watch = entry.maintenance.release_watch.clone();
     let old = AgentRegistry {
         agents: vec![adapter.scaffold.clone()],
     };

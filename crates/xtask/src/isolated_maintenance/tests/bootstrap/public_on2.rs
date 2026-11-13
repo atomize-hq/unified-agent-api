@@ -15,6 +15,125 @@ fn args(write: bool) -> crate::runtime_follow_on::Args {
 }
 
 #[test]
+fn public_on2_in1_refuses_lifecycle_rollback_and_closed_generation_refreeze() {
+    let f = public_on1::declared_chain();
+    let _installed = f.install();
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
+        .unwrap();
+    integrate(&f, &parent);
+    let enrolled = fs::read(f.root.path().join(STATE)).unwrap();
+    let record = fs::read(f.root.path().join(RECORD)).unwrap();
+    let executor = executor("", 0);
+    let mut write_args = args(true);
+    write_args.codex_binary = Some(executor.path().join("executor.sh").to_string_lossy().into());
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), write_args, &mut Vec::new()).unwrap();
+    integrate(&f, &parent);
+    let implemented = head(&f);
+    write(f.root.path(), STATE, &enrolled);
+    let rollback = candidate(&f, &implemented);
+    assert_eq!(
+        git(
+            f.root.path(),
+            &["diff", "--name-only", &implemented, &rollback]
+        ),
+        STATE
+    );
+    assert_eq!(fs::read(f.root.path().join(RECORD)).unwrap(), record);
+    let error = check_integration(f.root.path(), &implemented).unwrap_err();
+    assert!(error.contains("lifecycle progression"), "{error}");
+    let before =
+        crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap();
+    let error =
+        crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
+            .unwrap_err();
+    assert!(
+        error.to_string().contains("lifecycle progression"),
+        "{error}"
+    );
+    assert_eq!(
+        crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap(),
+        before
+    );
+    // Even if the refused candidate is moved to the protected tip, IN1 observes the rollback.
+    f.host();
+    local(&f, &rollback);
+    let error = check_integration(f.root.path(), &implemented).unwrap_err();
+    assert!(error.contains("lifecycle progression"), "{error}");
+}
+
+#[test]
+fn public_on2_release_watch_accepts_actual_on1_empty_current() {
+    let f = public_on1::declared_chain();
+    let _installed = f.install();
+    let current = fs::read_to_string(f.root.path().join(format!("{ROOT}/current.json"))).unwrap();
+    assert_eq!(
+        current,
+        crate::onboard_agent::render_current_json(&["x86_64-unknown-linux-gnu".into()])
+    );
+    let governing: toml_edit::DocumentMut =
+        include_str!("../../../../tests/fixtures/depth-synthetic/governing/registry-entry.toml")
+            .replace("{{ISOLATED_OWNER}}", "fixture")
+            .replace("{{ISOLATED_REPO}}", "isolated")
+            .parse()
+            .unwrap();
+    let release = toml_edit::Item::Value(toml_edit::Value::InlineTable(
+        governing["agents"][0]["maintenance"]["release_watch"]
+            .as_table()
+            .unwrap()
+            .clone()
+            .into_inline_table(),
+    ));
+    // Settle charter rule 12 in protected inputs, retaining the genuine ON1 output bytes.
+    f.registry(|d| {
+        d["agents"]
+            .as_array_of_tables_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|e| e["agent_id"].as_str() == Some("depth_fixture"))
+            .unwrap()["maintenance"]["release_watch"] = release.clone();
+    });
+    let mut approval: toml_edit::DocumentMut = fs::read_to_string(f.root.path().join(APPROVAL))
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut maintenance = toml_edit::Table::new();
+    maintenance["mode"] = toml_edit::value("release_watch_enrolled");
+    maintenance["release_watch"] = release;
+    approval["descriptor"]["maintenance"] = toml_edit::Item::Table(maintenance);
+    let raw = approval.to_string();
+    let mut state = life::load_lifecycle_state(f.root.path(), STATE).unwrap();
+    write(f.root.path(), APPROVAL, &raw);
+    state.approval_artifact_sha256 = hex::encode(Sha256::digest(raw.as_bytes()));
+    write(
+        f.root.path(),
+        STATE,
+        serde_json::to_vec_pretty(&state).unwrap(),
+    );
+    f.commit();
+    local(&f, &head(&f));
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
+        .unwrap();
+    integrate(&f, &parent);
+    assert_eq!(
+        fs::read_to_string(f.root.path().join(format!("{ROOT}/current.json"))).unwrap(),
+        current
+    );
+    let registry = crate::isolated_maintenance::registry(f.root.path()).unwrap();
+    let mut entry = registry.find("depth_fixture").unwrap().clone();
+    assert!(entry.maintenance.release_watch.is_some());
+    assert!(onboarding::reporting_targets(&entry, &current)
+        .unwrap()
+        .is_some());
+    entry.display_name = "Foreign descriptor".into();
+    assert!(onboarding::reporting_targets(&entry, &current)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn public_on2_connected_freeze_write_admission_and_observation() {
     let f = public_on1::declared_chain();
     let _installed = f.install();

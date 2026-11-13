@@ -12,7 +12,7 @@ use serde_json::Value;
 
 mod approval;
 mod integration;
-pub(crate) use integration::check_freeze;
+pub(crate) use integration::{check_freeze, check_progression};
 mod execution;
 mod packet;
 mod reporting;
@@ -67,6 +67,17 @@ fn plan(workspace: &Path, approval_path: &str, parent: Option<&Source>) -> Resul
     }
     if state.lifecycle_stage != agent_lifecycle::LifecycleStage::Enrolled {
         return Err(format!("runtime-follow-on requires lifecycle stage `enrolled` (found `{}`); after runtime_integrated a new approval is required", state.lifecycle_stage.as_str()));
+    }
+    // A branch-local rollback cannot reopen the same generation's protected freeze window.
+    if let Some(raw) = tip.optional(&state_path)? {
+        let prior: LifecycleState = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        if prior.support_depth.is_some() {
+            let prior_approval =
+                OnboardingApproval::parse(&tip.read(approval_path)?, approval_path)?;
+            if prior_approval.event == approval.event {
+                check_progression(prior.lifecycle_stage, state.lifecycle_stage)?;
+            }
+        }
     }
     use crate::agent_registry::support_depth::LifecyclePath;
     let declaration = entry

@@ -100,7 +100,7 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
     Ok(())
 }
 
-/// An implementation leaves the statement unchanged but must still preserve its binding.
+/// Implementations preserve their binding and the frozen generation's lifecycle progression.
 /// Only the installed onboarding scope gets this finite read; production dispatch is unchanged.
 fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, String> {
     let Some(route) = crate::isolated_maintenance::route(root)? else {
@@ -118,9 +118,12 @@ fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, Stri
         &path,
     )?;
     let path = agent_lifecycle::lifecycle_state_path_for_entry(&new.entry);
-    for view in [old, new] {
-        let state: agent_lifecycle::LifecycleState =
-            serde_json::from_str(&view.source.read(&path)?).map_err(|e| e.to_string())?;
+    let read = |view: &View| -> Result<agent_lifecycle::LifecycleState, String> {
+        serde_json::from_str(&view.source.read(&path)?).map_err(|e| e.to_string())
+    };
+    let prior = read(old)?;
+    let next = read(new)?;
+    for (view, state) in [(old, &prior), (new, &next)] {
         crate::depth_record::onboarding::onboarding_binding(
             state.support_depth.as_deref(),
             &approval,
@@ -133,6 +136,18 @@ fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, Stri
                 .collect::<Vec<_>>()
                 .join("; ")
         })?;
+    }
+    // The binding also closes a frozen generation across lifecycle-only changes.
+    if approval
+        .support_depth_version
+        .as_ref()
+        .and_then(|v| old.records.get(v))
+        .is_some_and(|record| record.event == approval.event)
+    {
+        crate::runtime_follow_on::depth::check_progression(
+            prior.lifecycle_stage,
+            next.lifecycle_stage,
+        )?;
     }
     captured.recheck(root)?;
     Ok(true)
