@@ -208,6 +208,11 @@ fn prove_profile_in(
     host: Option<&crate::isolated_maintenance::EvidenceHost>,
 ) -> Result<String, String> {
     let resolved = resolve_profile_in(api, root, p, host)?;
+    prove_resolved(root, api.repository(), &resolved)
+}
+
+fn prove_resolved(root: &Path, repository: &str, resolved: &Resolved) -> Result<String, String> {
+    let p = resolved.profile;
     let target = match &resolved.original.obligations {
         Some(o) if o.targets.len() == 1 => o.targets[0].clone(),
         _ => return Err("isolated proof requires exactly one frozen target".into()),
@@ -228,20 +233,16 @@ fn prove_profile_in(
     )?;
     // All run/endorsement objects used by currentness must exist in the disposable checkout.
     for run in &resolved.runs {
+        source(scratch.path(), repository, &run.receipt.build.source_commit)?;
         source(
             scratch.path(),
-            api.repository(),
-            &run.receipt.build.source_commit,
-        )?;
-        source(
-            scratch.path(),
-            api.repository(),
+            repository,
             &run.receipt.adequacy.endorsement.source_commit,
         )?;
     }
     let jail = crate::workspace_mutation::WorkspacePathJail::new(scratch.path())
         .map_err(|e| e.to_string())?;
-    let assembly = assembly::assemble(&resolved)?;
+    let assembly = assembly::assemble(resolved)?;
     for (reference, bytes) in &assembly.files {
         let path = jail
             .resolve(Path::new(&reference.path))

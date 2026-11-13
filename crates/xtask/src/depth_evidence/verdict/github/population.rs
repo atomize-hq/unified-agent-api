@@ -228,6 +228,25 @@ pub(super) fn resolve_profile_inputs(
     if runs.is_empty() {
         return Err("no applicable producer attempts".into());
     }
+    check_stable(api, &query, &inventory, &anchor_value, ir_p3)?;
+    same_host()?;
+    view.verify()?;
+    Ok(Resolved {
+        profile: p,
+        original,
+        definition,
+        runs,
+    })
+}
+
+/// Recheck discovery facts independently of already authenticated immutable source/artifact bytes.
+pub(super) fn check_stable(
+    api: &impl Api,
+    query: &str,
+    inventory: &[Value],
+    anchor_value: &Value,
+    ir_p3: bool,
+) -> Result<(), String> {
     // Do not allow an attempt created during discovery to disappear from the population. Under
     // IR-P3 unrelated workflow progress may continue, so only run identities must hold still.
     let identities = |rows: &[Value]| -> Vec<Value> {
@@ -248,17 +267,10 @@ pub(super) fn resolve_profile_inputs(
             })
             .collect()
     };
-    if identities(&inventory) != identities(&list(api, &query, Some("workflow_runs"))?)
-        || anchor_value != api.json(&api.endpoint("git/ref/heads/staging"))?
+    if identities(inventory) != identities(&list(api, query, Some("workflow_runs"))?)
+        || *anchor_value != api.json(&api.endpoint("git/ref/heads/staging"))?
     {
         return Err("host population or approved anchor changed during read".into());
     }
-    same_host()?;
-    view.verify()?;
-    Ok(Resolved {
-        profile: p,
-        original,
-        definition,
-        runs,
-    })
+    Ok(())
 }

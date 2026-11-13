@@ -376,5 +376,59 @@ pub(super) fn onboarding_workspace() -> tempfile::TempDir {
             root.path().to_str().unwrap(),
         ],
     );
+    // Reconstitute the real freeze/write lifecycle outputs on the same installed, reviewed
+    // producer closure. These are producer-source projections, not a second ON2 admission
+    // proof: actual public ON2 above still requires and observes changed implementation files.
+    let implemented = fs::read(root.path().join(depth_ci::onboarding::STATE)).unwrap();
+    let frozen = git(
+        root.path(),
+        &[
+            "show",
+            &format!("on2-freeze:{}", depth_ci::onboarding::STATE),
+        ],
+    );
+    install_onboarding_producer(root.path());
+    // The upstream reporting admission needed this source; wrapper-only evidence does not.
+    fs::remove_dir_all(root.path().join("crates/agent_api/src")).unwrap();
+    write(root.path(), depth_ci::onboarding::STATE, frozen);
+    let (_, freeze) = build(root.path(), Profile::SyntheticOnboarding);
+    git(root.path(), &["tag", "producer-freeze", &freeze]);
+    write(root.path(), depth_ci::onboarding::STATE, implemented);
     root
+}
+
+#[cfg(unix)]
+fn install_onboarding_producer(root: &Path) {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    // Install the compiled producer independently of lifecycle progress. All bytes, including
+    // the decoder, are authentic repository inputs; no lifecycle output is preseeded.
+    let mut paths = vec![
+        "Cargo.lock".to_owned(),
+        profile::WORKFLOW.into(),
+        depth_ci::COLLECTOR.into(),
+        depth_ci::ARCHIVE.into(),
+        depth_ci::PRODUCTION.into(),
+        depth_ci::ASSERTION.into(),
+        "crates/wrapper_events/Cargo.toml".into(),
+    ];
+    paths.extend(
+        crate::runtime_advertising::source::Source::tip(&repo, "HEAD")
+            .unwrap()
+            .committed_files("crates/depth_fixture")
+            .unwrap(),
+    );
+    for name in [
+        "record.json",
+        "cases.json",
+        "build-profile.json",
+        "contract.md",
+    ] {
+        paths.push(format!(
+            "{}/{name}",
+            Profile::SyntheticOnboarding.directory()
+        ));
+    }
+    for path in paths {
+        write(root, &path, fs::read(repo.join(&path)).unwrap());
+    }
 }

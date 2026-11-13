@@ -2,6 +2,8 @@
 use super::*;
 use crate::{depth_ci::onboarding as inputs, isolated_maintenance::EvidenceHost};
 
+mod checkpoints;
+
 const P: Profile = Profile::SyntheticOnboarding;
 const RUNS: &str = "actions/workflows/ci.yml/runs?created=%3E%3D2026-11-05&per_page=100&page=1";
 
@@ -25,8 +27,7 @@ fn onboarding_eleven_obligations_bind_committed_on2_and_approval_adoption() {
         assert_eq!(run.receipt.adequacy.endorsement.pull_request, 9);
     }
     let proof: Value =
-        serde_json::from_str(&prove_profile_in(f.root.path(), &f.api, P, Some(&host)).unwrap())
-            .unwrap();
+        serde_json::from_str(&prove_resolved(f.root.path(), ISOLATED, &resolved).unwrap()).unwrap();
     assert_eq!(proof["result"], "verified", "{proof}");
     assert_eq!(proof["obligations"].as_array().unwrap().len(), 11);
     assert!(proof["obligations"]
@@ -40,14 +41,18 @@ fn onboarding_eleven_obligations_bind_committed_on2_and_approval_adoption() {
 /// Add a later run at its actual API-derived source head. Adoption always names its real
 /// reviewed source and mapping, so incompatible source bytes cannot be hidden by this host.
 fn later(f: &mut Fixture, id: u64, event: &str, label: &str, witness: &Witness) {
-    write(f.root.path(), &format!("docs/{label}.md"), label);
     git(f.root.path(), &["add", "."]);
     git(f.root.path(), &["commit", "-qm", label]);
     let commit = git(f.root.path(), &["rev-parse", "HEAD"]);
+    add_run(f, id, event, &commit, witness);
+}
+
+fn add_run(f: &mut Fixture, id: u64, event: &str, commit: &str, witness: &Witness) {
+    let commit = commit.to_owned();
     let mut w = witness.clone();
     w.workflow_commit = commit.clone();
     w.build.source_commit = commit.clone();
-    w.build.source_tree = git(f.root.path(), &["rev-parse", "HEAD^{tree}"]);
+    w.build.source_tree = git(f.root.path(), &["rev-parse", &format!("{commit}^{{tree}}")]);
     let next = fixture::endpoints_for_run(f.root.path(), P, &w, &commit, id, 2);
     let mut rows = f.api.json(&f.api.endpoint(RUNS)).unwrap()["workflow_runs"]
         .as_array()
@@ -122,9 +127,20 @@ fn onboarding_same_generation_later_runs_wait_for_producer_not_workflow() {
     let (mut f, _) = onboarding();
     f.install(2);
     let w = f.w.clone();
-    later(&mut f, 2, "pull_request", "publication", &w);
-    later(&mut f, 3, "merge_group", "proving", &w);
-    later(&mut f, 4, "push", "post-tip", &w);
+    let initial_host = EvidenceHost::for_test(ISOLATED, &f.commit);
+    let initial = resolve_profile_in(&f.api, f.root.path(), P, Some(&initial_host)).unwrap();
+    let mut record = checkpoints::reporting(&f, &initial);
+    let freeze = git(f.root.path(), &["rev-parse", "producer-freeze"]);
+    add_run(&mut f, 5, "pull_request", &freeze, &w);
+    use crate::agent_lifecycle::LifecycleStage as Stage;
+    checkpoints::advance(&f, &mut record, Stage::PublicationReady);
+    later(&mut f, 2, "pull_request", "publication-ready", &w);
+    checkpoints::advance(&f, &mut record, Stage::Published);
+    later(&mut f, 3, "merge_group", "publication", &w);
+    checkpoints::advance(&f, &mut record, Stage::ClosedBaseline);
+    later(&mut f, 4, "push", "proving", &w);
+    write(f.root.path(), "docs/post-tip.md", "post-tip observation");
+    later(&mut f, 6, "push", "post-tip", &w);
     all_running(&mut f.api);
     let tip = git(f.root.path(), &["rev-parse", "HEAD"]);
     f.api
@@ -136,12 +152,18 @@ fn onboarding_same_generation_later_runs_wait_for_producer_not_workflow() {
         .iter()
         .map(|r| (r.receipt.producer.run_id, r.receipt.producer.run_attempt))
         .collect();
-    assert_eq!(attempts.len(), 8);
-    assert_eq!(resolved.runs.len(), 8 * 11);
-    let proof: Value =
-        serde_json::from_str(&prove_profile_in(f.root.path(), &f.api, P, Some(&host)).unwrap())
-            .unwrap();
-    assert_eq!(proof["result"], "verified", "{proof}");
+    assert_eq!(
+        attempts,
+        (1..=6)
+            .flat_map(|id| (1..=2).map(move |attempt| (id, attempt)))
+            .collect()
+    );
+    assert_eq!(resolved.runs.len(), 12 * 11);
+    // The separate eleven-obligation proof covers the full verdict/publisher surface. Here
+    // authenticate all eleven for every attempt, then evaluate the complete attempt population
+    // for one obligation; source/currentness work need not be repeated eleven times per head.
+    let verdict = checkpoints::evaluate_population(&f, &resolved, None);
+    assert_eq!(verdict.result, DepthResult::Verified, "{verdict:?}");
     // This is the same authenticated population an IN1 consumer evaluates after terminal
     // producer binding. Actual protected IN1/needs scheduling is the independent phase C proof.
     // Cover each applicable attempt, including every later retry. Distribute the producer
@@ -158,39 +180,55 @@ fn onboarding_same_generation_later_runs_wait_for_producer_not_workflow() {
             _ => v["jobs"][0]["steps"].as_array_mut().unwrap().clear(),
         });
         assert!(
-            resolve_profile_in(&api, f.root.path(), P, Some(&host)).is_err(),
+            artifact::witness(
+                &api,
+                &fs::read_to_string(f.root.path().join(depth_ci::ARCHIVE)).unwrap(),
+                &api.json(&api.endpoint(&format!("actions/runs/{id}/attempts/{attempt}")))
+                    .unwrap(),
+                *attempt,
+                P,
+            )
+            .is_err(),
             "discarded {id}/{attempt}"
         );
     }
     let mut missing = f.api.clone();
     missing.page("actions/runs/4/artifacts", Some("artifacts"), vec![]);
-    assert!(resolve_profile_in(&missing, f.root.path(), P, Some(&host)).is_err());
+    assert!(artifact::witness(
+        &missing,
+        &fs::read_to_string(f.root.path().join(depth_ci::ARCHIVE)).unwrap(),
+        &missing
+            .json(&missing.endpoint("actions/runs/4/attempts/1"))
+            .unwrap(),
+        1,
+        P,
+    )
+    .is_err());
     let changed = |field, value| PopulationChanges {
         api: &f.api,
         reads: std::cell::Cell::new(0),
         field,
         value,
     };
-    assert!(resolve_profile_in(
-        &changed("run_attempt", json!(3)),
-        f.root.path(),
-        P,
-        Some(&host)
-    )
-    .unwrap_err()
-    .contains("population"));
-    assert_eq!(
-        resolve_profile_in(
-            &changed("status", json!("completed")),
-            f.root.path(),
-            P,
-            Some(&host)
-        )
-        .unwrap()
-        .runs
-        .len(),
-        88
-    );
+    let query = RUNS.split("&per_page").next().unwrap();
+    let anchor = f
+        .api
+        .json(&f.api.endpoint("git/ref/heads/staging"))
+        .unwrap();
+    for (field, value, refuses) in [
+        ("run_attempt", json!(3), true),
+        ("status", json!("completed"), false),
+    ] {
+        let changed = changed(field, value);
+        let inventory = list(&changed, query, Some("workflow_runs")).unwrap();
+        let stable = population::check_stable(&changed, query, &inventory, &anchor, true);
+        if refuses {
+            assert!(stable.unwrap_err().contains("population"));
+        } else {
+            stable.unwrap();
+            assert_eq!(resolved.runs.len(), 132);
+        }
+    }
 
     // The earlier unsuccessful attempt remains in the population alongside every green retry.
     let mut failed = f.w.clone();
@@ -215,17 +253,30 @@ fn onboarding_same_generation_later_runs_wait_for_producer_not_workflow() {
     }
     all_running(&mut f.api);
     let resolved = resolve_profile_in(&f.api, f.root.path(), P, Some(&host)).unwrap();
-    assert_eq!(resolved.runs.len(), 88);
+    assert_eq!(resolved.runs.len(), 132);
     assert!(resolved.runs.iter().any(|r| r.receipt.producer.run_id == 1
         && r.receipt
             .cases
             .executed
             .iter()
             .any(|c| c.outcome == CaseOutcome::Failed)));
-    let proof: Value =
-        serde_json::from_str(&prove_profile_in(f.root.path(), &f.api, P, Some(&host)).unwrap())
-            .unwrap();
-    assert_ne!(proof["result"], "verified", "{proof}");
+    let obligation = resolved
+        .runs
+        .iter()
+        .find(|r| {
+            r.receipt
+                .cases
+                .executed
+                .iter()
+                .any(|c| c.outcome == CaseOutcome::Failed)
+        })
+        .unwrap()
+        .receipt
+        .scope
+        .obligation
+        .clone();
+    let verdict = checkpoints::evaluate_population(&f, &resolved, Some(obligation));
+    assert_ne!(verdict.result, DepthResult::Verified, "{verdict:?}");
 }
 
 #[test]
@@ -311,16 +362,16 @@ fn onboarding_refuses_cross_event_population_and_independent_adoption_mismatch()
         }
         api.page("issues/9/comments", None, vec![json!({"id":33,"user":{"login":"maintainer"},"body":format!("```depth-adequacy-v1\n{proposal}\n```")})]);
         assert!(
-            resolve_profile_in(&api, f.root.path(), P, Some(&host))
-                .unwrap_err()
-                .contains("adoption"),
+            adoption::resolve(&api, f.root.path(), 9, &f.w, P)
+                .unwrap()
+                .is_empty(),
             "edit {edit}"
         );
     }
     f.api.page("issues/9/comments", None, vec![]);
-    assert!(resolve_profile_in(&f.api, f.root.path(), P, Some(&host))
-        .unwrap_err()
-        .contains("adoption"));
+    assert!(adoption::resolve(&f.api, f.root.path(), 9, &f.w, P)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
@@ -452,6 +503,27 @@ fn onboarding_requires_intact_on2_inputs_and_complete_immutable_graph() {
     let built = source(f.root.path(), ISOLATED, &f.commit).unwrap();
     let original = profile::original_for(&built, P).unwrap();
     let state = fs::read(f.root.path().join(inputs::STATE)).unwrap();
+    // Stage projections must follow LifecycleState::validate, including the committed ON2
+    // freeze (no implementation yet) and publication/proving states (no active runtime id).
+    for stage in ["producer-freeze", "HEAD"] {
+        let commit = git(f.root.path(), &["rev-parse", stage]);
+        let at = source(f.root.path(), ISOLATED, &commit).unwrap();
+        inputs::check(&at, P, &original).unwrap();
+    }
+    let raw = fs::read_to_string(f.root.path().join(inputs::APPROVAL)).unwrap();
+    let mut approval: toml_edit::DocumentMut = raw.parse().unwrap();
+    approval["support_depth"]["version"] = toml_edit::value("0.3.0");
+    let raw = approval.to_string();
+    let mut mismatched: Value = serde_json::from_slice(&state).unwrap();
+    mismatched["approval_artifact_sha256"] =
+        json!(depth_ci::reference(inputs::APPROVAL, raw.as_bytes()).sha256);
+    let error = inputs::check_inputs(P, &original, |path| match path {
+        inputs::APPROVAL => Ok(raw.clone()),
+        inputs::STATE => Ok(mismatched.to_string()),
+        _ => built.read(path),
+    })
+    .unwrap_err();
+    assert!(error.contains("approval"), "{error}");
     for edit in 0..4 {
         let mut proposed: Value = serde_json::from_slice(&state).unwrap();
         match edit {
@@ -461,7 +533,7 @@ fn onboarding_requires_intact_on2_inputs_and_complete_immutable_graph() {
                 None
             }
             2 => {
-                proposed["lifecycle_stage"] = json!("enrolled");
+                proposed["active_runtime_evidence_run_id"] = Value::Null;
                 None
             }
             _ => proposed

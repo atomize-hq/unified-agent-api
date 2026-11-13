@@ -82,21 +82,24 @@ pub(crate) fn check_inputs(
         .support_depth
         .as_deref()
         .ok_or("missing ON2 frozen lifecycle object")?;
-    if approval.event != record.event
+    if approval.support_depth_version.as_deref() != Some(p.version())
+        || approval.event != record.event
         || state.agent_id != p.agent_id()
         || state.onboarding_pack_prefix != entry.scaffold.onboarding_pack_prefix
         || state.approval_artifact_path != APPROVAL
         || state.approval_artifact_sha256 != super::reference(APPROVAL, raw.as_bytes()).sha256
-        || state.lifecycle_stage < LifecycleStage::RuntimeIntegrated
-        || state.active_runtime_evidence_run_id.is_none()
-        || state.written_paths_sha256.is_none()
-        || state.implementation_summary.is_none()
+        || state.lifecycle_stage < LifecycleStage::Enrolled
+        // validate() enforces the active run id and implementation summary only at their
+        // owning stages. The enrolled ON2 freeze has P/O but no passing write-run digest.
+        || (state.lifecycle_stage >= LifecycleStage::RuntimeIntegrated
+            && state.written_paths_sha256.is_none())
         || record
             .request_mismatch(&object.binding(approval.event))
             .is_some()
     {
         return Err(
-            "committed ON2 approval, implementation or frozen lifecycle binding differs".into(),
+            "committed ON2 approval version, implementation or frozen lifecycle binding differs"
+                .into(),
         );
     }
     for input in &record
