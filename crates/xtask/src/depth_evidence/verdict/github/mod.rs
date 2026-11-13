@@ -11,6 +11,7 @@ mod artifact;
 pub(super) mod assembly;
 mod population;
 mod profile;
+mod progression;
 use population::resolve_profile_inputs;
 #[path = "readonly_transport.rs"]
 pub(super) mod transport;

@@ -123,6 +123,7 @@ pub(super) fn resolve_profile_inputs(
     let query = format!("actions/workflows/ci.yml/runs?created=%3E%3D{date}");
     let inventory = list(api, &query, Some("workflow_runs"))?;
     let mut runs = vec![];
+    let mut progression = progression::Onboarding::default();
     for run in &inventory {
         if run["path"] != profile::WORKFLOW {
             return Err("workflow population path mismatch".into());
@@ -151,6 +152,7 @@ pub(super) fn resolve_profile_inputs(
         }
         // Approve the API-derived execution head before trusting any witness source claims.
         let head_sha = sha(required_string(run, "head_sha")?)?;
+        progression.observe(root, head_sha, &head, p, &candidate)?;
         profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
         let count = run["run_attempt"]
@@ -177,6 +179,15 @@ pub(super) fn resolve_profile_inputs(
                 return Err(
                     "actual checkout disagrees with independently applicable generation".into(),
                 );
+            }
+            if p == Profile::SyntheticOnboarding && w.build.source_commit != head_sha {
+                progression.observe(
+                    root,
+                    &w.build.source_commit,
+                    &source(root, repository, &w.build.source_commit)?,
+                    p,
+                    &built_original,
+                )?;
             }
             let adoptions = adoption::resolve(api, root, pr, &w, p)?;
             if adoptions.is_empty() {

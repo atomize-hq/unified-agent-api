@@ -3,6 +3,7 @@ use super::*;
 use crate::{depth_ci::onboarding as inputs, isolated_maintenance::EvidenceHost};
 
 mod checkpoints;
+mod history;
 
 const P: Profile = Profile::SyntheticOnboarding;
 const RUNS: &str = "actions/workflows/ci.yml/runs?created=%3E%3D2026-11-05&per_page=100&page=1";
