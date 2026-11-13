@@ -168,13 +168,19 @@ fn create_candidate_preparation_refuses_caller_absolute_prompt() {
 
 #[test]
 fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
-    for passed in [true, false] {
+    for (exit_code, write_recovery) in [(0, false), (7, false), (0, true)] {
+        let passed = exit_code == 0 && !write_recovery;
         let (root, context) = setup(true);
         let before = fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap();
         let host = tempfile::tempdir().unwrap();
         let binary = host.path().join("executor.sh");
         let handoff = serde_json::json!({"agent_id":"codex", "manifest_root":"cli_manifests/codex", "runtime_lane_complete":true, "publication_refresh_required":true, "required_commands":life::REQUIRED_PUBLICATION_COMMANDS, "blockers":[]});
-        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\nexit {}\n", if passed { 0 } else { 7 })).unwrap();
+        let recovery_write = if write_recovery {
+            "printf '%s\\n' \"$PWD\" > \"$(dirname \"$target\")/recovery-candidate.txt\""
+        } else {
+            ":"
+        };
+        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\n{recovery_write}\nexit {exit_code}\n")).unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
         let mut args = args();
         args.codex_binary = Some(binary.to_string_lossy().into_owned());
@@ -195,9 +201,22 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
             )
         });
         let (evidence, output) = execution.unwrap();
-        assert_eq!(evidence.exit_code, if passed { 0 } else { 7 });
+        assert_eq!(evidence.exit_code, exit_code);
         let observed = observed.unwrap();
-        candidate.check(&observed).unwrap();
+        let guard = candidate.check(&observed);
+        let errors = if write_recovery {
+            let error = guard.unwrap_err().to_string();
+            assert!(error.contains("protected request"), "{error}");
+            assert!(error.contains("recovery-candidate.txt"), "{error}");
+            vec![error]
+        } else {
+            guard.unwrap();
+            if passed {
+                vec![]
+            } else {
+                vec!["executor failed".into()]
+            }
+        };
         validate_handoff(
             &candidate
                 .root
@@ -220,11 +239,7 @@ fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
             run_id: context.run_id.clone(),
             status: if passed { "pass" } else { "fail" }.into(),
             checks: vec![],
-            errors: if passed {
-                vec![]
-            } else {
-                vec!["executor failed".into()]
-            },
+            errors,
         };
         let execution = Ok((evidence, output));
         let diagnostic_files =

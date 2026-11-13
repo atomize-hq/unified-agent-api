@@ -372,3 +372,46 @@ fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
         }
     }
 }
+
+#[test]
+fn executor_recovery_pointer_is_rejected_and_replaced_by_host_diagnostics() {
+    for existing in [false, true] {
+        let fixture = prepare_execute_fixture("relay-reserved-recovery-pointer");
+        let binary = executor(
+            &fixture,
+            "printf '%s\\n' \"$PWD/forged\" > \"$XTASK_AGENT_MAINTENANCE_RUN_DIR/recovery-candidate.txt\"",
+        );
+        prepare(&fixture, &binary);
+        let pointer = fixture
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID)
+            .join("recovery-candidate.txt");
+        if existing {
+            fs::write(&pointer, "previous recovery pointer\n").unwrap();
+        }
+        let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+        assert_ne!(out.exit_code, 0);
+        assert!(out.stderr.contains("protected request"), "{}", out.stderr);
+        assert!(
+            out.stderr.contains("recovery-candidate.txt"),
+            "{}",
+            out.stderr
+        );
+        assert!(!fixture.join(NOTE).exists());
+        let recovery = fs::read_to_string(pointer).unwrap();
+        let recovery = Path::new(recovery.trim());
+        assert!(recovery.join(NOTE).is_file());
+        assert!(out.stderr.contains(recovery.to_str().unwrap()));
+        assert_eq!(
+            fs::read_to_string(
+                recovery
+                    .join(EXECUTE_RUNS_ROOT)
+                    .join(EXECUTE_WRITE_RUN_ID)
+                    .join("recovery-candidate.txt")
+            )
+            .unwrap()
+            .trim(),
+            recovery.to_str().unwrap()
+        );
+    }
+}

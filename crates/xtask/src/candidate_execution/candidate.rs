@@ -114,6 +114,7 @@ impl Candidate {
                 || path.split('/').any(|s| s == "automation-stand-down")
                 || path == format!("{}/input-contract.json", self.run_dir_rel)
                 || path == format!("{}/codex-prompt.md", self.run_dir_rel)
+                || path == format!("{}/recovery-candidate.txt", self.run_dir_rel)
             {
                 return Err(Error::Validation(format!(
                     "executor changed protected request/marker/frozen packet: {path}"
