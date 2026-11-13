@@ -1,4 +1,4 @@
-//! Reporting artifacts for the private non-runtime proof. These never authorize execution.
+//! Executable wrapper packet, built by the same context and prompt as write preparation.
 use super::*;
 use crate::workspace_mutation::{PlannedMutation, WorkspacePathJail};
 use serde_json::json;
@@ -13,69 +13,32 @@ pub(super) fn prepare(
     run_id: &str,
     freeze: &Freeze,
 ) -> Result<Vec<PlannedMutation>, Error> {
-    let entry = freeze
-        .captured
-        .registry()
-        .find(&freeze.approval.agent_id)
-        .ok_or_else(|| Error::Validation("missing isolated subject".into()))?;
+    let raw = freeze
+        .view
+        .clone()
+        .required(&args.approval)
+        .map_err(Error::Validation)?;
+    let approval = approval::execution(workspace, &raw, &args.approval, &freeze.captured)
+        .map_err(Error::Validation)?;
+    let mut args = args.clone();
+    args.run_id = Some(run_id.into());
+    let context = context::assemble(
+        workspace,
+        &args,
+        approval,
+        freeze.captured.registry(),
+        freeze.state_path.clone(),
+        freeze.state.clone(),
+        true,
+    )?;
+    let contract = &context.input_contract;
+    let entry = &context.approval.descriptor;
     let object = freeze
         .state
         .support_depth
         .as_ref()
         .ok_or_else(|| Error::Validation("missing planned lifecycle object".into()))?;
     let generated_at = now_rfc3339()?;
-    let contract = InputContract {
-        workflow_version: WORKFLOW_VERSION.into(),
-        support_depth: Some(SupportDepthContract {
-            version: freeze
-                .plan
-                .record
-                .policy
-                .selection
-                .enrollment
-                .version
-                .clone(),
-            policy_identity: object.policy_identity.clone(),
-            obligations_identity: object.obligations_identity.clone(),
-        }),
-        generated_at: generated_at.clone(),
-        run_id: run_id.into(),
-        approval_artifact_path: args.approval.clone(),
-        approval_artifact_sha256: freeze.approval_sha256.clone(),
-        agent_id: entry.agent_id.clone(),
-        display_name: entry.display_name.clone(),
-        crate_path: entry.crate_path.clone(),
-        // The compiled synthetic subject has no runtime backend. This reporting-only packet
-        // cannot be passed to the public execution loader, which continues to require one.
-        backend_module: String::new(),
-        manifest_root: entry.manifest_root.clone(),
-        wrapper_coverage_source_path: entry.wrapper_coverage.source_path.clone(),
-        canonical_targets: entry.canonical_targets.clone(),
-        always_on_capabilities: entry.capability_declaration.always_on.clone(),
-        target_gated_capabilities: vec![],
-        config_gated_capabilities: vec![],
-        backend_extensions: entry.capability_declaration.backend_extensions.clone(),
-        support_matrix_enabled: entry.publication.support_matrix_enabled,
-        capability_matrix_enabled: entry.publication.capability_matrix_enabled,
-        capability_matrix_target: entry.publication.capability_matrix_target.clone(),
-        requested_tier: args.requested_tier.as_str().into(),
-        minimal_justification_file: args.minimal_justification_file.clone(),
-        minimal_justification_text: args
-            .minimal_justification_file
-            .as_ref()
-            .map(|p| read_string(&workspace.join(p)))
-            .transpose()?,
-        allow_rich_surface: args.allow_rich_surface.clone(),
-        required_agent_api_test: required_agent_api_test(&entry.agent_id),
-        required_handoff_commands: required_publication_commands(),
-        docs_to_read: docs_to_read(&entry.agent_id),
-        allowed_write_paths: vec![
-            format!("{}/**", entry.crate_path),
-            format!("{}/versions/**", entry.manifest_root),
-        ],
-        ignored_diff_roots: vec![RUNTIME_RUNS_ROOT.into()],
-        baseline: snapshot_workspace(workspace, &[Path::new(RUNTIME_RUNS_ROOT)])?,
-    };
     let run_dir = format!("{RUNTIME_RUNS_ROOT}/{run_id}");
     let status = json!({
         "workflow_version":WORKFLOW_VERSION, "generated_at":generated_at,
@@ -93,15 +56,27 @@ pub(super) fn prepare(
         checks: vec![],
         errors: vec![],
     };
-    let prompt = format!("# Isolated synthetic runtime-follow-on proof\n\nRead input-contract.json. Preserve its frozen support_depth identities. The executor's only run file is handoff.json. Snapshots, governance and acquired inputs are protected. This reporting packet grants no production authority.\n\nAgent: {}\n", entry.agent_id);
+    let prompt = depth_candidate::render_depth_prompt(&context);
     let summary = format!("# Runtime-follow-on dry run\n\nrun_id: {run_id}\n\nP: {}\nO: {}\n", object.policy_identity,
         object.obligations_identity.as_deref().unwrap_or("not yet produced; a passing write closes the window; depth acceptance requires a new approval"));
     let files = [
-        (INPUT_CONTRACT_FILE_NAME, json_bytes(&contract)?),
+        (INPUT_CONTRACT_FILE_NAME, json_bytes(contract)?),
         (PROMPT_FILE_NAME, prompt.into_bytes()),
         (RUN_STATUS_FILE_NAME, json_bytes(&status)?),
         (VALIDATION_REPORT_FILE_NAME, json_bytes(&report)?),
         (RUN_SUMMARY_FILE_NAME, summary.into_bytes()),
+        (WRITTEN_PATHS_FILE_NAME, json_bytes(&Vec::<String>::new())?),
+        (
+            HANDOFF_FILE_NAME,
+            json_bytes(&HandoffContract {
+                agent_id: entry.agent_id.clone(),
+                manifest_root: entry.manifest_root.clone(),
+                runtime_lane_complete: false,
+                publication_refresh_required: true,
+                required_commands: required_publication_commands(),
+                blockers: vec!["Pending runtime follow-on implementation.".into()],
+            })?,
+        ),
     ];
     let jail = WorkspacePathJail::new(workspace).map_err(|e| Error::Validation(e.to_string()))?;
     files

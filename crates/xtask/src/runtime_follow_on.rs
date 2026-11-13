@@ -10,9 +10,11 @@ use serde::{Deserialize, Serialize};
 use crate::{agent_registry::AgentRegistry, approval_artifact::load_approval_artifact};
 
 mod codex_exec;
-// Private until roadmap E.6 installs ON2. There is no CLI selector for this path.
-#[allow(dead_code)]
-mod depth;
+mod context;
+mod validation;
+use context::build_context;
+use validation::{validate_observed_write_mode, validate_write_mode};
+pub(crate) mod depth;
 #[cfg(test)]
 pub(crate) fn isolated_depth_dry_run(
     workspace: &Path,
@@ -173,6 +175,18 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if let Some(route) =
+        crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?
+    {
+        if route
+            .context()
+            .bootstrap_pending()
+            .map_err(Error::Validation)?
+            || route.context().bootstrap_declared_onboarding()
+        {
+            return depth::run(workspace_root, args, route, writer);
+        }
+    }
     if args.write {
         // Ordinary approvals keep the original workspace refusal, even inside an isolated route.
         let depth_approval = load_approval_artifact(workspace_root, &args.approval)
@@ -299,100 +313,6 @@ fn validate_args(args: &Args, workspace_root: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn build_context(workspace_root: &Path, args: &Args) -> Result<RuntimeContext, Error> {
-    let approval =
-        load_approval_artifact(workspace_root, &args.approval).map_err(map_approval_error)?;
-    if approval.support_depth_version.is_some() {
-        if let Some(run_id) = &args.run_id {
-            crate::runtime_evidence_run::validate_run_id(run_id).map_err(Error::Validation)?;
-        }
-    }
-    let registry = if approval.support_depth_version.is_some() {
-        crate::isolated_maintenance::route(workspace_root)
-            .map_err(Error::Validation)?
-            .ok_or_else(|| {
-                Error::Validation("onboarding depth execution requires an isolated route".into())
-            })?
-            .registry(workspace_root)
-            .map_err(Error::Validation)?
-            .clone()
-    } else {
-        AgentRegistry::load(workspace_root).map_err(|err| Error::Validation(err.to_string()))?
-    };
-    let registry_entry = registry
-        .find(&approval.descriptor.agent_id)
-        .cloned()
-        .ok_or_else(|| {
-            Error::Validation(format!(
-                "approval/registry mismatch: `{}` is not present in {}",
-                approval.descriptor.agent_id,
-                crate::agent_registry::REGISTRY_RELATIVE_PATH
-            ))
-        })?;
-    validate_registry_alignment(&approval, &registry_entry)?;
-    let (lifecycle_state_path, lifecycle_state) =
-        load_enrolled_lifecycle_state(workspace_root, &approval)?;
-
-    let run_id = args.run_id.clone().unwrap_or_else(generate_run_id);
-    let run_dir = workspace_root.join(RUNTIME_RUNS_ROOT).join(&run_id);
-    let minimal_justification_text = args
-        .minimal_justification_file
-        .as_ref()
-        .map(|path| {
-            fs::read_to_string(workspace_root.join(path))
-                .map_err(|err| Error::Internal(format!("read {path}: {err}")))
-        })
-        .transpose()?;
-    let required_agent_api_test = required_agent_api_test(&approval.descriptor.agent_id);
-    let mut input_contract = InputContract {
-        workflow_version: WORKFLOW_VERSION.to_string(),
-        support_depth: SupportDepthContract::copy_from(&approval, &lifecycle_state)
-            .map_err(Error::Validation)?,
-        generated_at: now_rfc3339()?,
-        run_id: run_id.clone(),
-        approval_artifact_path: approval.relative_path.clone(),
-        approval_artifact_sha256: approval.sha256.clone(),
-        agent_id: approval.descriptor.agent_id.clone(),
-        display_name: approval.descriptor.display_name.clone(),
-        crate_path: approval.descriptor.crate_path.clone(),
-        backend_module: approval.descriptor.backend_module.clone(),
-        manifest_root: approval.descriptor.manifest_root.clone(),
-        wrapper_coverage_source_path: approval.descriptor.wrapper_coverage_source_path.clone(),
-        canonical_targets: approval.descriptor.canonical_targets.clone(),
-        always_on_capabilities: approval.descriptor.always_on_capabilities.clone(),
-        target_gated_capabilities: approval.descriptor.target_gated_capabilities.clone(),
-        config_gated_capabilities: approval.descriptor.config_gated_capabilities.clone(),
-        backend_extensions: approval.descriptor.backend_extensions.clone(),
-        support_matrix_enabled: approval.descriptor.support_matrix_enabled,
-        capability_matrix_enabled: approval.descriptor.capability_matrix_enabled,
-        capability_matrix_target: approval.descriptor.capability_matrix_target.clone(),
-        requested_tier: args.requested_tier.as_str().to_string(),
-        minimal_justification_file: args.minimal_justification_file.clone(),
-        minimal_justification_text,
-        allow_rich_surface: args.allow_rich_surface.clone(),
-        required_agent_api_test,
-        required_handoff_commands: required_publication_commands(),
-        docs_to_read: docs_to_read(&approval.descriptor.agent_id),
-        allowed_write_paths: allowed_write_paths(&approval.descriptor),
-        ignored_diff_roots: vec![RUNTIME_RUNS_ROOT.to_string()],
-        baseline: snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?,
-    };
-
-    if approval.support_depth_version.is_some() {
-        input_contract
-            .allowed_write_paths
-            .retain(|p| p != &format!("{}/snapshots/**", approval.descriptor.manifest_root));
-    }
-    Ok(RuntimeContext {
-        approval,
-        input_contract,
-        lifecycle_state,
-        lifecycle_state_path,
-        run_id,
-        run_dir,
-    })
-}
-
 fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
     fs::create_dir_all(&context.run_dir)
         .map_err(|err| Error::Internal(format!("create {}: {err}", context.run_dir.display())))?;
@@ -460,215 +380,4 @@ fn persist_dry_run_artifacts(context: &RuntimeContext) -> Result<(), Error> {
         },
     )?;
     Ok(())
-}
-
-fn validate_write_mode(
-    workspace_root: &Path,
-    context: &RuntimeContext,
-    prior_contract: &InputContract,
-    codex_execution: &CodexExecutionEvidence,
-) -> Result<(ValidationReport, Vec<String>), Error> {
-    let current_snapshot = snapshot_workspace(workspace_root, &[Path::new(RUNTIME_RUNS_ROOT)])?;
-    let changed_paths = diff_snapshots(&prior_contract.baseline, &current_snapshot);
-    validate_observed_write_mode(
-        workspace_root,
-        context,
-        prior_contract,
-        codex_execution,
-        changed_paths,
-    )
-}
-
-fn validate_observed_write_mode(
-    workspace_root: &Path,
-    context: &RuntimeContext,
-    prior_contract: &InputContract,
-    codex_execution: &CodexExecutionEvidence,
-    changed_paths: Vec<String>,
-) -> Result<(ValidationReport, Vec<String>), Error> {
-    let mut checks = Vec::new();
-    let mut errors = Vec::new();
-
-    if codex_execution.exit_code == 0 {
-        checks.push(ValidationCheck {
-            name: "codex_exec".to_string(),
-            ok: true,
-            message: format!("codex exec completed via `{}`", codex_execution.binary),
-        });
-    } else {
-        errors.push(format!(
-            "codex exec failed with exit code {} (see {})",
-            codex_execution.exit_code, codex_execution.stderr_path
-        ));
-        checks.push(ValidationCheck {
-            name: "codex_exec".to_string(),
-            ok: false,
-            message: format!(
-                "codex exec exited non-zero; stderr captured at {}",
-                codex_execution.stderr_path
-            ),
-        });
-    }
-
-    let boundary_violations = changed_paths
-        .iter()
-        .filter(|path| !is_allowed_write_path(path, &context.approval.descriptor))
-        .cloned()
-        .collect::<Vec<_>>();
-    if boundary_violations.is_empty() {
-        checks.push(ValidationCheck {
-            name: "write_boundary".to_string(),
-            ok: true,
-            message: "all changed paths stay inside the runtime-owned boundary".to_string(),
-        });
-    } else {
-        errors.push(format!(
-            "write boundary violation: {}",
-            boundary_violations.join(", ")
-        ));
-        checks.push(ValidationCheck {
-            name: "write_boundary".to_string(),
-            ok: false,
-            message: format!(
-                "out-of-bounds paths detected: {}",
-                boundary_violations.join(", ")
-            ),
-        });
-    }
-
-    let manifest_violations = changed_paths
-        .iter()
-        .filter(|path| {
-            is_publication_owned_manifest_path(path, &context.approval.descriptor.manifest_root)
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    if manifest_violations.is_empty() {
-        checks.push(ValidationCheck {
-            name: "manifest_split".to_string(),
-            ok: true,
-            message: "manifest writes stay inside runtime-owned evidence roots".to_string(),
-        });
-    } else {
-        errors.push(format!(
-            "publication-owned manifest writes are forbidden: {}",
-            manifest_violations.join(", ")
-        ));
-        checks.push(ValidationCheck {
-            name: "manifest_split".to_string(),
-            ok: false,
-            message: format!(
-                "publication-owned manifest writes detected: {}",
-                manifest_violations.join(", ")
-            ),
-        });
-    }
-
-    let written_paths = changed_paths
-        .iter()
-        .filter(|path| is_allowed_write_path(path, &approval_descriptor_view(prior_contract)))
-        .cloned()
-        .collect::<Vec<_>>();
-    if written_paths.is_empty() {
-        errors.push(
-            "runtime-follow-on write produced no runtime-owned output changes from the prepared baseline"
-                .to_string(),
-        );
-        checks.push(ValidationCheck {
-            name: "runtime_owned_writes".to_string(),
-            ok: false,
-            message: "no runtime-owned output changes were detected after codex exec".to_string(),
-        });
-    } else {
-        checks.push(ValidationCheck {
-            name: "runtime_owned_writes".to_string(),
-            ok: true,
-            message: format!(
-                "detected {} runtime-owned output change(s)",
-                written_paths.len()
-            ),
-        });
-    }
-
-    let generated_wrapper_coverage_path = format!(
-        "{}/wrapper_coverage.json",
-        context.approval.descriptor.manifest_root
-    );
-    if changed_paths
-        .iter()
-        .any(|path| path == &generated_wrapper_coverage_path)
-    {
-        errors.push(format!(
-            "generated wrapper coverage edits are forbidden: {generated_wrapper_coverage_path}"
-        ));
-        checks.push(ValidationCheck {
-            name: "wrapper_coverage_generated_json".to_string(),
-            ok: false,
-            message: format!(
-                "generated wrapper coverage output `{generated_wrapper_coverage_path}` was edited"
-            ),
-        });
-    } else {
-        checks.push(ValidationCheck {
-            name: "wrapper_coverage_generated_json".to_string(),
-            ok: true,
-            message: "no generated wrapper_coverage.json edit was used".to_string(),
-        });
-    }
-
-    let required_test = workspace_root.join(&prior_contract.required_agent_api_test);
-    let requires_default_test = matches!(prior_contract.requested_tier.as_str(), "default");
-    if !requires_default_test || required_test.is_file() {
-        checks.push(ValidationCheck {
-            name: "required_agent_api_test".to_string(),
-            ok: true,
-            message: "required default-tier agent_api onboarding test is present".to_string(),
-        });
-    } else {
-        errors.push(format!(
-            "default-tier run requires `{}`",
-            prior_contract.required_agent_api_test
-        ));
-        checks.push(ValidationCheck {
-            name: "required_agent_api_test".to_string(),
-            ok: false,
-            message: format!(
-                "missing required test `{}`",
-                prior_contract.required_agent_api_test
-            ),
-        });
-    }
-
-    let handoff_path = context.run_dir.join(HANDOFF_FILE_NAME);
-    match validate_handoff(&handoff_path, context) {
-        Ok(()) => checks.push(ValidationCheck {
-            name: "handoff_contract".to_string(),
-            ok: true,
-            message: "handoff.json passed schema and semantic validation".to_string(),
-        }),
-        Err(message) => {
-            errors.push(message.clone());
-            checks.push(ValidationCheck {
-                name: "handoff_contract".to_string(),
-                ok: false,
-                message,
-            });
-        }
-    }
-
-    Ok((
-        ValidationReport {
-            workflow_version: WORKFLOW_VERSION.to_string(),
-            generated_at: now_rfc3339()?,
-            run_id: context.run_id.clone(),
-            status: if errors.is_empty() {
-                "pass".to_string()
-            } else {
-                "fail".to_string()
-            },
-            checks,
-            errors,
-        },
-        written_paths,
-    ))
 }

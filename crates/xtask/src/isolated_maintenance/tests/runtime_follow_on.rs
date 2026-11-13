@@ -5,6 +5,8 @@ use sha2::{Digest, Sha256};
 
 #[path = "runtime_follow_on/authority.rs"]
 mod authority;
+#[path = "runtime_follow_on/public.rs"]
+mod public;
 
 #[path = "../../prepare_publication/acquired_inputs_tests.rs"]
 mod acquired_inputs_tests;
@@ -62,7 +64,7 @@ fn setup(acquired: bool) -> Fixture {
     write(
         root,
         &format!("{ROOT}/versions/0.2.0.json"),
-        r#"{"schema_version":1,"semantic_version":"0.2.0"}"#,
+        r#"{"schema_version":1,"semantic_version":"0.2.0","status":"snapshotted"}"#,
     );
     if acquired {
         super::super::prepare::acquire(root, "0.2.0");
@@ -153,10 +155,9 @@ fn runtime_follow_on_freezes_p_record_object_and_contract_then_o() {
     );
 }
 #[test]
-fn runtime_follow_on_no_route_and_public_entry_refuse_without_writes() {
+fn runtime_follow_on_no_route_refuses_without_writes() {
     let f = setup(true);
     refuses_unchanged(&f, "isolated route");
-    let _installed = f.install();
     assert!(runtime::run_in_workspace(f.root.path(), args(), &mut Vec::new()).is_err());
     assert!(!f.root.path().join(RECORD).exists());
     assert!(!f.root.path().join(RUN).exists());

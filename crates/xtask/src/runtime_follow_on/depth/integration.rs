@@ -68,3 +68,100 @@ pub(super) fn targets(
     }
     Ok(())
 }
+
+/// IN1 re-establishes reporting freeze inputs independently, using its pinned parent for
+/// acquisition authority even during post-tip observation. Command labels are never authority.
+pub(crate) fn check_freeze(
+    root: &std::path::Path,
+    parent: &Source,
+    prior: Option<&DepthRecord>,
+    record: &DepthRecord,
+    entry: &crate::agent_registry::AgentRegistryEntry,
+) -> Result<(), String> {
+    use crate::agent_lifecycle::{self, LifecycleStage, LifecycleState};
+    let path = agent_lifecycle::approval_artifact_path_for_entry(entry);
+    let freeze = super::plan(root, &path, Some(parent))?;
+    let prior_state: LifecycleState =
+        serde_json::from_str(&parent.read(&freeze.state_path)?).map_err(|e| e.to_string())?;
+    let previous_records = prior
+        .map(|record| {
+            (
+                record.policy.selection.enrollment.version.clone(),
+                record.clone(),
+            )
+        })
+        .into_iter()
+        .collect();
+    crate::depth_record::onboarding::onboarding_binding(
+        prior_state.support_depth.as_deref(),
+        &freeze.approval,
+        &previous_records,
+    )
+    .map_err(|faults| {
+        faults
+            .into_iter()
+            .map(|f| f.message)
+            .collect::<Vec<_>>()
+            .join("; ")
+    })?;
+    if prior_state.lifecycle_stage != LifecycleStage::Enrolled {
+        return Err(
+            "onboarding reporting freeze cannot reopen the window after implementation".into(),
+        );
+    }
+    if parent.optional_bytes(&path)?.as_ref() != Some(&freeze.view.clone().required(&path)?) {
+        return Err("onboarding freeze approval differs from its pinned parent".into());
+    }
+    let object = freeze
+        .state
+        .support_depth
+        .as_ref()
+        .ok_or("onboarding freeze lacks lifecycle support_depth object")?;
+    if let Some(why) = record.request_mismatch(&object.binding(freeze.approval.event.clone())) {
+        return Err(format!("onboarding reporting freeze: {why}"));
+    }
+    // Re-derivation binds current registry policy and all acquired inputs. An asserted hash or
+    // a hand-assembled P/O object does not substitute for the shared planner.
+    if freeze.plan.record != *record {
+        return Err("onboarding reporting freeze differs from independently derived P/O".into());
+    }
+    let retained_execution = prior
+        .filter(|p| p.event == record.event && p.obligations == record.obligations)
+        .and_then(|p| p.execution.clone());
+    if record.execution != retained_execution {
+        return Err("onboarding freeze cannot manufacture execution evidence".into());
+    }
+    let carried = prior
+        .and_then(|p| p.obligations.as_ref())
+        .map(|o| o.acceptance_work.as_slice())
+        .unwrap_or_default();
+    let proposed_work = record
+        .obligations
+        .as_ref()
+        .map(|o| o.acceptance_work.as_slice())
+        .unwrap_or_default();
+    if carried != proposed_work {
+        return Err("onboarding freeze changed carried acceptance work".into());
+    }
+    if let Some(prior) = prior {
+        if record.acceptance_entries != prior.acceptance_entries
+            || !record.lacking_from(prior).is_empty()
+        {
+            return Err("onboarding freeze changed entries or shrank selection".into());
+        }
+        if prior.event == record.event && prior.policy != record.policy {
+            return Err("onboarding re-freeze changed P".into());
+        }
+    } else if !record.acceptance_entries.is_empty() {
+        return Err("onboarding freeze cannot add acceptance entries".into());
+    }
+    let mut expected = prior_state;
+    expected.support_depth = freeze.state.support_depth.clone();
+    if serde_json::to_value(expected).map_err(|e| e.to_string())?
+        != serde_json::to_value(&freeze.state).map_err(|e| e.to_string())?
+    {
+        return Err("onboarding freeze changed lifecycle outside its P/O object".into());
+    }
+    freeze.view.verify()?;
+    freeze.captured.recheck(root)
+}

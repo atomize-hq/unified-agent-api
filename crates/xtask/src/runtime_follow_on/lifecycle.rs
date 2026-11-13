@@ -62,6 +62,11 @@ pub(super) fn validate_handoff(path: &Path, context: &RuntimeContext) -> Result<
                 .to_string(),
         );
     }
+    if context.wrapper_only && !handoff.blockers.is_empty() {
+        return Err(
+            "wrapper-only handoff.json must have no blockers for a successful write run".into(),
+        );
+    }
     if !handoff.publication_refresh_required {
         return Err("handoff.json publication_refresh_required must be true".to_string());
     }
@@ -253,11 +258,15 @@ fn build_implementation_summary(
     let primary_template = primary_template(context, requested_runtime_profile);
     let mut landed_surfaces = BTreeSet::new();
     landed_surfaces.insert(LandedSurface::WrapperRuntime);
-    landed_surfaces.insert(LandedSurface::BackendHarness);
+    if !context.wrapper_only {
+        landed_surfaces.insert(LandedSurface::BackendHarness);
+    }
     landed_surfaces.insert(LandedSurface::WrapperCoverageSource);
-    landed_surfaces.insert(LandedSurface::RuntimeManifestEvidence);
+    if !context.wrapper_only {
+        landed_surfaces.insert(LandedSurface::RuntimeManifestEvidence);
+    }
 
-    if wrote_agent_api_onboarding_test(prior_contract, written_paths) {
+    if !context.wrapper_only && wrote_agent_api_onboarding_test(prior_contract, written_paths) {
         landed_surfaces.insert(LandedSurface::AgentApiOnboardingTest);
     }
 
