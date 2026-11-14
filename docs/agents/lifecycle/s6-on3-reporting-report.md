@@ -158,3 +158,38 @@ checks.
 | 8 — portable runtime status | The shared immutable ON3 template is reused through Git clones. Runtime follow-on and generated runtime bundles now record repo-relative `run_dir`. The active connected test asserts the exact relative status path in the copied repo before ON3. The repaired sibling validates the restored older run from that copy. Existing absolute-path compatibility in the historical reader is preserved. |
 | 9 — installed-route unsupported writer | Restored `depth_routes::refuse_workspace` before the undeclared-onboarding fallback. The public no-route/maintenance regression pins the exact unsupported-depth reason and unchanged caller tree. The lead's `an_installed_route_grants_unsupported_writers_no_depth_authority` keeps its existing assertion. |
 | 10 — publication entrypoint ordering | The same restored guard reaches the existing unsupported-depth refusal for acquired-input fixtures under maintenance authority. The lead's `publication_entrypoints_unchanged_freeze_reaches_the_existing_approval_refusal` keeps its existing assertion. |
+
+## Review round 2 fixes
+
+Round 2 corrects the shared-writer change and the remaining publication refusal ordering from
+round 1, based on `e3e7bd77`.
+
+- Restored the caller-supplied `metadata_run_root` in the shared runtime bundle writer. Ordinary
+  repair again records its absolute canonical root, satisfying the existing repair test.
+- Restored the ordinary runtime-follow-on status renderer's absolute run directory. The depth
+  candidate controller supplies its repo-relative run directory when serializing the delivered
+  status. This matches the real ON2 independent-candidate delivery consumed by ON3 and makes the
+  connected fixture's immutable implementation checkpoint portable across sibling repositories.
+  Routed depth repair already supplies a relative metadata root. The reader continues to accept
+  only the consuming repository's absolute run root or the exact relative run path. The existing
+  repair validator regression verifies foreign absolute-root rejection.
+- Printed the failing publication refusal through an assertion diagnostic. Its actual message
+  was `Prepare: ON3 runtime state differs from protected generation`. The fixture retains an
+  earlier onboarding lifecycle checkpoint. Routed ON3 now invokes the existing unsupported-depth
+  write guard for other lifecycle checkpoints, before protected runtime-selection
+  comparison. The `runtime_integrated` and `publication_ready` paths retain the full acquired-input,
+  approval, contract, protected-selection and reporting checks. The test retains both approval
+  refusal and unsupported-depth assertions, with the entrypoint and actual error in diagnostics.
+
+| Focused command | Round-2 result |
+| --- | --- |
+| `make fmt-check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test -p xtask --test repair_runtime_evidence_entrypoint` | 10 passed |
+| `cargo test -p xtask --lib publication_entrypoints_unchanged_freeze_reaches_the_existing_approval_refusal -- --nocapture` | 1 passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::unsupported_routes` | 1 passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on3 -- --nocapture` | 3 passed, including both connected siblings. Runtime 665.88 seconds. |
+| `make loc-check` | Passed, 700-code-line cap |
+
+The initial diagnostic run reproduced the publication failure before the ordering fix. Final
+fixed-source results are recorded in the table. Changes remain uncommitted for the lead.

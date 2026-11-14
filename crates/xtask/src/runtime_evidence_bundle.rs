@@ -126,11 +126,7 @@ pub fn write_runtime_evidence_bundle_at(
             "status": "write_validated",
             "validation_passed": true,
             "handoff_ready": true,
-            "run_dir": metadata_run_root
-                .strip_prefix(workspace_root)
-                .unwrap_or(metadata_run_root)
-                .to_string_lossy()
-                .replace('\\', "/"),
+            "run_dir": metadata_run_root.display().to_string(),
             "written_paths": written_paths,
             "errors": [],
         }),

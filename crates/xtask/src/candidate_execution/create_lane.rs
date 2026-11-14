@@ -481,22 +481,22 @@ fn diagnostics(
     };
     insert(VALIDATION_REPORT_FILE_NAME, bytes(report)?);
     insert(WRITTEN_PATHS_FILE_NAME, bytes(&written)?);
-    insert(
-        RUN_STATUS_FILE_NAME,
-        bytes(&render_run_status(
-            context,
-            "write",
-            if passed {
-                "write_validated"
-            } else {
-                "write_failed"
-            },
-            passed,
-            passed,
-            written.to_vec(),
-            report.errors.clone(),
-        ))?,
+    let mut status = render_run_status(
+        context,
+        "write",
+        if passed {
+            "write_validated"
+        } else {
+            "write_failed"
+        },
+        passed,
+        passed,
+        written.to_vec(),
+        report.errors.clone(),
     );
+    // Depth execution delivers the bundle from an independent candidate into the caller repo.
+    status.run_dir = prefix.clone();
+    insert(RUN_STATUS_FILE_NAME, bytes(&status)?);
     insert(
         RUN_SUMMARY_FILE_NAME,
         render_run_summary(context, report, written, execution.map(|e| &e.0)).into_bytes(),

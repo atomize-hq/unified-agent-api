@@ -222,6 +222,17 @@ fn context(
         .cloned()
         .ok_or_else(|| Error::Validation("unknown onboarding agent".into()))?;
     let context = context_for(root, approval, entry)?;
+    // Earlier onboarding checkpoints have no ON3 writer. Preserve their existing write refusal
+    // before comparing the protected runtime selection, which only ON3 checkpoints can carry.
+    if args.write
+        && !matches!(
+            context.lifecycle_state.lifecycle_stage,
+            LifecycleStage::RuntimeIntegrated | LifecycleStage::PublicationReady
+        )
+    {
+        crate::depth_routes::refuse_workspace(root, "prepare_publication")
+            .map_err(Error::Validation)?;
+    }
     let host = captured.evidence_host(root).map_err(Error::Validation)?;
     let tip = Source::tip(root, host.tip()).map_err(Error::Validation)?;
     if tip
