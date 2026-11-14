@@ -18,6 +18,28 @@ pub(crate) struct SupportDepthContract {
 }
 
 impl SupportDepthContract {
+    /// Authenticate the selected runtime contract against the frozen successful generation.
+    pub(crate) fn check_input_contract(
+        contract: &serde_json::Value,
+        approval: &ApprovalArtifact,
+        state: &LifecycleState,
+        run_id: &str,
+    ) -> Result<(), String> {
+        let depth = Self::copy_from(approval, state)?;
+        if contract["workflow_version"] != super::WORKFLOW_VERSION
+            || contract["run_id"] != run_id
+            || contract["approval_artifact_path"] != approval.relative_path
+            || contract["approval_artifact_sha256"] != approval.sha256
+            || contract["agent_id"] != approval.descriptor.agent_id
+            || contract["manifest_root"] != approval.descriptor.manifest_root
+            || contract["support_depth"]
+                != serde_json::to_value(depth).map_err(|e| e.to_string())?
+        {
+            return Err("runtime input contract differs from frozen success state".into());
+        }
+        Ok(())
+    }
+
     /// Copy P/O from the lifecycle object; neither the contract nor repair freezes identities.
     pub(crate) fn copy_from(
         approval: &ApprovalArtifact,

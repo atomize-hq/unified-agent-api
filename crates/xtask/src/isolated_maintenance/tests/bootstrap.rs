@@ -9,6 +9,7 @@ mod fr2;
 mod producer;
 mod public_on1;
 pub(super) mod public_on2;
+pub(super) mod public_on3;
 mod public_repair;
 mod regressions;
 mod renderer;

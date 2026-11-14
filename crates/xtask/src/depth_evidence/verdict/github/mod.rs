@@ -487,6 +487,7 @@ pub(super) fn view_record_results(
     inputs: &mut GitInputs,
     record: &DepthRecord,
     host: &crate::isolated_maintenance::EvidenceHost,
+    proposed: &crate::runtime_advertising::source::Source,
 ) -> Result<super::super::EvidenceVerdicts, String> {
     let p = Profile::for_event(&record.event);
     let selection = &record.policy.selection;
@@ -495,10 +496,23 @@ pub(super) fn view_record_results(
     }
     let _read_only = transport::read_only(inputs)?;
     let caller = inputs.object_root().to_path_buf();
-    let resolved =
-        resolve_profile_inputs(&Isolated::new(host), &caller, p, Some(host), Some(inputs))?;
+    let resolved = population::resolve_generation_view(
+        &Isolated::new(host),
+        &caller,
+        Some(host),
+        Some(inputs),
+        &p,
+        Some(proposed),
+    )?;
     let (results, _) = resolved.decisions_with(record, |selected, current| {
-        evaluate_inputs(&caller, inputs, selected, current, &resolved)
+        evaluate_inputs(
+            &caller,
+            inputs,
+            selected,
+            current,
+            &resolved,
+            Some(proposed),
+        )
     })?;
     inputs.verify()?;
     Ok(results)

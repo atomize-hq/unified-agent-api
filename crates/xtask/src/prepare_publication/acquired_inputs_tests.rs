@@ -142,9 +142,11 @@ fn publication_entrypoints_unchanged_freeze_reaches_the_existing_approval_refusa
     for entry in ENTRYPOINTS {
         unchanged(&f, entry, "`backend_module`", &[]);
         let before = lifecycle_depth::snapshot(f.root.path());
-        assert!(entry
-            .run(f.root.path(), true)
-            .contains("unsupported depth write"));
+        let error = entry.run(f.root.path(), true);
+        assert!(
+            error.contains("unsupported depth write"),
+            "{entry:?}: {error}"
+        );
         assert_eq!(before, lifecycle_depth::snapshot(f.root.path()));
     }
 }

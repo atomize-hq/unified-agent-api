@@ -153,19 +153,8 @@ fn context(
             .map_err(Error::Validation)?,
     )
     .map_err(|e| Error::Validation(e.to_string()))?;
-    if contract["workflow_version"] != WORKFLOW_VERSION
-        || contract["run_id"] != run_id
-        || contract["approval_artifact_path"] != approval.relative_path
-        || contract["approval_artifact_sha256"] != approval.sha256
-        || contract["agent_id"] != approval.descriptor.agent_id
-        || contract["manifest_root"] != approval.descriptor.manifest_root
-        || contract["support_depth"]
-            != serde_json::to_value(&depth).map_err(|e| Error::Internal(e.to_string()))?
-    {
-        return Err(Error::Validation(
-            "repair input contract differs from frozen success state".into(),
-        ));
-    }
+    SupportDepthContract::check_input_contract(&contract, &approval, &state, run_id)
+        .map_err(Error::Validation)?;
     let inventory = source
         .optional_bytes(&format!("{run}/written-paths.json"))
         .map_err(Error::Validation)?
@@ -251,21 +240,6 @@ fn prepare(
         .map_err(Error::Validation)?;
     validate_runtime_evidence_run_for_approval(root, &context.approval, run_id)
         .map_err(|e| Error::Validation(e.to_string()))?;
-    // The general historical validator deliberately reads a smaller contract projection.
-    let contract: serde_json::Value = serde_json::from_slice(
-        &fs::read(run.join("input-contract.json")).map_err(|e| Error::Internal(e.to_string()))?,
-    )
-    .map_err(|e| Error::Validation(e.to_string()))?;
-    if contract["support_depth"]
-        != serde_json::to_value(&context.support_depth)
-            .map_err(|e| Error::Internal(e.to_string()))?
-        || contract["run_id"] != run_id
-        || contract["workflow_version"] != WORKFLOW_VERSION
-    {
-        return Err(Error::Validation(
-            "repair changed frozen runtime contract".into(),
-        ));
-    }
     Ok(())
 }
 

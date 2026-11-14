@@ -21,6 +21,19 @@ pub(super) fn resolve_generation_inputs(
     borrowed: Option<&mut GitInputs>,
     resolver: &impl GenerationResolver,
 ) -> Result<Resolved, String> {
+    resolve_generation_view(api, root, host, borrowed, resolver, None)
+}
+
+/// ON3's mutable lifecycle projection comes from its attested proposal. Generation identity
+/// belongs to committed HEAD, while acquisition and build bytes still use strict GitInputs.
+pub(super) fn resolve_generation_view(
+    api: &impl Api,
+    root: &Path,
+    host: Option<&crate::isolated_maintenance::EvidenceHost>,
+    borrowed: Option<&mut GitInputs>,
+    resolver: &impl GenerationResolver,
+    proposed: Option<&crate::runtime_advertising::source::Source>,
+) -> Result<Resolved, String> {
     let p = resolver.profile();
     let observed = super::transport_impl::Observed(api);
     let api = &observed;
@@ -68,8 +81,8 @@ pub(super) fn resolve_generation_inputs(
             &mut owned
         }
     };
-    let original = if p == Profile::Synthetic {
-        // MA5/MA6 evaluate post-entry proposals with unstaged report bytes. Generation authority
+    let original = if p.synthetic() {
+        // ON3/MA5/MA6 evaluate proposals with unstaged report bytes. Generation authority
         // stays at the caller's immutable checkout, including when the view lives in scratch.
         // Proposed build/acquired inputs below retain all GitInputs freshness checks.
         let committed = view.provenance("HEAD")?;
@@ -82,6 +95,11 @@ pub(super) fn resolve_generation_inputs(
         resolver.current_generation(view)?.record
     };
     depth_ci::onboarding::check_inputs(p, &original, |path| {
+        if path == depth_ci::onboarding::STATE {
+            if let Some(proposed) = proposed {
+                return proposed.read(path);
+            }
+        }
         String::from_utf8(view.required(path)?).map_err(|e| e.to_string())
     })?;
     let definition = depth_ci::reference("", &view.required(p.contract())?).sha256;

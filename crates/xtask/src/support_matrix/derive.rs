@@ -384,7 +384,11 @@ fn derive_rows_for_loaded_root(root: &LoadedAgentRoot) -> Result<Vec<SupportRow>
 pub(super) fn load_agent_root(root: &AgentRoot) -> Result<LoadedAgentRoot, String> {
     let posture = read_current_root_posture(&root.root)?;
     let records = read_depth_records(root)?;
-    let evidence = depth_record::bound_evidence(&root.workspace, records.values())?;
+    let evidence =
+        match crate::depth_evidence::EvidenceVerdicts::publication_evidence(&root.workspace)? {
+            Some(evidence) => evidence,
+            None => depth_record::bound_evidence(&root.workspace, records.values())?,
+        };
     let covered = records
         .values()
         .flat_map(depth::covered_targets)

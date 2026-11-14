@@ -47,6 +47,24 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
         false
     };
     for (version, record) in &new.records {
+        // Lifecycle and packet integrity remain admission inputs when the statement is unchanged.
+        if onboarding
+            && matches!(record.event, Event::Onboarding { .. })
+            && old.records.get(version).is_some_and(|prior| {
+                prior.event == record.event
+                    && prior.policy == record.policy
+                    && prior.obligations == record.obligations
+                    && (prior.execution.is_some() || record.execution.is_some())
+            })
+        {
+            crate::prepare_publication::check_reporting_transition(
+                root,
+                &old.source,
+                record,
+                &new.entry,
+            )?;
+            continue;
+        }
         if old
             .records
             .get(version)
