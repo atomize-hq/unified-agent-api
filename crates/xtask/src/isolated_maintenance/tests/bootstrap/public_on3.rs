@@ -8,6 +8,8 @@ use crate::{
 };
 use clap::Parser;
 
+mod review;
+
 fn install_route(
     f: &Fixture,
     root: &Path,
@@ -152,6 +154,9 @@ pub(in crate::isolated_maintenance::tests) fn prove(
         refusals(f, root, &api, &evidence);
     }
     let _evidence = evidence.install();
+    if !repaired {
+        review::runtime_selection(f, root, &api);
+    }
     run(root, false).unwrap();
     run(root, true).unwrap();
     let error = crate::git_inputs::GitInputs::new(root)
@@ -217,6 +222,9 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     if !repaired {
         in1_refusals(f, root, &api, &parent, &head, &record);
     }
+    if !repaired {
+        review::reporting_candidate(f, root, &api, &parent, &head);
+    }
     check_integration(root, &parent).unwrap();
     assert!(host
         .records()
@@ -229,6 +237,7 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     check_integration(root, &parent).unwrap();
     run(root, false).unwrap();
     reporting_facts(root);
+    review::publication_checkpoint(f, root, &_api, &head);
 }
 
 fn repair(f: &Fixture, root: &Path, host: &Arc<MemoryHost>, evidence: &SyntheticHost) {
@@ -290,11 +299,12 @@ fn reporting_facts(root: &Path) {
         .find(|r| r["agent"] == "depth_fixture")
         .unwrap();
     assert_eq!(row["depth"]["promises"][0]["qualified"], false);
-    assert!(row["depth"]["promises"][0]["obligations"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|r| r["result"] == "verified"));
+    let expected: Value = serde_json::from_str(include_str!("vectors/on3-reporting.json")).unwrap();
+    assert_eq!(row["depth"]["promises"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        row["depth"]["promises"][0]["obligations"],
+        expected["published_obligations"]
+    );
     for pointer in [
         "min_supported.txt",
         "latest_validated.txt",
@@ -351,7 +361,12 @@ fn refusals(f: &Fixture, root: &Path, api: &super::super::fixture::Fake, evidenc
     let revoked = evidence.fork();
     revoked.revoke_adoption();
     let _reader = revoked.install();
+    let before = crate::candidate_execution::tree::capture(root, &Default::default()).unwrap();
     let error = run(root, true).unwrap_err().to_string();
+    assert_eq!(
+        crate::candidate_execution::tree::capture(root, &Default::default()).unwrap(),
+        before
+    );
     assert!(
         error.starts_with("missing exact authenticated adequacy adoption on PR #9;"),
         "{error}"
@@ -422,7 +437,7 @@ fn public_on3_no_route_and_maintenance_scope_refuse_without_writes() {
     let error = run(f.root.path(), true).unwrap_err().to_string();
     assert_eq!(
         error,
-        "prepare-publication requires a declared onboarding generation"
+        "prepare_publication: unsupported depth write (declared enrollment)"
     );
     assert_eq!(
         crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap(),

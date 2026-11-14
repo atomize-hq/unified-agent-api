@@ -14,6 +14,8 @@ pub(super) fn run(
     writer: &mut impl Write,
 ) -> Result<(), Error> {
     if !route.context().bootstrap_declared_onboarding() {
+        crate::depth_routes::refuse_workspace(root, "prepare_publication")
+            .map_err(Error::Validation)?;
         return Err(Error::Validation(
             "prepare-publication requires a declared onboarding generation".into(),
         ));
@@ -241,15 +243,17 @@ fn context(
         prior.lifecycle_stage,
         context.lifecycle_state.lifecycle_stage,
     ) {
-        (LifecycleStage::RuntimeIntegrated, LifecycleStage::RuntimeIntegrated) => {
-            prior.active_runtime_evidence_run_id
-                == context.lifecycle_state.active_runtime_evidence_run_id
+        (LifecycleStage::RuntimeIntegrated, LifecycleStage::RuntimeIntegrated)
+        | (LifecycleStage::RuntimeIntegrated, LifecycleStage::PublicationReady)
+        | (LifecycleStage::PublicationReady, LifecycleStage::PublicationReady) => {
+            reporting_transition::predecessor_runtime_run_id(
+                &tip,
+                &prior,
+                &context.publication_packet_path,
+            )
+            .map_err(Error::Validation)?
+                == context.runtime_evidence.run_id
         }
-        (LifecycleStage::RuntimeIntegrated, LifecycleStage::PublicationReady) => {
-            prior.active_runtime_evidence_run_id.as_deref()
-                == Some(context.runtime_evidence.run_id.as_str())
-        }
-        (LifecycleStage::PublicationReady, LifecycleStage::PublicationReady) => true,
         _ => false,
     };
     if prior.support_depth != context.lifecycle_state.support_depth

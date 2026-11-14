@@ -46,11 +46,33 @@ pub(crate) fn check(
     }
     acquired_inputs::check(root, &approval_path)?;
     validate_check_mode(root, &context).map_err(|e| e.to_string())?;
-    if prior.lifecycle_stage == LifecycleStage::RuntimeIntegrated
-        && prior.active_runtime_evidence_run_id.as_deref()
-            != Some(context.runtime_evidence.run_id.as_str())
+    if predecessor_runtime_run_id(before, &prior, &context.publication_packet_path)?
+        != context.runtime_evidence.run_id
     {
         return Err("ON3 packet does not select its predecessor's active runtime evidence".into());
     }
     captured.recheck(root)
+}
+
+/// Publication clears the active selector. Its committed packet then preserves that binding.
+pub(super) fn predecessor_runtime_run_id(
+    before: &Source,
+    prior: &LifecycleState,
+    packet_path: &str,
+) -> Result<String, String> {
+    match prior.lifecycle_stage {
+        LifecycleStage::RuntimeIntegrated => prior
+            .active_runtime_evidence_run_id
+            .clone()
+            .ok_or("ON3 predecessor lacks active runtime evidence".into()),
+        LifecycleStage::PublicationReady => {
+            let packet: PublicationReadyPacket =
+                serde_json::from_str(&before.read(packet_path)?).map_err(|e| e.to_string())?;
+            packet.validate().map_err(|e| e.to_string())?;
+            crate::runtime_evidence_run::validate_runtime_evidence_paths_shape(
+                &packet.runtime_evidence_paths,
+            )
+        }
+        _ => Err("ON3 predecessor lacks a runtime evidence checkpoint".into()),
+    }
 }

@@ -103,7 +103,7 @@ pub(super) fn validate_runtime_evidence_run(
     let relative_run_root =
         runtime_evidence_run::run_relative_root(run_id).map_err(Error::Validation)?;
     let absolute_run_root = workspace_root.join(&relative_run_root);
-    verify_written_paths_binding(workspace_root, approval, run_id, &absolute_run_root)?;
+    verify_depth_success_binding(workspace_root, approval, run_id, &absolute_run_root)?;
     inspect_runtime_run_at(approval, run_id, &relative_run_root, &absolute_run_root)?.ok_or_else(
         || {
             Error::Validation(format!(
@@ -132,7 +132,7 @@ pub(super) fn validate_runtime_evidence_directory(
         })?
         .to_string_lossy()
         .replace('\\', "/");
-    verify_written_paths_binding(workspace_root, approval, run_id, run_root)?;
+    verify_depth_success_binding(workspace_root, approval, run_id, run_root)?;
     inspect_runtime_run_at(approval, run_id, &relative_run_root, run_root)?.ok_or_else(|| {
         Error::Validation(format!(
             "runtime evidence run `{run_id}` is missing required runtime evidence files under `{relative_run_root}`"
@@ -285,9 +285,9 @@ fn stale_runtime_evidence_error(approval: &ApprovalArtifact, run_id: &str, detai
     ))
 }
 
-/// OF-P9 check (i). Non-depth evidence keeps its historical validation. A depth run's
-/// reporting file is authenticated by the success state, never by its own contents.
-fn verify_written_paths_binding(
+/// Bind the depth run's complete contract and written-paths inventory to frozen success.
+/// Historical non-depth evidence retains its existing validation.
+fn verify_depth_success_binding(
     workspace: &Path,
     approval: &ApprovalArtifact,
     run_id: &str,
@@ -311,6 +311,11 @@ fn verify_written_paths_binding(
             "does not match the depth lifecycle success state",
         ));
     }
+    let contract = read_json(&run_root.join("input-contract.json"))?;
+    crate::runtime_follow_on::SupportDepthContract::check_input_contract(
+        &contract, approval, &state, run_id,
+    )
+    .map_err(|detail| stale_runtime_evidence_error(approval, run_id, &detail))?;
     let expected = state.written_paths_sha256.as_ref().ok_or_else(|| {
         stale_runtime_evidence_error(approval, run_id, "has no lifecycle written_paths_sha256")
     })?;

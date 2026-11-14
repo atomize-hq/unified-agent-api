@@ -31,5 +31,18 @@
     {"operation":"run","id":"X2","target":"x86_64-unknown-linux-gnu","result":"verified"},
     {"operation":"run","id":"X3","target":"x86_64-unknown-linux-gnu","result":"verified"},
     {"operation":"run","id":"X4","target":"x86_64-unknown-linux-gnu","result":"verified"}
+  ],
+  "published_obligations": [
+    {"id":"R1","result":"verified"},
+    {"id":"V1","result":"verified"},
+    {"id":"G1","result":"verified"},
+    {"id":"E1","result":"verified"},
+    {"id":"A1","result":"verified"},
+    {"id":"X1","result":"verified"},
+    {"id":"X2","result":"verified"},
+    {"id":"X3","result":"verified"},
+    {"id":"X4","result":"verified"},
+    {"id":"OUT3","result":"verified"},
+    {"id":"LC2","result":"verified"}
   ]
 }

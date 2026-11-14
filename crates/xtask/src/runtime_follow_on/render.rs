@@ -189,7 +189,7 @@ pub(super) fn render_run_status(
         status: status.to_string(),
         validation_passed,
         handoff_ready,
-        run_dir: context.run_dir.to_string_lossy().into_owned(),
+        run_dir: format!("{}/{}", super::RUNTIME_RUNS_ROOT, context.run_id),
         written_paths,
         errors,
     }
