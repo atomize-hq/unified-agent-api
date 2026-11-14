@@ -17,6 +17,7 @@ pub struct Source {
     immutable: Option<crate::git_inputs::immutable::Immutable>,
     proposed: BTreeMap<String, String>,
     captured: Option<Arc<CapturedFiles>>,
+    nonregular: std::collections::BTreeSet<String>,
 }
 
 impl Source {
@@ -27,6 +28,7 @@ impl Source {
             immutable: None,
             proposed: BTreeMap::new(),
             captured: None,
+            nonregular: Default::default(),
         })
     }
 
@@ -34,6 +36,18 @@ impl Source {
     pub(crate) fn captured(root: &Path, files: CapturedFiles) -> Result<Self, String> {
         let mut source = Self::workspace(root)?;
         source.captured = Some(Arc::new(files));
+        Ok(source)
+    }
+
+    /// A complete authenticated data snapshot can preserve nonregular entries while refusing
+    /// to consume them as regular source inputs. No later object/worktree reopening occurs.
+    pub(crate) fn captured_inventory(
+        root: &Path,
+        files: CapturedFiles,
+        nonregular: std::collections::BTreeSet<String>,
+    ) -> Result<Self, String> {
+        let mut source = Self::captured(root, files)?;
+        source.nonregular = nonregular;
         Ok(source)
     }
 
@@ -101,6 +115,13 @@ impl Source {
                 .any(|p| !matches!(p, Component::Normal(_)))
         {
             return Err(format!("invalid source path: {path}"));
+        }
+        if self
+            .nonregular
+            .iter()
+            .any(|entry| path == entry || path.starts_with(&format!("{entry}/")))
+        {
+            return Err(format!("{path}: nonregular captured source input"));
         }
         if let Some(files) = &self.captured {
             return Ok(files.get(path).map(|(bytes, _)| bytes.clone()));
@@ -178,6 +199,7 @@ impl Source {
             let mut paths = std::collections::BTreeSet::new();
             for path in files
                 .keys()
+                .chain(self.nonregular.iter())
                 .filter(|p| p.starts_with(&format!("{prefix}/")))
             {
                 paths.insert(path.clone());
@@ -288,6 +310,20 @@ impl Source {
 
     pub(crate) fn committed_files(&self, prefix: &str) -> Result<Vec<String>, String> {
         self.optional_bytes(&format!("{prefix}/.source-directory-probe"))?;
+        if let Some(files) = &self.captured {
+            if self
+                .nonregular
+                .iter()
+                .any(|path| path.starts_with(&format!("{prefix}/")))
+            {
+                return Err("nonregular captured directory entry".into());
+            }
+            return Ok(files
+                .keys()
+                .filter(|path| path.starts_with(&format!("{prefix}/")))
+                .cloned()
+                .collect());
+        }
         let commit = self.commit.as_ref().ok_or("expected an immutable source")?;
         self.git(&["ls-tree", "-r", "-z", "--full-tree", commit, "--", prefix])?
             .split('\0')
@@ -391,6 +427,22 @@ mod immutable_tests;
 #[cfg(test)]
 mod captured_tests {
     use super::*;
+    #[test]
+    fn captured_inventory_preserves_and_refuses_nonregular_input_names() {
+        let root = tempfile::tempdir().unwrap();
+        let source = Source::captured_inventory(
+            root.path(),
+            BTreeMap::from([("data/regular".into(), (b"bytes".to_vec(), false))]),
+            ["data/link".into(), "module".into()].into_iter().collect(),
+        )
+        .unwrap();
+        assert!(source.optional("data/link").is_err());
+        assert!(source.optional("module/child").is_err());
+        assert!(source.paths("data").unwrap().contains(&"data/link".into()));
+        assert!(source.committed_files("data").is_err());
+        assert_eq!(source.read("data/regular").unwrap(), "bytes");
+    }
+
     #[test]
     fn immutable_reads_use_constant_git_processes() {
         let root = tempfile::tempdir().unwrap();

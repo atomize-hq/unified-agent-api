@@ -17,6 +17,7 @@ mod preparation;
 #[path = "support_matrix/publication.rs"]
 mod publication;
 pub use preparation::preview_preparation;
+pub use preparation::{load_preparation, PreparationInputs};
 #[path = "support_matrix/runtime_support.rs"]
 mod runtime_support;
 

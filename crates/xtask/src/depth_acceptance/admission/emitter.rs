@@ -16,7 +16,7 @@ pub(crate) struct Emitter {
     pub agent: String,
     pub version: String,
     pub input_paths: Vec<String>,
-    pub prepared: Option<Record>,
+    pub prepared: Option<(Record, Option<freeze::Captured>)>,
 }
 pub(crate) fn object(root: &Path, commit: &str) -> Result<Object, String> {
     Ok(Objects::new(root).commit(commit)?.object)
@@ -66,10 +66,18 @@ impl Emitter {
     pub(crate) fn prepare(&mut self, root: &Path) -> Result<(), String> {
         let prepared = self.read_inputs(root);
         observations::unavailable("in1/evaluated-inputs", &prepared);
-        self.prepared = Some(prepared?);
+        prepared?;
+        let stable = self.recheck_freeze();
+        observations::unavailable("in1/freeze-stability", &stable);
+        stable
+    }
+    fn recheck_freeze(&self) -> Result<(), String> {
+        if let Some((_, Some(captured))) = &self.prepared {
+            captured.recheck(self.publication.host.as_ref(), &self.candidate)?;
+        }
         Ok(())
     }
-    fn read_inputs(&self, root: &Path) -> Result<Record, String> {
+    fn read_inputs(&mut self, root: &Path) -> Result<(), String> {
         let mut objects = Objects::new(root);
         let candidate = objects.commit(&self.candidate)?.object;
         let parent = objects
@@ -135,76 +143,132 @@ impl Emitter {
         };
         let old_state = read_state(&mut objects, &parent)?;
         let new_state = read_state(&mut objects, &candidate)?;
-        Ok(Record {
-            schema_version: 1,
-            kind: "in1_admission".into(),
-            repository: self.publication.authority.repository.clone(),
-            generation_sha256: generation.as_ref().map(Generation::identity).transpose()?,
-            generation,
-            candidate: candidate.clone(),
-            parent,
-            checkout: candidate,
-            head_relationship: "exact_head".into(),
-            old_state,
-            new_state,
-            checkpoint: if predecessors.is_empty() {
-                Checkpoint::Bootstrap
-            } else {
-                Checkpoint::Unclassified
+        let captured = depth
+            .as_ref()
+            .map(|_| freeze::Captured::read(self.publication.host.as_ref(), &self.candidate))
+            .transpose();
+        if let Ok(Some(captured)) = &captured {
+            captured.pin();
+        }
+        let classification = captured
+            .as_ref()
+            .map_err(Clone::clone)
+            .and_then(|captured| {
+                depth
+                    .as_ref()
+                    .zip(captured.as_ref())
+                    .map(|(depth, captured)| {
+                        freeze::classify_authenticated(
+                            root,
+                            &self.publication,
+                            &parent,
+                            &candidate,
+                            depth,
+                            captured.observation.as_ref(),
+                            &Ok(captured.acquired.clone()),
+                        )
+                    })
+                    .transpose()
+            });
+        observations::unavailable("in1/freeze-planning", &classification);
+        let established = classification.as_ref().ok().and_then(Option::as_ref);
+        let bootstrap = predecessors.is_empty();
+        self.prepared = Some((
+            Record {
+                schema_version: 1,
+                kind: "in1_admission".into(),
+                repository: self.publication.authority.repository.clone(),
+                generation_sha256: generation.as_ref().map(Generation::identity).transpose()?,
+                generation,
+                candidate: candidate.clone(),
+                parent,
+                checkout: candidate,
+                head_relationship: "exact_head".into(),
+                old_state,
+                new_state,
+                checkpoint: established.map_or(
+                    if classification.is_ok() && bootstrap {
+                        Checkpoint::Bootstrap
+                    } else {
+                        Checkpoint::Unclassified
+                    },
+                    |classification| classification.checkpoint,
+                ),
+                bootstrap: established.is_some() && bootstrap,
+                transition: established
+                    .and_then(|classification| classification.transition.clone()),
+                decision: Decision::Refused,
+                reasons: established
+                    .iter()
+                    .map(|classification| classification.reason)
+                    .collect(),
+                predecessors,
+                enrollment_anchor: self.publication.authority.anchor.clone(),
+                policy: self.publication.authority.policy.clone(),
+                protected_tip,
+                canonical_tip: self.canonical_tip.clone(),
+                accepted_origin: format!(
+                    "https://github.com/{}.git",
+                    self.publication.authority.repository.name
+                ),
+                registry_blob: self.registry_blob.clone(),
+                inputs,
+                observed_authority: String::new(),
+                producer_context: None,
+                execution_evidence,
+                claims: Claims {
+                    run: 0,
+                    attempt: 0,
+                    job: 0,
+                    check: 0,
+                    event: self.publication.host.event()?,
+                },
             },
-            decision: Decision::Refused,
-            reasons: vec![Reason::ObservationIncomplete],
-            predecessors,
-            enrollment_anchor: self.publication.authority.anchor.clone(),
-            policy: self.publication.authority.policy.clone(),
-            protected_tip,
-            canonical_tip: self.canonical_tip.clone(),
-            accepted_origin: format!(
-                "https://github.com/{}.git",
-                self.publication.authority.repository.name
-            ),
-            registry_blob: self.registry_blob.clone(),
-            inputs,
-            observed_authority: String::new(),
-            producer_context: None,
-            execution_evidence,
-            claims: Claims {
-                run: 0,
-                attempt: 0,
-                job: 0,
-                check: 0,
-                event: self.publication.host.event()?,
-            },
-        })
+            captured.ok().flatten(),
+        ));
+        classification.map(|_| ())
     }
     fn retain(&self, root: &Path, authority: observations::Authority) -> Result<(), String> {
-        let Some(mut record) = self.prepared.clone() else {
+        let Some(mut record) = self.prepared.as_ref().map(|(record, _)| record.clone()) else {
             self.publication.start(&self.candidate)?;
             return Err("IN1 evaluated inputs unavailable".into());
         };
         record.observed_authority = authority.identity;
         record.decision = authority.decision.unwrap_or(Decision::Refused);
+        let classification_reasons = std::mem::take(&mut record.reasons);
         record.reasons = match authority.decision {
             Some(Decision::Admitted) => vec![Reason::OwningPredicatesSatisfied],
             Some(Decision::Refused) => vec![Reason::OwningPredicateRefused],
             None => Vec::new(),
         };
+        if authority.decision.is_some() {
+            record.reasons.extend(classification_reasons);
+        }
         // Reconstruct only to verify continued availability/progression. These reads cannot
         // replace any of the evaluated inputs, even on a reached policy refusal.
         let history = self
             .publication
             .resolve(root, &[self.protected_tip.clone(), self.candidate.clone()]);
-        let closing = history.as_ref().map_err(Clone::clone).and_then(|history| {
-            if history.candidate_predecessors(&record.candidate.commit)? != record.predecessors {
-                return Err("IN1 predecessor frontier changed after input capture".into());
-            }
-            if record.decision == Decision::Admitted {
-                if let (Some(generation), Some(state)) = (&record.generation, &record.new_state) {
-                    history.check_progression(&record.candidate.commit, generation, state.stage)?;
+        let closing = self
+            .recheck_freeze()
+            .and_then(|()| history.as_ref().map_err(Clone::clone))
+            .and_then(|history| {
+                if history.candidate_predecessors(&record.candidate.commit)? != record.predecessors
+                {
+                    return Err("IN1 predecessor frontier changed after input capture".into());
                 }
-            }
-            Ok(())
-        });
+                if record.decision == Decision::Admitted {
+                    if let (Some(generation), Some(state)) = (&record.generation, &record.new_state)
+                    {
+                        history.check_progression(
+                            &record.candidate.commit,
+                            generation,
+                            state.stage,
+                        )?;
+                    }
+                }
+                Ok(())
+            });
         if authority.incomplete || closing.is_err() {
             record.reasons.push(Reason::ObservationIncomplete);
         }
@@ -214,8 +278,13 @@ impl Emitter {
             return Err("IN1 emitting event differs from evaluated event".into());
         }
         record.claims = session.claims.clone();
-        session.publish(&record)?;
+        let publishing = self.recheck_freeze();
+        if publishing.is_err() && !record.reasons.contains(&Reason::ObservationIncomplete) {
+            record.reasons.push(Reason::ObservationIncomplete);
+        }
+        session.publish(&mut record, || self.recheck_freeze())?;
         closing?;
+        publishing?;
         history?.recheck_publication(&session.claims)
     }
 }

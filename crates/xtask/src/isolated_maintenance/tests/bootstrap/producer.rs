@@ -37,11 +37,14 @@ pub(super) fn acquire(root: &Path) {
         rules: base.join("RULES.json"),
     })
     .unwrap();
-    crate::manifest_union::run(crate::manifest_union::Args {
-        root: Some(base.clone()),
-        rules: None,
-        version: "0.2.0".into(),
-    })
+    crate::manifest_union::run_at(
+        crate::manifest_union::Args {
+            root: Some(base.clone()),
+            rules: None,
+            version: "0.2.0".into(),
+        },
+        "2026-11-03T00:00:00Z",
+    )
     .unwrap();
     crate::manifest_report::run_at(
         crate::manifest_report::Args {

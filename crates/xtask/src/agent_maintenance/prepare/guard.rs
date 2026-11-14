@@ -212,22 +212,8 @@ pub(super) fn apply(
             "stale or modified prepare plan; rebuild before applying".into(),
         ));
     }
-    let mutations = plan
-        .files
-        .iter()
-        .zip(&plan.context.before)
-        .map(|(file, before)| match before {
-            Some(before) => crate::workspace_mutation::PlannedMutation::replace(
-                &file.relative_path,
-                before.clone(),
-                file.contents.clone(),
-            ),
-            None => crate::workspace_mutation::PlannedMutation::create(
-                &file.relative_path,
-                file.contents.clone(),
-            ),
-        })
-        .collect::<Vec<_>>();
+    let mutations = crate::freeze_transition::delivery::from_plan(&plan.transition)
+        .map_err(Error::Validation)?;
     // Host, source and workspace may move while the plan is rebuilt: recheck right before writing.
     if let Some(route) = route {
         route.recheck(root).map_err(Error::Validation)?;
@@ -237,6 +223,12 @@ pub(super) fn apply(
             ));
         }
     }
+    #[cfg(test)]
+    super::BEFORE_APPLY.with(|hook| {
+        if let Some(hook) = hook.get() {
+            hook(root);
+        }
+    });
     apply_mutations(root, &mutations).map_err(Into::into)
 }
 

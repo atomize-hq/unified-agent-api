@@ -15,6 +15,22 @@ pub(crate) struct Authority {
 pub(crate) trait Host: Send + Sync {
     fn json(&self, path: &str) -> Result<Value, String>;
     fn bytes(&self, path: &str, limit: usize) -> Result<Vec<u8>, String>;
+    /// Independent invocation observation. Production has no activated implementation.
+    fn freeze_inputs(
+        &self,
+        _candidate: &str,
+    ) -> Result<Option<freeze::authority::Observation>, String> {
+        Ok(None)
+    }
+    fn acquisition_reference(
+        &self,
+        _candidate: &str,
+    ) -> Result<Option<freeze::acquisition::Reference>, String> {
+        Ok(None)
+    }
+    fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
+        Ok(None)
+    }
     /// Independently supplied invocation event, pinned before owning predicate evaluation.
     fn event(&self) -> Result<String, String>;
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
@@ -66,14 +82,31 @@ impl Publication {
     }
 }
 impl Session {
-    pub(crate) fn publish(&self, record: &Record) -> Result<(), String> {
+    pub(crate) fn publish(
+        &self,
+        record: &mut Record,
+        recheck: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
         if record.claims != self.claims {
             return Err("IN1 emitter claims changed".into());
         }
         let bytes = record.canonical()?;
-        let artifact = self.publication.host.upload(&self.claims, &bytes)?;
+        let mut artifact = self.publication.host.upload(&self.claims, &bytes)?;
         if artifact == 0 {
             return Err("IN1 upload returned no artifact identity".into());
+        }
+        // Close freeze observations after upload, while the retained commitment is still open.
+        // A late failure publishes the pinned decision with incompleteness in a fresh artifact.
+        let closing = recheck();
+        if closing.is_err() && !record.reasons.contains(&Reason::ObservationIncomplete) {
+            record.reasons.push(Reason::ObservationIncomplete);
+            artifact = self
+                .publication
+                .host
+                .upload(&self.claims, &record.canonical()?)?;
+            if artifact == 0 {
+                return Err("IN1 upload returned no artifact identity".into());
+            }
         }
         self.publication
             .host
@@ -93,7 +126,7 @@ impl Session {
         if retained != *record {
             return Err("IN1 published decision differs from evaluated decision".into());
         }
-        Ok(())
+        closing
     }
 }
 pub(crate) fn commitment(digest: &str, artifact: u64) -> String {
@@ -394,7 +427,7 @@ fn decode(zip: &[u8]) -> Result<Vec<u8>, String> {
     }
     Ok(result.stdout)
 }
-pub(super) fn list(
+pub(crate) fn list(
     host: &dyn Host,
     path: &str,
     member: &str,

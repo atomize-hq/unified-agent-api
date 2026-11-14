@@ -1,0 +1,34 @@
+{
+  "ma2": {
+    "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json": "ma2/cli_manifests/depth_fixture/reports/0.2.0/depth-record.json",
+    "cli_manifests/support_matrix/current.json": "common/support.json",
+    "crates/agent_api/src/runtime_support_data.rs": "common/runtime-support.txt",
+    "docs/agents/lifecycle/depth_fixture-maintenance/CI_WORKFLOWS_PLAN.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/CI_WORKFLOWS_PLAN.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/HANDOFF.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/HANDOFF.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/OPS_PLAYBOOK.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/OPS_PLAYBOOK.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/README.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/README.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/governance/execute-agent-maintenance-prompt.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/governance/execute-agent-maintenance-prompt.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-request.toml": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-request.toml",
+    "docs/agents/lifecycle/depth_fixture-maintenance/governance/pr-summary.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/governance/pr-summary.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/governance/remediation-log.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/governance/remediation-log.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/review_surfaces.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/review_surfaces.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/scope_brief.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/scope_brief.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/seam_map.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/seam_map.md",
+    "docs/agents/lifecycle/depth_fixture-maintenance/threading.md": "ma2/docs/agents/lifecycle/depth_fixture-maintenance/threading.md",
+    "docs/specs/unified-agent-api/support-matrix.md": "common/support-matrix.md"
+  },
+  "on2": {
+    "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json": "on2/cli_manifests/depth_fixture/reports/0.2.0/depth-record.json",
+    "cli_manifests/support_matrix/current.json": "common/support.json",
+    "crates/agent_api/src/runtime_support_data.rs": "common/runtime-support.txt",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/codex-prompt.md": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/codex-prompt.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/handoff.json": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/handoff.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/input-contract.json": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/input-contract.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/run-status.json": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/run-status.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/run-summary.md": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/run-summary.md",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/validation-report.json": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/validation-report.json",
+    "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/written-paths.json": "on2/docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze/written-paths.json",
+    "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/lifecycle-state.json": "on2/docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/lifecycle-state.json",
+    "docs/specs/unified-agent-api/support-matrix.md": "common/support-matrix.md"
+  }
+}

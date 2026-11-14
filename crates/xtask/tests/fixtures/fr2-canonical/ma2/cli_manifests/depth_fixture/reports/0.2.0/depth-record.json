@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "event": {
+    "lifecycle_path": "maintenance",
+    "request_commit": "abcdef0",
+    "request_recorded_at": "2026-11-03T00:00:00Z",
+    "trigger_kind": "upstream_release_detected",
+    "opened_from": ".github/workflows/agent-maintenance-open-pr.yml"
+  },
+  "policy": {
+    "identity": "d3132eb6d8b5af674505ddf9a1d910643e1913a01d14abe93bdfceca8f4de389",
+    "selection": {
+      "agent_id": "depth_fixture",
+      "enrollment": {
+        "lifecycle_path": "maintenance",
+        "version": "0.2.0",
+        "targets": [
+          "x86_64-unknown-linux-gnu"
+        ],
+        "modes": [
+          {
+            "selector": "run-json",
+            "command_path": "depth_fixture run",
+            "mode": "headless",
+            "predicates": [
+              {
+                "flag": "--json"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "run",
+            "serves": [
+              "run-json"
+            ],
+            "templates": [
+              "CORE"
+            ],
+            "shared_mapping": "wrapper_only",
+            "forwarding": false,
+            "promise": {
+              "r1": "r",
+              "v1": "v",
+              "g1": "g",
+              "e1": "e",
+              "a1": "a",
+              "x1": "x",
+              "x2": "x",
+              "x3": "x",
+              "x4": "x"
+            },
+            "not_applicable_permitted": []
+          }
+        ],
+        "capabilities": []
+      }
+    },
+    "rules_revision": "1",
+    "base": [
+      "A1",
+      "E1",
+      "G1",
+      "R1",
+      "V1",
+      "X1",
+      "X2",
+      "X3",
+      "X4"
+    ],
+    "templates": [
+      {
+        "template": "CORE",
+        "obligations": [
+          "LC2",
+          "OUT3"
+        ]
+      }
+    ],
+    "path_enabled": true,
+    "debt_baseline": []
+  },
+  "obligations": {
+    "identity": "0b966187a19ec1ac935bcd13f0aca9ddaa6f4ee60b7f2cb12846785f43114f50",
+    "policy_identity": "d3132eb6d8b5af674505ddf9a1d910643e1913a01d14abe93bdfceca8f4de389",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ],
+    "acquired_inputs": [
+      {
+        "path": "cli_manifests/depth_fixture/RULES.json",
+        "sha256": "035742336c34bf4e00327bad012f2a7c333e73b33c3bfb4206ec742da8f83659"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/SCHEMA.json",
+        "sha256": "b6404fce6522b3ad7255fd965b3b4e94a5bf9cec08bee1a4a5cdcf82353460cb"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json",
+        "sha256": "d260e596925433f24f53cc81756f1bb0d79d7134546dae6681fdce5d15a5c8cc"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json",
+        "sha256": "7d8a332d97302c511c027e57f0f0f7824ad443ed0c0aebf2c1011a0fd7623aac"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json",
+        "sha256": "7f9413876d7dfe8aa20546b4359229d4f2a56a3fb10e4cbbaf30d2803584b340"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/snapshots/0.2.0/union.json",
+        "sha256": "f12af55ecc1194243b77cc9360a3c5fcf2d45928e6ff5c1fc54d72a1b4e37c29"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json",
+        "sha256": "9b9cd9c31491e4d3fcb5ea4afe8fa8e32f0f98864b50ebb11d408bebd2b14947"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/wrapper_coverage.json",
+        "sha256": "e40f72ff12aa750223db5e4ddaaf6e0a8d9d18c2d03f7366c2f67d16e7be6d0b"
+      }
+    ],
+    "operations": [
+      {
+        "id": "run",
+        "surfaces": [
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--help"
+          },
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--json"
+          },
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--model"
+          },
+          {
+            "surface_kind": "positional_args",
+            "command_path": "depth_fixture run",
+            "surface_id": "PROMPT"
+          },
+          {
+            "surface_kind": "commands",
+            "command_path": "depth_fixture run",
+            "surface_id": "run"
+          }
+        ],
+        "obligations": [
+          "A1",
+          "E1",
+          "G1",
+          "LC2",
+          "OUT3",
+          "R1",
+          "V1",
+          "X1",
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    ],
+    "classification_required": [
+      {
+        "operation": "run",
+        "surface": {
+          "surface_kind": "flags",
+          "command_path": "depth_fixture run",
+          "surface_id": "--help"
+        }
+      },
+      {
+        "operation": "run",
+        "surface": {
+          "surface_kind": "flags",
+          "command_path": "depth_fixture run",
+          "surface_id": "--json"
+        }
+      },
+      {
+        "operation": "run",
+        "surface": {
+          "surface_kind": "flags",
+          "command_path": "depth_fixture run",
+          "surface_id": "--model"
+        }
+      },
+      {
+        "operation": "run",
+        "surface": {
+          "surface_kind": "positional_args",
+          "command_path": "depth_fixture run",
+          "surface_id": "PROMPT"
+        }
+      },
+      {
+        "operation": "run",
+        "surface": {
+          "surface_kind": "commands",
+          "command_path": "depth_fixture run",
+          "surface_id": "run"
+        }
+      }
+    ],
+    "acceptance_work": []
+  },
+  "execution": null,
+  "acceptance_entries": []
+}

@@ -14,6 +14,7 @@ pub mod depth_evidence;
 pub mod depth_fixture_snapshot;
 pub mod depth_fixture_wrapper_coverage;
 pub mod depth_record;
+pub(crate) mod freeze_transition;
 mod git_inputs;
 pub mod isolated_maintenance;
 pub mod manifest_acquisition;

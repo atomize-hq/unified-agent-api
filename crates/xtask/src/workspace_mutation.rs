@@ -11,6 +11,7 @@ pub struct PlannedMutation {
     desired_after: Vec<u8>,
     remove: bool,
     expected_mode: Option<u32>,
+    git_mode: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,49 +77,6 @@ impl fmt::Display for WorkspaceMutationError {
         match self {
             Self::Validation(message) | Self::Internal(message) => f.write_str(message),
         }
-    }
-}
-
-impl PlannedMutation {
-    /// Owning proposals may retire a regular file in the same checked batch as their writes.
-    pub(crate) fn remove(relative_path: impl Into<PathBuf>, expected_before: Vec<u8>) -> Self {
-        let mut mutation = Self::replace(relative_path, expected_before, Vec::new());
-        mutation.remove = true;
-        mutation
-    }
-
-    pub fn create(relative_path: impl Into<PathBuf>, desired_after: Vec<u8>) -> Self {
-        Self {
-            relative_path: relative_path.into(),
-            expected_before: None,
-            desired_after,
-            remove: false,
-            expected_mode: None,
-        }
-    }
-
-    pub fn replace(
-        relative_path: impl Into<PathBuf>,
-        expected_before: Vec<u8>,
-        desired_after: Vec<u8>,
-    ) -> Self {
-        Self {
-            relative_path: relative_path.into(),
-            expected_before: Some(expected_before),
-            desired_after,
-            remove: false,
-            expected_mode: None,
-        }
-    }
-
-    /// Optional mode precondition for invocation snapshots; bytes alone cannot detect chmod.
-    pub(crate) fn with_expected_mode(mut self, mode: u32) -> Self {
-        self.expected_mode = Some(mode);
-        self
-    }
-
-    pub fn relative_path(&self) -> &Path {
-        &self.relative_path
     }
 }
 
@@ -335,6 +293,12 @@ fn apply_with_hook(
             fs::write(&temp_path, &mutation.classified.mutation.desired_after).map_err(|err| {
                 WorkspaceMutationError::Internal(format!("write {}: {err}", temp_path.display()))
             })?;
+            #[cfg(unix)]
+            if let Some(mode) = mutation.classified.mutation.git_mode {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&temp_path, fs::Permissions::from_mode(mode))
+                    .map_err(|e| WorkspaceMutationError::Internal(e.to_string()))?;
+            }
             mutation.temp_path = temp_path;
         }
 
@@ -493,6 +457,9 @@ fn classify_mutation<'a>(
                 || mutation
                     .expected_mode
                     .is_some_and(|m| file_mode(&metadata) != m)
+                || mutation
+                    .git_mode
+                    .is_some_and(|mode| (file_mode(&metadata) & 0o100 != 0) != (mode & 0o100 != 0))
             {
                 MutationState::Divergent
             } else {

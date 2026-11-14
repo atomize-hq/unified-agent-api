@@ -177,7 +177,13 @@ fn comment_edit_cannot_salt_a_reached_conflict(original: &str) {
         "{error}"
     );
     let refusal = f.api.3.records().pop().unwrap();
-    assert_eq!(refusal.reasons, [Reason::OwningPredicateRefused]);
+    assert_eq!(
+        refusal.reasons,
+        [
+            Reason::OwningPredicateRefused,
+            Reason::FreezeAuthorityUnavailable
+        ]
+    );
     assert_eq!(refusal.observed_authority, first.observed_authority);
     assert_eq!(
         f.api.3.inputs_identity(&refusal),
@@ -248,6 +254,7 @@ fn late_isolated_host_flake_preserves_reached_admission_and_retry_recovers() {
         refusal.reasons,
         [
             Reason::OwningPredicatesSatisfied,
+            Reason::FreezeAuthorityUnavailable,
             Reason::ObservationIncomplete
         ]
     );
@@ -300,6 +307,7 @@ fn late_flake_preserves_reached_policy_refusal_and_conflicts_with_later_admissio
         refusal.reasons,
         [
             Reason::OwningPredicateRefused,
+            Reason::FreezeAuthorityUnavailable,
             Reason::ObservationIncomplete
         ]
     );

@@ -304,7 +304,8 @@ pub(super) fn resolve(
                 }
                 let frontier_complete = references_complete
                     && referenced == expected
-                    && (expected.is_empty() == (record.checkpoint == Checkpoint::Bootstrap));
+                    && (expected.is_empty()
+                        == (record.checkpoint == Checkpoint::Bootstrap || record.bootstrap));
                 if !frontier_complete {
                     // A retained attempt remains accountable even when later parent admissions
                     // supersede its captured frontier. Quarantine it without blocking recovery.

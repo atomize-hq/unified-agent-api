@@ -13,6 +13,9 @@ pub(super) mod fixture;
 mod git_metadata;
 mod in1_integration;
 pub(crate) use in1_integration::admission::fixture as admission_fixture;
+mod fr2_canonical;
+mod fr2_maintenance;
+mod fr2_maintenance_acquisition;
 mod ma2_routes;
 // The connected evidence chain needs the Linux channel peer anchor; other platforms refuse it
 // (see `depth_evidence::staged::non_linux_tests`).

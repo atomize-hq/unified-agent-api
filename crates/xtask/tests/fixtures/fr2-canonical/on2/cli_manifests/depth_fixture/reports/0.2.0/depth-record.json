@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "event": {
+    "lifecycle_path": "onboarding",
+    "approval_commit": "{{APPROVAL_COMMIT}}",
+    "approval_recorded_at": "2026-11-05T00:00:00Z"
+  },
+  "policy": {
+    "identity": "{{POLICY_IDENTITY}}",
+    "selection": {
+      "agent_id": "depth_fixture",
+      "enrollment": {
+        "lifecycle_path": "onboarding",
+        "version": "0.2.0",
+        "targets": [
+          "x86_64-unknown-linux-gnu"
+        ],
+        "modes": [
+          {
+            "selector": "run-json",
+            "command_path": "depth_fixture run",
+            "mode": "headless",
+            "predicates": [
+              {
+                "flag": "--json"
+              }
+            ]
+          }
+        ],
+        "operations": [
+          {
+            "id": "run",
+            "serves": [
+              "run-json"
+            ],
+            "templates": [
+              "CORE"
+            ],
+            "shared_mapping": "wrapper_only",
+            "forwarding": false,
+            "promise": {
+              "r1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "v1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "g1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "e1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "a1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x1": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x2": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x3": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent.",
+              "x4": "Synthetic machinery-proof wrapper promise; see depth-synthetic/contract.md; qualifies no real agent."
+            },
+            "not_applicable_permitted": [],
+            "classification_basis": "{{CLASSIFICATION_BASIS}}",
+            "classifications": [
+              {
+                "surface": {
+                  "surface_kind": "flags",
+                  "command_path": "depth_fixture run",
+                  "surface_id": "--help"
+                },
+                "templates": [
+                  "CORE"
+                ],
+                "rationale": "Reviewed synthetic wrapper CORE promise"
+              },
+              {
+                "surface": {
+                  "surface_kind": "flags",
+                  "command_path": "depth_fixture run",
+                  "surface_id": "--json"
+                },
+                "templates": [
+                  "CORE"
+                ],
+                "rationale": "Reviewed synthetic wrapper CORE promise"
+              },
+              {
+                "surface": {
+                  "surface_kind": "flags",
+                  "command_path": "depth_fixture run",
+                  "surface_id": "--model"
+                },
+                "templates": [
+                  "CORE"
+                ],
+                "rationale": "Reviewed synthetic wrapper CORE promise"
+              },
+              {
+                "surface": {
+                  "surface_kind": "positional_args",
+                  "command_path": "depth_fixture run",
+                  "surface_id": "PROMPT"
+                },
+                "templates": [
+                  "CORE"
+                ],
+                "rationale": "Reviewed synthetic wrapper CORE promise"
+              },
+              {
+                "surface": {
+                  "surface_kind": "commands",
+                  "command_path": "depth_fixture run",
+                  "surface_id": "run"
+                },
+                "templates": [
+                  "CORE"
+                ],
+                "rationale": "Reviewed synthetic wrapper CORE promise"
+              }
+            ]
+          }
+        ],
+        "capabilities": []
+      }
+    },
+    "rules_revision": "1",
+    "base": [
+      "A1",
+      "E1",
+      "G1",
+      "R1",
+      "V1",
+      "X1",
+      "X2",
+      "X3",
+      "X4"
+    ],
+    "templates": [
+      {
+        "template": "CORE",
+        "obligations": [
+          "LC2",
+          "OUT3"
+        ]
+      }
+    ],
+    "path_enabled": true,
+    "debt_baseline": []
+  },
+  "obligations": {
+    "identity": "{{OBLIGATIONS_IDENTITY}}",
+    "policy_identity": "{{POLICY_IDENTITY}}",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ],
+    "acquired_inputs": [
+      {
+        "path": "cli_manifests/depth_fixture/RULES.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/RULES.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/SCHEMA.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/SCHEMA.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/snapshots/0.2.0/union.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/snapshots/0.2.0/union.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json}}"
+      },
+      {
+        "path": "cli_manifests/depth_fixture/wrapper_coverage.json",
+        "sha256": "{{INPUT_SHA256:cli_manifests/depth_fixture/wrapper_coverage.json}}"
+      }
+    ],
+    "operations": [
+      {
+        "id": "run",
+        "surfaces": [
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--help"
+          },
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--json"
+          },
+          {
+            "surface_kind": "flags",
+            "command_path": "depth_fixture run",
+            "surface_id": "--model"
+          },
+          {
+            "surface_kind": "positional_args",
+            "command_path": "depth_fixture run",
+            "surface_id": "PROMPT"
+          },
+          {
+            "surface_kind": "commands",
+            "command_path": "depth_fixture run",
+            "surface_id": "run"
+          }
+        ],
+        "obligations": [
+          "A1",
+          "E1",
+          "G1",
+          "LC2",
+          "OUT3",
+          "R1",
+          "V1",
+          "X1",
+          "X2",
+          "X3",
+          "X4"
+        ]
+      }
+    ],
+    "classification_required": [],
+    "acceptance_work": []
+  },
+  "execution": null,
+  "acceptance_entries": []
+}

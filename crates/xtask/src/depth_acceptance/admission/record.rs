@@ -85,6 +85,12 @@ pub(crate) enum Checkpoint {
 pub(crate) enum Reason {
     OwningPredicatesSatisfied,
     OwningPredicateRefused,
+    ExactFreezeTree,
+    FreezeTreeMismatch,
+    FreezeAuthorityUnavailable,
+    FreezeAuthorityMismatch,
+    AcquisitionAuthorityUnavailable,
+    FreezePlanningRefused,
     ObservationIncomplete,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,6 +99,12 @@ pub(crate) struct State {
     pub path: String,
     pub blob: String,
     pub stage: LifecycleStage,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Transition {
+    pub planner: String,
+    pub writer_inputs: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -109,6 +121,12 @@ pub(crate) struct Record {
     pub old_state: Option<State>,
     pub new_state: Option<State>,
     pub checkpoint: Checkpoint,
+    /// First-decision anchoring is independent of transition classification. Older v1 records
+    /// express this with checkpoint=bootstrap and omit this member.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub bootstrap: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition: Option<Transition>,
     pub decision: Decision,
     pub reasons: Vec<Reason>,
     pub predecessors: Vec<String>,
@@ -189,29 +207,38 @@ impl Record {
         if self.schema_version != 1 || self.kind != "in1_admission" {
             return Err("unsupported IN1 control record version/kind".into());
         }
-        if self.reasons.contains(&Reason::ObservationIncomplete)
-            && !matches!(
-                (self.decision, self.reasons.as_slice()),
-                (Decision::Refused, [Reason::ObservationIncomplete])
-                    | (
-                        Decision::Refused,
-                        [
-                            Reason::OwningPredicateRefused,
-                            Reason::ObservationIncomplete
-                        ]
-                    )
-                    | (
-                        Decision::Admitted,
-                        [
-                            Reason::OwningPredicatesSatisfied,
-                            Reason::ObservationIncomplete
-                        ]
-                    )
-            )
-        {
-            return Err(
-                "IN1 incomplete observation has inconsistent reached decision/reasons".into(),
-            );
+        if self.reasons.contains(&Reason::ObservationIncomplete) {
+            let mut reached = self.reasons.as_slice();
+            if reached.last() != Some(&Reason::ObservationIncomplete) {
+                return Err("IN1 incompleteness must follow reached reasons".into());
+            }
+            reached = &reached[..reached.len() - 1];
+            let owning = match self.decision {
+                Decision::Admitted => Reason::OwningPredicatesSatisfied,
+                Decision::Refused => Reason::OwningPredicateRefused,
+            };
+            let valid = match reached {
+                [] => self.decision == Decision::Refused,
+                [reason] => *reason == owning,
+                [reason, freeze] => {
+                    *reason == owning
+                        && matches!(
+                            freeze,
+                            Reason::ExactFreezeTree
+                                | Reason::FreezeTreeMismatch
+                                | Reason::FreezeAuthorityUnavailable
+                                | Reason::FreezeAuthorityMismatch
+                                | Reason::AcquisitionAuthorityUnavailable
+                                | Reason::FreezePlanningRefused
+                        )
+                }
+                _ => false,
+            };
+            if !valid {
+                return Err(
+                    "IN1 incomplete observation has inconsistent reached decision/reasons".into(),
+                );
+            }
         }
         for object in [
             &self.candidate,
@@ -281,6 +308,20 @@ impl Record {
                 sha256(o)?;
             }
         }
+        if self.bootstrap && !self.predecessors.is_empty() {
+            return Err("IN1 bootstrap decision has predecessor admissions".into());
+        }
+        if let Some(transition) = &self.transition {
+            sha256(&transition.planner)?;
+            sha256(&transition.writer_inputs)?;
+        }
+        if self.checkpoint == Checkpoint::RequestFreeze
+            && (self.transition.is_none()
+                || (!self.reasons.contains(&Reason::ExactFreezeTree)
+                    && self.reasons != [Reason::ObservationIncomplete]))
+        {
+            return Err("IN1 request freeze lacks a captured exact transition".into());
+        }
         for state in self.old_state.iter().chain(&self.new_state) {
             oid(&state.blob)?;
         }
@@ -314,4 +355,8 @@ fn identity(value: &str, size: usize) -> Result<(), String> {
         return Err("invalid IN1 object/digest identity".into());
     }
     Ok(())
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }

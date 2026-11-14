@@ -15,6 +15,8 @@ pub(crate) struct MemoryHost {
     pub facts: Mutex<BTreeMap<String, Vec<u8>>>,
     next: AtomicU64,
     next_retry: Mutex<Option<Record>>,
+    pub fail_freeze_after_upload: std::sync::atomic::AtomicBool,
+    pub fail_freeze_after_capture: std::sync::atomic::AtomicBool,
     pub fail_history_after_capture: std::sync::atomic::AtomicBool,
     pub fail_upload: std::sync::atomic::AtomicBool,
     pub fail_commit: std::sync::atomic::AtomicBool,
@@ -25,6 +27,8 @@ impl Default for MemoryHost {
             facts: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(1000),
             next_retry: Mutex::new(None),
+            fail_freeze_after_upload: false.into(),
+            fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
             fail_upload: false.into(),
             fail_commit: false.into(),
@@ -113,6 +117,8 @@ impl MemoryHost {
             facts: Mutex::new(self.facts.lock().unwrap().clone()),
             next: AtomicU64::new(self.next.load(Ordering::SeqCst)),
             next_retry: Mutex::new(None),
+            fail_freeze_after_upload: false.into(),
+            fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
             fail_upload: false.into(),
             fail_commit: false.into(),
@@ -161,6 +167,41 @@ impl Host for MemoryHost {
         }
         Ok(bytes)
     }
+    fn freeze_inputs(
+        &self,
+        candidate: &str,
+    ) -> Result<Option<freeze::authority::Observation>, String> {
+        if !observations::capturing()
+            && self.fail_freeze_after_capture.swap(false, Ordering::SeqCst)
+        {
+            return Err("fake post-capture freeze read failed".into());
+        }
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("freeze-inputs/{candidate}"))
+            .map(|bytes| serde_json::from_slice(bytes).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn acquisition_reference(
+        &self,
+        candidate: &str,
+    ) -> Result<Option<freeze::acquisition::Reference>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("acquisition-inputs/{candidate}"))
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get("acquisition-policy")
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
     fn event(&self) -> Result<String, String> {
         Ok(self.next_retry.lock().unwrap().as_ref().map_or_else(
             || "pull_request".into(),
@@ -202,7 +243,12 @@ impl Host for MemoryHost {
         }
         let record = Record::parse(bytes)?;
         let zip = archive(bytes)?;
-        let artifact = claims.run + 30_000 + claims.attempt * 100_000;
+        let path = format!("actions/runs/{}/artifacts", claims.run);
+        let mut rows = self.json(&format!("{path}?per_page=100&page=1"))?["artifacts"]
+            .as_array()
+            .unwrap()
+            .clone();
+        let artifact = self.next.fetch_add(1, Ordering::SeqCst) + 1_000_000;
         self.facts.lock().unwrap().insert(
             format!("payload/{}-{}", claims.run, claims.attempt),
             bytes.to_vec(),
@@ -211,13 +257,11 @@ impl Host for MemoryHost {
             .lock()
             .unwrap()
             .insert(format!("actions/artifacts/{artifact}/zip"), zip.clone());
-        let path = format!("actions/runs/{}/artifacts", claims.run);
-        let mut rows = self.json(&format!("{path}?per_page=100&page=1"))?["artifacts"]
-            .as_array()
-            .unwrap()
-            .clone();
         rows.push(json!({"id":artifact,"name":format!("in1-admission-{}-{}",claims.run,claims.attempt),"expired":false,"size_in_bytes":zip.len(),"digest":format!("sha256:{}",digest(b"",&zip)),"workflow_run":{"id":claims.run,"head_sha":record.candidate.commit}}));
         self.page(&path, "artifacts", rows);
+        if self.fail_freeze_after_upload.swap(false, Ordering::SeqCst) {
+            self.fail_freeze_after_capture.store(true, Ordering::SeqCst);
+        }
         Ok(artifact)
     }
     fn commit(&self, claims: &Claims, line: &str) -> Result<(), String> {

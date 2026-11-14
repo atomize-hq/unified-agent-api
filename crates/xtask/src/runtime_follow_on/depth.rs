@@ -15,6 +15,7 @@ mod integration;
 pub(crate) use integration::{check_freeze, check_progression};
 mod execution;
 mod packet;
+pub(crate) mod planner;
 mod reporting;
 pub(super) use execution::{check_implementation, run, wrapper_prompt};
 
@@ -24,7 +25,6 @@ struct Freeze {
     plan: FreezePlan,
     state: LifecycleState,
     state_path: String,
-    state_before: Vec<u8>,
     approval: OnboardingApproval,
 }
 
@@ -147,7 +147,6 @@ fn plan(workspace: &Path, approval_path: &str, parent: Option<&Source>) -> Resul
         plan,
         state,
         state_path,
-        state_before,
         approval,
     })
 }
@@ -234,6 +233,18 @@ fn text(raw: &[u8]) -> Result<&str, String> {
 
 /// Freeze preparation is reporting-only. No executor is reachable in dry-run mode.
 pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> Result<(), Error> {
+    dry_run_at(workspace, args, writer, now_rfc3339()?, now_rfc3339()?)
+}
+
+/// Explicit invocation clock inputs. Host authority must authenticate both named values
+/// independently before IN1 can classify the resulting candidate as a request freeze.
+pub(crate) fn dry_run_at(
+    workspace: &Path,
+    args: Args,
+    writer: &mut impl Write,
+    contract_generated_at: String,
+    packet_generated_at: String,
+) -> Result<(), Error> {
     if !args.dry_run || args.write {
         return Err(Error::Validation(
             "private depth freeze accepts only --dry-run".into(),
@@ -258,28 +269,33 @@ pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> 
         .state
         .validate_in_workspace(workspace)
         .map_err(|e| Error::Validation(e.to_string()))?;
-    let record_path = format!(
-        "{}/reports/{}/depth-record.json",
-        freeze.approval.manifest_root,
-        freeze
-            .approval
-            .support_depth_version
-            .as_deref()
-            .ok_or_else(|| Error::Validation("depth version undecided".into()))?
-    );
-    let mut mutations = packet::prepare(workspace, &args, &run_id, &freeze)?;
-    use crate::workspace_mutation::PlannedMutation;
-    let record = packet::json_bytes(&freeze.plan.record)?;
-    mutations.push(match &freeze.plan.previous_record {
-        Some(before) => PlannedMutation::replace(&record_path, before.clone(), record),
-        None => PlannedMutation::create(&record_path, record),
-    });
-    mutations.push(PlannedMutation::replace(
-        &freeze.state_path,
-        freeze.state_before.clone(),
-        packet::json_bytes(&freeze.state)?,
-    ));
-    reporting::append(workspace, &freeze, &record_path, &mut mutations)?;
+    let inputs = planner::writer_inputs(
+        workspace,
+        &args,
+        &run_id,
+        &freeze,
+        contract_generated_at,
+        packet_generated_at,
+    )?;
+    let planned =
+        crate::freeze_transition::delivery::plan(workspace, &inputs).map_err(Error::Validation)?;
+    let proposed = planned
+        .rendered
+        .files
+        .iter()
+        .map(|(path, bytes)| {
+            Ok((
+                path.clone(),
+                String::from_utf8(bytes.clone()).map_err(|e| Error::Validation(e.to_string()))?,
+            ))
+        })
+        .collect::<Result<_, Error>>()?;
+    crate::depth_acceptance::check_reporting_preparation(
+        workspace,
+        freeze.captured.registry(),
+        proposed,
+    )
+    .map_err(Error::Validation)?;
     // The owning LW1 path admits only this record/object and these reporting artifacts. The
     // production lifecycle writer remains refusing; no general depth-writing bypass is exposed.
     freeze.view.verify().map_err(Error::Validation)?;
@@ -287,8 +303,8 @@ pub(super) fn dry_run(workspace: &Path, args: Args, writer: &mut impl Write) -> 
         .captured
         .recheck(workspace)
         .map_err(Error::Validation)?;
-    crate::workspace_mutation::apply_admitted_mutations(workspace, &mutations)
-        .map_err(|e| Error::Validation(e.to_string()))?;
+    crate::freeze_transition::delivery::apply(workspace, &planned.transition)
+        .map_err(Error::Validation)?;
     writeln!(
         writer,
         "OK: runtime-follow-on dry-run packet prepared.\nrun_id: {run_id}"

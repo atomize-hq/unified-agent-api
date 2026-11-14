@@ -2,6 +2,8 @@
 mod depth;
 #[path = "prepare/guard.rs"]
 mod guard;
+#[path = "prepare/planner.rs"]
+pub(crate) mod planner;
 #[path = "prepare/render.rs"]
 mod render;
 #[path = "prepare/report.rs"]
@@ -28,7 +30,6 @@ use super::{
         build_execution_contract, derive_detected_release_fields, dispatch_kind_str,
         dispatch_workflow_value, opened_from_path,
     },
-    docs::build_preparation_packet_docs,
     request::{
         self, validate_commit_value, validate_non_empty_scalar, validate_repo_relative_reference,
         DetectedRelease, ExecutionContract, MaintenanceAction, MaintenanceRequest,
@@ -113,6 +114,7 @@ pub struct PreparePlan {
     /// `(operation, sha256)` of each acquired classification basis: the value a maintainer
     /// reviews and copies into a classified operation's `classification_basis`. Never authority.
     pub classification_bases: Vec<(String, String)>,
+    transition: crate::freeze_transition::Plan,
     context: guard::Context,
     /// The isolated route binding this plan was built under; `None` on the ordinary route.
     isolated: Option<crate::isolated_maintenance::RouteBinding>,
@@ -122,6 +124,11 @@ pub struct PreparePlan {
 pub struct PreparedFile {
     pub relative_path: String,
     pub contents: Vec<u8>,
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static BEFORE_APPLY: std::cell::Cell<Option<fn(&Path)>> = const { std::cell::Cell::new(None) };
 }
 
 impl Error {
@@ -211,12 +218,64 @@ pub(crate) fn build_routed(
     Ok(plan)
 }
 
-fn build_with_registry(
+pub(crate) fn build_with_registry(
     workspace_root: &Path,
     args: &Args,
     registry: &AgentRegistry,
 ) -> Result<PreparePlan, Error> {
     let mut context = guard::Context::capture(workspace_root, registry, args)?;
+    let derived = derive_inputs(workspace_root, args, registry)?;
+    let classification_bases = derived.classification_bases();
+    let planned = crate::freeze_transition::delivery::plan(workspace_root, &derived)
+        .map_err(Error::Validation)?;
+    let request = planned
+        .rendered
+        .request
+        .ok_or_else(|| Error::Internal("maintenance plan lacks request".into()))?;
+    let files = planned
+        .rendered
+        .files
+        .into_iter()
+        .map(|(relative_path, contents)| PreparedFile {
+            relative_path,
+            contents,
+        })
+        .collect::<Vec<_>>();
+    let proposed = files
+        .iter()
+        .map(|file| {
+            Ok((
+                file.relative_path.clone(),
+                String::from_utf8(file.contents.clone())
+                    .map_err(|e| Error::Validation(e.to_string()))?,
+            ))
+        })
+        .collect::<Result<_, Error>>()?;
+    crate::depth_acceptance::check_reporting_preparation(workspace_root, registry, proposed)
+        .map_err(Error::Validation)?;
+    context.bind_outputs(workspace_root, &files)?;
+    let after = guard::Context::capture(workspace_root, registry, args)?;
+    if context.inputs != after.inputs || context.index != after.index {
+        return Err(Error::Validation(
+            "preparation inputs changed during planning".into(),
+        ));
+    }
+    Ok(PreparePlan {
+        request,
+        files,
+        classification_bases,
+        transition: planned.transition,
+        context,
+        isolated: None,
+    })
+}
+
+/// Approved read-only input derivation, also used on IN1's authenticated predecessor data view.
+pub(crate) fn derive_inputs(
+    workspace_root: &Path,
+    args: &Args,
+    registry: &AgentRegistry,
+) -> Result<planner::Inputs, Error> {
     let entry = registry.find(&args.agent).ok_or_else(|| {
         Error::Validation(format!(
             "prepare-agent-maintenance references unknown agent_id `{}`",
@@ -233,7 +292,6 @@ fn build_with_registry(
 
     let request_path = maintenance_request_path(&args.agent);
     let maintenance_root = format!("docs/agents/lifecycle/{}-maintenance", args.agent);
-    let basis_ref = format!("{}/latest_validated.txt", entry.manifest_root);
     let derived_detected_release =
         derive_detected_release_fields(&args.agent, release_watch).map_err(Error::Validation)?;
     let detected_release = DetectedRelease {
@@ -262,74 +320,30 @@ fn build_with_registry(
         derive_support_surface_audit(workspace_root, entry, &detected_release)
             .map_err(Error::Internal)?;
     let freeze = depth::freeze(workspace_root, entry, args, &mut support_surface_audit)?;
-    let support_depth = freeze.as_ref().map(|plan| request::SupportDepthBinding {
-        policy_identity: plan.record.policy.identity.clone(),
-        obligations_identity: plan.record.obligations.as_ref().map(|o| o.identity.clone()),
-    });
-    let request_bytes = render_request_toml(
+    let prompt = super::contract_policy::render_prompt_template_for_contract(
+        workspace_root,
+        entry,
+        &maintenance_root,
+        &execution_contract.prompt_template_path,
+        &args.target_version,
+    )
+    .map_err(Error::Validation)?;
+    let publication = freeze
+        .as_ref()
+        .map(|plan| crate::support_matrix::load_preparation(workspace_root, registry, &plan.record))
+        .transpose()
+        .map_err(Error::Validation)?;
+    Ok(planner::Inputs::new(
+        workspace_root,
         args,
-        &basis_ref,
-        &detected_release,
-        &support_surface_audit,
-        &execution_contract,
-        support_depth.as_ref(),
-    )?
-    .into_bytes();
-    let request = MaintenanceRequest {
-        relative_path: request_path.clone(),
-        canonical_path: workspace_root.join(&request_path),
-        sha256: hex::encode(Sha256::digest(&request_bytes)),
-        maintenance_pack_prefix: format!("{}-maintenance", args.agent),
-        maintenance_root,
-        agent_id: args.agent.clone(),
-        trigger_kind: TriggerKind::UpstreamReleaseDetected,
-        basis_ref,
-        opened_from: args.opened_from.display().to_string(),
-        requested_control_plane_actions: vec![MaintenanceAction::PacketDocRefresh],
-        runtime_followup_required: RuntimeFollowupRequired {
-            required: false,
-            items: Vec::new(),
-        },
-        detected_release: Some(detected_release),
-        support_surface_audit: Some(support_surface_audit),
-        support_depth,
-        request_recorded_at: args.request_recorded_at.clone(),
-        request_commit: args.request_commit.clone(),
-    };
-    let mut files = vec![PreparedFile {
-        relative_path: request.relative_path.clone(),
-        contents: request_bytes,
-    }];
-    for doc in build_preparation_packet_docs(workspace_root, &request, &execution_contract, entry)
-        .map_err(|err| Error::Internal(format!("render maintenance packet docs: {err}")))?
-    {
-        files.push(PreparedFile {
-            relative_path: doc.relative_path,
-            contents: doc.contents.into_bytes(),
-        });
-    }
-    if let Some(freeze) = &freeze {
-        depth::append(workspace_root, registry, freeze, &mut files)?;
-    }
-    context.bind_outputs(workspace_root, &files)?;
-    let after = guard::Context::capture(workspace_root, registry, args)?;
-    if context.inputs != after.inputs || context.index != after.index {
-        return Err(Error::Validation(
-            "preparation inputs changed during planning".into(),
-        ));
-    }
-    let classification_bases = freeze
-        .iter()
-        .flat_map(|plan| &plan.classification_bases)
-        .map(|basis| (basis.operation.clone(), basis.sha256.clone()))
-        .collect();
-    Ok(PreparePlan {
-        request,
-        files,
-        classification_bases,
-        context,
-        isolated: None,
-    })
+        entry,
+        detected_release,
+        execution_contract,
+        support_surface_audit,
+        freeze,
+        prompt,
+        publication,
+    ))
 }
 
 pub fn apply_prepare_plan(
@@ -718,7 +732,7 @@ pub(super) fn isolated_build(
 }
 #[cfg(test)]
 #[allow(dead_code)]
-pub(super) fn isolated_apply(
+pub(crate) fn isolated_apply(
     root: &Path,
     plan: &PreparePlan,
     registry: &AgentRegistry,

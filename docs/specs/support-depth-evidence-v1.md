@@ -638,7 +638,8 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     separately authenticated observations. Decision identities MUST be immutable. Conflicting
     decisions over one substantive `inputs_identity` MUST prevent verification. The key MUST bind
     candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
-    evaluated blobs, normalized observed authority, checkpoint classification and generation.
+    evaluated blobs, normalized observed authority, checkpoint/transition classification, bootstrap
+    anchoring and generation. Decision reasons, including freeze reasons, MUST be excluded.
     Predecessors MUST contribute a sorted set of commit/transition-digest pairs. Equivalent
     predecessor retries MUST yield the same key. Emitting session claims and predecessor record
     identities MUST be excluded. Every reached decision MUST participate, including quarantined
@@ -703,11 +704,34 @@ The record contains the following fields.
   commit and tree identities. FR1 emits `head_relationship` as `exact_head`.
 - `old_state` and `new_state` contain lifecycle path, authenticated blob identity and stage when
   present. The blob preserves the complete evaluated lifecycle state.
-- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR1 emits `bootstrap`
-  for the first anchored decision and `unclassified` thereafter. `request_freeze` and
-  `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
-  or `refused`. Reasons are the bounded enums `owning_predicates_satisfied`,
-  `owning_predicate_refused` and `observation_incomplete`, with at most sixteen entries.
+- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR2a emits
+  `request_freeze` only after exact writer-derived complete-tree equality and independent
+  writer-input authentication. Other depth candidates remain `execution_required`. Record-free
+  decisions retain FR1's `bootstrap` / `unclassified` representation. Optional `bootstrap=true`
+  independently records first-decision anchoring when a depth transition has its own checkpoint
+  kind. Omitted `bootstrap` means false, preserving earlier v1 canonical records. Optional
+  `transition` contains domain-separated `planner` and `writer_inputs` identities for an exact
+  freeze. IN1 MUST compute this classification before owning-predicate evaluation from authenticated
+  Git objects and independently observed freeze/acquisition inputs, including for a candidate
+  subsequently refused by owning predicates. An exact classification supplies checkpoint identity;
+  readiness authority requires a complete admitted decision and the reporting-context join.
+  The consumed observations MUST be pinned and rechecked after planning and around publication.
+  The final freeze/acquisition stability read occurs after artifact upload and before sealing the
+  exact job-log commitment. A failed read adds incompleteness to the pinned decision and uploads
+  that final payload before committing its artifact identity. The earlier uncommitted artifact
+  supplies no admission authority.
+  A changed or unavailable closing read MUST add `observation_incomplete` while preserving the
+  captured checkpoint, transition and substantive authority. If an initial freeze/acquisition read
+  is unavailable, input capture MUST fail as an incomplete attempt before policy evaluation.
+  A successful observation of absent authority can select `execution_required` with its bounded
+  reason. Decisions are `admitted` or `refused`. The bounded reasons include
+  `owning_predicates_satisfied`, `owning_predicate_refused`, `exact_freeze_tree`,
+  `freeze_tree_mismatch`, `freeze_authority_unavailable`, `freeze_authority_mismatch`,
+  `acquisition_authority_unavailable`, `freeze_planning_refused` and `observation_incomplete`,
+  with at most sixteen entries.
+  FR2a supplies the empty-only acquisition seam. FR2b authenticates the combined MA2 acquisition
+  delta before freeze derivation and complete-tree comparison. FR3 supplies the reporting-context
+  join required for an execution exception.
   After initial input capture succeeds, an unavailable producer or isolated-host read before a
   substantive decision yields a refused decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
   successful reads, including source object acquisition and retained history reads during
@@ -717,20 +741,21 @@ The record contains the following fields.
   its corresponding owning reason and the normalized authority facts consumed up to that boundary.
   Closing captured-context and binding rechecks MUST still run. Any failed closing recheck adds
   `observation_incomplete` after the owning reason, without replacing the decision or changing
-  its substantive authority commitment. The only combined forms are admitted with
-  `[owning_predicates_satisfied, observation_incomplete]` and refused with
-  `[owning_predicate_refused, observation_incomplete]`. These reached decisions MUST participate
-  in identical-input conflict comparisons. Any record containing `observation_incomplete` MUST
+  its substantive authority commitment. Reached records contain their owning reason, followed
+  by the captured freeze reason when applicable, then `observation_incomplete` on closing failure.
+  These reached decisions MUST participate in identical-input conflict comparisons. Any record
+  containing `observation_incomplete` MUST
   NOT authorize readiness, predecessor frontiers, generation-history completion or progression,
   and its emitting job MUST conclude failure. A closing failure prevents invocation success.
   Reached contradictory decisions over identical normalized authority MUST refuse.
 - `predecessors` is a sorted unique list of retained successful decision identities at every
   applicable parent frontier. Before invoking the owning policy predicates, IN1 MUST resolve
   that frontier from authenticated history and pin both the predecessor identities and checkpoint
-  classification. An empty authenticated frontier selects `bootstrap`, and an existing frontier
-  selects `unclassified`. Retention-time reconstruction MUST preserve those pinned values on
-  both admission and refusal. A failed reconstruction adds `observation_incomplete` to the reached
-  decision, retains its original evaluated-input identity and prevents invocation success.
+  classification. An empty authenticated frontier selects first-decision anchoring through
+  `bootstrap=true` for a depth candidate or `checkpoint=bootstrap` for a record-free candidate.
+  Existing record-free frontiers select `unclassified`. Retention-time reconstruction MUST
+  preserve those pinned values on both admission and refusal. A failed reconstruction adds
+  `observation_incomplete` to the reached decision, retains its original evaluated-input identity and prevents invocation success.
   History MUST check parent-frontier coverage and Bootstrap classification. Any record with
   deficient, unavailable or superseded predecessor references or inconsistent classification MUST
   be quarantined in reconstructed history, for both reached admissions and refusals. Quarantined
@@ -774,6 +799,9 @@ The record contains the following fields.
     parsing or referenced-source/mapping processing. Unauthorized comments, including malformed
     adoption JSON, and ignored records contribute no content facts and MUST NOT truncate capture
     or alter discovery completeness. Ordinary authorized comments contribute no adoption facts.
+  - Independently observed freeze writer inputs and authenticated acquisition observations with
+    approved acquisition policy, including successful observations of absence. The record's
+    checkpoint, bootstrap and transition fields independently bind the captured classification.
   - Isolated and canonical repository ids/owners/names, protected staging identities and protection,
     baseline/candidate ancestry status and merge base, candidate host presence, governing registry
     path/type/blob, and canonical approved-scope path/blob/mode/type inventory with tree truncation
@@ -816,8 +844,9 @@ its sorted unique array of `[commit, transition_digest]` pairs from independentl
 referenced records. A transition digest uses the NUL-terminated
 `support-depth-in1-transition-v1` domain over canonical `[old_state, new_state]`, including null
 states. Unresolved audit references mark history deficiency and contribute no authenticated pair.
-Checkpoint classification and every other substantive field remain in the key. Complete and
-incomplete reached decisions with an identical key MUST conflict when their decisions differ.
+Checkpoint classification, bootstrap anchoring, transition identities and every other substantive
+field remain in the key. Freeze reasons follow the exclusion applied to all decision reasons.
+Complete and incomplete reached decisions with an identical key MUST conflict when their decisions differ.
 
 All other identity-bearing record fields MUST also be captured before the owning policy predicates
 run. This includes authenticated root/policy snapshots, content-addressed candidate/parent/checkout
