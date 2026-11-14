@@ -8,6 +8,8 @@ use std::{
     process::Command,
 };
 
+mod batch;
+
 #[derive(Clone, PartialEq, Eq)]
 struct Input {
     index: Vec<u8>,
@@ -124,7 +126,11 @@ impl GitInputs {
         } else {
             self.recheck_borrowed()?;
         }
-        let mut input = read(&self.root, path, self.borrowed.as_ref())?;
+        let input = read(&self.root, path, self.borrowed.as_ref())?;
+        self.record(path, input)
+    }
+
+    fn record(&mut self, path: &str, mut input: Input) -> Result<Option<Vec<u8>>, String> {
         if let Some(source) = &self.proposed {
             let bytes = source.optional_bytes(path)?;
             if bytes != input.bytes
@@ -173,14 +179,50 @@ impl GitInputs {
 
     /// Observe every file and directory in a relevant build scope, including untracked additions.
     pub(crate) fn files_under(&mut self, path: &str) -> Result<Vec<String>, String> {
+        let children: Vec<_> = self
+            .list(path)?
+            .into_iter()
+            .map(|name| {
+                let child = format!("{path}/{name}");
+                let directory = safe_path(&self.root, &child)
+                    .map(|full| fs::symlink_metadata(full).is_ok_and(|m| m.is_dir()));
+                (child, directory)
+            })
+            .collect();
+        let paths: Vec<_> = children
+            .iter()
+            .filter(|(child, directory)| {
+                matches!(directory, Ok(false))
+                    && !(self.proposed.is_some() && self.files.contains_key(child))
+            })
+            .map(|(child, _)| child.as_str())
+            .collect();
+        let binding = if self.proposed.is_none() && !paths.is_empty() {
+            self.recheck_borrowed()
+        } else {
+            Ok(())
+        };
+        // Refuse reads through a stale binding, consuming its error at the original optional
+        // boundary so an earlier directory or path-validation failure retains precedence.
+        let mut inputs = match binding {
+            Ok(()) => batch::read_many(&self.root, &paths, self.borrowed.as_ref()),
+            Err(error) => vec![Err(error); paths.len()],
+        }
+        .into_iter();
         let mut result = Vec::new();
-        for name in self.list(path)? {
-            let child = format!("{path}/{name}");
-            let full = safe_path(&self.root, &child)?;
-            if fs::symlink_metadata(full).is_ok_and(|m| m.is_dir()) {
+        for (child, directory) in children {
+            if directory? {
                 result.extend(self.files_under(&child)?);
             } else {
-                self.required(&child)?;
+                let bytes = if self.proposed.is_some() && self.files.contains_key(&child) {
+                    self.files[&child].bytes.clone()
+                } else {
+                    if self.proposed.is_none() {
+                        self.recheck_borrowed()?;
+                    }
+                    self.record(&child, inputs.next().ok_or("missing batch input")??)?
+                };
+                bytes.ok_or_else(|| format!("missing bound input: {child}"))?;
                 result.push(child);
             }
         }
@@ -210,8 +252,10 @@ impl GitInputs {
 
     pub(crate) fn verify(&self) -> Result<(), String> {
         self.recheck_borrowed()?;
-        for (path, expected) in &self.files {
-            if read(&self.root, path, self.borrowed.as_ref())? != *expected {
+        let paths: Vec<_> = self.files.keys().map(String::as_str).collect();
+        let inputs = batch::read_many(&self.root, &paths, self.borrowed.as_ref());
+        for ((path, expected), input) in self.files.iter().zip(inputs) {
+            if input? != *expected {
                 return Err(format!("bound input changed during freeze: {path}"));
             }
         }
@@ -392,6 +436,8 @@ fn list(
 /// Reads must neither refresh the caller's index nor acquire missing promisor objects. Explicit
 /// mutations/acquisition at other call sites still require their own authorized commands.
 pub(crate) fn command(root: &Path) -> Command {
+    #[cfg(test)]
+    tests::GIT_COMMANDS.with(|count| count.set(count.get() + 1));
     let mut command = Command::new("git");
     for (key, _) in std::env::vars_os() {
         if key.to_string_lossy().starts_with("GIT_") {
