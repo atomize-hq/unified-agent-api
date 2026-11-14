@@ -151,6 +151,27 @@ impl Record {
     }
     /// A retry's host association is excluded. Root snapshots and all evaluated inputs remain.
     pub(crate) fn inputs_identity(&self) -> Result<String, String> {
+        Ok(digest(
+            b"support-depth-in1-inputs-v1\0",
+            &canonical(&self.evaluated_inputs())?,
+        ))
+    }
+    /// A deficient refusal still conflicts over its remaining pinned facts. Omit unknown
+    /// frontier fields from this comparison projection without changing the retained record.
+    pub(crate) fn inputs_without_frontier_identity(&self) -> Result<String, String> {
+        let serde_json::Value::Object(mut inputs) =
+            serde_json::to_value(self.evaluated_inputs()).map_err(|e| e.to_string())?
+        else {
+            return Err("IN1 evaluated inputs must be an object".into());
+        };
+        inputs.remove("predecessors");
+        inputs.remove("checkpoint");
+        Ok(digest(
+            b"support-depth-in1-inputs-v1\0",
+            &canonical(&inputs)?,
+        ))
+    }
+    fn evaluated_inputs(&self) -> Self {
         let mut inputs = self.clone();
         inputs.claims = Claims {
             run: 0,
@@ -161,10 +182,7 @@ impl Record {
         };
         inputs.decision = Decision::Admitted;
         inputs.reasons.clear();
-        Ok(digest(
-            b"support-depth-in1-inputs-v1\0",
-            &canonical(&inputs)?,
-        ))
+        inputs
     }
     /// A reached admission with failed closing observations cannot grant historical authority.
     pub(crate) fn successful(&self) -> bool {

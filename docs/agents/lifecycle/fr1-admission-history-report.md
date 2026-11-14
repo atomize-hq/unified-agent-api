@@ -1,5 +1,132 @@
 # FR1 admission history implementation report
 
+## Review round 6 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `e0efb49b`, subject to
+four Unix-socket sandbox failures detailed below. This section was started before code changes.
+Changes remain uncommitted.
+
+`Emitter::prepare` runs immediately after the authenticated parent binding and before the
+owning policy predicates on both finite-bootstrap and enrolled routes. It resolves the complete
+history frontier and all content-addressed record inputs. Retention clones this captured record
+and fills only the decision/reasons, pinned normalized authority and independently authenticated
+session association. It never reconstructs identity-bearing fields from fallible emission reads.
+A failed retention-time history reconstruction preserves the reached admission/refusal, appends
+`observation_incomplete`, publishes the pinned inputs and returns failure. Closing frontier changes
+also fail without replacing the captured predecessors. The independent session event must equal
+the invocation event obtained before policy evaluation.
+
+The chosen history rule checks complete frontier coverage and Bootstrap classification for every
+reached decision, including reached-incomplete admissions/refusals. Inconsistent reached admissions
+refuse verification. A refusal with missing/superseded predecessors or inconsistent classification
+is explicitly marked incomplete and non-authoritative in reconstructed `History::incomplete`.
+It still compares against every reached admission over all remaining pinned facts, omitting exactly
+`predecessors` and `checkpoint` from that secondary canonical comparison projection. Retained
+bytes and the full evaluated-input identity stay intact.
+Only incomplete-only refusals remain exempt from conflict comparisons. All incomplete records
+remain ineligible for successful history/readiness. The evidence contract, freeze/readiness design
+and Annex A IN1 row state these rules.
+
+Validation caught a compatibility problem in an initial strict-rejection implementation. A refused
+stacked candidate can precede a later successful admission for its ancestor, which supersedes the
+old observed frontier. A focused regression reproduced `missing or inconsistent predecessor
+admissions`. The final rule uses the packet's explicit incomplete/non-authoritative alternative,
+preserves the older refusal and retains its remaining-facts contradiction check.
+
+Initial input capture must succeed before the owning policy predicates can run and a complete
+record can be published. Failed capture leaves the scheduler attempt incomplete and unverified.
+Present malformed lifecycle/depth bytes now fail capture. Null states/generation, empty input/evidence maps
+and lists, and empty predecessor lists represent successful lookups of actual absence. This
+extends the repair beyond the reported history fallback to the state and depth parsing paths.
+
+### Round 6 identity-field audit
+
+`inputs_identity` still hashes the existing canonical record representation under the existing
+domain. The following table covers every record field, including normalized/excluded fields.
+Schema version 1, the canonical encoding and existing digest domains apply. Literal vectors
+continue passing with the refactored input normalization.
+
+| Field | Pinned source and failure handling |
+| --- | --- |
+| `schema_version` | Fixed schema constant `1` in the prepared record. |
+| `kind` | Fixed `in1_admission` constant in the prepared record. |
+| `repository` | Captured source-installed repository name/id/owner, independently checked by history and isolated-host binding. |
+| `generation` | Typed parse of authenticated candidate depth-record blob before predicates. Null only when the path is absent. Read/parse errors abort capture. |
+| `generation_sha256` | Derived from the pinned generation with the existing canonical generation domain. Errors abort capture. |
+| `candidate` | Captured checkout commit with bounded, rehashed Git commit/tree reads before predicates. Errors abort capture. |
+| `parent` | Authenticated binding parent with rehashed Git commit/tree reads before predicates. Errors abort capture. |
+| `checkout` | Exact copy of the pinned candidate object. |
+| `head_relationship` | Fixed `exact_head` invariant from authenticated binding. |
+| `old_state` | Parent lifecycle path/blob/stage read and parsed before predicates. Null only for actual absence or a route with no applicable state path. Read/parse errors abort capture. |
+| `new_state` | Candidate lifecycle path/blob/stage read and parsed before predicates, with the same absence/error rule as old state. |
+| `checkpoint` | Bootstrap for an authenticated empty parent frontier, unclassified for an existing frontier, resolved before predicates. Retention never substitutes a classification on error. |
+| `predecessors` | Sorted unique successful identities from authenticated complete parent history before predicates. A failed read aborts capture. Closing history errors preserve these identities. |
+| `enrollment_anchor` | Source-installed baseline commit/tree authenticated by bounded history resolution before predicates. |
+| `policy` | Source-installed implementation/workflow/job/app/closure snapshot. History authenticates its source against the protected installation anchor before predicates. |
+| `protected_tip` | Captured authenticated host tip with rehashed commit/tree reads before predicates. |
+| `canonical_tip` | Captured authenticated canonical host root, preserved in the prepared record. |
+| `accepted_origin` | Deterministically derived from the pinned repository name. |
+| `registry_blob` | Captured authenticated protected-registry blob from the isolated context, preserved before predicates. |
+| `inputs` | Candidate authoritative paths and acquired/execution paths resolved by bounded, rehashed Git blob reads before predicates. An absent path is omitted only after a successful lookup. Any source read error aborts capture. |
+| `observed_authority` | Normalized authenticated facts accumulate during evaluation and pin at the first reached owning decision. Closing/emission failures track incompleteness separately. |
+| `producer_context` | Explicit FR1 reserved null constant. FR3 will supply its owning association. |
+| `execution_evidence` | Sorted deduplicated identities projected from the pinned parsed depth record before predicates. Empty means the authenticated record has no execution references or is absent. |
+| `claims.event` | Independent invocation event from the host before predicates. Session publication checks exact equality with that pinned event. |
+| `claims.run`, `claims.attempt`, `claims.job`, `claims.check` | Independent session associations normalized to zero by `inputs_identity`, then authenticated through retained job/attempt/artifact facts. |
+| `decision` | Normalized to admitted by `inputs_identity`. The separately pinned reached value remains a conflict side. |
+| `reasons` | Cleared by `inputs_identity`. Incompleteness changes eligibility without changing the reached conflict identity. |
+
+### Round 6 regressions
+
+Both required post-capture tests failed against inherited code. The first-admission reproduction
+retained Unclassified, and the existing-frontier reproduction retained empty predecessors.
+The one-shot fake-host fault ignores every history read while observation capture is active and
+fails the first reconstruction read inside `retain()`. Subsequent publication reads succeed.
+Both repaired cases retain the original policy refusal with incompleteness, preserve the exact
+frontier/checkpoint, and accept a healthy contradictory retry far enough to retain its reached
+admission with identical normalized authority and evaluated-input identity. Independent history
+then rejects `conflicting decisions over identical inputs`.
+
+- `post_capture_history_failure_preserves_bootstrap_refusal_conflict` covers first-admission Bootstrap.
+- `post_capture_history_failure_preserves_predecessors_and_refusal_conflict` covers an existing successful parent frontier.
+- `missing_refusal_predecessors_cannot_hide_a_reached_conflict` detects the contradiction despite an omitted parent admission.
+- `missing_refusal_bootstrap_is_incomplete_and_still_conflicts` marks a reached-incomplete first refusal with Unclassified incomplete and detects a later contradictory admission.
+- `later_parent_admission_preserves_a_refusals_original_inputs` preserves the retained bytes while explicitly marking the superseded frontier incomplete.
+- `failed_input_capture_cannot_reach_policy_or_publish_default_projections` supplies malformed authenticated lifecycle bytes and verifies policy remains unevaluated, with an incomplete attempt and unavailable historical authority.
+
+### Round 6 validation
+
+Cargo validation uses `env -u TMPDIR`. Logs are under ignored
+`target/fr1-round6-validation/`. Groups ran concurrently. Durations below are test execution
+times reported by Cargo, with build and lock waits excluded. Initial reproduction and diagnostic
+logs are retained in that directory with the `initial-` prefix.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 79 passed | 106.46 s |
+| `cargo test -p xtask --lib in1_integration` | 34 passed, 4 sandbox failures | 163.33 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 155.85 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 541.29 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` | Pass | — |
+| `git diff --check` | Pass | — |
+
+The four IN1 failures are the connected cases
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. All fail during fixture
+preparation with `cannot open the MA4 evidence channel: Operation not permitted (os error 1)`.
+Their socket-dependent assertions remain unverified in this sandbox. Both required round-6
+post-capture regressions and the failed-input-capture guard pass in the final IN1 group. All
+existing socket-free producer-backed observed-authority regressions also pass. The final bootstrap
+run has passed the connected ON2 admission/observation case that exposed the initial strict-rule
+compatibility failure. Across the four requested test groups, 252 tests passed and four failed
+in socket-dependent fixture preparation. Final diff, formatting, LOC and repository hygiene
+checks pass. HEAD remains `e0efb49b` on the requested branch.
+
 ## Review round 5 repair
 
 Status — implemented and validated on `feat/fr1-admission-history` over `c5b4c99f`, subject to

@@ -65,6 +65,7 @@ impl Context {
         Ok(Emitter {
             context: self.clone(),
             parent: None,
+            prepared: None,
             publication: self.admission_publication()?,
             protected_tip: self.host.isolated_tip.clone(),
             canonical_tip: self.host.canonical_tip().into(),

@@ -229,13 +229,28 @@ commitments, stale roots or changed populations prevent verification. Distinguis
 different root snapshots and observed host authority. Candidate-authored files cannot select the
 observed-authority digest. Author login and current permission precede fallible adoption-body
 parsing; unauthorized prose and malformed adoption JSON cannot truncate normalized capture.
-An unavailable read before a substantive decision produces a retained refusal with the sole reason
-`observation_incomplete`, excluded from identical-input conflict comparisons. At the owning
+After initial input capture succeeds, an unavailable read before a substantive decision produces
+a retained refusal with the sole reason `observation_incomplete`, excluded from identical-input conflict comparisons. At the owning
 boundary, pin the reached decision, owning reason and normalized facts. Closing context/binding
 rechecks still run; failures append `observation_incomplete` without relabeling the reached
 admission/refusal or salting its authority commitment. Such reached decisions remain conflict
-sides. Every incomplete record is ineligible for readiness, predecessor frontiers, generation-history
-completion and progression, and requires a failed emitting job. Reached contradictory decisions
+sides. Capture every other evaluated-input field before invoking the owning policy predicates,
+including the authenticated predecessor frontier and its Bootstrap/unclassified classification,
+immutable generation/state/input/evidence projections, root/policy snapshots and independently
+supplied invocation event. Failed reads or malformed present state/depth bytes abort input capture
+before a substantive decision and leave an incomplete, unverified attempt. Successful lookups can
+represent actual absence. Retention reuses the captured fields. A retention-time history failure
+adds incompleteness while preserving the reached decision and its full conflict identity. The
+emitting session event must match the captured event. History checks parent-frontier equality
+and Bootstrap classification for every reached decision, including reached-incomplete records.
+Inconsistent reached admissions refuse verification. A refusal with a missing or superseded
+frontier or inconsistent classification is explicitly incomplete and non-authoritative in
+reconstructed history. It still conflicts against every reached admission over its remaining
+pinned facts, omitting exactly predecessors/checkpoint from the comparison projection. The
+retained record and full evaluated-input identity remain intact. Incomplete-only refusals remain
+exempt from conflict comparisons. A later ancestor admission can supersede a refusal's frontier
+while preserving the earlier decision. Every incomplete record is ineligible for readiness,
+predecessor frontiers, generation-history completion and progression, and requires a failed emitting job. Reached contradictory decisions
 over identical normalized facts still refuse. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification

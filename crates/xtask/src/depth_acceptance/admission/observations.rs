@@ -21,8 +21,9 @@ pub(crate) struct Authority {
     pub decision: Option<Decision>,
 }
 
-/// Ends before admission-history reconstruction/publication. Independent read order and
-/// repeated facts preserve identity. Any unavailable read remains sticky for this invocation.
+/// Ends before retention-time history reconstruction/publication. Initial input history is
+/// authenticated while capture is active. Independent read order and repeated facts preserve
+/// identity. Any unavailable read remains sticky for this invocation.
 pub(crate) struct Capture(PhantomData<*const ()>);
 impl Capture {
     pub(crate) fn start() -> Result<Self, String> {
@@ -136,3 +137,8 @@ pub(crate) fn population(endpoint: &str, kind: &str, mut rows: Vec<serde_json::V
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) fn capturing() -> bool {
+    ACTIVE.with(|slot| slot.borrow().is_some())
+}

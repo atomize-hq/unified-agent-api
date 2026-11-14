@@ -15,6 +15,7 @@ pub(crate) struct MemoryHost {
     pub facts: Mutex<BTreeMap<String, Vec<u8>>>,
     next: AtomicU64,
     next_retry: Mutex<Option<Record>>,
+    pub fail_history_after_capture: std::sync::atomic::AtomicBool,
     pub fail_upload: std::sync::atomic::AtomicBool,
     pub fail_commit: std::sync::atomic::AtomicBool,
 }
@@ -24,6 +25,7 @@ impl Default for MemoryHost {
             facts: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(1000),
             next_retry: Mutex::new(None),
+            fail_history_after_capture: false.into(),
             fail_upload: false.into(),
             fail_commit: false.into(),
         };
@@ -111,6 +113,7 @@ impl MemoryHost {
             facts: Mutex::new(self.facts.lock().unwrap().clone()),
             next: AtomicU64::new(self.next.load(Ordering::SeqCst)),
             next_retry: Mutex::new(None),
+            fail_history_after_capture: false.into(),
             fail_upload: false.into(),
             fail_commit: false.into(),
         }
@@ -130,6 +133,14 @@ impl Host for MemoryHost {
         serde_json::from_slice(&self.bytes(path, 16_777_216)?).map_err(|e| e.to_string())
     }
     fn bytes(&self, path: &str, limit: usize) -> Result<Vec<u8>, String> {
+        if path.is_empty()
+            && !observations::capturing()
+            && self
+                .fail_history_after_capture
+                .swap(false, Ordering::SeqCst)
+        {
+            return Err("fake post-capture history read failed".into());
+        }
         let bytes = self
             .facts
             .lock()
@@ -141,6 +152,12 @@ impl Host for MemoryHost {
             return Err("fake IN1 response bound exceeded".into());
         }
         Ok(bytes)
+    }
+    fn event(&self) -> Result<String, String> {
+        Ok(self.next_retry.lock().unwrap().as_ref().map_or_else(
+            || "pull_request".into(),
+            |record| record.claims.event.clone(),
+        ))
     }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String> {
         if let Some(prior) = self.next_retry.lock().unwrap().take() {

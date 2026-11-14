@@ -294,6 +294,9 @@ impl Host for Changes {
     fn bytes(&self, path: &str, limit: usize) -> Result<Vec<u8>, String> {
         self.host.bytes(path, limit)
     }
+    fn event(&self) -> Result<String, String> {
+        self.host.event()
+    }
     fn begin(&self, _: &str, _: &Policy) -> Result<Claims, String> {
         unreachable!()
     }

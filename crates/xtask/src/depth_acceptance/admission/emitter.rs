@@ -16,6 +16,7 @@ pub(crate) struct Emitter {
     pub agent: String,
     pub version: String,
     pub input_paths: Vec<String>,
+    pub prepared: Option<Record>,
 }
 pub(crate) fn object(root: &Path, commit: &str) -> Result<Object, String> {
     Ok(Objects::new(root).commit(commit)?.object)
@@ -60,41 +61,29 @@ impl Emitter {
             )),
         }
     }
-    fn retain(
-        &self,
-        root: &Path,
-        observed_authority: observations::Authority,
-    ) -> Result<(), String> {
-        let decision = observed_authority.decision.unwrap_or(Decision::Refused);
-        let admitted = decision == Decision::Admitted && !observed_authority.incomplete;
-        let mut reasons = match observed_authority.decision {
-            Some(Decision::Admitted) => vec![Reason::OwningPredicatesSatisfied],
-            Some(Decision::Refused) => vec![Reason::OwningPredicateRefused],
-            None => Vec::new(),
-        };
-        if observed_authority.incomplete {
-            reasons.push(Reason::ObservationIncomplete);
-        }
-        let parent = self
-            .parent
-            .as_deref()
-            .ok_or("IN1 missing authenticated admission parent")?;
+    /// Resolve every content-addressed input and the authenticated frontier before policy
+    /// evaluation. Failed reads leave an incomplete attempt without inventing record inputs.
+    pub(crate) fn prepare(&mut self, root: &Path) -> Result<(), String> {
+        let prepared = self.read_inputs(root);
+        observations::unavailable("in1/evaluated-inputs", &prepared);
+        self.prepared = Some(prepared?);
+        Ok(())
+    }
+    fn read_inputs(&self, root: &Path) -> Result<Record, String> {
         let mut objects = Objects::new(root);
         let candidate = objects.commit(&self.candidate)?.object;
-        let parent = objects.commit(parent)?.object;
+        let parent = objects
+            .commit(
+                self.parent
+                    .as_deref()
+                    .ok_or("IN1 missing authenticated admission parent")?,
+            )?
+            .object;
         let protected_tip = objects.commit(&self.protected_tip)?.object;
         let history = self
             .publication
-            .resolve(root, &[self.protected_tip.clone(), self.candidate.clone()]);
-        // The scheduler's attempt remains observable if reconstruction or later emission fails.
-        let session = self.publication.start(&candidate.commit)?;
-        if admitted {
-            history.as_ref().map_err(Clone::clone)?;
-        }
-        let predecessors = match &history {
-            Ok(history) => history.candidate_predecessors(&candidate.commit)?,
-            Err(_) => Vec::new(),
-        };
+            .resolve(root, &[self.protected_tip.clone(), self.candidate.clone()])?;
+        let predecessors = history.candidate_predecessors(&candidate.commit)?;
         let mut inputs = BTreeMap::new();
         for path in &self.input_paths {
             if let Some((identity, _)) = objects.blob(&candidate, path)? {
@@ -103,11 +92,14 @@ impl Emitter {
         }
         let depth = objects
             .blob(&candidate, &self.record_path)?
-            .and_then(|(_, bytes)| {
-                std::str::from_utf8(&bytes)
-                    .ok()
-                    .and_then(|raw| DepthRecord::parse(raw, &self.agent, &self.version).ok())
-            });
+            .map(|(_, bytes)| {
+                DepthRecord::parse(
+                    std::str::from_utf8(&bytes).map_err(|e| e.to_string())?,
+                    &self.agent,
+                    &self.version,
+                )
+            })
+            .transpose()?;
         let generation = depth.as_ref().map(Generation::from_record);
         let mut execution_evidence = Vec::new();
         if let Some(depth) = &depth {
@@ -141,21 +133,9 @@ impl Emitter {
                 .transpose()
                 .map(Option::flatten)
         };
-        let old_state = read_state(&mut objects, &parent);
-        let new_state = read_state(&mut objects, &candidate);
-        if admitted {
-            old_state.as_ref().map_err(Clone::clone)?;
-            if let (Some(generation), Some(state)) =
-                (&generation, new_state.as_ref().map_err(Clone::clone)?)
-            {
-                history.as_ref().map_err(Clone::clone)?.check_progression(
-                    &candidate.commit,
-                    generation,
-                    state.stage,
-                )?;
-            }
-        }
-        session.publish(&Record {
+        let old_state = read_state(&mut objects, &parent)?;
+        let new_state = read_state(&mut objects, &candidate)?;
+        Ok(Record {
             schema_version: 1,
             kind: "in1_admission".into(),
             repository: self.publication.authority.repository.clone(),
@@ -165,15 +145,15 @@ impl Emitter {
             parent,
             checkout: candidate,
             head_relationship: "exact_head".into(),
-            old_state: old_state.unwrap_or(None),
-            new_state: new_state.unwrap_or(None),
-            checkpoint: if predecessors.is_empty() && history.is_ok() {
+            old_state,
+            new_state,
+            checkpoint: if predecessors.is_empty() {
                 Checkpoint::Bootstrap
             } else {
                 Checkpoint::Unclassified
             },
-            decision,
-            reasons,
+            decision: Decision::Refused,
+            reasons: vec![Reason::ObservationIncomplete],
             predecessors,
             enrollment_anchor: self.publication.authority.anchor.clone(),
             policy: self.publication.authority.policy.clone(),
@@ -185,14 +165,57 @@ impl Emitter {
             ),
             registry_blob: self.registry_blob.clone(),
             inputs,
-            observed_authority: observed_authority.identity,
+            observed_authority: String::new(),
             producer_context: None,
             execution_evidence,
-            claims: session.claims.clone(),
-        })?;
-        if let Ok(history) = history {
-            history.recheck_publication(&session.claims)?;
+            claims: Claims {
+                run: 0,
+                attempt: 0,
+                job: 0,
+                check: 0,
+                event: self.publication.host.event()?,
+            },
+        })
+    }
+    fn retain(&self, root: &Path, authority: observations::Authority) -> Result<(), String> {
+        let Some(mut record) = self.prepared.clone() else {
+            self.publication.start(&self.candidate)?;
+            return Err("IN1 evaluated inputs unavailable".into());
+        };
+        record.observed_authority = authority.identity;
+        record.decision = authority.decision.unwrap_or(Decision::Refused);
+        record.reasons = match authority.decision {
+            Some(Decision::Admitted) => vec![Reason::OwningPredicatesSatisfied],
+            Some(Decision::Refused) => vec![Reason::OwningPredicateRefused],
+            None => Vec::new(),
+        };
+        // Reconstruct only to verify continued availability/progression. These reads cannot
+        // replace any of the evaluated inputs, even on a reached policy refusal.
+        let history = self
+            .publication
+            .resolve(root, &[self.protected_tip.clone(), self.candidate.clone()]);
+        let closing = history.as_ref().map_err(Clone::clone).and_then(|history| {
+            if history.candidate_predecessors(&record.candidate.commit)? != record.predecessors {
+                return Err("IN1 predecessor frontier changed after input capture".into());
+            }
+            if record.decision == Decision::Admitted {
+                if let (Some(generation), Some(state)) = (&record.generation, &record.new_state) {
+                    history.check_progression(&record.candidate.commit, generation, state.stage)?;
+                }
+            }
+            Ok(())
+        });
+        if authority.incomplete || closing.is_err() {
+            record.reasons.push(Reason::ObservationIncomplete);
         }
-        Ok(())
+        // The scheduler's attempt remains observable even when closing reconstruction fails.
+        let session = self.publication.start(&record.candidate.commit)?;
+        if session.claims.event != record.claims.event {
+            return Err("IN1 emitting event differs from evaluated event".into());
+        }
+        record.claims = session.claims.clone();
+        session.publish(&record)?;
+        closing?;
+        history?.recheck_publication(&session.claims)
     }
 }

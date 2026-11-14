@@ -15,6 +15,8 @@ pub(crate) struct Authority {
 pub(crate) trait Host: Send + Sync {
     fn json(&self, path: &str) -> Result<Value, String>;
     fn bytes(&self, path: &str, limit: usize) -> Result<Vec<u8>, String>;
+    /// Independently supplied invocation event, pinned before owning predicate evaluation.
+    fn event(&self) -> Result<String, String>;
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
     fn upload(&self, claims: &Claims, bytes: &[u8]) -> Result<u64, String>;
     fn commit(&self, claims: &Claims, line: &str) -> Result<(), String>;

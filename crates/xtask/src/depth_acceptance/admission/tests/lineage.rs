@@ -146,6 +146,94 @@ fn ordinary_unadmitted_ancestors_and_pending_candidate_transition_pass() {
 }
 
 #[test]
+fn missing_refusal_predecessors_cannot_hide_a_reached_conflict() {
+    let f = Lineage::new();
+    let candidate = f.commit(LifecycleStage::Enrolled, "refused child");
+    let mut refusal = f.admit(&candidate, &f.enrolled);
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    refusal.predecessors.clear();
+    publish(&f.host, refusal);
+    assert!(f
+        .check(&candidate)
+        .unwrap_err()
+        .contains("conflicting decisions over identical inputs"));
+}
+
+#[test]
+fn missing_refusal_bootstrap_is_incomplete_and_still_conflicts() {
+    let host = fixture().host.fork();
+    host.page(transport::RUNS, "workflow_runs", vec![]);
+    let mut refusal = retained();
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![
+        Reason::OwningPredicateRefused,
+        Reason::ObservationIncomplete,
+    ];
+    refusal.checkpoint = Checkpoint::Unclassified;
+    let refusal = publish(&host, refusal);
+    let history = resolve(host.fork()).unwrap();
+    assert!(history.incomplete.contains(&refusal.identity().unwrap()));
+    assert!(!history.eligible(&refusal.identity().unwrap()).unwrap());
+    for incomplete_admission in [false, true] {
+        let conflicting = host.fork();
+        let mut admission = retained();
+        if incomplete_admission {
+            admission.reasons.push(Reason::ObservationIncomplete);
+        }
+        publish(&conflicting, admission);
+        conflicting.change(
+            &format!("{}?per_page=100&page=1", transport::RUNS),
+            |value| {
+                value["workflow_runs"].as_array_mut().unwrap().reverse();
+            },
+        );
+        assert!(resolve(conflicting)
+            .err()
+            .unwrap()
+            .contains("conflicting decisions over identical inputs"));
+    }
+}
+
+#[test]
+fn later_parent_admission_preserves_a_refusals_original_inputs() {
+    let f = Lineage::new();
+    let parent = f.commit(LifecycleStage::Enrolled, "pending parent");
+    let child = f.commit(LifecycleStage::Enrolled, "refused child");
+    let mut refusal = f.enrolled.clone();
+    refusal.parent = f.enrolled.candidate.clone();
+    refusal.protected_tip = refusal.parent.clone();
+    refusal.candidate = emitter::object(f.root.path(), &child).unwrap();
+    refusal.checkout = refusal.candidate.clone();
+    refusal.old_state = f.enrolled.new_state.clone();
+    refusal.new_state = objects::Objects::new(f.root.path())
+        .state(&refusal.candidate, STATE)
+        .unwrap();
+    refusal.predecessors = vec![f.enrolled.identity().unwrap()];
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    let refusal = publish(&f.host, refusal);
+    let original = refusal.canonical().unwrap();
+    f.admit(&parent, &f.enrolled);
+    let history = f
+        .publication
+        .resolve(f.root.path(), &[f.enrolled.candidate.commit.clone(), child])
+        .unwrap();
+    assert!(history.incomplete.contains(&refusal.identity().unwrap()));
+    assert!(!history.eligible(&refusal.identity().unwrap()).unwrap());
+    assert_eq!(
+        f.host
+            .records()
+            .into_iter()
+            .find(|r| r.claims == refusal.claims)
+            .unwrap()
+            .canonical()
+            .unwrap(),
+        original
+    );
+}
+
+#[test]
 fn legacy_inputs_over_64k_remain_readable_in_ancestor_history() {
     let f = Lineage::new();
     for path in [DEPTH, STATE] {

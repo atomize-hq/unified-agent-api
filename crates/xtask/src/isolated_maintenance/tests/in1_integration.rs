@@ -3,6 +3,7 @@ use super::*;
 use crate::depth_acceptance::check_integration;
 
 pub(super) mod admission;
+mod history_failure;
 mod maintenance_observation;
 #[cfg(target_os = "linux")]
 mod observed_authority;

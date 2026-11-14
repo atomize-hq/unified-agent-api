@@ -13,6 +13,7 @@ pub(crate) struct History {
     ancestors: BTreeMap<String, BTreeSet<String>>,
     frontiers: BTreeMap<String, BTreeSet<String>>,
     parents: BTreeMap<String, Vec<String>>,
+    pub(crate) incomplete: BTreeSet<String>,
     pub(crate) revoked: BTreeSet<String>,
     pub(super) observation: Option<(Publication, super::transport::Snapshot)>,
 }
@@ -138,6 +139,7 @@ impl History {
     #[allow(dead_code)] // FR2/FR3 consume current eligibility independently of historical stage.
     pub(crate) fn eligible(&self, identity: &str) -> Result<bool, String> {
         Ok(!self.revoked.contains(identity)
+            && !self.incomplete.contains(identity)
             && self
                 .records
                 .iter()
@@ -208,11 +210,19 @@ pub(super) fn resolve(
     let mut frontiers: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut by_commit: BTreeMap<String, Vec<&Record>> = BTreeMap::new();
     let mut decisions = BTreeMap::new();
+    let mut reached_admissions = BTreeSet::new();
+    let mut incomplete = BTreeSet::new();
     let mut identities = BTreeSet::new();
     let mut by_identity = BTreeMap::new();
     for record in records {
         let id = record.identity()?;
         by_identity.insert(id.clone(), record);
+        if record.reasons.contains(&Reason::ObservationIncomplete) {
+            incomplete.insert(id.clone());
+        }
+        if record.decision == Decision::Admitted {
+            reached_admissions.insert(record.inputs_without_frontier_identity()?);
+        }
         if !identities.insert(id) {
             return Err("IN1 duplicate decision identity".into());
         }
@@ -281,18 +291,23 @@ pub(super) fn resolve(
                     .collect::<Result<BTreeSet<_>, String>>()?;
                 if !lineage.contains(&record.parent.commit)
                     || referenced.iter().any(|commit| !lineage.contains(*commit))
-                    || (record.successful() && referenced != expected)
                 {
                     return Err("IN1 missing or inconsistent predecessor admissions".into());
                 }
-                // A refusal grants no transition. An ancestor may receive its first successful
-                // admission after a refused stacked candidate was evaluated against an older
-                // protected parent. That later decision cannot rewrite the refusal's inputs.
-                if record.successful()
-                    && expected.is_empty()
-                    && record.checkpoint != Checkpoint::Bootstrap
-                {
-                    return Err("IN1 first record lacks bootstrap anchoring".into());
+                let frontier_complete = referenced == expected
+                    && (expected.is_empty() == (record.checkpoint == Checkpoint::Bootstrap));
+                if record.reasons != [Reason::ObservationIncomplete] && !frontier_complete {
+                    if record.decision == Decision::Admitted {
+                        return Err(
+                            "IN1 missing predecessor admissions or bootstrap anchoring".into()
+                        );
+                    }
+                    // A later ancestor admission can supersede a refusal's pinned frontier.
+                    // Preserve its bytes and reached conflict side, but mark it incomplete.
+                    incomplete.insert(record.identity()?);
+                    if reached_admissions.contains(&record.inputs_without_frontier_identity()?) {
+                        return Err("IN1 conflicting decisions over identical inputs with incomplete refusal frontier".into());
+                    }
                 }
             }
             // A predecessor references a retained successful attempt at each frontier commit.
@@ -324,6 +339,7 @@ pub(super) fn resolve(
             .iter()
             .map(|(id, commit)| (id.clone(), commit.parents.clone()))
             .collect(),
+        incomplete,
         revoked: BTreeSet::new(),
         observation: None,
     };

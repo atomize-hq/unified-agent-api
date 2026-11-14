@@ -47,6 +47,7 @@ impl crate::isolated_maintenance::Route {
         if self.context().bootstrap_pending()? {
             let initial = binding::capture(root, revision, self.context())?;
             emitter.parent = Some(initial.parent.clone());
+            emitter.prepare(root)?;
             if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
                 if checkpoint.publication_changed {
                     checkpoint
@@ -65,6 +66,7 @@ impl crate::isolated_maintenance::Route {
         };
         let binding = binding::capture(root, revision, context)?;
         emitter.parent = Some(binding.parent.clone());
+        emitter.prepare(root)?;
         // Only onboarding can observe a first declaration. Maintenance keeps its existing
         // admission even when its parent lacks the subject entry or depth table.
         let checkpoint = if context.bootstrap_declared_onboarding() {

@@ -698,8 +698,8 @@ The record contains the following fields.
   `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
   or `refused`. Reasons are the bounded enums `owning_predicates_satisfied`,
   `owning_predicate_refused` and `observation_incomplete`, with at most sixteen entries.
-  An unavailable producer or isolated-host read before a substantive decision yields a refused
-  decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
+  After initial input capture succeeds, an unavailable producer or isolated-host read before a
+  substantive decision yields a refused decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
   successful reads, including source object acquisition and retained history reads during
   predicate evaluation. Only these incomplete-only refusals are excluded from both sides of
   identical-input conflict comparisons.
@@ -715,8 +715,23 @@ The record contains the following fields.
   and its emitting job MUST conclude failure. A closing failure prevents invocation success.
   Reached contradictory decisions over identical normalized authority MUST refuse.
 - `predecessors` is a sorted unique list of retained successful decision identities at every
-  applicable parent frontier. Late retries remain independently discoverable and cannot rewrite
-  an earlier child's predecessor references. No earlier decision is synthesized.
+  applicable parent frontier. Before invoking the owning policy predicates, IN1 MUST resolve
+  that frontier from authenticated history and pin both the predecessor identities and checkpoint
+  classification. An empty authenticated frontier selects `bootstrap`, and an existing frontier
+  selects `unclassified`. Retention-time reconstruction MUST preserve those pinned values on
+  both admission and refusal. A failed reconstruction adds `observation_incomplete` to the reached
+  decision, retains its original evaluated-input identity and prevents invocation success.
+  History MUST check complete parent-frontier coverage and Bootstrap classification for every
+  reached decision. A reached admission with inconsistent history MUST refuse verification,
+  including when its closing observations were incomplete. A reached refusal with missing or
+  superseded predecessors or inconsistent checkpoint classification MUST be marked incomplete
+  and non-authoritative in reconstructed history. It MUST still be compared against every reached
+  admission on the remaining pinned facts, omitting exactly `predecessors` and `checkpoint` from
+  that comparison projection. The projection removes exactly those keys and preserves every
+  other pinned field, with retained bytes and full evaluated-input identity intact. This comparison includes reached-incomplete admissions.
+  Only the sole-reason incomplete-only refusal is exempt from conflict comparisons.
+  Late retries remain independently discoverable and cannot rewrite an earlier child's predecessor
+  references. No earlier decision is synthesized.
 - `policy` names independently supplied implementation/workflow provenance, workflow id, job key,
   app id and the approved closure. The isolated FR1 route resolves `workflow_commit` from the
   source-installed authenticated protected installation commit, independently of candidate JSON.
@@ -774,7 +789,7 @@ The record contains the following fields.
   `support-depth-in1-observed-authority-v1` followed by NUL. The empty set represents an evaluation
   consuming no host facts. Facts are pinned when the owning predicates reach their substantive
   decision; closing observations track completeness separately. If no substantive decision is
-  reached, capture ends before admission-history reconstruction and publication. Repeated reads
+  reached, capture ends before retention-time admission-history reconstruction and publication. Repeated reads
   and independent read order preserve identity. Existing host response, pagination,
   attempt, population and canonical encoding bounds apply, and the record retains its 65,536-byte
   bound. This required fixed-size digest participates in evaluated-input identity. Reached
@@ -784,6 +799,25 @@ The record contains the following fields.
 - `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
   FR3 supplies the reporting-context association. An admission without a producer is supported.
 - `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
+  The invocation event MUST be obtained independently before policy evaluation and matched against
+  the emitting session event before publication. The four numeric association fields are normalized
+  to zero in evaluated-input identity.
+
+All other identity-bearing record fields MUST also be captured before the owning policy predicates
+run. This includes authenticated root/policy snapshots, content-addressed candidate/parent/checkout
+objects, lifecycle states, generation and its digest, authoritative input blob maps and execution
+references. Explicit absence is permitted only after a successful authenticated source lookup.
+Malformed present state/depth bytes and failed source reads MUST abort input capture. Such an
+invocation cannot reach a substantive owning decision or publish a record with substituted nulls,
+empty maps or default classifications. Its independently started attempt remains incomplete and
+unverified. `producer_context` remains the explicit FR1 reserved absence. Normalized host facts
+continue accumulating during evaluation and are pinned at the reached decision boundary.
+
+After input capture, closing or emission failures MUST preserve every pinned identity field and
+the reached decision. A retained reached-incomplete decision participates in conflict detection
+against a contradictory complete retry over those same inputs, while supplying no successful
+historical authority. Later parent-frontier changes can mark a refusal incomplete in reconstructed
+history while preserving the earlier record's pinned inputs and remaining-facts conflict comparison.
 
 The fixed commitment line has exactly this form, with a lowercase 64-character payload digest
 and a positive decimal returned artifact id.
