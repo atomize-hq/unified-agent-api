@@ -4,7 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const RECORD_LIMIT: usize = 65_536;
 pub(crate) const DOMAIN: &[u8] = b"support-depth-in1-admission-v1\0";
@@ -149,40 +149,36 @@ impl Record {
     pub(crate) fn identity(&self) -> Result<String, String> {
         Ok(digest(DOMAIN, &self.canonical()?))
     }
-    /// A retry's host association is excluded. Root snapshots and all evaluated inputs remain.
-    pub(crate) fn inputs_identity(&self) -> Result<String, String> {
+    /// The caller supplies authenticated predecessor records from the retained audit references.
+    /// Equivalent retries contribute the same commit/transition pair to this sorted set.
+    pub(crate) fn inputs_identity(&self, predecessors: &[&Record]) -> Result<String, String> {
+        let mut inputs = serde_json::to_value(self).map_err(|e| e.to_string())?;
+        let inputs = inputs
+            .as_object_mut()
+            .ok_or("IN1 inputs must be an object")?;
+        inputs.remove("claims");
+        inputs.remove("decision");
+        inputs.remove("reasons");
+        let transitions = predecessors
+            .iter()
+            .map(|prior| {
+                Ok((
+                    prior.candidate.commit.clone(),
+                    digest(
+                        b"support-depth-in1-transition-v1\0",
+                        &canonical(&(&prior.old_state, &prior.new_state))?,
+                    ),
+                ))
+            })
+            .collect::<Result<BTreeSet<_>, String>>()?;
+        inputs.insert(
+            "predecessors".into(),
+            serde_json::to_value(transitions).map_err(|e| e.to_string())?,
+        );
         Ok(digest(
             b"support-depth-in1-inputs-v1\0",
-            &canonical(&self.evaluated_inputs())?,
+            &canonical(inputs)?,
         ))
-    }
-    /// A deficient refusal still conflicts over its remaining pinned facts. Omit unknown
-    /// frontier fields from this comparison projection without changing the retained record.
-    pub(crate) fn inputs_without_frontier_identity(&self) -> Result<String, String> {
-        let serde_json::Value::Object(mut inputs) =
-            serde_json::to_value(self.evaluated_inputs()).map_err(|e| e.to_string())?
-        else {
-            return Err("IN1 evaluated inputs must be an object".into());
-        };
-        inputs.remove("predecessors");
-        inputs.remove("checkpoint");
-        Ok(digest(
-            b"support-depth-in1-inputs-v1\0",
-            &canonical(&inputs)?,
-        ))
-    }
-    fn evaluated_inputs(&self) -> Self {
-        let mut inputs = self.clone();
-        inputs.claims = Claims {
-            run: 0,
-            attempt: 0,
-            job: 0,
-            check: 0,
-            event: self.claims.event.clone(),
-        };
-        inputs.decision = Decision::Admitted;
-        inputs.reasons.clear();
-        inputs
     }
     /// A reached admission with failed closing observations cannot grant historical authority.
     pub(crate) fn successful(&self) -> bool {

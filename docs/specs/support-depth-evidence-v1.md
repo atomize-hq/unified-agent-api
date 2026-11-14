@@ -636,8 +636,18 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     no authority. Missing, duplicate, ambiguous or conflicting commitments, wrong-job or
     cross-attempt replay and substituted bytes MUST prevent verification. Retries MUST have
     separately authenticated observations. Decision identities MUST be immutable. Conflicting
-    decisions over identical policy/authoritative inputs MUST prevent verification. Different root
-    snapshots and independently observed host authority MUST remain distinguishable. Revocation MUST affect present eligibility while
+    decisions over one substantive `inputs_identity` MUST prevent verification. The key MUST bind
+    candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+    evaluated blobs, normalized observed authority, checkpoint classification and generation.
+    Predecessors MUST contribute a sorted set of commit/transition-digest pairs. Equivalent
+    predecessor retries MUST yield the same key. Emitting session claims and predecessor record
+    identities MUST be excluded. Every reached decision MUST participate, including quarantined
+    decisions. Only complete records contribute frontier, readiness or progression authority.
+    Observation-incomplete and history-deficient records MUST be quarantined and MUST permit
+    healthy retries and other candidates to reconstruct. Reconstruction MUST fail only for genuine
+    integrity failures, including object mismatches, history gaps, bound overflow, duplicate
+    identities and contradictory reached decisions over one key. Different root snapshots and
+    independently observed host authority MUST remain distinguishable. Revocation MUST affect present eligibility while
     preserving historical readiness and execution accountability.
 12. Trusted emitters MUST be isolated from candidate-controlled processes that could alter their
     runtime, inputs, observations or publication. Protected IN1 MUST use a clean separate
@@ -721,17 +731,14 @@ The record contains the following fields.
   selects `unclassified`. Retention-time reconstruction MUST preserve those pinned values on
   both admission and refusal. A failed reconstruction adds `observation_incomplete` to the reached
   decision, retains its original evaluated-input identity and prevents invocation success.
-  History MUST check complete parent-frontier coverage and Bootstrap classification for every
-  reached decision. A reached admission with inconsistent history MUST refuse verification,
-  including when its closing observations were incomplete. A reached refusal with missing or
-  superseded predecessors or inconsistent checkpoint classification MUST be marked incomplete
-  and non-authoritative in reconstructed history. It MUST still be compared against every reached
-  admission on the remaining pinned facts, omitting exactly `predecessors` and `checkpoint` from
-  that comparison projection. The projection removes exactly those keys and preserves every
-  other pinned field, with retained bytes and full evaluated-input identity intact. This comparison includes reached-incomplete admissions.
-  Only the sole-reason incomplete-only refusal is exempt from conflict comparisons.
-  Late retries remain independently discoverable and cannot rewrite an earlier child's predecessor
-  references. No earlier decision is synthesized.
+  History MUST check parent-frontier coverage and Bootstrap classification. Any record with
+  deficient, unavailable or superseded predecessor references or inconsistent classification MUST
+  be quarantined in reconstructed history, for both reached admissions and refusals. Quarantined
+  records MUST contribute no authority to frontier completeness, readiness, generation-history
+  completion or progression. Their presence MUST permit reconstruction and healthy complete
+  retries. Every reached decision retains its substantive-key conflict participation. The sole-reason
+  incomplete-only refusal is exempt because no decision was reached. Late retries remain
+  independently discoverable, and earlier retained predecessor references remain immutable.
 - `policy` names independently supplied implementation/workflow provenance, workflow id, job key,
   app id and the approved closure. The isolated FR1 route resolves `workflow_commit` from the
   source-installed authenticated protected installation commit, independently of candidate JSON.
@@ -800,8 +807,17 @@ The record contains the following fields.
   FR3 supplies the reporting-context association. An admission without a producer is supported.
 - `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
   The invocation event MUST be obtained independently before policy evaluation and matched against
-  the emitting session event before publication. The four numeric association fields are normalized
-  to zero in evaluated-input identity.
+  the emitting session event before publication. The entire `claims` object is excluded from
+  evaluated-input identity.
+
+`inputs_identity` uses the NUL-terminated `support-depth-in1-inputs-v1` domain over canonical
+record JSON after removing `claims`, `decision` and `reasons` and replacing `predecessors` with
+its sorted unique array of `[commit, transition_digest]` pairs from independently authenticated
+referenced records. A transition digest uses the NUL-terminated
+`support-depth-in1-transition-v1` domain over canonical `[old_state, new_state]`, including null
+states. Unresolved audit references mark history deficiency and contribute no authenticated pair.
+Checkpoint classification and every other substantive field remain in the key. Complete and
+incomplete reached decisions with an identical key MUST conflict when their decisions differ.
 
 All other identity-bearing record fields MUST also be captured before the owning policy predicates
 run. This includes authenticated root/policy snapshots, content-addressed candidate/parent/checkout
@@ -816,8 +832,8 @@ continue accumulating during evaluation and are pinned at the reached decision b
 After input capture, closing or emission failures MUST preserve every pinned identity field and
 the reached decision. A retained reached-incomplete decision participates in conflict detection
 against a contradictory complete retry over those same inputs, while supplying no successful
-historical authority. Later parent-frontier changes can mark a refusal incomplete in reconstructed
-history while preserving the earlier record's pinned inputs and remaining-facts conflict comparison.
+historical authority. Later parent-frontier changes can quarantine either decision in reconstructed
+history while preserving its pinned inputs and substantive-key conflict participation.
 
 The fixed commitment line has exactly this form, with a lowercase 64-character payload digest
 and a positive decimal returned artifact id.

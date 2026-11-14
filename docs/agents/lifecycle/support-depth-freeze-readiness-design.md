@@ -224,8 +224,8 @@ Use v1 bounds of 1,000 runs and 100 attempts for each independently enumerated h
 record. Existing object/source/artifact bounds also apply. Exceeding a bound yields `unverified`
 with complete-discovery failure. Required history is never truncated. Keep records immutable by
 decision identity and separately authenticate retries. Conflicting decisions over identical policy
-and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
-commitments, stale roots or changed populations prevent verification. Distinguish decisions over
+and authoritative inputs, object mismatches, gaps, ambiguous/duplicate commitments, bound overflow,
+stale roots or changed populations prevent verification. Distinguish decisions over
 different root snapshots and observed host authority. Candidate-authored files cannot select the
 observed-authority digest. Author login and current permission precede fallible adoption-body
 parsing; unauthorized prose and malformed adoption JSON cannot truncate normalized capture.
@@ -241,17 +241,23 @@ supplied invocation event. Failed reads or malformed present state/depth bytes a
 before a substantive decision and leave an incomplete, unverified attempt. Successful lookups can
 represent actual absence. Retention reuses the captured fields. A retention-time history failure
 adds incompleteness while preserving the reached decision and its full conflict identity. The
-emitting session event must match the captured event. History checks parent-frontier equality
-and Bootstrap classification for every reached decision, including reached-incomplete records.
-Inconsistent reached admissions refuse verification. A refusal with a missing or superseded
-frontier or inconsistent classification is explicitly incomplete and non-authoritative in
-reconstructed history. It still conflicts against every reached admission over its remaining
-pinned facts, omitting exactly predecessors/checkpoint from the comparison projection. The
-retained record and full evaluated-input identity remain intact. Incomplete-only refusals remain
-exempt from conflict comparisons. A later ancestor admission can supersede a refusal's frontier
-while preserving the earlier decision. Every incomplete record is ineligible for readiness,
-predecessor frontiers, generation-history completion and progression, and requires a failed emitting job. Reached contradictory decisions
-over identical normalized facts still refuse. Revocation changes present eligibility while preserving historical
+emitting session event must match the captured event. The substantive conflict key binds
+candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+evaluated blobs, normalized observed authority, checkpoint classification and generation. Replace
+the audit predecessor identities with a sorted set of predecessor commit/transition-digest pairs.
+The transition digest covers canonical `[old_state, new_state]` under the NUL-terminated
+`support-depth-in1-transition-v1` domain. Exclude emitting session claims, decision and reasons.
+Equivalent predecessor retries yield the same key. Retained predecessor identities authenticate
+the audit trail. Every reached decision participates in key-based conflict comparison.
+
+History quarantines every observation-incomplete or history-deficient record, including admissions
+with missing/superseded predecessor references or inconsistent Bootstrap classification. Only
+complete records contribute frontier completeness, readiness, generation-history completion and
+progression. Quarantined records preserve accountability while allowing healthy retries and other
+candidates to reconstruct. Reconstruction fails only for genuine integrity failures, including
+object mismatches, gaps, bounds, duplicate identities and contradictory reached decisions over
+one substantive key. Incomplete-only refusals remain exempt from conflict comparison. Every
+observation-incomplete record requires a failed emitting job. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification
 requires the evidence to remain available.

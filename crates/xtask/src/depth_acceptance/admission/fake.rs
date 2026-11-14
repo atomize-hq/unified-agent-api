@@ -118,6 +118,14 @@ impl MemoryHost {
             fail_commit: false.into(),
         }
     }
+    pub(crate) fn inputs_identity(&self, record: &Record) -> String {
+        let records = self.records();
+        let predecessors: Vec<_> = records
+            .iter()
+            .filter(|prior| record.predecessors.contains(&prior.identity().unwrap()))
+            .collect();
+        record.inputs_identity(&predecessors).unwrap()
+    }
     pub(crate) fn records(&self) -> Vec<Record> {
         self.facts
             .lock()

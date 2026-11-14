@@ -170,8 +170,8 @@ fn retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs() {
     let retry = publish(&host, first.clone());
     assert_ne!(retry.identity().unwrap(), first.identity().unwrap());
     assert_eq!(
-        retry.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        retry.inputs_identity(&[]).unwrap(),
+        first.inputs_identity(&[]).unwrap()
     );
     let history = resolve(host.fork()).unwrap();
     assert!(history.eligible(&retry.identity().unwrap()).unwrap());
@@ -186,8 +186,8 @@ fn retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs() {
     let mut changed = first.clone();
     changed.protected_tip = first.candidate.clone();
     assert_ne!(
-        changed.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        changed.inputs_identity(&[]).unwrap(),
+        first.inputs_identity(&[]).unwrap()
     );
     let host = fixture().host.fork();
     changed.decision = Decision::Refused;
@@ -208,13 +208,13 @@ fn observed_authority_distinguishes_decisions_but_unchanged_facts_still_conflict
     refusal.decision = Decision::Refused;
     refusal.reasons = vec![Reason::OwningPredicateRefused];
     assert_eq!(
-        refusal.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        refusal.inputs_identity(&[]).unwrap(),
+        first.inputs_identity(&[]).unwrap()
     );
     refusal.observed_authority = digest(b"test missing authority\0", b"[]");
     assert_ne!(
-        refusal.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        refusal.inputs_identity(&[]).unwrap(),
+        first.inputs_identity(&[]).unwrap()
     );
     let refused = publish(&host, refusal.clone());
     let history = resolve(host.fork()).unwrap();
@@ -249,7 +249,7 @@ fn revocation_preserves_immutable_history_and_changes_present_eligibility() {
 }
 
 #[test]
-fn missing_predecessors_object_mismatches_and_history_gaps_refuse() {
+fn history_deficiency_quarantines_while_object_and_input_mismatches_refuse() {
     let first = retained();
     for mutation in 0..4 {
         let mut record = first.clone();
@@ -263,18 +263,25 @@ fn missing_predecessors_object_mismatches_and_history_gaps_refuse() {
                 .unwrap_or(()),
             _ => record.checkpoint = Checkpoint::Unclassified,
         }
-        // Keep host authentication valid so these refusals exercise independent reconstruction.
         record.checkout = record.candidate.clone();
-        assert!(
-            history::resolve(
-                fixture().root.path(),
-                &fixture().publication.authority,
-                &[record],
-                &roots()
-            )
-            .is_err(),
-            "mutation {mutation}"
+        let identity = record.identity().unwrap();
+        let result = history::resolve(
+            fixture().root.path(),
+            &fixture().publication.authority,
+            &[record],
+            &roots(),
         );
+        if matches!(mutation, 0 | 3) {
+            let history = result.unwrap();
+            assert!(history.incomplete.contains(&identity));
+            assert!(!history.eligible(&identity).unwrap());
+            assert!(history
+                .predecessors(&first.candidate.commit)
+                .unwrap()
+                .is_empty());
+        } else {
+            assert!(result.is_err(), "mutation {mutation}");
+        }
     }
 }
 

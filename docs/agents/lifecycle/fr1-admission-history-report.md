@@ -1,5 +1,90 @@
 # FR1 admission history implementation report
 
+## Review round 7 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `1ce898d0`, subject to
+four Unix-socket sandbox failures detailed below.
+This section was started before code changes. Changes remain uncommitted.
+
+`inputs_identity` removes `claims`, `decision` and `reasons` from canonical record JSON and
+replaces the audit predecessor identities with the sorted unique set of predecessor commit and
+transition-digest pairs. The transition digest hashes canonical `[old_state, new_state]` under
+`support-depth-in1-transition-v1` followed by NUL. The input domain remains
+`support-depth-in1-inputs-v1` followed by NUL. Checkpoint classification and substantive
+repository/object/policy/generation/root/blob/observed-authority facts remain included. Raw
+predecessor identities and emitting session claims remain authenticated in retained record bytes.
+Equivalent predecessor retries have identical conflict keys regardless of representative selection.
+
+Reconstruction authenticates and indexes every retained record before comparing reached decisions.
+Every reached admission/refusal participates under its substantive key, including quarantined
+records. The sole-reason incomplete-only refusal remains exempt. Missing, refused, quarantined,
+non-ancestor or superseded predecessor references and inconsistent Bootstrap classification mark
+a record history-deficient. Any observation-incomplete or history-deficient record is quarantined
+from frontiers, readiness, progression and generation-history completion. Unresolved audit references
+contribute no authenticated predecessor pair. Quarantine leaves retained bytes intact and allows
+healthy retries and other candidates to reconstruct. Object/provenance integrity, history gaps,
+bounds, duplicate identities and identical-key contradictions continue to refuse.
+
+Two round-6 assertions used the broader secondary comparison that omitted checkpoint and all
+predecessors. The round-7 substantive-key rule supersedes those assertions. Their tests now
+verify quarantine/recovery for different substantive keys and refusal for contradictory reached
+decisions over the same deficient key. The general history-integrity test likewise now requires quarantine for
+missing predecessors and inconsistent classification, while preserving object/blob rejection.
+The remaining round-4 through round-6 regressions retain their behavior. This interpretation was
+raised during implementation and follows the round-7 substantive-key rule.
+
+### Round 7 regressions and vectors
+
+After correcting the new fixtures' protected-root binding, both required regressions failed
+against inherited production logic. Retry reordering allowed a contradictory reached admission,
+and concurrent parent admission returned `missing predecessor admissions or bootstrap anchoring`.
+The repaired lineage tests pass. The real IN1 publication regression also passes through input
+capture, changed-frontier detection, incomplete reached-admission retention, healthy complete
+retry, independent sibling admission and a later complete contradiction refusing reconstruction.
+Additional coverage checks missing-reference quarantine, exclusion from progression and generation
+history, propagation to a referencing descendant, and continued object-integrity rejection.
+
+Python `json`/`hashlib` independently generated the updated literal canonical input vector and
+transition digest using compact sorted-key UTF-8 and NUL-terminated domains. Admission and
+generation payloads/digests remain the existing literals.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Predecessor transition | `98e4ae1846fa06900dc1f159fee09db39fe3ddcaa8d3c57a8ae03988e07f1ad9` |
+| Substantive evaluated inputs | `d4d8e94e1aae330ce60f2c13c2f2b1f5c3b3ff90f14d54b19479d6b81bd9a399` |
+
+### Round 7 validation
+
+Cargo uses `env -u TMPDIR`. Logs are under ignored `target/fr1-round7-validation/`.
+The final requested test groups report 257 passing tests and four fixture failures. The two groups
+with updated test-only projection assertions were rerun after those edits. The final depth and IN1
+results below are from those reruns. Clippy initially caught one cloned-reference slice in a new
+test, which was corrected before the successful final run.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 83 passed | 52.80 s |
+| `cargo test -p xtask --lib in1_integration` | 35 passed, 4 sandbox failures | 236.44 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 131.54 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 365.21 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` | Pass | — |
+| `git diff --check` | Pass | — |
+
+The four IN1 fixture failures are
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. Each fails before its
+socket-dependent assertions with `cannot open the MA4 evidence channel: Operation not permitted
+(os error 1)`. Those assertions remain unverified in this sandbox. Both round-6 post-capture
+history-failure regressions, all socket-free round-4/5 observed-authority regressions, the new
+retry-reordering and quarantine tests, and the real concurrent-parent recovery/contradiction
+regression pass. The connected ON2 bootstrap admission/observation case also passes. All tracked
+changes remain inside this worktree, uncommitted, with HEAD still `1ce898d0`.
+
 ## Review round 6 repair
 
 Status — implemented and validated on `feat/fr1-admission-history` over `e0efb49b`, subject to

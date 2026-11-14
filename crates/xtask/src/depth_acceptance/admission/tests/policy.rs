@@ -123,8 +123,8 @@ fn incomplete_observation_is_never_eligible_or_a_conflict_side() {
     incomplete.decision = Decision::Refused;
     incomplete.reasons = vec![Reason::ObservationIncomplete];
     assert_eq!(
-        incomplete.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        incomplete.inputs_identity(&[]).unwrap(),
+        first.inputs_identity(&[]).unwrap()
     );
     let refused = publish(&host, incomplete.clone());
     publish(&host, first.clone());

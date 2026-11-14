@@ -48,16 +48,16 @@ fn in1_retains_disturbed_and_restored_host_authority_without_a_conflict() {
         assert_ne!(refusal.observed_authority, first.observed_authority);
         assert_eq!(refusal.inputs, first.inputs);
         assert_ne!(
-            refusal.inputs_identity().unwrap(),
-            first.inputs_identity().unwrap()
+            f.api.3.inputs_identity(&refusal),
+            f.api.3.inputs_identity(&first)
         );
         let _restored = host.install();
         authenticate(&f, &parent).unwrap();
         let restored = f.api.3.records().pop().unwrap();
         assert_eq!(restored.observed_authority, first.observed_authority);
         assert_eq!(
-            restored.inputs_identity().unwrap(),
-            first.inputs_identity().unwrap()
+            f.api.3.inputs_identity(&restored),
+            f.api.3.inputs_identity(&first)
         );
     }
     f.resolve()
@@ -180,8 +180,8 @@ fn comment_edit_cannot_salt_a_reached_conflict(original: &str) {
     assert_eq!(refusal.reasons, [Reason::OwningPredicateRefused]);
     assert_eq!(refusal.observed_authority, first.observed_authority);
     assert_eq!(
-        refusal.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        f.api.3.inputs_identity(&refusal),
+        f.api.3.inputs_identity(&first)
     );
     let error = f
         .resolve()
@@ -213,8 +213,8 @@ fn reordered_populations_and_unrelated_workflow_progress_preserve_identity() {
     let second = f.api.3.records().pop().unwrap();
     assert_eq!(second.observed_authority, first.observed_authority);
     assert_eq!(
-        second.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        f.api.3.inputs_identity(&second),
+        f.api.3.inputs_identity(&first)
     );
 }
 
@@ -264,8 +264,8 @@ fn late_isolated_host_flake_preserves_reached_admission_and_retry_recovers() {
     let retry = f.api.3.records().pop().unwrap();
     assert_eq!(retry.decision, Decision::Admitted);
     assert_eq!(
-        retry.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        f.api.3.inputs_identity(&retry),
+        f.api.3.inputs_identity(&first)
     );
     f.resolve()
         .unwrap()
@@ -313,8 +313,8 @@ fn late_flake_preserves_reached_policy_refusal_and_conflicts_with_later_admissio
     assert_eq!(admitted.decision, Decision::Admitted);
     assert_eq!(admitted.observed_authority, refusal.observed_authority);
     assert_eq!(
-        admitted.inputs_identity().unwrap(),
-        refusal.inputs_identity().unwrap()
+        f.api.3.inputs_identity(&admitted),
+        f.api.3.inputs_identity(&refusal)
     );
     let error = f
         .resolve()

@@ -146,14 +146,27 @@ fn ordinary_unadmitted_ancestors_and_pending_candidate_transition_pass() {
 }
 
 #[test]
-fn missing_refusal_predecessors_cannot_hide_a_reached_conflict() {
+fn missing_refusal_predecessors_are_quarantined_and_same_key_still_conflicts() {
     let f = Lineage::new();
     let candidate = f.commit(LifecycleStage::Enrolled, "refused child");
     let mut refusal = f.admit(&candidate, &f.enrolled);
     refusal.decision = Decision::Refused;
     refusal.reasons = vec![Reason::OwningPredicateRefused];
     refusal.predecessors.clear();
-    publish(&f.host, refusal);
+    let refusal = publish(&f.host, refusal);
+    f.check(&candidate).unwrap();
+    let history = f
+        .publication
+        .resolve(
+            f.root.path(),
+            &[f.enrolled.candidate.commit.clone(), candidate.clone()],
+        )
+        .unwrap();
+    assert!(history.incomplete.contains(&refusal.identity().unwrap()));
+    let mut contradiction = refusal;
+    contradiction.decision = Decision::Admitted;
+    contradiction.reasons = vec![Reason::OwningPredicatesSatisfied];
+    publish(&f.host, contradiction);
     assert!(f
         .check(&candidate)
         .unwrap_err()
@@ -181,6 +194,15 @@ fn missing_refusal_bootstrap_is_incomplete_and_still_conflicts() {
         if incomplete_admission {
             admission.reasons.push(Reason::ObservationIncomplete);
         }
+        assert_ne!(
+            admission.inputs_identity(&[]).unwrap(),
+            refusal.inputs_identity(&[]).unwrap()
+        );
+        publish(&conflicting, admission.clone());
+        resolve(conflicting.fork()).unwrap();
+        // The malformed checkpoint remains pinned. A reached opposite decision with the
+        // same classification must conflict even when both records are quarantined.
+        admission.checkpoint = refusal.checkpoint;
         publish(&conflicting, admission);
         conflicting.change(
             &format!("{}?per_page=100&page=1", transport::RUNS),
@@ -276,4 +298,187 @@ fn missing_admission_on_second_parent_refuses() {
         ],
     );
     assert!(f.check(&merge).unwrap_err().contains("history gap"));
+}
+
+#[test]
+fn predecessor_retry_reordering_cannot_bypass_a_reached_refusal() {
+    let f = Lineage::new();
+    let parent = f.commit(LifecycleStage::Enrolled, "parent with incomplete first run");
+    let mut incomplete = f.enrolled.clone();
+    incomplete.candidate = emitter::object(f.root.path(), &parent).unwrap();
+    incomplete.checkout = incomplete.candidate.clone();
+    incomplete.parent = f.enrolled.candidate.clone();
+    incomplete.protected_tip = incomplete.parent.clone();
+    incomplete.old_state = f.enrolled.new_state.clone();
+    incomplete.new_state = incomplete.old_state.clone();
+    incomplete.predecessors = vec![f.enrolled.identity().unwrap()];
+    incomplete.decision = Decision::Refused;
+    incomplete.reasons = vec![Reason::ObservationIncomplete];
+    let incomplete = publish(&f.host, incomplete);
+    let successful = f.admit(&parent, &f.enrolled);
+    let child = f.commit(LifecycleStage::Enrolled, "refused child");
+    let mut refusal = successful.clone();
+    refusal.candidate = emitter::object(f.root.path(), &child).unwrap();
+    refusal.checkout = refusal.candidate.clone();
+    refusal.parent = successful.candidate.clone();
+    refusal.protected_tip = refusal.parent.clone();
+    refusal.predecessors = vec![successful.identity().unwrap()];
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    let refusal = publish(&f.host, refusal);
+    let mut retry = incomplete.clone();
+    retry.decision = Decision::Admitted;
+    retry.reasons = vec![Reason::OwningPredicatesSatisfied];
+    f.host.retry_on_next_begin(&incomplete);
+    let retry = publish(&f.host, retry);
+    let history = f
+        .publication
+        .resolve(
+            f.root.path(),
+            &[f.enrolled.candidate.commit.clone(), child.clone()],
+        )
+        .unwrap();
+    assert_eq!(
+        history.candidate_predecessors(&child).unwrap(),
+        vec![retry.identity().unwrap()]
+    );
+    let mut contradiction = refusal;
+    contradiction.predecessors = history.candidate_predecessors(&child).unwrap();
+    assert_eq!(
+        contradiction.inputs_identity(&[&retry]).unwrap(),
+        contradiction.inputs_identity(&[&successful]).unwrap()
+    );
+    contradiction.decision = Decision::Admitted;
+    contradiction.reasons = vec![Reason::OwningPredicatesSatisfied];
+    publish(&f.host, contradiction);
+    assert!(f
+        .publication
+        .resolve(f.root.path(), &[f.enrolled.candidate.commit.clone(), child])
+        .err()
+        .unwrap()
+        .contains("conflicting decisions over identical inputs"));
+}
+
+#[test]
+fn incomplete_admission_with_superseded_frontier_allows_recovery_and_other_candidates() {
+    let f = Lineage::new();
+    let parent = f.commit(LifecycleStage::Enrolled, "concurrently admitted parent");
+    let child = f.commit(LifecycleStage::Enrolled, "captured child");
+    // Capture C before P has an admission, then publish P before retaining C's reached result.
+    let mut captured = f.enrolled.clone();
+    captured.parent = f.enrolled.candidate.clone();
+    captured.protected_tip = captured.parent.clone();
+    captured.candidate = emitter::object(f.root.path(), &child).unwrap();
+    captured.checkout = captured.candidate.clone();
+    captured.old_state = f.enrolled.new_state.clone();
+    captured.new_state = captured.old_state.clone();
+    captured.predecessors = vec![f.enrolled.identity().unwrap()];
+    let admitted_parent = f.admit(&parent, &f.enrolled);
+    captured.reasons.push(Reason::ObservationIncomplete);
+    let incomplete = publish(&f.host, captured.clone());
+    let history = f
+        .publication
+        .resolve(
+            f.root.path(),
+            &[f.enrolled.candidate.commit.clone(), child.clone()],
+        )
+        .unwrap();
+    assert!(!history.eligible(&incomplete.identity().unwrap()).unwrap());
+    assert_eq!(
+        history.candidate_predecessors(&child).unwrap(),
+        vec![admitted_parent.identity().unwrap()]
+    );
+    let other = f.commit(LifecycleStage::Enrolled, "unrelated later candidate");
+    f.check(&other).unwrap();
+    let mut retry = captured;
+    retry.predecessors = history.candidate_predecessors(&child).unwrap();
+    retry.reasons = vec![Reason::OwningPredicatesSatisfied];
+    let retry = publish(&f.host, retry);
+    let history = f
+        .publication
+        .resolve(
+            f.root.path(),
+            &[f.enrolled.candidate.commit.clone(), other.clone()],
+        )
+        .unwrap();
+    assert!(history.eligible(&retry.identity().unwrap()).unwrap());
+    f.check(&other).unwrap();
+    let mut refusal = retry;
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    publish(&f.host, refusal);
+    assert!(f
+        .publication
+        .resolve(f.root.path(), &[f.enrolled.candidate.commit.clone(), other])
+        .err()
+        .unwrap()
+        .contains("conflicting decisions over identical inputs"));
+}
+
+#[test]
+fn history_deficient_admissions_cannot_grant_frontier_progression_or_transition_history() {
+    let f = Lineage::new();
+    let higher = f.commit(LifecycleStage::RuntimeIntegrated, "quarantined transition");
+    let mut deficient = f.enrolled.clone();
+    deficient.parent = f.enrolled.candidate.clone();
+    deficient.protected_tip = deficient.parent.clone();
+    deficient.candidate = emitter::object(f.root.path(), &higher).unwrap();
+    deficient.checkout = deficient.candidate.clone();
+    deficient.old_state = f.enrolled.new_state.clone();
+    deficient.new_state = objects::Objects::new(f.root.path())
+        .state(&deficient.candidate, STATE)
+        .unwrap();
+    deficient.predecessors = vec!["f".repeat(64)];
+    let deficient = publish(&f.host, deficient);
+    let later = f.commit(LifecycleStage::Enrolled, "later lower candidate");
+    let history = f
+        .publication
+        .resolve(
+            f.root.path(),
+            &[f.enrolled.candidate.commit.clone(), later.clone()],
+        )
+        .unwrap();
+    assert!(history.incomplete.contains(&deficient.identity().unwrap()));
+    assert!(!history.eligible(&deficient.identity().unwrap()).unwrap());
+    assert_eq!(
+        history.predecessors(&higher).unwrap(),
+        vec![f.enrolled.identity().unwrap()]
+    );
+    let generation = Generation::from_record(&f.depth);
+    history
+        .check_progression(&later, &generation, LifecycleStage::Enrolled)
+        .unwrap();
+    assert!(history
+        .check_candidate(f.root.path(), &later, &f.depth, STATE)
+        .unwrap_err()
+        .contains("generation history gap"));
+    // A record citing the quarantined admission also loses authority without poisoning history.
+    let mut descendant = deficient.clone();
+    descendant.candidate = emitter::object(f.root.path(), &later).unwrap();
+    descendant.checkout = descendant.candidate.clone();
+    descendant.parent = deficient.candidate.clone();
+    descendant.protected_tip = descendant.parent.clone();
+    descendant.old_state = deficient.new_state.clone();
+    descendant.new_state = f.enrolled.new_state.clone();
+    descendant.predecessors = vec![deficient.identity().unwrap()];
+    let descendant = publish(&f.host, descendant);
+    let history = f
+        .publication
+        .resolve(f.root.path(), &[f.enrolled.candidate.commit.clone(), later])
+        .unwrap();
+    assert!(history.incomplete.contains(&descendant.identity().unwrap()));
+    assert!(!history.eligible(&descendant.identity().unwrap()).unwrap());
+    // Object substitution remains an integrity error even for a quarantined record.
+    let mut forged = deficient;
+    forged.reasons.push(Reason::ObservationIncomplete);
+    forged.candidate.tree = "f".repeat(40);
+    forged.checkout = forged.candidate.clone();
+    publish(&f.host, forged);
+    assert!(f
+        .publication
+        .resolve(
+            f.root.path(),
+            std::slice::from_ref(&f.enrolled.candidate.commit)
+        )
+        .is_err());
 }

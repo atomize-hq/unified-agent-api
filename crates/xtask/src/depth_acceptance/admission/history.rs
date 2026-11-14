@@ -18,6 +18,12 @@ pub(crate) struct History {
     pub(super) observation: Option<(Publication, super::transport::Snapshot)>,
 }
 impl History {
+    fn authoritative(&self, record: &Record) -> bool {
+        record.successful()
+            && record
+                .identity()
+                .is_ok_and(|id| !self.incomplete.contains(&id))
+    }
     pub(crate) fn recheck(&self) -> Result<(), String> {
         if let Some((publication, snapshot)) = &self.observation {
             snapshot.recheck(publication.host.as_ref(), &publication.authority)?;
@@ -104,7 +110,7 @@ impl History {
                 && !self.records.iter().any(|r| {
                     r.candidate.commit == *commit
                         && r.generation.as_ref() == Some(&generation)
-                        && r.successful()
+                        && self.authoritative(r)
                 })
             {
                 return Err(
@@ -143,7 +149,7 @@ impl History {
             && self
                 .records
                 .iter()
-                .any(|r| r.identity().as_deref() == Ok(identity) && r.successful()))
+                .any(|r| r.identity().as_deref() == Ok(identity) && self.authoritative(r)))
     }
     pub(crate) fn check_progression(
         &self,
@@ -156,7 +162,7 @@ impl History {
             .get(commit)
             .ok_or("IN1 candidate absent from authenticated history")?;
         for record in &self.records {
-            if !record.successful() || record.generation.as_ref() != Some(generation) {
+            if !self.authoritative(record) || record.generation.as_ref() != Some(generation) {
                 continue;
             }
             if let Some(prior) = &record.new_state {
@@ -210,7 +216,6 @@ pub(super) fn resolve(
     let mut frontiers: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut by_commit: BTreeMap<String, Vec<&Record>> = BTreeMap::new();
     let mut decisions = BTreeMap::new();
-    let mut reached_admissions = BTreeSet::new();
     let mut incomplete = BTreeSet::new();
     let mut identities = BTreeSet::new();
     let mut by_identity = BTreeMap::new();
@@ -219,9 +224,6 @@ pub(super) fn resolve(
         by_identity.insert(id.clone(), record);
         if record.reasons.contains(&Reason::ObservationIncomplete) {
             incomplete.insert(id.clone());
-        }
-        if record.decision == Decision::Admitted {
-            reached_admissions.insert(record.inputs_without_frontier_identity()?);
         }
         if !identities.insert(id) {
             return Err("IN1 duplicate decision identity".into());
@@ -232,7 +234,19 @@ pub(super) fn resolve(
         {
             return Err("IN1 authority mismatch".into());
         }
-        let key = record.inputs_identity()?;
+        verify_record(&mut objects, record)?;
+        by_commit
+            .entry(record.candidate.commit.clone())
+            .or_default()
+            .push(record);
+    }
+    for record in records {
+        let predecessors: Vec<_> = record
+            .predecessors
+            .iter()
+            .filter_map(|id| by_identity.get(id).copied())
+            .collect();
+        let key = record.inputs_identity(&predecessors)?;
         if record.reasons != [Reason::ObservationIncomplete]
             && decisions
                 .insert(key, record.decision)
@@ -240,11 +254,6 @@ pub(super) fn resolve(
         {
             return Err("IN1 conflicting decisions over identical inputs".into());
         }
-        verify_record(&mut objects, record)?;
-        by_commit
-            .entry(record.candidate.commit.clone())
-            .or_default()
-            .push(record);
     }
     while !remaining.is_empty() {
         let ready = remaining
@@ -276,38 +285,30 @@ pub(super) fn resolve(
                     .iter()
                     .map(|id| by_identity[id].candidate.commit.as_str())
                     .collect();
-                let referenced = record
-                    .predecessors
-                    .iter()
-                    .map(|id| {
-                        let prior = by_identity
-                            .get(id)
-                            .ok_or("IN1 missing predecessor admission")?;
-                        if !prior.successful() {
-                            return Err("IN1 refused predecessor admission".to_owned());
+                let mut referenced = BTreeSet::new();
+                let mut references_complete = true;
+                for id in &record.predecessors {
+                    match by_identity.get(id) {
+                        Some(prior)
+                            if prior.successful()
+                                && !incomplete.contains(id)
+                                && lineage.contains(&prior.candidate.commit) =>
+                        {
+                            referenced.insert(prior.candidate.commit.as_str());
                         }
-                        Ok(prior.candidate.commit.as_str())
-                    })
-                    .collect::<Result<BTreeSet<_>, String>>()?;
-                if !lineage.contains(&record.parent.commit)
-                    || referenced.iter().any(|commit| !lineage.contains(*commit))
-                {
-                    return Err("IN1 missing or inconsistent predecessor admissions".into());
+                        _ => references_complete = false,
+                    }
                 }
-                let frontier_complete = referenced == expected
+                if !lineage.contains(&record.parent.commit) {
+                    return Err("IN1 inconsistent admission parent".into());
+                }
+                let frontier_complete = references_complete
+                    && referenced == expected
                     && (expected.is_empty() == (record.checkpoint == Checkpoint::Bootstrap));
-                if record.reasons != [Reason::ObservationIncomplete] && !frontier_complete {
-                    if record.decision == Decision::Admitted {
-                        return Err(
-                            "IN1 missing predecessor admissions or bootstrap anchoring".into()
-                        );
-                    }
-                    // A later ancestor admission can supersede a refusal's pinned frontier.
-                    // Preserve its bytes and reached conflict side, but mark it incomplete.
+                if !frontier_complete {
+                    // A retained attempt remains accountable even when later parent admissions
+                    // supersede its captured frontier. Quarantine it without blocking recovery.
                     incomplete.insert(record.identity()?);
-                    if reached_admissions.contains(&record.inputs_without_frontier_identity()?) {
-                        return Err("IN1 conflicting decisions over identical inputs with incomplete refusal frontier".into());
-                    }
                 }
             }
             // A predecessor references a retained successful attempt at each frontier commit.
@@ -315,7 +316,9 @@ pub(super) fn resolve(
             // predecessor references. Keep one deterministic representative for new emissions.
             if let Some(admitted) = attempts
                 .iter()
-                .filter(|r| r.successful())
+                .filter(|r| {
+                    r.successful() && r.identity().is_ok_and(|id| !incomplete.contains(&id))
+                })
                 .min_by_key(|r| (r.claims.run, r.claims.attempt, r.claims.job))
             {
                 frontier.clear();
@@ -344,7 +347,7 @@ pub(super) fn resolve(
         observation: None,
     };
     for record in records {
-        if record.successful() {
+        if history.authoritative(record) {
             if let (Some(generation), Some(state)) = (&record.generation, &record.new_state) {
                 history.check_progression(&record.candidate.commit, generation, state.stage)?;
             }
