@@ -252,3 +252,157 @@ The lead must rerun the affected groups unrestricted. All new FR2a proofs and th
 group pass. Real host issuance, deployed source/runtime binding, emitter isolation, credentials,
 retention and production activation remain phase C. The changes stay uncommitted on
 `feat/fr2-freeze-planner` for the lead to review and commit.
+
+## FR2b
+
+Status — FR2b implementation and validation complete, with the same five existing
+Unix-socket-blocked tests as FR2a. Changes remain uncommitted for the lead.
+
+### Authority choice and scope
+
+Use independently supplied fake-host acquisition observations, separate from candidate and producer
+artifacts. Authenticate the checked transport's complete output inventory (including absence, mode,
+object kind and exact bytes), approved acquisition invocation, and candidate/predecessor association
+using retained host job/artifact commitments. Semantic validators alone cannot reproduce timestamps,
+encoding, metadata notes/validation fields or complete lockfile contents. Independent observations
+therefore authenticate those complete producer bytes, followed by the existing acquisition checks.
+RULES/SCHEMA and the acquisition descriptor remain predecessor prerequisites. ON2 retains its
+separate protected-parent boundary. No workflow, production route, phase-C activation or FR3 changes.
+
+### Progress and validation
+
+- Read FR2a report and the design's acquisition-boundary prerequisites before implementation.
+- Confirmed branch `feat/fr2-freeze-planner`, initial head `986022c4`, clean worktree.
+- Implementation and measured validation results will be recorded here as they complete.
+- Added a connected combined-commit regression before enabling authority. Its first run exposed
+  the existing public isolated route's clean-checkout requirement. The fixture uses the existing
+  guarded private MA2 core/test apply shim for the staged transport boundary; production route
+  policy is unchanged. The next regression run must fail specifically on absent acquisition
+  authority before installing the independently retained observation.
+- Implemented complete acquisition inventories, planner application before writer derivation,
+  protected descriptor/plan resolution, modeled emitting-job/artifact commitments and closing
+  observation rechecks. Metadata is additionally replayed as `reported` against predecessor
+  notes/validation, and lockfile checks preserve predecessor rows and top-level content.
+- The connected test reproduces the intended FR2a absent-authority failure, then reconstructs
+  the complete combined expected tree from retained authority. The protocol is located in
+  `isolated_maintenance/acquisition.rs`, separate from producer artifacts, and reuses FR1's
+  protected policy closure, canonical/domain digests, bounded paginated host reads and emitting-job
+  commitments. The admission record gains no fields: its existing writer-input identity binds the
+  freeze observation together with the full authenticated acquisition observation.
+- The synthetic subject is wrapper-only and claims no agent_api capability. Reported metadata can
+  change its existing name-level coverage label. The proof checks zero qualified depth promises,
+  no capability claims, no execution or acceptance entries, no pointer promotion and identical
+  actual runtime-support bytes. It does not change existing support classification semantics.
+
+### Delivered implementation
+
+- `freeze_transition/acquisition.rs` alone constructs non-empty deltas after exact inventory
+  comparison. Deltas retain expected-before entries, preserve optional absence, reject stale
+  predecessors and cannot overlap freeze-owned output paths. The pure planner applies acquisition
+  create/replace/delete effects before freeze effects and preserves every other predecessor leaf.
+- `isolated_maintenance/acquisition.rs` defines the separate fake-host reference/observation
+  protocol. Approved policy comes independently from the installed host, not payload/candidate
+  fields. FR1 checks its complete runtime Git policy closure against the protected source.
+  Attempt-specific job and artifact inventories, repository/inputs/parent/candidate association,
+  exact canonical observation bytes, artifact digest/size, one domain-separated emitting-job
+  commitment within the step window, expiration and independent revocations are authenticated.
+  Complete observations are re-read during planning and around publication. Production Host
+  methods default to absent authority.
+- Protected IN1 resolves the full `AcquisitionPlan` against authenticated predecessor registry,
+  RULES, required/expected targets and descriptor. Only that plan's exact `output_paths` may
+  change. RULES/SCHEMA remain predecessor inputs. A private data view stages authenticated regular
+  acquisition blobs with no-filter Git plumbing, preserving the predecessor HEAD. No candidate
+  executable, checkout hook or build script runs.
+- `freeze/acquisition_checks.rs` reuses manifest validation's schema/pointer/report checks before
+  freeze outputs exist, replays the `reported` metadata producer against predecessor metadata and
+  the authenticated clock, and checks lockfile top-level/retained-row preservation and complete
+  target provenance. The owning MA2 derivation runs union/report intake validators and regenerates
+  O; IN1 additionally checks O digests against the combined authenticated view. Complete-tree
+  equality then authenticates the canonical request/record/packet/reporting outputs.
+- Existing full `manifest-validate` behavior is unchanged. The connected proof runs it on the
+  finished combined candidate and on the semantically unchanged byte-substitution candidate.
+  Public acquisition version-validation order is preserved. The guarded MA2 apply shim is only
+  test-visible; the production clean-checkout route is unchanged.
+- Annex A now records combined acquisition admission and its modeled-host/phase-C limits. No
+  admission record fields were added, so `support-depth-evidence-v1.md` is unchanged. `.github/`,
+  producer transport, production route, live profile and FR3 remain unchanged.
+
+### Proving coverage
+
+The connected `fr2_ma2_combined_acquisition_and_freeze_real_in1` fixture shares one setup. It uses
+real union/report writers, metadata planning, predecessor-preserving lockfile generation, the
+real guarded MA2 writer and real transport staging/bundle/verification. Exactly one commit carries
+all acquisition and freeze outputs. It admits through real IN1 and is re-observed after protected
+history advances. The same fixture checks an unrelated edit and schema-valid whitespace changes
+to both metadata and lockfile through real IN1. Byte/inventory and host mutation matrices share
+immutable trees and independently forked host facts. Every acquired JSON output receives semantic
+value-preserving byte, deletion, mode, symlink-kind, object-kind and substitution checks. Missing
+inventory entries, extras, RULES/SCHEMA ownership, optional absence and candidate bundle/fingerprint
+files refuse. Host mutations cover run, attempt, job, workflow, app, inputs, repository, artifact,
+commitment availability/window, policy, predecessor/candidate, generation, resolved plan and
+revocation. Pure delta tests cover create/replace/delete/preserve, stale parent and output collision.
+A small lockfile test separately refuses top-level/row loss and incorrect target provenance.
+
+### Review and current validation
+
+Review preserved the public acquisition version-error ordering and the existing jq lock writer's
+missing/null-artifact-list behavior. The latter now has direct small-test coverage alongside
+preserved top-level/row content, duplicate targets and source/digest/size refusals. Acquisition logs
+have an explicit bound, and retained acquisition identities honor the independently observed
+revocation set. No new code edits are planned while regression validation completes.
+
+Final Clippy passed after these corrections. Formatting, hygiene, complete diff whitespace and
+LOC checks pass; `manifest_validate.rs` has 688 code lines and `prepare.rs` remains at 679.
+Both MA2 connected proofs passed together in 78.41 s (78.48 s wall), including combined exact-tree
+admission, full acquisition validation, actual IN1 semantic-byte-substitution/unrelated-edit
+refusals and post-tip observation. The first full depth group passed all 70 tests. The maintenance
+library group passed 50, with its one pre-existing Unix-socket-blocked failure and one existing
+ignored test. Bootstrap, runtime-follow-on and existing integration regressions passed. Full IN1 has the same
+four existing socket-blocked closeout failures as FR2a.
+Detailed logs and measured command records are in ignored `target/fr2b-validation/`.
+
+### Final commands and measured results
+
+No network, credentials or live profile were used. The default TMPDIR worked. Wall times include
+compilation, Cargo lock waits and concurrent validation load; the test times come from Cargo.
+The final depth rerun follows the small lockfile missing/null-list correction. Existing assertions
+remain unchanged; the two path-included MA harnesses also run the additional pure planner test.
+
+| Command | Result | Test time / wall time |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | 1.909 s wall |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass on final code | 6.977 s wall |
+| `cargo test -p xtask --lib freeze_transition` | 5 passed | 0.00 s / 14.815 s |
+| `cargo test -p xtask --lib depth_acceptance` | 70 passed on final code | 60.90 s / 68.944 s |
+| `cargo test -p xtask --lib agent_maintenance` | 50 passed, 1 socket-blocked, 1 existing ignored | 0.08 s / 14.090 s |
+| `cargo test -p xtask --lib manifest_acquisition` | Pass; no matching library tests (integration coverage below) | 0.00 s / 0.074 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | Both freeze-only and combined MA2 proofs passed | 78.41 s / 78.480 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 62 passed, including genuine ON2 and same-candidate acquisition/statement refusals | 256.93 s / 257.053 s |
+| `cargo test -p xtask --lib runtime_follow_on` | 46 passed | 80.08 s / 80.204 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::in1_integration` | 24 passed, 4 socket-blocked | 110.21 s / 110.298 s |
+| `cargo test -p xtask --test manifest_acquisition_plan --test agent_maintenance_prepare --test agent_maintenance_audit_status` | 15 acquisition, 52 preparation, 62 audit tests passed | 0.03 s, 11.73 s, 0.10 s / 16.829 s combined |
+| `cargo test -p xtask --test c0_spec_validate --test c3_spec_reports_metadata_retain` | 83 validator and 5 report/metadata/retention tests passed | 41.85 s and 0.02 s / 59.343 s combined |
+| `python3 scripts/test_maintenance_transport.py` | 12 passed | 0.368 s / 0.416 s |
+| `make loc-check` | Pass, every Rust file within 700 code lines | 0.059 s wall |
+| `make hygiene` | Pass | 0.094 s wall |
+| `git diff --check` | Pass | 0.004 s wall |
+
+### Sandbox limits and handoff
+
+The sandbox prevents opening the existing MA4 Unix-socket evidence channel. These unchanged tests
+fail with `Operation not permitted (os error 1)` at channel creation and require unrestricted reruns:
+
+- `agent_maintenance::execute::runtime::tests::every_executor_failure_path_revokes_the_evidence_channel`
+- `isolated_maintenance::tests::in1_integration::connected::in1_closeout_candidate_admission_and_post_push_observation`
+- `isolated_maintenance::tests::in1_integration::connected::in1_prepared_closeout_candidate_admission_and_post_push_observation`
+- `isolated_maintenance::tests::in1_integration::connected::in1_reauthenticates_population_in_admission_and_post_push_observation`
+- `isolated_maintenance::tests::in1_integration::connected::in1_refuses_forged_closeout_entries_in_admission_and_observation`
+
+All new FR2b proofs pass. New connected cases reuse one fixture and immutable observations; the
+combined MA2 group completes in 78.41 s and the full bootstrap group in 256.93 s in this environment.
+Production acquisition-observation issuance, deployed source/runtime binding, emitter isolation,
+credentials and retention remain phase C. FR3 canonical MA2 discovery/reporting-context/population
+joins remain unimplemented. There is no new production reporting exception or support credit.
+
+The worktree remains on `feat/fr2-freeze-planner` at committed head `986022c4`. All FR2b source,
+tests, Annex A and report changes are uncommitted for the lead; no push was performed.

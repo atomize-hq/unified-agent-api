@@ -7,6 +7,8 @@ use crate::{
 };
 use std::path::Path;
 
+pub(crate) use crate::isolated_maintenance::acquisition;
+mod acquisition_checks;
 pub(crate) mod authority;
 mod objects;
 
@@ -25,6 +27,7 @@ impl Classification {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn classify(
     root: &Path,
     publication: &Publication,
@@ -32,6 +35,26 @@ pub(crate) fn classify(
     candidate: &Object,
     record: &DepthRecord,
     observation: Option<&authority::Observation>,
+) -> Classification {
+    classify_authenticated(
+        root,
+        publication,
+        parent,
+        candidate,
+        record,
+        observation,
+        &Ok(None),
+    )
+}
+
+pub(crate) fn classify_authenticated(
+    root: &Path,
+    publication: &Publication,
+    parent: &Object,
+    candidate: &Object,
+    record: &DepthRecord,
+    observation: Option<&authority::Observation>,
+    acquired: &Result<Option<acquisition::Retained>, String>,
 ) -> Classification {
     let Some(observation) = observation else {
         return Classification::required(Reason::FreezeAuthorityUnavailable);
@@ -46,7 +69,19 @@ pub(crate) fn classify(
     if observation.writer.validate().is_err() {
         return Classification::required(Reason::FreezePlanningRefused);
     }
-    match expected(root, parent, candidate, record, observation) {
+    let acquired = match acquired {
+        Ok(value) => value.as_ref(),
+        Err(_) => return Classification::required(Reason::AcquisitionAuthorityUnavailable),
+    };
+    match expected_authenticated(
+        root,
+        parent,
+        candidate,
+        record,
+        observation,
+        Some(publication),
+        acquired,
+    ) {
         Ok((plan, proposed)) => match plan.require_equal(&proposed) {
             Ok(()) => Classification {
                 checkpoint: Checkpoint::RequestFreeze,
@@ -56,9 +91,16 @@ pub(crate) fn classify(
                         b"support-depth-freeze-planner-v1\0",
                         observation.policy.implementation.as_bytes(),
                     ),
-                    writer_inputs: observation
-                        .identity()
-                        .expect("typed freeze observation serializes"),
+                    writer_inputs: match acquired {
+                        Some(acquired) => digest(
+                            b"support-depth-freeze-acquisition-inputs-v1\0",
+                            &super::canonical(&(observation, &acquired.observation))
+                                .expect("typed acquisition observation serializes"),
+                        ),
+                        None => observation
+                            .identity()
+                            .expect("typed freeze observation serializes"),
+                    },
                 }),
             },
             Err(_) => Classification::required(Reason::FreezeTreeMismatch),
@@ -70,12 +112,26 @@ pub(crate) fn classify(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn expected(
     root: &Path,
     parent: &Object,
     candidate: &Object,
     record: &DepthRecord,
     observation: &authority::Observation,
+) -> Result<(freeze_transition::Plan, freeze_transition::Tree), String> {
+    expected_authenticated(root, parent, candidate, record, observation, None, None)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn expected_authenticated(
+    root: &Path,
+    parent: &Object,
+    candidate: &Object,
+    record: &DepthRecord,
+    observation: &authority::Observation,
+    publication: Option<&Publication>,
+    acquired: Option<&acquisition::Retained>,
 ) -> Result<(freeze_transition::Plan, freeze_transition::Tree), String> {
     let mut objects = Objects::new(root);
     let predecessor = objects::read(&mut objects, parent)?;
@@ -107,8 +163,65 @@ pub(crate) fn expected(
         .map_err(|e| e.to_string())?;
     let (_, outputs) =
         crate::manifest_acquisition::plan::delivery_paths(&entry.manifest_root, version, &targets);
-    let acquisition = freeze_transition::acquisition::validate(&predecessor, &proposed, &outputs)?;
     let view = objects::DataView::new(root, parent, &predecessor)?;
+    let acquisition = if let Some(acquired) = acquired {
+        let checked = || -> Result<_, String> {
+            if !matches!(
+                (&record.event, &observation.writer),
+                (Event::Maintenance { .. }, authority::Writer::Maintenance)
+            ) {
+                return Err("ON2 acquisition must precede freeze".into());
+            }
+            let plan = crate::manifest_acquisition::plan_with_registry(
+                view.root(),
+                &selection.agent_id,
+                version,
+                &registry,
+            )
+            .map_err(|e| e.to_string())?;
+            let request_path =
+                crate::agent_lifecycle::maintenance_request_path(&selection.agent_id);
+            let args = crate::agent_maintenance::prepare::args_from_request_in_workspace(
+                view.root(),
+                Path::new(&request_path),
+                false,
+                true,
+            )
+            .map_err(|e| e.to_string())?;
+            acquired.require_binding(
+                root,
+                publication.ok_or("missing protected acquisition publication")?,
+                parent,
+                candidate,
+                &Generation::from_record(record),
+                &plan,
+                &args.branch_name,
+            )?;
+            let delta = freeze_transition::acquisition::authenticated(
+                &predecessor,
+                &proposed,
+                &plan.output_paths,
+                &acquired.observation.outputs,
+            )?;
+            let combined = delta.apply(&predecessor)?;
+            view.overlay(&predecessor, &combined)?;
+            acquisition_checks::validate(view.root(), &predecessor, &plan)?;
+            let obligations = record.obligations.as_ref().ok_or("acquisition lacks O")?;
+            for reference in &obligations.acquired_inputs {
+                let entry = combined
+                    .get(&reference.path)
+                    .filter(|e| e.regular())
+                    .ok_or("missing authenticated O input")?;
+                if reference.sha256 != digest(b"", &entry.bytes) {
+                    return Err("O acquisition digest differs".into());
+                }
+            }
+            Ok(delta)
+        };
+        checked().map_err(|_| "acquisition authority unavailable")?
+    } else {
+        freeze_transition::acquisition::validate(&predecessor, &proposed, &outputs)?
+    };
     let transition = match (&record.event, &observation.writer) {
         (Event::Maintenance { .. }, authority::Writer::Maintenance) => {
             let request_path =

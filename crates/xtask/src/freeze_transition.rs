@@ -1,4 +1,4 @@
-//! Exact freeze effects. Input acquisition authority is deliberately empty-only in FR2a.
+//! Exact freeze effects over authenticated predecessor and acquisition inputs.
 use std::collections::BTreeMap;
 
 #[path = "freeze_transition/acquisition.rs"]
@@ -29,18 +29,34 @@ pub(crate) struct Plan {
 /// No filesystem, clock, environment, policy selection or executable dispatch occurs here.
 pub(crate) fn operations(
     predecessor: &Tree,
-    _acquisition: &ValidatedAcquisitionDelta,
+    acquisition: &ValidatedAcquisitionDelta,
     rendered: impl IntoIterator<Item = (String, Option<Vec<u8>>)>,
 ) -> Result<Plan, String> {
-    let mut expected = predecessor.clone();
+    let mut expected = acquisition.apply(predecessor)?;
     let mut operations = predecessor
         .iter()
         .map(|(path, entry)| (path.clone(), Operation::Preserve(entry.clone())))
         .collect::<BTreeMap<_, _>>();
+    for path in predecessor.keys().chain(expected.keys()) {
+        if !acquisition.owns(path) {
+            continue;
+        }
+        let operation = match (predecessor.get(path), expected.get(path)) {
+            (Some(before), Some(after)) if before == after => Operation::Preserve(after.clone()),
+            (Some(before), Some(after)) => Operation::Replace {
+                before: before.clone(),
+                after: after.clone(),
+            },
+            (None, Some(after)) => Operation::Create(after.clone()),
+            (Some(before), None) => Operation::Delete(before.clone()),
+            (None, None) => continue,
+        };
+        operations.insert(path.clone(), operation);
+    }
     let mut seen = std::collections::BTreeSet::new();
     for (path, bytes) in rendered {
         tree::validate_path(&path)?;
-        if !seen.insert(path.clone()) {
+        if acquisition.owns(&path) || !seen.insert(path.clone()) {
             return Err("duplicate freeze output".into());
         }
         let before = predecessor.get(&path);

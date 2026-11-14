@@ -725,7 +725,7 @@ pub(super) fn isolated_build(
 }
 #[cfg(test)]
 #[allow(dead_code)]
-pub(super) fn isolated_apply(
+pub(crate) fn isolated_apply(
     root: &Path,
     plan: &PreparePlan,
     registry: &AgentRegistry,

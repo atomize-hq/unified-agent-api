@@ -126,3 +126,53 @@ fn deletion_and_output_collisions_are_explicit() {
     )
     .is_err());
 }
+
+#[test]
+fn authenticated_acquisition_is_applied_before_freeze_and_cannot_be_overwritten_or_rebased() {
+    let before = Tree::from([
+        (
+            "retained".into(),
+            Entry::file("100755", b"retained".to_vec()),
+        ),
+        ("replace".into(), Entry::file("100644", b"old".to_vec())),
+        ("remove".into(), Entry::file("100644", b"old".to_vec())),
+    ]);
+    let mut candidate = before.clone();
+    candidate.insert("replace".into(), Entry::file("100644", b"new".to_vec()));
+    candidate.insert("create".into(), Entry::file("100644", b"created".to_vec()));
+    candidate.remove("remove");
+    let outputs: Vec<String> = vec![
+        "replace".into(),
+        "create".into(),
+        "remove".into(),
+        "absent".into(),
+    ];
+    let inventory = outputs
+        .iter()
+        .map(|p| (p.clone(), candidate.get(p).cloned()))
+        .collect();
+    let acquired = acquisition::authenticated(&before, &candidate, &outputs, &inventory).unwrap();
+    let plan = operations(
+        &before,
+        &acquired,
+        [("freeze".into(), Some(b"frozen".to_vec()))],
+    )
+    .unwrap();
+    candidate.insert("freeze".into(), Entry::file("100644", b"frozen".to_vec()));
+    plan.require_equal(&candidate).unwrap();
+    assert!(matches!(
+        plan.operations["replace"],
+        Operation::Replace { .. }
+    ));
+    assert!(matches!(plan.operations["create"], Operation::Create(_)));
+    assert!(matches!(plan.operations["remove"], Operation::Delete(_)));
+    assert!(matches!(
+        plan.operations["retained"],
+        Operation::Preserve(_)
+    ));
+    assert!(operations(&before, &acquired, [("replace".into(), Some(vec![]))]).is_err());
+    assert!(operations(&before, &acquired, [("absent".into(), Some(vec![]))]).is_err());
+    let mut another_parent = before;
+    another_parent.get_mut("replace").unwrap().bytes.push(b' ');
+    assert!(acquired.apply(&another_parent).is_err());
+}

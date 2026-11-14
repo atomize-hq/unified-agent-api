@@ -22,6 +22,15 @@ pub(crate) trait Host: Send + Sync {
     ) -> Result<Option<freeze::authority::Observation>, String> {
         Ok(None)
     }
+    fn acquisition_reference(
+        &self,
+        _candidate: &str,
+    ) -> Result<Option<freeze::acquisition::Reference>, String> {
+        Ok(None)
+    }
+    fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
+        Ok(None)
+    }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
     fn upload(&self, claims: &Claims, bytes: &[u8]) -> Result<u64, String>;
     fn commit(&self, claims: &Claims, line: &str) -> Result<(), String>;
@@ -395,7 +404,7 @@ fn decode(zip: &[u8]) -> Result<Vec<u8>, String> {
     }
     Ok(result.stdout)
 }
-pub(super) fn list(
+pub(crate) fn list(
     host: &dyn Host,
     path: &str,
     member: &str,

@@ -128,21 +128,27 @@ impl Emitter {
             }
         }
         let observation = self.publication.host.freeze_inputs(&self.candidate)?;
+        let acquired =
+            super::freeze::acquisition::read(self.publication.host.as_ref(), &self.candidate);
         let classification = if admitted {
             depth.as_ref().map(|record| {
-                super::freeze::classify(
+                super::freeze::classify_authenticated(
                     root,
                     &self.publication,
                     &parent,
                     &candidate,
                     record,
                     observation.as_ref(),
+                    &acquired,
                 )
             })
         } else {
             None
         };
-        if self.publication.host.freeze_inputs(&self.candidate)? != observation {
+        if self.publication.host.freeze_inputs(&self.candidate)? != observation
+            || super::freeze::acquisition::read(self.publication.host.as_ref(), &self.candidate)
+                != acquired
+        {
             return Err("IN1 freeze input authority changed during planning".into());
         }
         session.publish(&Record {
@@ -196,7 +202,10 @@ impl Emitter {
             execution_evidence,
             claims: session.claims.clone(),
         })?;
-        if self.publication.host.freeze_inputs(&self.candidate)? != observation {
+        if self.publication.host.freeze_inputs(&self.candidate)? != observation
+            || super::freeze::acquisition::read(self.publication.host.as_ref(), &self.candidate)
+                != acquired
+        {
             return Err("IN1 freeze input authority changed around publication".into());
         }
         if let Ok(history) = history {

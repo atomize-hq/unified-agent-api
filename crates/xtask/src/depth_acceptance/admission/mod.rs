@@ -5,7 +5,7 @@ pub(crate) mod history;
 mod objects;
 pub(crate) mod policy;
 mod record;
-mod transport;
+pub(crate) mod transport;
 pub(crate) use record::*;
 pub(crate) use transport::{Authority, Host, Publication};
 

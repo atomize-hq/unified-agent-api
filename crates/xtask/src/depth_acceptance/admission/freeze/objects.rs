@@ -130,6 +130,69 @@ impl DataView {
         }
         Ok(Self(directory))
     }
+    /// Stage only authenticated acquisition differences using literal no-filter object plumbing.
+    pub(super) fn overlay(&self, before: &Tree, after: &Tree) -> Result<(), String> {
+        for path in before
+            .keys()
+            .chain(after.keys())
+            .collect::<std::collections::BTreeSet<_>>()
+        {
+            if before.get(path) == after.get(path) {
+                continue;
+            }
+            validate_path(path)?;
+            let full = self.root().join(path);
+            match after.get(path) {
+                Some(entry) if entry.regular() => {
+                    fs::create_dir_all(full.parent().ok_or("invalid acquisition parent")?)
+                        .map_err(|e| e.to_string())?;
+                    fs::write(&full, &entry.bytes).map_err(|e| e.to_string())?;
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        fs::set_permissions(
+                            &full,
+                            fs::Permissions::from_mode(if entry.mode == "100755" {
+                                0o755
+                            } else {
+                                0o644
+                            }),
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
+                    let out = crate::git_inputs::command(self.root())
+                        .args(["hash-object", "--no-filters", "-w", "--", path])
+                        .output()
+                        .map_err(|e| e.to_string())?;
+                    if !out.status.success() {
+                        return Err("cannot stage authenticated acquisition blob".into());
+                    }
+                    let id = std::str::from_utf8(&out.stdout)
+                        .map_err(|e| e.to_string())?
+                        .trim();
+                    git(
+                        self.root(),
+                        &[
+                            "update-index",
+                            "--add",
+                            "--cacheinfo",
+                            &entry.mode,
+                            id,
+                            path,
+                        ],
+                    )?;
+                }
+                None => {
+                    if full.exists() {
+                        fs::remove_file(full).map_err(|e| e.to_string())?;
+                    }
+                    git(self.root(), &["update-index", "--force-remove", "--", path])?;
+                }
+                _ => return Err("nonregular authenticated acquisition input".into()),
+            }
+        }
+        Ok(())
+    }
     pub(super) fn root(&self) -> &Path {
         self.0.path()
     }

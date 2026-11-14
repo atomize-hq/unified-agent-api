@@ -1,6 +1,7 @@
 //! Invocation-local isolated maintenance binding. Scope and freshness never grant admission.
 // The foundation deliberately has no installed profile or production bound-Proposal caller.
 #![allow(dead_code)]
+pub(crate) mod acquisition;
 mod admission;
 mod host;
 pub(crate) mod onboarding;

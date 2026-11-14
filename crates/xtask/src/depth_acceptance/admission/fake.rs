@@ -153,6 +153,25 @@ impl Host for MemoryHost {
             .map(|bytes| serde_json::from_slice(bytes).map_err(|e| e.to_string()))
             .transpose()
     }
+    fn acquisition_reference(
+        &self,
+        candidate: &str,
+    ) -> Result<Option<freeze::acquisition::Reference>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("acquisition-inputs/{candidate}"))
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get("acquisition-policy")
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String> {
         if let Some(prior) = self.next_retry.lock().unwrap().take() {
             if prior.candidate.commit != candidate || prior.policy != *policy {

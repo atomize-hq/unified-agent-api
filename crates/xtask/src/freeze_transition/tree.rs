@@ -2,7 +2,8 @@
 use std::collections::BTreeMap;
 
 pub(crate) type Tree = BTreeMap<String, Entry>;
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct Entry {
     pub mode: String,
     pub kind: String,
