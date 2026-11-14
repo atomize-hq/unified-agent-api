@@ -194,8 +194,8 @@ impl BlobReader {
             }
             self.batch.as_mut().ok_or("missing Git batch")?.read(object)
         })();
-        // Recheck after the response as well: a pack can disappear while the child serves
-        // the request. A fresh command preserves the original availability diagnostics.
+        // Recheck after the response as well: packs or resolved alternates can change while
+        // the child serves the request. A fresh command preserves availability diagnostics.
         let changed = self
             .packs
             .as_mut()

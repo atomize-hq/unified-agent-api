@@ -357,3 +357,52 @@ fn warm_immutable_reads_observe_removed_packed_blobs() {
     assert!(expected.is_err());
     assert_eq!(cached.optional_bytes("bound"), expected);
 }
+
+#[cfg(unix)]
+#[test]
+fn warm_immutable_reads_observe_retargeted_loose_alternates() {
+    use std::os::unix::fs::symlink;
+
+    for transitive in [false, true] {
+        let root = fixture();
+        let workspace = Source::workspace(root.path()).unwrap();
+        let object = workspace.git(&["rev-parse", "HEAD:bound"]).unwrap();
+        let object = object.trim();
+        let loose = format!("{}/{}", &object[..2], &object[2..]);
+        let objects = root.path().join(".git/objects");
+        let store_a = root.path().join("store-a");
+        let store_b = root.path().join("store-b");
+        fs::create_dir_all(store_a.join(&object[..2])).unwrap();
+        fs::create_dir(&store_b).unwrap();
+        fs::rename(objects.join(&loose), store_a.join(&loose)).unwrap();
+        let link = root.path().join("alternate");
+        symlink(&store_a, &link).unwrap();
+        let alternates = if transitive {
+            let parent = root.path().join("store-parent");
+            fs::create_dir_all(parent.join("info")).unwrap();
+            fs::write(objects.join("info/alternates"), "../../store-parent\n").unwrap();
+            parent.join("info/alternates")
+        } else {
+            objects.join("info/alternates")
+        };
+        fs::write(&alternates, format!("{}\n", link.display())).unwrap();
+        let cached = Source::tip(root.path(), "HEAD").unwrap();
+        let mut single = cached.clone();
+        single.immutable = None;
+        assert_eq!(cached.read("bound").unwrap(), "regular");
+        crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.set(0));
+        assert_eq!(cached.clone().read("bound").unwrap(), "regular");
+        assert_eq!(
+            crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.get()),
+            0,
+            "unchanged storage must reuse the warmed child"
+        );
+        let before = fs::read(&alternates).unwrap();
+        fs::remove_file(&link).unwrap();
+        symlink(&store_b, &link).unwrap();
+        assert_eq!(fs::read(&alternates).unwrap(), before);
+        let expected = single.optional_bytes("bound");
+        assert!(expected.is_err());
+        assert_eq!(cached.optional_bytes("bound"), expected);
+    }
+}
