@@ -148,91 +148,23 @@ test leg), independent adoption, terminal producers before failure-preserving
 consumers/same-run IN1, and the terminal workflow/gate before conditional MERGE.
 No real host call, live profile, production enablement, commit or push was made.
 
-## Round-3 history correction
+## Deferred: rollback over unobserved history
 
-The round-2 source map compared only commits discovered through CI. A rollback could
-therefore authenticate when its higher-stage ancestor had no workflow run. The
-round-3 regression reproduced that acceptance with only the rollback descendant in
-`RUNS`, while retaining independent adoption.
+Round 3 found that producer discovery's progression check compares only authenticated sources that
+received CI runs: a descendant that restores an earlier lifecycle stage passes when the
+higher-stage ancestor itself had no run. A round-3 attempt walked local Git history from the
+freeze to each source; round-4 review found that walk reads unauthenticated local objects (no OID
+verification), caches incompletely and is unbounded. That walk was reverted.
 
-`progression.rs` now walks every raw parent edge reachable from each applicable
-host head and actual checkout. It reads commit headers with the hardened Git
-runner's `cat-file commit`, then lifecycle, record and approval blobs from pinned
-`Source` views. Raw headers retain parents hidden by shallow or graft metadata.
-Missing commit/tree/blob objects refuse through local reads. History traversal
-performs no object acquisition. The complete graph is visited without Git's
-path-based history simplification. Identical record/state/approval/registry tree
-entries share their authenticated projection, and validated commit histories are
-cached within one discovery of one Event/P/O generation.
+This gap belongs to the same decision as the freeze checkpoint. The maintainer-delegated consult
+(2026-11-13, option 3 adjusted) roots lifecycle authority in protected IN1 admission history: the
+freeze checkpoint and the readiness transition are independently authenticated IN1 admissions, and
+readiness is irreversible within the generation. IN1 already refuses backward progression at
+admission. The shared freeze/readiness amendment slice must therefore also define and test
+progression for applicable attempts against that authenticated admission history, including:
 
-The lifecycle interval begins at the unique first ancestor whose record matches
-that Event/P/O, normally the ON2 freeze. Every parent/child transition thereafter
-uses IN1's `check_progression`. Every merge parent carrying this generation
-participates, regardless of parent order. A staging parent with no earlier state
-of this generation contributes no transition. Thus both a staging merge into a PR
-branch and GitHub's test merge receive the same checks. An earlier freeze observed
-after implementation remains an ancestor observation with its own forward history.
-An intervening rollback remains invalid even if a later commit restores the higher
-stage. Binding disappearance/change after that interval begins, multiple independent
-first matching states, and different generation starts among observed sources
-refuse as ambiguous histories.
+- a descendant restoring an earlier stage with no CI run on the higher-stage ancestor;
+- a new freeze-labelled head after readiness, including on another PR.
 
-This follows the evidence contract's onboarding producer binding and producer
-discovery requirements that actual approval Event/P/O bind each source and that
-all applicable heads/attempts participate. The support-depth contract's Generation
-definition names one create-lane run under one approval as one generation. The
-onboarding charter's Support depth rules 5 and 7 close the freeze window after a
-passing write and preserve the lifecycle object. The support-depth contract's
-Complete mediation rule 7 covers every proposed merge result. Together with the
-existing IN1 progression predicate, these require ancestry-based checks at merges.
-A first-parent interpretation could discard the PR head of a test merge or a
-higher-stage staging parent. The implementation checks all parent edges and
-requires one connected frozen generation, refusing ambiguous lineage.
-
-The producer-only reconstructed freeze fixture previously descended from the real
-implementation checkpoint. Its new parent is the genuine `on2-freeze`, with the
-final-source projection replayed there before the implementation lifecycle projection.
-The genuine implementation is retained as `on2-implementation` in the disposable
-fixture. This preserves the positive's disclosed final-closure projection while
-making its history forward-only. The actual freeze's earlier closure still receives
-the separate refusal characterization.
-
-The regression now covers the rollback-only run population, both API listing
-orders, a subsequently restored higher stage, valid staging merges, a rollback
-reachable through the second merge parent, the actual PR-test-checkout path,
-interrupted bindings, independently rooted generations and missing parent objects
-hidden by shallow metadata. Historical freeze observations remain progression-valid.
-The freeze-checkpoint exception remains deferred to its separate contract amendment.
-
-### Round-3 validation
-
-The changed files are `github/progression.rs`, `github/tests/fixture.rs`,
-`github/tests/onboarding/history.rs`, this investigation, and the forward,
-backward and conformance rows in `docs/specs/support-depth-contract.md` Annex A.
-The fixture replay is the only setup adjustment beyond history validation and
-its regressions. The initial rollback-only regression failed because discovery
-returned authenticated evidence. The five history tests subsequently passed,
-and all ten onboarding tests passed in the full evidence run.
-
-| Command | Result and elapsed time |
-| --- | --- |
-| `cargo fmt --all -- --check` | Pass |
-| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 14.78 s including build-lock wait |
-| `cargo test -p xtask --lib depth_evidence::verdict::github::tests::onboarding::history -- --nocapture` | 5 passed, 34.09 s including compilation, 23.78 s test execution |
-| `cargo test -p xtask --lib depth_evidence` | 94 passed, 12 environment failures, 1 ignored, 93.69 s total, 87.41 s test execution |
-| `cargo test -p xtask --lib depth_ci` | 6 passed, 7.78 s including compilation |
-| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 59 passed, 115.36 s including compilation/build-lock wait, 109.98 s test execution |
-| `cargo test -p xtask --test depth_ci_archive --test depth_evidence --test depth_evidence_payloads --test depth_fixture_snapshot --test depth_native_evidence --test depth_promotion --test depth_record --test depth_refusal_routes --test depth_synthetic_governing` | All nine targets passed, 27.07 s including compilation |
-| `make loc-check`, `make hygiene`, `git diff --check` | Pass |
-
-The full evidence run stays within round 1's five-minute budget. Its twelve
-failures match the round-2 environment failures above. Ten staged-channel tests
-cannot establish their Unix socket, including the forged-channel child's failure
-to bind. The other two fail with `ForeignLoader` in the `/tmp` native-context
-fixtures. These require the lead's unrestricted validation environment.
-
-Phase C still owes independently authenticated adoption of the reviewed source,
-real protected CI producer/consumer ordering with the recursive workspace-test
-leg and same-run IN1, and terminal workflow/checks/gate before conditional MERGE.
-P1 remains deferred. The genuine historical-freeze attempt still receives exact
-closure refusal. Repository edits remain uncommitted in this worktree.
+Until then, round 2's check over authenticated observed sources remains in force and
+`onboarding_producer_refuses_descendant_lifecycle_rollback_in_either_api_order` pins it.
