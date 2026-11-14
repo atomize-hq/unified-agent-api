@@ -31,6 +31,27 @@ pub(crate) trait Host: Send + Sync {
     fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
         Ok(None)
     }
+    /// Candidate named by the installed current invocation, including at a PR test merge.
+    /// Production has no activated reporting implementation.
+    fn reporting_candidate(&self) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+    fn reporting_invocation(
+        &self,
+        _candidate: &str,
+    ) -> Result<Option<crate::depth_ci::reporting::Invocation>, String> {
+        Ok(None)
+    }
+    fn reporting_attempt(
+        &self,
+        _run: u64,
+        _attempt: u64,
+    ) -> Result<Option<crate::depth_ci::reporting::Invocation>, String> {
+        Ok(None)
+    }
+    fn reporting_execution(&self, _run: u64, _attempt: u64) -> Result<bool, String> {
+        Ok(false)
+    }
     /// Independently supplied invocation event, pinned before owning predicate evaluation.
     fn event(&self) -> Result<String, String>;
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
@@ -276,6 +297,43 @@ pub(super) fn authenticate(
     run: u64,
     attempt: u64,
 ) -> Result<Record, String> {
+    let (bytes, details, job, expected) =
+        authenticate_payload(host, authority, run, attempt, COMMITMENT, "in1_admission")?;
+    let job_id = number(&job, "id")?;
+    let record = Record::parse(&bytes)?;
+    if record.identity()? != expected
+        || record.claims.run != run
+        || record.claims.attempt != attempt
+        || record.claims.job != job_id
+        || job["check_run_id"] != record.claims.check
+        || details["event"] != record.claims.event
+        || details["head_sha"] != record.candidate.commit
+        || record.policy != authority.policy
+        || record.repository != authority.repository
+        || record.enrollment_anchor != authority.anchor
+        || job["conclusion"]
+            != if record.successful() {
+                "success"
+            } else {
+                "failure"
+            }
+    {
+        return Err("IN1 payload differs from independent host association".into());
+    }
+    Ok(record)
+}
+pub(crate) fn control_commitment(prefix: &str, kind: &str, digest: &str, artifact: u64) -> String {
+    format!("{prefix} kind={kind} sha256={digest} artifact={artifact}")
+}
+/// Shared control-record envelope. Payload-specific association checks follow this read.
+pub(crate) fn authenticate_payload(
+    host: &dyn Host,
+    authority: &Authority,
+    run: u64,
+    attempt: u64,
+    prefix: &str,
+    kind: &str,
+) -> Result<(Vec<u8>, Value, Value, String), String> {
     let details = observed_json(host, &format!("actions/runs/{run}/attempts/{attempt}"))?;
     if details["id"] != run
         || details["run_attempt"] != attempt
@@ -321,7 +379,7 @@ pub(super) fn authenticate(
     let lines: Vec<_> = logs
         .lines()
         .filter_map(|line| line.split_once(' '))
-        .filter(|(_, body)| body.starts_with(COMMITMENT))
+        .filter(|(_, body)| body.starts_with(prefix))
         .collect();
     if lines.len() != 1 {
         return Err("IN1 missing/ambiguous job commitment".into());
@@ -337,7 +395,7 @@ pub(super) fn authenticate(
         return Err("IN1 commitment outside emitting step".into());
     }
     let tokens: Vec<_> = line.split(' ').collect();
-    if tokens.len() != 4 || tokens[0] != COMMITMENT || tokens[1] != "kind=in1_admission" {
+    if tokens.len() != 4 || tokens[0] != prefix || tokens[1] != format!("kind={kind}") {
         return Err("IN1 malformed commitment".into());
     }
     let digest = tokens[2]
@@ -349,7 +407,7 @@ pub(super) fn authenticate(
         .ok_or("IN1 missing artifact identity")?
         .parse()
         .map_err(|_| "IN1 invalid artifact identity")?;
-    if commitment(digest, artifact_id) != line {
+    if control_commitment(prefix, kind, digest, artifact_id) != line {
         return Err("IN1 noncanonical commitment".into());
     }
     let artifacts = list(host, &format!("actions/runs/{run}/artifacts"), "artifacts")?.0;
@@ -378,27 +436,7 @@ pub(super) fn authenticate(
     {
         return Err("IN1 artifact digest/size mismatch".into());
     }
-    let record = Record::parse(&decode(&zip)?)?;
-    if record.identity()? != digest
-        || record.claims.run != run
-        || record.claims.attempt != attempt
-        || record.claims.job != job_id
-        || job["check_run_id"] != record.claims.check
-        || details["event"] != record.claims.event
-        || details["head_sha"] != record.candidate.commit
-        || record.policy != authority.policy
-        || record.repository != authority.repository
-        || record.enrollment_anchor != authority.anchor
-        || job["conclusion"]
-            != if record.successful() {
-                "success"
-            } else {
-                "failure"
-            }
-    {
-        return Err("IN1 payload differs from independent host association".into());
-    }
-    Ok(record)
+    Ok((decode(&zip)?, details, job.clone(), digest.to_owned()))
 }
 fn digest_bytes(bytes: &[u8]) -> String {
     digest(b"", bytes)

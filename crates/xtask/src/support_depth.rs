@@ -7,8 +7,10 @@
 
 mod acquisition;
 mod acquisition_basis;
+pub(crate) mod acquisition_inputs;
 mod acquisition_modes;
 pub(crate) mod acquisition_schema;
+pub(crate) mod generation;
 pub(crate) use acquisition_basis::{supported_shard, supported_union, supported_wrapper};
 pub mod codex_pilot;
 pub use acquisition_basis::ClassificationBasis;

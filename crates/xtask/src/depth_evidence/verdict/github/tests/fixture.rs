@@ -13,7 +13,12 @@ fn keep_or_write(root: &Path, path: &str, bytes: impl FnOnce() -> Vec<u8>) -> Fi
 pub(super) fn build(path: &Path, p: Profile) -> (Witness, String) {
     {
         let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let record_raw = fs::read_to_string(path.join(p.fixture()))
+        let record_path = if p == Profile::Synthetic {
+            depth_ci::onboarding::RECORD
+        } else {
+            p.fixture()
+        };
+        let record_raw = fs::read_to_string(path.join(record_path))
             .unwrap_or_else(|_| fs::read_to_string(repo.join(p.fixture())).unwrap());
         let record = record_raw.as_str();
         let mut inputs = vec![];
@@ -122,6 +127,31 @@ pub(super) fn build(path: &Path, p: Profile) -> (Witness, String) {
                     }
                 }
             }
+        }
+        if p == Profile::Synthetic {
+            keep_or_write(path, depth_ci::onboarding::RECORD, || {
+                record.as_bytes().to_vec()
+            });
+            let r = p.record(record).unwrap();
+            let Event::Maintenance {
+                request_commit,
+                request_recorded_at,
+                trigger_kind,
+                opened_from,
+            } = &r.event
+            else {
+                unreachable!()
+            };
+            let request = json!({"artifact_version":"2", "agent_id":p.agent_id(),
+                "request_commit":request_commit, "request_recorded_at":request_recorded_at,
+                "trigger_kind":trigger_kind, "opened_from":opened_from,
+                "detected_release":{"target_version":p.version()},
+                "support_depth":{"policy_identity":r.policy.identity, "obligations_identity":r.obligations.as_ref().unwrap().identity}});
+            keep_or_write(
+                path,
+                &crate::agent_lifecycle::maintenance_request_path(p.agent_id()),
+                || toml_edit::ser::to_string(&request).unwrap().into_bytes(),
+            );
         }
         inputs.sort();
         git(path, &["add", "."]);

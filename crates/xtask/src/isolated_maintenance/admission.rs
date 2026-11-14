@@ -66,6 +66,7 @@ impl Context {
             context: self.clone(),
             parent: None,
             prepared: None,
+            prepared_context: None,
             publication: self.admission_publication()?,
             protected_tip: self.host.isolated_tip.clone(),
             canonical_tip: self.host.canonical_tip().into(),
@@ -80,6 +81,10 @@ impl Context {
     }
 }
 impl EvidenceHost {
+    pub(crate) fn reporting_publication(&self) -> Option<&Publication> {
+        self.admission.as_ref()
+    }
+
     /// Independent from producer discovery and from any installed thread-local reader.
     pub(crate) fn admission_history(
         &self,
@@ -98,4 +103,10 @@ impl EvidenceHost {
             })
             .transpose()
     }
+}
+
+pub(crate) fn reporting_host(root: &Path) -> Result<Option<EvidenceHost>, String> {
+    super::route(root)?
+        .map(|route| route.0.evidence_host(root))
+        .transpose()
 }

@@ -11,9 +11,11 @@ use std::{path::Path, process::Command};
 
 mod collector;
 mod graph;
+mod maintenance;
 pub(crate) mod native;
 pub(crate) mod onboarding;
 pub(crate) mod profile;
+pub(crate) mod reporting;
 pub const REPOSITORY: &str = "atomize-hq/unified-agent-api";
 pub const FIXTURE: &str = "crates/xtask/tests/fixtures/depth-ci/record.json";
 pub const CONTRACT: &str = "crates/xtask/tests/fixtures/depth-ci/contract.md";

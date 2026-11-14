@@ -1,7 +1,7 @@
 use super::{
     acquisition_basis::{self, AcquisitionFacts, ClassificationBasis},
+    acquisition_inputs::Inputs,
     acquisition_modes, canonical_set,
-    git_inputs::GitInputs,
 };
 use crate::{
     agent_maintenance::support_audit::{surface_identity, ReportRowShape, SurfaceIdentity},
@@ -23,7 +23,7 @@ pub(super) struct Acquired {
 }
 
 pub(super) fn derive(
-    view: &mut GitInputs,
+    view: &mut impl Inputs,
     root: &str,
     rules_bytes: &[u8],
     policy: &PolicyPart,
@@ -34,7 +34,7 @@ pub(super) fn derive(
 }
 
 pub(super) fn derive_with_pilot(
-    view: &mut GitInputs,
+    view: &mut impl Inputs,
     root: &str,
     rules_bytes: &[u8],
     policy: &PolicyPart,

@@ -223,7 +223,7 @@ fn onboarding_same_generation_later_runs_wait_for_producer_not_workflow() {
     ] {
         let changed = changed(field, value);
         let inventory = list(&changed, query, Some("workflow_runs")).unwrap();
-        let stable = population::check_stable(&changed, query, &inventory, &anchor, true);
+        let stable = population::check_stable(&changed, query, &inventory, &anchor, true, None);
         if refuses {
             assert!(stable.unwrap_err().contains("population"));
         } else {

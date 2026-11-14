@@ -11,10 +11,14 @@ use std::{
     },
 };
 
+type ReportingUploadHook = Box<dyn FnOnce(&MemoryHost) + Send>;
+
 pub(crate) struct MemoryHost {
     pub facts: Mutex<BTreeMap<String, Vec<u8>>>,
     next: AtomicU64,
     next_retry: Mutex<Option<Record>>,
+    pub after_reporting_upload: Mutex<Option<ReportingUploadHook>>,
+    pub fail_reporting_execution_once: std::sync::atomic::AtomicBool,
     pub fail_freeze_after_upload: std::sync::atomic::AtomicBool,
     pub fail_freeze_after_capture: std::sync::atomic::AtomicBool,
     pub fail_history_after_capture: std::sync::atomic::AtomicBool,
@@ -27,6 +31,8 @@ impl Default for MemoryHost {
             facts: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(1000),
             next_retry: Mutex::new(None),
+            after_reporting_upload: Mutex::new(None),
+            fail_reporting_execution_once: false.into(),
             fail_freeze_after_upload: false.into(),
             fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
@@ -35,6 +41,7 @@ impl Default for MemoryHost {
         };
         host.put("in1/revocations", json!({"records":[]}));
         host.page(transport::RUNS, "workflow_runs", vec![]);
+        host.page("reporting/runs", "workflow_runs", vec![]);
         host
     }
 }
@@ -117,6 +124,8 @@ impl MemoryHost {
             facts: Mutex::new(self.facts.lock().unwrap().clone()),
             next: AtomicU64::new(self.next.load(Ordering::SeqCst)),
             next_retry: Mutex::new(None),
+            after_reporting_upload: Mutex::new(None),
+            fail_reporting_execution_once: false.into(),
             fail_freeze_after_upload: false.into(),
             fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
@@ -202,6 +211,52 @@ impl Host for MemoryHost {
             .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
             .transpose()
     }
+    fn reporting_candidate(&self) -> Result<Option<String>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get("reporting/current")
+            .map(|bytes| serde_json::from_slice(bytes).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn reporting_invocation(
+        &self,
+        candidate: &str,
+    ) -> Result<Option<crate::depth_ci::reporting::Invocation>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("reporting/candidates/{candidate}"))
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn reporting_attempt(
+        &self,
+        run: u64,
+        attempt: u64,
+    ) -> Result<Option<crate::depth_ci::reporting::Invocation>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("reporting/invocations/{run}/{attempt}"))
+            .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
+            .transpose()
+    }
+    fn reporting_execution(&self, run: u64, attempt: u64) -> Result<bool, String> {
+        if self
+            .fail_reporting_execution_once
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err("fake reporting execution observation unavailable".into());
+        }
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("reporting/execution/{run}/{attempt}"))
+            .map_or(Ok(false), |bytes| {
+                serde_json::from_slice(bytes).map_err(|e| e.to_string())
+            })
+    }
     fn event(&self) -> Result<String, String> {
         Ok(self.next_retry.lock().unwrap().as_ref().map_or_else(
             || "pull_request".into(),
@@ -225,7 +280,12 @@ impl Host for MemoryHost {
         };
         let details = json!({"id":run,"run_attempt":1,"head_sha":candidate,"head_repository":{"full_name":"fixture/isolated"},"path":policy.workflow_path,"workflow_id":policy.workflow_id,"policy":policy,"event":claims.event});
         self.put(&format!("actions/runs/{run}/attempts/1"), details.clone());
-        self.change(&format!("{}?per_page=100&page=1", transport::RUNS), |v| {
+        let inventory = if policy.job_key == "rust-tests" {
+            "reporting/runs"
+        } else {
+            transport::RUNS
+        };
+        self.change(&format!("{inventory}?per_page=100&page=1"), |v| {
             v["workflow_runs"].as_array_mut().unwrap().push(details);
             v["total_count"] = json!(v["workflow_runs"].as_array().unwrap().len());
         });
@@ -241,7 +301,18 @@ impl Host for MemoryHost {
         if self.fail_upload.load(Ordering::SeqCst) {
             return Err("fake IN1 upload failed".into());
         }
-        let record = Record::parse(bytes)?;
+        let value: Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+        let reporting = value["kind"] == "reporting_only";
+        if reporting {
+            crate::depth_ci::reporting::ContextRecord::parse(bytes)?;
+        } else {
+            Record::parse(bytes)?;
+        }
+        let prefix = if reporting {
+            "reporting-payload"
+        } else {
+            "payload"
+        };
         let zip = archive(bytes)?;
         let path = format!("actions/runs/{}/artifacts", claims.run);
         let mut rows = self.json(&format!("{path}?per_page=100&page=1"))?["artifacts"]
@@ -250,15 +321,21 @@ impl Host for MemoryHost {
             .clone();
         let artifact = self.next.fetch_add(1, Ordering::SeqCst) + 1_000_000;
         self.facts.lock().unwrap().insert(
-            format!("payload/{}-{}", claims.run, claims.attempt),
+            format!("{prefix}/{}-{}", claims.run, claims.attempt),
             bytes.to_vec(),
         );
         self.facts
             .lock()
             .unwrap()
             .insert(format!("actions/artifacts/{artifact}/zip"), zip.clone());
-        rows.push(json!({"id":artifact,"name":format!("in1-admission-{}-{}",claims.run,claims.attempt),"expired":false,"size_in_bytes":zip.len(),"digest":format!("sha256:{}",digest(b"",&zip)),"workflow_run":{"id":claims.run,"head_sha":record.candidate.commit}}));
+        rows.push(json!({"id":artifact,"name":format!("in1-admission-{}-{}",claims.run,claims.attempt),"expired":false,"size_in_bytes":zip.len(),"digest":format!("sha256:{}",digest(b"",&zip)),"workflow_run":{"id":claims.run,"head_sha":value["candidate"]["commit"]}}));
         self.page(&path, "artifacts", rows);
+        if reporting {
+            let after = self.after_reporting_upload.lock().unwrap().take();
+            if let Some(after) = after {
+                after(self);
+            }
+        }
         if self.fail_freeze_after_upload.swap(false, Ordering::SeqCst) {
             self.fail_freeze_after_capture.store(true, Ordering::SeqCst);
         }
@@ -268,10 +345,21 @@ impl Host for MemoryHost {
         if self.fail_commit.load(Ordering::SeqCst) {
             return Err("fake IN1 commitment failed".into());
         }
-        let record = Record::parse(&self.bytes(
-            &format!("payload/{}-{}", claims.run, claims.attempt),
+        let reporting = line.starts_with(crate::depth_ci::reporting::PREFIX);
+        let prefix = if reporting {
+            "reporting-payload"
+        } else {
+            "payload"
+        };
+        let bytes = self.bytes(
+            &format!("{prefix}/{}-{}", claims.run, claims.attempt),
             RECORD_LIMIT,
-        )?)?;
+        )?;
+        let success = if reporting {
+            crate::depth_ci::reporting::ContextRecord::parse(&bytes)?.successful()
+        } else {
+            Record::parse(&bytes)?.successful()
+        };
         self.change(
             &format!(
                 "actions/runs/{}/attempts/{}/jobs?per_page=100&page=1",
@@ -279,11 +367,7 @@ impl Host for MemoryHost {
             ),
             |v| {
                 v["jobs"][0]["status"] = json!("completed");
-                v["jobs"][0]["conclusion"] = json!(if record.successful() {
-                    "success"
-                } else {
-                    "failure"
-                });
+                v["jobs"][0]["conclusion"] = json!(if success { "success" } else { "failure" });
             },
         );
         self.facts.lock().unwrap().insert(

@@ -298,15 +298,14 @@ pub(in crate::isolated_maintenance) fn installed() -> Option<(Profile, Arc<dyn A
     INSTALLED.with(|i| i.borrow().as_ref().map(|make| make()))
 }
 /// Uninstalls on drop, so a failing test never leaks its profile into another test.
-pub(super) struct Installed;
+pub(super) struct Installed(Option<Installer>);
 impl Drop for Installed {
     fn drop(&mut self) {
-        INSTALLED.with(|i| *i.borrow_mut() = None);
+        INSTALLED.with(|i| *i.borrow_mut() = self.0.take());
     }
 }
 pub(super) fn install(make: Installer) -> Installed {
-    INSTALLED.with(|i| *i.borrow_mut() = Some(make));
-    Installed
+    Installed(INSTALLED.with(|i| i.borrow_mut().replace(make)))
 }
 
 #[cfg(unix)]

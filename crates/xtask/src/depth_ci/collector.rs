@@ -302,12 +302,7 @@ fn execute(
 fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     let (run_id, run_attempt, workflow_commit) = host_header()?;
     let mut view = GitInputs::new(root)?;
-    let original = profile.record(
-        std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
-    )?;
-    if original.execution.is_some() || !original.acceptance_entries.is_empty() {
-        return Err("source fixture must contain only frozen P/O".into());
-    }
+    use super::profile::GenerationResolver;
     let commit = String::from_utf8(output(
         Command::new("git")
             .arg("--no-replace-objects")
@@ -319,6 +314,10 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     .trim()
     .to_owned();
     let source = Source::tip(root, &commit)?;
+    let original = profile.committed_generation(&source)?.record;
+    if original.execution.is_some() || !original.acceptance_entries.is_empty() {
+        return Err("source fixture must contain only frozen P/O".into());
+    }
     super::onboarding::check(&source, profile, &original)?;
     let mut absent = [
         ".cargo/config",
@@ -407,6 +406,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     super::graph::resolve(
         root,
         &mut view,
+        &source,
         &metadata,
         &super::graph::expected(&metadata, profile)?,
         profile,
@@ -492,7 +492,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         );
         return Err("compiled features/build scripts are outside the reviewed profile".into());
     }
-    let graph = super::graph::resolve(root, &mut view, &metadata, &compiled, profile)?;
+    let graph = super::graph::resolve(root, &mut view, &source, &metadata, &compiled, profile)?;
     for file in &graph.inputs {
         if source.optional_bytes(&file.path)?.as_deref()
             != Some(view.required(&file.path)?.as_slice())
@@ -634,6 +634,9 @@ pub(super) fn collect(workspace: &Path) -> Result<(), String> {
     collect_profile(&root, profile::Profile::Channel)
 }
 pub(super) fn collect_profile(root: &Path, profile: profile::Profile) -> Result<(), String> {
+    if super::reporting::dispatch_installed(root, profile)? {
+        return Ok(());
+    }
     let result = witness(root, profile);
     let value = match &result {
         Ok(w) => serde_json::to_value(w).map_err(|e| e.to_string())?,

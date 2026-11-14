@@ -683,3 +683,5 @@ fn apply_keeps_external_changes_to_its_exact_destination() {
         "external replacement"
     );
 }
+
+mod fr3_reporting;

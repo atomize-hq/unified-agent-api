@@ -56,6 +56,8 @@ struct Population {
     environment: Environment,
     toolchain: FileRef,
     runs: Vec<Run>,
+    reporting: Vec<crate::depth_ci::reporting::ContextRecord>,
+    reporting_conflicts: BTreeSet<(u64, u64)>,
 }
 struct Run {
     evidence: FileRef,
@@ -228,6 +230,18 @@ fn reconcile(
         ));
     }
     let mut seen = BTreeSet::new();
+    for context in &population.reporting {
+        if !seen.insert((
+            context.repository.name.clone(),
+            context.invocation.claims.run,
+            context.invocation.claims.attempt,
+            "rust-tests".into(),
+        )) {
+            return Ok(Verdict::unverified("duplicate reporting run/attempt/job"));
+        }
+    }
+    // Unexpected execution shares the checkpoint's attempt identity and remains a conflict.
+    seen.retain(|(_, run, attempt, _)| !population.reporting_conflicts.contains(&(*run, *attempt)));
     let mut passed = false;
     let mut failed = false;
     let mut incomplete = false;
@@ -288,6 +302,9 @@ fn reconcile(
             incomplete = true;
             continue;
         }
+        incomplete |= population
+            .reporting_conflicts
+            .contains(&(run.producer.run_id, run.producer.run_attempt));
         let (complete, counterexample) = case_outcomes(&receipt.cases);
         failed |= counterexample;
         passed |= complete;
@@ -530,3 +547,9 @@ mod view_eval;
 
 #[cfg(all(test, unix))]
 pub(crate) use github::prove_unobserved_admission;
+
+#[cfg(test)]
+pub(crate) use github::prove_reporting;
+
+#[cfg(test)]
+pub(crate) use github::prove_refused_reporting;
