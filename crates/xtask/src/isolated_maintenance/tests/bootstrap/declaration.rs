@@ -22,11 +22,11 @@ fn prepared() -> Fixture {
         "Cargo.toml",
         "crates/agent_api/Cargo.toml",
         "crates/agent_api/src",
-        "cli_manifests",
         "docs/specs/unified-agent-api",
     ] {
         copy(&repo.join(path), &f.root.path().join(path));
     }
+    baseline::manifests(f.root.path());
     f.commit();
     local(&f, &head(&f));
     let _installed = f.install();

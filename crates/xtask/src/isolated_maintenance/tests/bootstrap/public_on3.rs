@@ -628,6 +628,12 @@ fn connected(repaired: bool, owning_only: bool) {
             root.path().to_str().unwrap(),
         ],
     );
+    // The private clone must also commit without caller-global Git identity.
+    git(root.path(), &["config", "user.name", "Binding Fixture"]);
+    git(
+        root.path(),
+        &["config", "user.email", "binding@example.invalid"],
+    );
     let api = Arc::new(super::super::fixture::Fake(
         std::sync::Mutex::new(template.api.0.lock().unwrap().clone()),
         Default::default(),

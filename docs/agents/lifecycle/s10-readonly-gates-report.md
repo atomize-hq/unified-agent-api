@@ -614,3 +614,50 @@ Validation: `python3 -I -m unittest discover -s scripts -p 'test_s10*.py'` passe
 subprocess-mocked tests, including rejected/allowed argument forms, rustup environment policy,
 and unavailable toolchains. `make hygiene` and `git diff --check` passed. Only the two runner
 Python files and this appended section changed; all changes remain uncommitted, with no push.
+
+## Declared-registry test leg fixes
+
+The connected bootstrap fixtures now construct one shared immutable subject-absent baseline.
+It uses the committed undeclared registry, generates its exact approval and minimal workspace
+inputs, and copies only ordinary registry-named manifest roots plus the aggregate support matrix.
+The build workspace's synthetic registry entry, manifest root (including current, pointers and
+depth artifacts), lifecycle state and acquisition artifacts cannot enter this baseline. Both the
+connected ON1 context and the declaration preparation context copy manifests from it. Existing
+test-owned ON1 scaffold outputs survive that merge unchanged.
+
+This preserves the absent-to-scaffold and record-free preparation requirements in
+[`support-depth-evidence-v1.md`](../../specs/support-depth-evidence-v1.md#synthetic-onboarding-proof-selection).
+No production check or existing assertion was relaxed. Two new regressions cover a source with
+preexisting declared-subject artifacts, unchanged source/ordinary current bytes, exact ON1 current
+bytes through the manifest merge, and the specific production refusal for a genuinely preexisting
+manifest root.
+
+The original declared reproduction failed at the connected ON1 missing-root assertion before the
+fix. Validation after the fix is recorded below. All Cargo checks use offline dependencies with
+`TMPDIR` unset. Changes remain uncommitted for the lead; no push was performed.
+
+Once that contamination was removed, the isolated HOME exposed missing local Git author
+configuration in private onboarding producer and ON3 clones. Git does not copy local author
+configuration when cloning. Both helpers now set fixture-owned local identities before their
+first commit, preserving the same commit and admission assertions without caller-global config.
+
+| Validation | Result |
+| --- | --- |
+| `make fmt-check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::baseline` | Passed, 2 new regressions |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on1` | Passed, 10 tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on3 -- --nocapture` | Passed, 4 tests |
+| Declared runner with `-- -p xtask --lib isolated_maintenance::tests::bootstrap` | Passed, 68 tests; clean declared checkout |
+| Declared runner with `-- -p xtask --lib depth_evidence::verdict::github::tests::onboarding` | Passed, 7 tests; clean declared checkout |
+| `make loc-check` | Passed, 700-code-line cap |
+| `make hygiene` | Passed |
+| `git diff --check` | Passed |
+
+Both declared checks used `python3 scripts/s10_declared_test_leg.py`. The final bootstrap
+destination was `target/s10-declared-bootstrap-final`; the verdict destination was
+`target/s10-declared-onboarding`. The initial complete bootstrap rerun had 65 passes and three
+ON3 failures solely from missing clone-local Git author identity; the final run above includes
+that correction. Socket-blocked tests: none. The known ForeignLoader flake was outside these
+focused filters. No `readonly_gates` implementation or test file was edited.
+All `target/s10-declared-*` checkout directories were deleted after collecting results.

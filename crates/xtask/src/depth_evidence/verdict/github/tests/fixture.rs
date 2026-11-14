@@ -406,6 +406,13 @@ pub(super) fn onboarding_workspace() -> tempfile::TempDir {
             root.path().to_str().unwrap(),
         ],
     );
+    // Clones do not inherit the template's local author configuration. This helper commits
+    // before Fixture::new_for can configure it, including under the runner's isolated HOME.
+    git(root.path(), &["config", "user.name", "Fixture"]);
+    git(
+        root.path(),
+        &["config", "user.email", "fixture@example.invalid"],
+    );
     // Reconstitute the real freeze/write lifecycle outputs on the same installed, reviewed
     // producer closure. These are producer-source projections, not a second ON2 admission
     // proof: actual public ON2 above still requires and observes changed implementation files.

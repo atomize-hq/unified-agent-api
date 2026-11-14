@@ -8,6 +8,7 @@ use crate::{agent_lifecycle as life, depth_acceptance::check_integration};
 
 use sha2::{Digest, Sha256};
 
+mod baseline;
 mod declaration;
 mod fr2;
 mod producer;
@@ -36,20 +37,7 @@ const APPROVAL_TEMPLATE: &str = include_str!(
 
 fn setup(scaffold: bool) -> Fixture {
     let f = Fixture::new_for(&scope::SYNTHETIC);
-    write(
-        f.root.path(),
-        REGISTRY_RELATIVE_PATH,
-        registry_fixture::undeclared_registry(),
-    );
-    write(
-        f.root.path(),
-        APPROVAL,
-        APPROVAL_TEMPLATE
-            .replace("{{APPROVAL_COMMIT}}", "abc1234")
-            .replace("{{APPROVAL_RECORDED_AT}}", "2026-11-05T00:00:00Z"),
-    );
-    write(f.root.path(), "Cargo.toml", "[workspace]\nmembers = []\n");
-    write(f.root.path(), "docs/crates-io-release.md", "# Releases\n");
+    baseline::install(f.root.path());
     if scaffold {
         create(&f);
     }

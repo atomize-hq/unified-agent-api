@@ -94,7 +94,6 @@ fn canonical_context_for(f: &Fixture, producer: bool) {
     for path in [
         "Cargo.toml",
         "crates/agent_api/src",
-        "cli_manifests",
         "docs/specs/unified-agent-api",
     ] {
         if producer && path == "crates/agent_api/src" {
@@ -107,6 +106,7 @@ fn canonical_context_for(f: &Fixture, producer: bool) {
         }
         declaration::copy(&repo.join(path), &f.root.path().join(path));
     }
+    baseline::manifests(f.root.path());
     f.commit();
     local(f, &head(f));
 }
