@@ -9,8 +9,10 @@ use std::{
 };
 
 mod batch;
+pub(crate) mod immutable;
+mod listing;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Input {
     index: Vec<u8>,
     bytes: Option<Vec<u8>>,
@@ -20,6 +22,7 @@ struct Input {
 pub(crate) struct GitInputs {
     root: PathBuf,
     borrowed: Option<(PathBuf, String)>,
+    immutable: Option<immutable::Immutable>,
     proposed: Option<crate::runtime_advertising::source::Source>,
     files: BTreeMap<String, Input>,
     directories: BTreeMap<String, Vec<String>>,
@@ -43,6 +46,7 @@ impl GitInputs {
         Ok(Self {
             root,
             borrowed: None,
+            immutable: None,
             proposed: None,
             files: BTreeMap::new(),
             directories: BTreeMap::new(),
@@ -56,6 +60,7 @@ impl GitInputs {
         };
         Ok(Self {
             root: fs::canonicalize(root).map_err(|e| e.to_string())?,
+            immutable: Some(immutable::Immutable::new(&borrowed.0, &borrowed.1)),
             borrowed: Some(borrowed),
             proposed: None,
             files: BTreeMap::new(),
@@ -126,7 +131,12 @@ impl GitInputs {
         } else {
             self.recheck_borrowed()?;
         }
-        let input = read(&self.root, path, self.borrowed.as_ref())?;
+        let input = read_cached(
+            &self.root,
+            path,
+            self.borrowed.as_ref(),
+            self.immutable.as_ref(),
+        )?;
         self.record(path, input)
     }
 
@@ -164,6 +174,10 @@ impl GitInputs {
 
     pub(crate) fn list(&mut self, path: &str) -> Result<Vec<String>, String> {
         let names = list(&self.root, path, self.borrowed.as_ref())?;
+        self.record_directory(path, names)
+    }
+
+    fn record_directory(&mut self, path: &str, names: Vec<String>) -> Result<Vec<String>, String> {
         if self
             .directories
             .get(path)
@@ -179,8 +193,17 @@ impl GitInputs {
 
     /// Observe every file and directory in a relevant build scope, including untracked additions.
     pub(crate) fn files_under(&mut self, path: &str) -> Result<Vec<String>, String> {
+        self.files_under_listing(path, &listing::Listing::default())
+    }
+
+    fn files_under_listing(
+        &mut self,
+        path: &str,
+        listing: &listing::Listing,
+    ) -> Result<Vec<String>, String> {
+        let names = list_cached(&self.root, path, self.borrowed.as_ref(), Some(listing))?;
         let children: Vec<_> = self
-            .list(path)?
+            .record_directory(path, names)?
             .into_iter()
             .map(|name| {
                 let child = format!("{path}/{name}");
@@ -212,7 +235,7 @@ impl GitInputs {
         let mut result = Vec::new();
         for (child, directory) in children {
             if directory? {
-                result.extend(self.files_under(&child)?);
+                result.extend(self.files_under_listing(&child, listing)?);
             } else {
                 let bytes = if self.proposed.is_some() && self.files.contains_key(&child) {
                     self.files[&child].bytes.clone()
@@ -259,8 +282,9 @@ impl GitInputs {
                 return Err(format!("bound input changed during freeze: {path}"));
             }
         }
+        let listing = listing::Listing::default();
         for (path, expected) in &self.directories {
-            if list(&self.root, path, self.borrowed.as_ref())? != *expected {
+            if list_cached(&self.root, path, self.borrowed.as_ref(), Some(&listing))? != *expected {
                 return Err(format!(
                     "acquisition directory changed during freeze: {path}"
                 ));
@@ -293,6 +317,29 @@ fn safe_path(root: &Path, path: &str) -> Result<PathBuf, String> {
         }
     }
     Ok(full)
+}
+
+fn read_cached(
+    root: &Path,
+    path: &str,
+    borrowed: Option<&(PathBuf, String)>,
+    immutable: Option<&immutable::Immutable>,
+) -> Result<Input, String> {
+    let Some(cache) = immutable.filter(|_| borrowed.is_some()) else {
+        return read(root, path, borrowed);
+    };
+    let full = safe_path(root, path)?;
+    let Some(index) = cache.rows(path, false, false) else {
+        return read(root, path, borrowed);
+    };
+    // prepare retains the single reader's index, working-file and executable checks, in order.
+    let (input, object) = batch::prepare(&full, path, index, true)?;
+    if let Some(object) = object {
+        if input.bytes.as_ref() != Some(&cache.blob(&object)?) {
+            return Err(format!("working bytes disagree with index: {path}"));
+        }
+    }
+    Ok(input)
 }
 
 fn read(root: &Path, path: &str, borrowed: Option<&(PathBuf, String)>) -> Result<Input, String> {
@@ -386,6 +433,15 @@ fn list(
     path: &str,
     borrowed: Option<&(PathBuf, String)>,
 ) -> Result<Vec<String>, String> {
+    list_cached(root, path, borrowed, None)
+}
+
+fn list_cached(
+    root: &Path,
+    path: &str,
+    borrowed: Option<&(PathBuf, String)>,
+    listing: Option<&listing::Listing>,
+) -> Result<Vec<String>, String> {
     let full = safe_path(root, path)?;
     let mut names = BTreeSet::new();
     match fs::read_dir(full) {
@@ -418,6 +474,8 @@ fn list(
                 &prefix,
             ],
         )?
+    } else if let Some(tracked) = listing.and_then(|listing| listing.tracked(root, &prefix)) {
+        tracked
     } else {
         git(
             root,
@@ -476,4 +534,4 @@ fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

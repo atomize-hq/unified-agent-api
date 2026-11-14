@@ -3,9 +3,10 @@ use std::io::Write;
 use std::process::Stdio;
 
 mod batch;
+mod immutable;
 
 thread_local! {
-    pub(super) static GIT_COMMANDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static GIT_COMMANDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 fn fixture() -> tempfile::TempDir {
@@ -109,7 +110,7 @@ fn files_under_preserves_freeze_recording_proposals_and_error_order() {
     let frozen = equivalent_traversal(&view);
     GIT_COMMANDS.with(|count| count.set(0));
     frozen.verify().unwrap();
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 4); // Two file reads, two directory lists.
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 3); // Two file reads, one directory listing.
     let mut proposed = view.clone();
     proposed.proposed = Some(
         crate::runtime_advertising::source::Source::captured(

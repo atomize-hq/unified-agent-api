@@ -107,7 +107,7 @@ fn entries(
     Ok(entries)
 }
 
-fn prepare(
+pub(super) fn prepare(
     full: &Path,
     path: &str,
     index: Vec<u8>,

@@ -3,9 +3,18 @@ use crate::git_inputs::batch::read_many;
 
 fn equivalent(root: &Path, paths: &[&str], borrowed: Option<&(PathBuf, String)>) {
     let actual = read_many(root, paths, borrowed);
+    let cache =
+        borrowed.map(|(caller, commit)| super::super::immutable::Immutable::new(caller, commit));
     assert_eq!(actual.len(), paths.len());
     for (path, actual) in paths.iter().zip(actual) {
         let expected = read(root, path, borrowed);
+        if cache.is_some() {
+            assert_eq!(
+                read_cached(root, path, borrowed, cache.as_ref()),
+                expected,
+                "{path}"
+            );
+        }
         match (actual, expected) {
             (Ok(actual), Ok(expected)) => {
                 assert_eq!(actual.index, expected.index, "{path}");
