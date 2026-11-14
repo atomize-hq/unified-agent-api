@@ -10,7 +10,7 @@ use xtask::runtime_follow_on;
 
 use crate::harness::{
     fixture_root, run_xtask, seed_approval_artifact, seed_release_touchpoints, sha256_hex,
-    snapshot_files, wrapper_scaffold_args, HarnessOutput,
+    snapshot_files, wrapper_scaffold_args,
 };
 
 pub const RUNTIME_RUNS_ROOT: &str = "docs/agents/.uaa-temp/runtime-follow-on/runs";
@@ -31,43 +31,12 @@ pub enum Command {
     RuntimeFollowOn(runtime_follow_on::Args),
 }
 
-pub fn run_cli<I, S>(argv: I, workspace_root: &Path) -> HarnessOutput
+pub fn run_cli<I, S>(argv: I, workspace_root: &Path) -> crate::harness::CandidateOutput
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    let args = argv
-        .into_iter()
-        .map(|arg| arg.as_ref().to_string())
-        .collect::<Vec<_>>();
-
-    match Cli::try_parse_from(args) {
-        Ok(cli) => {
-            let mut stdout = Vec::new();
-            let mut stderr = String::new();
-            let exit_code = match cli.command {
-                Command::RuntimeFollowOn(args) => {
-                    match runtime_follow_on::run_in_workspace(workspace_root, args, &mut stdout) {
-                        Ok(()) => 0,
-                        Err(err) => {
-                            stderr = format!("{err}\n");
-                            err.exit_code()
-                        }
-                    }
-                }
-            };
-            HarnessOutput {
-                exit_code,
-                stdout: String::from_utf8(stdout).expect("stdout must be utf-8"),
-                stderr,
-            }
-        }
-        Err(err) => HarnessOutput {
-            exit_code: err.exit_code(),
-            stdout: String::new(),
-            stderr: err.to_string(),
-        },
-    }
+    crate::harness::run_candidate_xtask(workspace_root, argv)
 }
 
 pub fn prepare_runtime_fixture(prefix: &str) -> (PathBuf, String) {
