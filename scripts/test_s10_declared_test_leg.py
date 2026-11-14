@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -44,9 +45,14 @@ class DeclaredTestLegTests(unittest.TestCase):
         (self.cache / "config.toml").write_text("untrusted home config")
         (self.cache / "credentials.toml").write_text("secret")
         self.calls = []
+        self.unavailable_toolchain = False
 
     def subprocess(self, arguments, **kwargs):
         self.calls.append((list(arguments), kwargs))
+        if arguments == ["rustup", "show", "active-toolchain"]:
+            return "stable-fixture (default)\n"
+        if arguments[:2] == ["rustup", "run"] and self.unavailable_toolchain:
+            raise subprocess.CalledProcessError(1, arguments)
         if "ls-files" in arguments:
             return "\0".join(self.files) + "\0"
         if arguments[:2] == ["git", "init"]:
@@ -172,6 +178,114 @@ class DeclaredTestLegTests(unittest.TestCase):
                                    if arguments[:2] == ["cargo", "test"])
                     self.assertEqual(command, ["cargo", "test", "--offline", "-p", "xtask",
                                                "--test", "agent_registry"])
+
+    def test_unapproved_arguments_refuse_before_subprocesses_or_destination_mutation(self):
+        cases = [
+            ("--target-dir", "/outside"), ("--target-dir=/outside",),
+            ("--config", "build.target-dir='/outside'"), ("--config=/outside/config.toml",),
+            ("--manifest-path", "/outside/Cargo.toml"), ("--manifest-path=/outside/Cargo.toml",),
+            ("-Z", "unstable-options"), ("-Zunstable-options",), ("--offline",),
+            ("--release",), ("--features", "feature"), ("--no-run",),
+            ("--", "--logfile", "/outside/log"), ("--", "--config=/outside/config.toml"),
+        ]
+        for index, arguments in enumerate(cases):
+            with self.subTest(arguments=arguments), \
+                    mock.patch("sys.stderr") as stderr:
+                self.calls.clear()
+                destination = f"target/rejected-{index}"
+                with self.assertRaises(SystemExit) as error:
+                    self.invoke(destination, extra=("--", *arguments))
+                self.assertEqual(error.exception.code, 2)
+                self.assertIn("unsupported", "".join(call.args[0] for call in stderr.write.call_args_list))
+                self.assertFalse((self.source / destination).exists())
+                self.assertEqual(self.calls, [])
+
+    def test_allowed_test_selection_forms_preserve_offline_command(self):
+        cases = [
+            ("-p", "xtask", "--lib", "module::test"),
+            ("--package", "xtask", "--test", "agent_registry"),
+            ("--package=xtask", "--test=agent_registry"),
+            ("-pxtask", "--lib"),
+            ("--workspace", "--all-targets", "--all-features"),
+            ("module::test",),
+            ("-p", "xtask", "--lib", "--", "module::test", "--exact", "--nocapture",
+             "--test-threads", "2", "--ignored"),
+            ("--lib", "--", "--include-ignored", "--test-threads=1", "filter"),
+        ]
+        with mock.patch.dict(os.environ, {"CARGO_HOME": str(self.cache)}):
+            for index, arguments in enumerate(cases):
+                with self.subTest(arguments=arguments):
+                    self.calls.clear()
+                    self.invoke(f"target/allowed-{index}", extra=("--", *arguments))
+                    command = next(command for command, _ in reversed(self.calls)
+                                   if command[:2] == ["cargo", "test"])
+                    self.assertEqual(command, ["cargo", "test", "--offline", *arguments])
+
+    def test_missing_or_option_shaped_values_are_rejected(self):
+        cases = [("-p",), ("--package=",), ("--test", "--target-dir=/outside"),
+                 ("--package=--config=/outside",), ("--", "--test-threads"),
+                 ("--", "--test-threads=0"), ("--", "--test-threads", "many")]
+        for index, arguments in enumerate(cases):
+            with self.subTest(arguments=arguments), mock.patch("sys.stderr"):
+                self.calls.clear()
+                destination = f"target/malformed-{index}"
+                with self.assertRaises(SystemExit) as error:
+                    self.invoke(destination, extra=("--", *arguments))
+                self.assertEqual(error.exception.code, 2)
+                self.assertEqual(self.calls, [])
+                self.assertFalse((self.source / destination).exists())
+
+    def test_rustup_auto_install_is_disabled_and_selected_toolchain_is_checked(self):
+        with mock.patch.dict(os.environ, {"CARGO_HOME": str(self.cache),
+                                          "RUSTUP_AUTO_INSTALL": "1",
+                                          "RUSTUP_TOOLCHAIN": "already-installed"}):
+            self.invoke()
+        commands = [command for command, _ in self.calls]
+        check = ["rustup", "run", "already-installed", "rustc", "--version"]
+        self.assertIn(check, commands)
+        self.assertLess(commands.index(check), next(index for index, command in enumerate(commands)
+                                                   if command[0] == "cargo"))
+        for command, kwargs in self.calls:
+            with self.subTest(command=command):
+                self.assertEqual(kwargs["env"]["RUSTUP_AUTO_INSTALL"], "0")
+                self.assertNotIn("install", command)
+
+    def test_default_toolchain_is_resolved_in_the_destination(self):
+        with mock.patch.dict(os.environ, {"CARGO_HOME": str(self.cache)}):
+            os.environ.pop("RUSTUP_TOOLCHAIN", None)
+            root = self.invoke()
+        commands = [command for command, _ in self.calls]
+        self.assertIn(["rustup", "show", "active-toolchain"], commands)
+        self.assertIn(["rustup", "run", "stable-fixture", "rustc", "--version"], commands)
+        for command, kwargs in self.calls:
+            if command[0] in {"rustup", "cargo"}:
+                self.assertEqual(kwargs["cwd"], root)
+            if command[0] == "cargo":
+                self.assertEqual(kwargs["env"]["RUSTUP_TOOLCHAIN"], "stable-fixture")
+
+    def test_uninstalled_toolchain_fails_clearly_without_running_cargo(self):
+        self.unavailable_toolchain = True
+        with mock.patch.dict(os.environ, {"CARGO_HOME": str(self.cache),
+                                          "RUSTUP_TOOLCHAIN": "not-installed"}), \
+                mock.patch("sys.stderr") as stderr:
+            with self.assertRaises(SystemExit) as error:
+                self.invoke()
+        self.assertEqual(error.exception.code, 2)
+        message = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertIn("not-installed", message)
+        self.assertIn("already installed", message)
+        self.assertFalse(any(command[0] == "cargo" for command, _ in self.calls))
+        self.assertTrue(all(kwargs["env"]["RUSTUP_AUTO_INSTALL"] == "0"
+                            for _, kwargs in self.calls))
+
+    def test_toolchain_selection_cannot_enable_rustup_install(self):
+        with mock.patch.dict(os.environ, {"CARGO_HOME": str(self.cache),
+                                          "RUSTUP_TOOLCHAIN": "--install"}), \
+                mock.patch("sys.stderr"):
+            with self.assertRaises(SystemExit) as error:
+                self.invoke()
+        self.assertEqual(error.exception.code, 2)
+        self.assertFalse(any(command[0] in {"cargo", "rustup"} for command, _ in self.calls))
 
 
 if __name__ == "__main__":

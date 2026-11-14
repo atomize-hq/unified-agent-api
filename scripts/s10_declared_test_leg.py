@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Run the workspace test leg on a committed, credential-free declared fixture checkout."""
+"""Run the workspace test leg on a committed, credential-free declared fixture checkout.
+
+The runner does not mutate the caller's repository, credentials or Git metadata, and
+writes only inside its destination. It uses the same toolchain/config trust as the
+ordinary test leg and make preflight: Cargo's ancestor .cargo/config.toml search
+remains active. Cargo configuration is not hermetic. Toolchains must already be
+installed; the runner disables rustup auto-installation and never installs them.
+"""
 
 import argparse
 import hashlib
@@ -24,10 +31,58 @@ def environment_for(root):
                    "CARGO_HOME": str(state / "cargo-home"),
                    "CARGO_TARGET_DIR": str(state / "build"),
                    "CARGO_NET_OFFLINE": "true",
+                   "RUSTUP_AUTO_INSTALL": "0",
                    "RUSTUP_HOME": str(Path(os.environ.get("RUSTUP_HOME", Path.home() / ".rustup")).resolve())}
     if "RUSTUP_TOOLCHAIN" in os.environ:
         environment["RUSTUP_TOOLCHAIN"] = os.environ["RUSTUP_TOOLCHAIN"]
     return environment
+
+
+def test_selection_arguments(arguments):
+    """Allow only test selection; keep Cargo's containment controls runner-owned."""
+    arguments = arguments[1:] if arguments[:1] == ["--"] else arguments
+    libtest = False
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        flags = ({"--exact", "--nocapture", "--ignored", "--include-ignored"} if libtest
+                 else {"--lib", "--workspace", "--all-targets", "--all-features"})
+        if argument == "--" and not libtest:
+            libtest = True
+        elif argument in flags or not argument.startswith("-"):
+            pass  # Bare strings are test-name filters.
+        else:
+            option, separator, value = argument.partition("=")
+            if not libtest and argument.startswith("-p") and argument != "-p":
+                option, separator, value = "-p", "=", argument[2:]
+            value_options = {"--test-threads"} if libtest else {"-p", "--package", "--test"}
+            if option not in value_options:
+                kind = "libtest" if libtest else "Cargo"
+                raise ValueError(f"unsupported {kind} test-selection argument: {argument!r}")
+            if not separator:
+                index += 1
+                value = arguments[index] if index < len(arguments) else ""
+            if not value or value.startswith("-"):
+                raise ValueError(f"{option} requires a non-option value")
+            if option == "--test-threads" and (
+                    not value.isascii() or not value.isdecimal() or int(value) < 1):
+                raise ValueError("--test-threads requires a positive integer")
+        index += 1
+    return arguments
+
+
+def require_installed_toolchain(root, environment):
+    toolchain = environment.get("RUSTUP_TOOLCHAIN")
+    try:
+        if not toolchain:
+            toolchain = run(["rustup", "show", "active-toolchain"], root, environment).split()[0]
+        if toolchain.startswith("-"):
+            raise ValueError("Rust toolchain selection must be a name or path, not an option")
+        run(["rustup", "run", toolchain, "rustc", "--version"], root, environment)
+    except (OSError, subprocess.CalledProcessError, IndexError) as error:
+        raise ValueError(f"selected Rust toolchain {toolchain or '(active)'!r} must be already "
+                         "installed and runnable; the runner never installs toolchains") from error
+    environment["RUSTUP_TOOLCHAIN"] = toolchain
 
 
 def regular_files(source, relatives):
@@ -87,6 +142,10 @@ def main():
                         help="read-only input: copy only registry index and crate archives")
     parser.add_argument("cargo_arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    try:
+        arguments = test_selection_arguments(args.cargo_arguments)
+    except ValueError as error:
+        parser.error(str(error))
     source = Path(__file__).resolve().parents[1]
     root = (source / args.destination).resolve()
     root.relative_to(source)
@@ -100,6 +159,10 @@ def main():
     copy_files(source, root, files)
     Path(environment["HOME"]).mkdir(parents=True)
     copy_files(cache, Path(environment["CARGO_HOME"]), dependencies)
+    try:
+        require_installed_toolchain(root, environment)
+    except ValueError as error:
+        parser.error(str(error))
 
     fixtures = root / "crates/xtask/tests/fixtures/depth-synthetic"
     entry = (fixtures / "onboarding/registry-entry-deferred.toml" if args.lifecycle_path == "onboarding"
@@ -144,9 +207,6 @@ def main():
                   if item.get("reason") == "compiler-artifact" and item.get("executable")
                   and item["target"]["kind"] == ["lib"])
     environment["S10_DECLARED_REGISTRY_READER"] = reader
-    arguments = args.cargo_arguments
-    if arguments[:1] == ["--"]:
-        arguments = arguments[1:]
     subprocess.run(["cargo", "test", "--offline", *(arguments or ["--workspace", "--all-targets", "--all-features"])],
                    cwd=root, env=environment, check=True)
     assert not run(["git", "status", "--porcelain=v1", "--untracked-files=all"], root, environment).strip()

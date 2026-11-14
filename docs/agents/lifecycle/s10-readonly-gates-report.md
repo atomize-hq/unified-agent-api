@@ -593,3 +593,24 @@ After restoring compile-time production workspace resolution and correcting the 
 
 Other round-1 fixes remain in place. No `readonly_gates` file was edited; changes remain
 uncommitted and no push was performed.
+
+## Runner round 2
+
+The runner now accepts only the reviewed test-selection arguments: `-p`/`--package`,
+`--lib`, `--test`, `--workspace`, `--all-targets`, `--all-features`, test-name filters,
+and the allowed libtest flags after `--` (`--exact`, `--nocapture`, `--test-threads N`,
+`--ignored`, `--include-ignored`, and filters). Unsupported options, including
+`--target-dir`, `--config`, `--manifest-path` and `-Z`, fail before any subprocess or
+destination creation. Offline resolution remains runner-owned. Every subprocess receives
+`RUSTUP_AUTO_INSTALL=0`; before Cargo runs, the selected toolchain must pass
+`rustup run <toolchain> rustc --version`. Missing toolchains fail clearly without installation.
+
+The boundary is that the runner does not mutate the caller's repository, credentials or Git
+metadata, writes only inside its destination, and runs with the same toolchain/config trust
+as the ordinary test leg and `make preflight`. Cargo's ancestor `.cargo/config.toml` search
+remains active; Cargo configuration is not hermetic. The script docstring states this boundary.
+
+Validation: `python3 -I -m unittest discover -s scripts -p 'test_s10*.py'` passed all 15
+subprocess-mocked tests, including rejected/allowed argument forms, rustup environment policy,
+and unavailable toolchains. `make hygiene` and `git diff --check` passed. Only the two runner
+Python files and this appended section changed; all changes remain uncommitted, with no push.
