@@ -246,7 +246,7 @@ pub(crate) fn expected_authenticated(
                 entry,
                 &observation.writer,
             )?;
-            freeze_transition::plan(&predecessor, &acquisition, &inputs)?.transition
+            inputs.committed_plan(&predecessor, &acquisition, &proposed)?
         }
         _ => return Err("freeze writer identity differs from lifecycle".into()),
     };

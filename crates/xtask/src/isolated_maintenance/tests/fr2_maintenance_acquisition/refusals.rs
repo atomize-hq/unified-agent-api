@@ -80,6 +80,8 @@ pub(super) fn host(
     retained: &Retained,
     plan: &crate::manifest_acquisition::AcquisitionPlan,
     branch: &str,
+    record: &DepthRecord,
+    observation: &Observation,
 ) {
     let root = f.root.path();
     let original = &retained.observation;
@@ -188,8 +190,27 @@ pub(super) fn host(
                 .is_err(),
             "binding {which}"
         );
+        let classification = freeze::classify_authenticated(
+            root,
+            publication,
+            &original.predecessor,
+            &original.candidate,
+            record,
+            Some(observation),
+            &Ok(Some(observed)),
+        );
+        assert_eq!(
+            classification.checkpoint,
+            Checkpoint::ExecutionRequired,
+            "binding {which}"
+        );
+        assert_eq!(
+            classification.reason,
+            Reason::AcquisitionAuthorityUnavailable,
+            "binding {which}"
+        );
     }
-    // A candidate-authored observation (even exact canonical bytes) is no independent host fact.
+    // Candidate-authored authority files are committed and tested at real IN1 by the caller.
     assert!(observed::read(&MemoryHost::default(), commit)
         .unwrap()
         .is_none());

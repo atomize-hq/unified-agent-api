@@ -127,6 +127,38 @@ pub(crate) struct Inputs {
     publication: crate::support_matrix::PreparationInputs,
     packet_generated_at: String,
 }
+impl Inputs {
+    /// Run packets are local preparation artifacts. Only packet paths already tracked or
+    /// actually present in the candidate join the committed output inventory. Every such
+    /// entry still comes from the complete renderer, never from candidate-selected bytes.
+    pub(crate) fn committed_plan(
+        &self,
+        predecessor: &crate::freeze_transition::Tree,
+        acquisition: &crate::freeze_transition::ValidatedAcquisitionDelta,
+        candidate: &crate::freeze_transition::Tree,
+    ) -> Result<crate::freeze_transition::Plan, String> {
+        use crate::freeze_transition::WriterInputs;
+        let packet_paths =
+            packet::render(&self.args, &self.context, self.packet_generated_at.clone())
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect::<std::collections::BTreeSet<_>>();
+        crate::freeze_transition::operations(
+            predecessor,
+            acquisition,
+            self.render()?
+                .files
+                .into_iter()
+                .filter(|(path, _)| {
+                    !packet_paths.contains(path)
+                        || predecessor.contains_key(path)
+                        || candidate.contains_key(path)
+                })
+                .map(|(path, bytes)| (path, Some(bytes))),
+        )
+    }
+}
 impl crate::freeze_transition::WriterInputs for Inputs {
     type Request = ();
     fn render(&self) -> Result<crate::freeze_transition::Rendered<Self::Request>, String> {

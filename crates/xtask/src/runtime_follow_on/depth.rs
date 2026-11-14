@@ -296,7 +296,6 @@ pub(crate) fn dry_run_at(
         proposed,
     )
     .map_err(Error::Validation)?;
-    let mutations = crate::freeze_transition::delivery::from_plan(planned.transition);
     // The owning LW1 path admits only this record/object and these reporting artifacts. The
     // production lifecycle writer remains refusing; no general depth-writing bypass is exposed.
     freeze.view.verify().map_err(Error::Validation)?;
@@ -304,8 +303,8 @@ pub(crate) fn dry_run_at(
         .captured
         .recheck(workspace)
         .map_err(Error::Validation)?;
-    crate::workspace_mutation::apply_admitted_mutations(workspace, &mutations)
-        .map_err(|e| Error::Validation(e.to_string()))?;
+    crate::freeze_transition::delivery::apply(workspace, &planned.transition)
+        .map_err(Error::Validation)?;
     writeln!(
         writer,
         "OK: runtime-follow-on dry-run packet prepared.\nrun_id: {run_id}"

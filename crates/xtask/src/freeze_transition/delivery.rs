@@ -44,18 +44,51 @@ fn observe_outputs(workspace: &Path, files: &[(String, Vec<u8>)]) -> Result<Tree
     Ok(before)
 }
 
-pub(crate) fn from_plan(plan: Plan) -> Vec<PlannedMutation> {
+pub(crate) fn from_plan(plan: &Plan) -> Result<Vec<PlannedMutation>, String> {
     plan.operations
-        .into_iter()
-        .map(|(path, operation)| match operation {
-            Operation::Create(after) => PlannedMutation::create(path, after.bytes),
-            Operation::Replace { before, after } => {
-                PlannedMutation::replace(path, before.bytes, after.bytes)
+        .iter()
+        .map(|(path, operation)| {
+            let (before, after) = match operation {
+                Operation::Create(after) => (None, Some(after)),
+                Operation::Replace { before, after } => (Some(before), Some(after)),
+                Operation::Preserve(entry) => (Some(entry), Some(entry)),
+                Operation::Delete(before) => (Some(before), None),
+            };
+            // The filesystem writer admits only regular blobs. Never erase an object-kind or
+            // executable-bit precondition while converting the exact planner entries.
+            for entry in before.into_iter().chain(after) {
+                if !entry.regular() {
+                    return Err("freeze delivery requires regular blob outputs".into());
+                }
             }
-            Operation::Preserve(after) => {
-                PlannedMutation::replace(path, after.bytes.clone(), after.bytes)
+            if let (Some(before), Some(after)) = (before, after) {
+                if before.mode != after.mode {
+                    return Err("freeze delivery cannot change planned modes".into());
+                }
             }
-            Operation::Delete(before) => PlannedMutation::remove(path, before.bytes),
+            let entry = after.or(before).ok_or("empty freeze operation")?;
+            let mode = if entry.mode == "100755" { 0o755 } else { 0o644 };
+            let mutation = match (before, after) {
+                (None, Some(after)) => PlannedMutation::create(path, after.bytes.clone()),
+                (Some(before), Some(after)) => {
+                    PlannedMutation::replace(path, before.bytes.clone(), after.bytes.clone())
+                }
+                (Some(before), None) => PlannedMutation::remove(path, before.bytes.clone()),
+                (None, None) => unreachable!(),
+            };
+            Ok(mutation.with_git_mode(mode))
         })
         .collect()
+}
+
+pub(crate) fn apply(workspace: &Path, plan: &Plan) -> Result<(), String> {
+    let mutations = from_plan(plan)?;
+    crate::workspace_mutation::apply_admitted_mutations(workspace, &mutations)
+        .map_err(|e| e.to_string())?;
+    let files = plan
+        .operations
+        .keys()
+        .map(|path| (path.clone(), Vec::new()))
+        .collect::<Vec<_>>();
+    plan.require_equal(&observe_outputs(workspace, &files)?)
 }

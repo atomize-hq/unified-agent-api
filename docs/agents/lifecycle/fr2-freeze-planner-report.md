@@ -406,3 +406,70 @@ joins remain unimplemented. There is no new production reporting exception or su
 
 The worktree remains on `feat/fr2-freeze-planner` at committed head `986022c4`. All FR2b source,
 tests, Annex A and report changes are uncommitted for the lead; no push was performed.
+
+## Review round 1 fixes
+
+Status — all six findings repaired and validation complete on `feat/fr2-freeze-planner`.
+Changes remain uncommitted for the lead; HEAD remains `107a57b1`.
+Scope: complete independent canonical output expectations, connected acquisition-authority
+refusals, ON2 committed inventory under the repository ignore policy, and checked delivery of
+exact modes and object kinds. Validation results and sandbox restrictions are recorded below.
+
+### Repairs and regression evidence
+
+- Complete literal expectations live in `crates/xtask/tests/fixtures/fr2-canonical/`, with an
+  explicit inventory independent of the planner. Both connected fixtures compare every packet,
+  depth record, support JSON/Markdown and runtime projection output; ON2 also compares its entire
+  lifecycle object. Unchanged publication text is shared between lanes. The ON2 contract compares
+  every field structurally, including its complete baseline file list and SHA-256 values derived
+  independently from raw predecessor Git leaves. ON2 provenance slots (actual approval commit,
+  approval hash, predecessor classification basis and acquired-byte hashes) likewise come from
+  predecessor approval/registry/blobs. Expected P/O identities are independently hashed from the
+  complete literal expected parts. No expected field comes from candidate output or a planner.
+  MA2's union clock is fixed through the ordinary engine's test-only explicit clock. There is no
+  fixture update mode in the tests.
+- Coherent wrong parent, candidate, generation, invocation, descriptor plan and policy observations
+  retain their direct binding assertions and now pass through `classify_authenticated`, requiring
+  `execution_required` and `acquisition_authority_unavailable`.
+- Real IN1 receives a committed candidate containing canonical-looking acquisition reference,
+  observation and checked transport fingerprint files, with independent host authority withheld. It requires
+  `acquisition_authority_unavailable`. Separate metadata-only and lockfile-only whitespace
+  substitutions remain manifest-valid, retain matching host associations, and each require that
+  same bounded refusal at real IN1.
+- ON2's protected committed plan always includes reporting outputs and accounts for rendered
+  packet files already tracked or present in the candidate. Absent local packet creations are
+  omitted. Present packet bytes, modes and kinds remain subject to full equality. The connected
+  fixture installs the repository's actual `.gitignore`, exercises normal staging without the
+  seven local packet files, and separately force-adds packet files and substitutes bytes/modes.
+- Checked delivery rejects nonregular plan entries, retains Git mode preconditions through
+  mutation classification, applies planned modes to new files, and compares the delivered output
+  inventory with `Plan.expected`. The chmod regression failed before the repair and passed
+  afterward; the ignored-packet ON2 fixture likewise reproduced the original tree mismatch.
+
+### Round 1 validation
+
+Cargo commands used `env -u TMPDIR`; logs are ignored artifacts under `target/fr2-*.log`.
+The intended red regressions failed before their repairs. Initial canonical-fixture clock and
+provenance differences were resolved with explicit inputs and predecessor-only assertions.
+
+| Command | Result | Test time |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib freeze_transition` | 7 passed | 0.00 s |
+| `cargo test -p xtask --lib depth_acceptance` | 70 passed | 46.33 s |
+| `cargo test -p xtask --lib agent_maintenance` | 50 passed, 1 socket-blocked, 1 existing ignored | 0.21 s |
+| `cargo test -p xtask --lib runtime_follow_on` | 46 passed | 46.76 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | 2 passed, including combined acquisition | 115.26 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 62 passed | 507.32 s |
+| `cargo test -p xtask --test agent_maintenance_prepare` | 54 passed | 20.28 s |
+| `make loc-check` | Pass; all Rust files within 700 code lines | — |
+| `cargo test -p xtask --lib workspace_mutation` | 10 passed | 0.00 s |
+| `cargo test -p xtask --test c1_spec_union` | 7 passed | 0.01 s |
+| `make hygiene` and `git diff --check` | Pass | — |
+
+The sandbox blocks the existing
+`agent_maintenance::execute::runtime::tests::every_executor_failure_path_revokes_the_evidence_channel`
+while opening the MA4 evidence channel: `Operation not permitted (os error 1)`. That test and its
+assertions remain intact and require an unrestricted lead rerun. No other sandbox limitation was
+encountered by the requested validation commands. No existing test assertion was weakened or disabled. No changes have been committed or pushed.

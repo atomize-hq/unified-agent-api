@@ -43,9 +43,19 @@ fn run(f: &Fixture) {
 fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
     let f = public_on1::declared_chain_with_host_approval();
     let _installed = f.install();
+    // Exercise ordinary ON2 staging with the repository's actual ignored local run policy.
+    write(
+        f.root.path(),
+        ".gitignore",
+        include_str!("../../../../../../.gitignore"),
+    );
+    f.commit();
     let parent = head(&f);
+    local(&f, &parent);
     let statement_path = crate::depth_record::acquisition::statement_path(PACK, "0.2.0");
     let statement = fs::read(f.root.path().join(&statement_path)).unwrap();
+    let baseline = super::super::fr2_canonical::baseline(f.root.path(), &parent);
+    let bindings = super::super::fr2_canonical::onboarding_bindings(f.root.path(), &parent);
     run(&f);
     let freeze_commit = candidate(&f, &parent);
     let publication = f.resolve().unwrap().admission_publication().unwrap();
@@ -83,6 +93,89 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
     assert!(record.acceptance_entries.is_empty());
     assert_eq!(tree[&statement_path].bytes, statement);
     let run = "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze";
+    assert!(!tree.keys().any(|path| path.starts_with(&format!("{run}/"))));
+    let mut tree = tree;
+    let packet_names = [
+        "input-contract.json",
+        "codex-prompt.md",
+        "run-status.json",
+        "validation-report.json",
+        "run-summary.md",
+        "written-paths.json",
+        "handoff.json",
+    ];
+    let actual_names = fs::read_dir(f.root.path().join(run))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        actual_names,
+        packet_names.iter().map(|name| name.to_string()).collect()
+    );
+    for name in packet_names {
+        let path = format!("{run}/{name}");
+        let metadata = fs::symlink_metadata(f.root.path().join(&path)).unwrap();
+        assert!(metadata.file_type().is_file(), "{path}");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(metadata.permissions().mode() & 0o100, 0, "{path}");
+        }
+        tree.insert(
+            path.clone(),
+            crate::freeze_transition::Entry::file(
+                "100644",
+                fs::read(f.root.path().join(path)).unwrap(),
+            ),
+        );
+    }
+    super::super::fr2_canonical::check("on2", &tree, Some(baseline), &bindings);
+    // Present packet files must still match full planned bytes and modes.
+    git(f.root.path(), &["add", "-f", run]);
+    let present_commit = candidate(&f, &parent);
+    let present_object = admission::emitter::object(f.root.path(), &present_commit).unwrap();
+    let (present, present_tree) = freeze::expected(
+        f.root.path(),
+        &parent_object,
+        &present_object,
+        &record,
+        &observation,
+    )
+    .unwrap();
+    present.require_equal(&present_tree).unwrap();
+    for mutation in 0..2 {
+        git(f.root.path(), &["reset", "--hard", &present_commit]);
+        let path = format!("{run}/handoff.json");
+        if mutation == 0 {
+            let mut bytes = fs::read(f.root.path().join(&path)).unwrap();
+            bytes.extend(b" ");
+            write(f.root.path(), &path, bytes);
+        } else {
+            git(f.root.path(), &["update-index", "--chmod=+x", &path]);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(f.root.path().join(&path), fs::Permissions::from_mode(0o755))
+                    .unwrap();
+            }
+        }
+        git(f.root.path(), &["add", "-f", &path]);
+        let changed = candidate(&f, &parent);
+        let changed_object = admission::emitter::object(f.root.path(), &changed).unwrap();
+        assert_eq!(
+            freeze::classify(
+                f.root.path(),
+                &publication,
+                &parent_object,
+                &changed_object,
+                &record,
+                Some(&observation)
+            )
+            .reason,
+            Reason::FreezeTreeMismatch
+        );
+    }
+    git(f.root.path(), &["reset", "--hard", &freeze_commit]);
     let files: Vec<_> = tree
         .keys()
         .filter(|path| path.starts_with(&format!("{run}/")))
@@ -165,7 +258,7 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
             path.into(),
             crate::freeze_transition::Entry::file("100644", b"substitution".to_vec()),
         );
-        assert!(plan.require_equal(&substituted).is_err(), "{path}");
+        assert!(present.require_equal(&substituted).is_err(), "{path}");
     }
     // Candidate expected-output files and local predecessor substitutions cannot influence derivation.
     write(f.root.path(), "expected-output/record.json", "forged");
@@ -250,7 +343,7 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
             f.root.path(),
             &publication,
             &parent_object,
-            &candidate_object,
+            &present_object,
             &record,
             Some(&forged)
         )

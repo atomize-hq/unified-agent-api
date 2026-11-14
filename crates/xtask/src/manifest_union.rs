@@ -132,6 +132,19 @@ pub fn run(args: Args) -> Result<(), Error> {
 /// The neutral `manifest-union` subcommand passes `None` (root is mandatory); the per-agent
 /// back-compat aliases pass their historical default so existing callers keep working verbatim.
 pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(), Error> {
+    run_with_clock(args, default_root, deterministic_rfc3339_now)
+}
+
+#[cfg(test)]
+pub(crate) fn run_at(args: Args, collected_at: &str) -> Result<(), Error> {
+    run_with_clock(args, None, || collected_at.to_owned())
+}
+
+fn run_with_clock(
+    args: Args,
+    default_root: Option<&str>,
+    now: impl FnOnce() -> String,
+) -> Result<(), Error> {
     let requested_root = args
         .root
         .clone()
@@ -220,7 +233,7 @@ pub fn run_with_default_root(args: Args, default_root: Option<&str>) -> Result<(
         .cloned()
         .collect();
 
-    let collected_at = deterministic_rfc3339_now();
+    let collected_at = now();
 
     let mut inputs = Vec::new();
     for target in &present_targets {

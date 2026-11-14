@@ -1,0 +1,84 @@
+    {
+      "agent": "depth_fixture",
+      "version": "0.2.0",
+      "target": "x86_64-unknown-linux-gnu",
+      "manifest_support": "unsupported",
+      "backend_support": "supported",
+      "uaa_support": "unsupported",
+      "pointer_promotion": "none",
+      "evidence_notes": [],
+      "depth": {
+        "obligations_frozen": true,
+        "promises": [
+          {
+            "operation": "run",
+            "templates": [
+              "CORE"
+            ],
+            "qualified": false,
+            "outcomes": [
+              "insufficient_depth",
+              "classification_required"
+            ],
+            "obligations": [
+              {
+                "id": "R1",
+                "result": "unverified"
+              },
+              {
+                "id": "V1",
+                "result": "unverified"
+              },
+              {
+                "id": "G1",
+                "result": "unverified"
+              },
+              {
+                "id": "E1",
+                "result": "unverified"
+              },
+              {
+                "id": "A1",
+                "result": "unverified"
+              },
+              {
+                "id": "X1",
+                "result": "unverified"
+              },
+              {
+                "id": "X2",
+                "result": "unverified"
+              },
+              {
+                "id": "X3",
+                "result": "unverified"
+              },
+              {
+                "id": "X4",
+                "result": "unverified"
+              },
+              {
+                "id": "OUT3",
+                "result": "unverified"
+              },
+              {
+                "id": "LC2",
+                "result": "unverified"
+              }
+            ]
+          }
+        ],
+        "mode_exclusions": [],
+        "capabilities": []
+      }
+    },
+    {
+      "agent": "depth_fixture",
+      "version": "0.1.0",
+      "target": "x86_64-unknown-linux-gnu",
+      "manifest_support": "supported",
+      "backend_support": "supported",
+      "uaa_support": "supported",
+      "pointer_promotion": "latest_supported_and_validated",
+      "evidence_notes": []
+    },

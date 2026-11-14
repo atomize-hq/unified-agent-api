@@ -1,0 +1,8 @@
+{
+  "workflow_version": "runtime_follow_on_v2",
+  "generated_at": "2026-11-14T00:00:01Z",
+  "run_id": "fr2-freeze",
+  "status": "dry_run_ready",
+  "checks": [],
+  "errors": []
+}

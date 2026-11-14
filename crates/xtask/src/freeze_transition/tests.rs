@@ -176,3 +176,77 @@ fn authenticated_acquisition_is_applied_before_freeze_and_cannot_be_overwritten_
     another_parent.get_mut("replace").unwrap().bytes.push(b' ');
     assert!(acquired.apply(&another_parent).is_err());
 }
+
+#[cfg(unix)]
+#[test]
+fn delivery_refuses_intervening_packet_chmod() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let path = "packet.json";
+    std::fs::write(root.path().join(path), b"packet").unwrap();
+    std::fs::set_permissions(
+        root.path().join(path),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+    struct Packet;
+    impl WriterInputs for Packet {
+        type Request = ();
+        fn render(&self) -> Result<Rendered<()>, String> {
+            Ok(Rendered {
+                request: None,
+                files: vec![("packet.json".into(), b"packet".to_vec())],
+            })
+        }
+    }
+    let plan = delivery::plan(root.path(), &Packet).unwrap().transition;
+    assert_eq!(plan.expected[path].mode, "100644");
+    let mutations = delivery::from_plan(&plan).unwrap();
+    std::fs::set_permissions(
+        root.path().join(path),
+        std::fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    assert!(crate::workspace_mutation::apply_admitted_mutations(root.path(), &mutations).is_err());
+    assert!(delivery::apply(root.path(), &plan).is_err());
+    assert_eq!(
+        std::fs::metadata(root.path().join(path))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o755
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn delivery_matches_planned_bytes_modes_and_kinds() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("packet");
+    let expected = Entry::file("100755", b"executable packet".to_vec());
+    let plan = Plan {
+        operations: BTreeMap::from([("packet".into(), Operation::Create(expected.clone()))]),
+        expected: Tree::from([("packet".into(), expected)]),
+    };
+    delivery::apply(root.path(), &plan).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), plan.expected["packet"].bytes);
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o755
+    );
+    delivery::apply(root.path(), &plan).unwrap();
+    let mut wrong_expected = plan.clone();
+    wrong_expected.expected.get_mut("packet").unwrap().mode = "100644".into();
+    assert!(delivery::apply(root.path(), &wrong_expected).is_err());
+    let mut nonregular = plan.clone();
+    nonregular.operations.insert(
+        "packet".into(),
+        Operation::Preserve(Entry::file("120000", b"target".to_vec())),
+    );
+    assert!(delivery::from_plan(&nonregular).is_err());
+    std::fs::remove_file(&path).unwrap();
+    symlink("target", &path).unwrap();
+    assert!(delivery::apply(root.path(), &plan).is_err());
+}

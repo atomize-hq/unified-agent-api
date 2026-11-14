@@ -1,0 +1,50 @@
+{
+  "workflow_version": "runtime_follow_on_v2",
+  "support_depth": {
+    "version": "0.2.0",
+    "policy_identity": "{{POLICY_IDENTITY}}",
+    "obligations_identity": "{{OBLIGATIONS_IDENTITY}}"
+  },
+  "generated_at": "2026-11-14T00:00:00Z",
+  "run_id": "fr2-freeze",
+  "approval_artifact_path": "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "{{APPROVAL_SHA256}}",
+  "agent_id": "depth_fixture",
+  "display_name": "Depth Fixture",
+  "crate_path": "crates/depth_fixture",
+  "backend_module": "",
+  "manifest_root": "cli_manifests/depth_fixture",
+  "wrapper_coverage_source_path": "crates/depth_fixture",
+  "canonical_targets": [
+    "x86_64-unknown-linux-gnu"
+  ],
+  "always_on_capabilities": [],
+  "target_gated_capabilities": [],
+  "config_gated_capabilities": [],
+  "backend_extensions": [],
+  "support_matrix_enabled": true,
+  "capability_matrix_enabled": false,
+  "capability_matrix_target": null,
+  "requested_tier": "default",
+  "minimal_justification_file": null,
+  "minimal_justification_text": null,
+  "allow_rich_surface": [],
+  "required_agent_api_test": "",
+  "required_handoff_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "docs_to_read": [
+    "docs/specs/cli-agent-onboarding-charter.md",
+    "docs/specs/support-depth-contract.md"
+  ],
+  "allowed_write_paths": [
+    "crates/depth_fixture/**"
+  ],
+  "ignored_diff_roots": [
+    "docs/agents/.uaa-temp/runtime-follow-on/runs"
+  ],
+  "baseline": null
+}

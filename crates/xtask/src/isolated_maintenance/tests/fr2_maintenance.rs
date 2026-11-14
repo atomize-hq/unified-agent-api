@@ -67,6 +67,7 @@ fn fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1() {
     )
     .unwrap();
     expected.require_equal(&candidate).unwrap();
+    super::fr2_canonical::check("ma2", &candidate, None, &Default::default());
     assert!(record.obligations.is_some());
     assert!(record.execution.is_none());
     assert!(record.acceptance_entries.is_empty());

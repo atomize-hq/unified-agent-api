@@ -289,51 +289,88 @@ fn fr2_ma2_combined_acquisition_and_freeze_real_in1() {
         &retained,
         &acquired_plan,
         &args.branch_name,
+        &record,
+        &observation,
     );
-    // Metadata and the complete lockfile stay semantically valid, but authenticated bytes differ.
-    for path in ["cli_manifests/depth_fixture/versions/0.2.0.json", lock_path] {
-        let mut bytes = fs::read(root.join(path)).unwrap();
-        bytes.extend(b" \n");
-        write(root, path, bytes);
-    }
-    let substituted = super::in1_integration::candidate(&f, &parent);
-    assert_eq!(
-        crate::manifest_validate::run(crate::manifest_validate::Args {
-            root: Some(root.join("cli_manifests/depth_fixture")),
-            rules: None,
-            schema: None,
-            version_schema: None,
-            mode: crate::manifest_validate::Mode::Check,
-            json: false,
-            tip: None,
-        }),
-        0
+    // Canonical-looking candidate observation and fingerprint files cannot supply host authority.
+    write(
+        root,
+        "acquisition-inputs.json",
+        admission::canonical(&acquisition.reference).unwrap(),
     );
-    let mut substituted_observation = acquisition.clone();
-    substituted_observation.candidate = admission::emitter::object(root, &substituted).unwrap();
-    substituted_observation.reference = freeze::acquisition::Reference {
-        run: 720,
-        attempt: 1,
-        job: 721,
-        artifact: 722,
-    };
-    host::observe(&f.api.3, &substituted_observation);
+    write(
+        root,
+        "acquisition-observation.json",
+        admission::canonical(&acquisition).unwrap(),
+    );
+    // Copy the actual checked transport fingerprints, rather than inventing a malformed bundle.
+    write(root, "bundle/manifest.json", fs::read(&delivery).unwrap());
+    let authored = super::in1_integration::candidate(&f, &parent);
+    assert!(freeze::acquisition::read(f.api.3.as_ref(), &authored)
+        .unwrap()
+        .is_none());
     f.api.3.put(
-        &format!("freeze-inputs/{substituted}"),
+        &format!("freeze-inputs/{authored}"),
         serde_json::to_value(&observation).unwrap(),
     );
     check_integration(root, &parent).unwrap();
-    let decision = f
+    let refused = f
         .api
         .3
         .records()
         .into_iter()
-        .find(|r| r.candidate.commit == substituted)
+        .find(|r| r.candidate.commit == authored)
         .unwrap();
-    assert_eq!(decision.checkpoint, Checkpoint::ExecutionRequired);
-    assert!(decision
+    assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired);
+    assert!(refused
         .reasons
         .contains(&Reason::AcquisitionAuthorityUnavailable));
+    git(root, &["reset", "--hard", &commit]);
+    // Independent candidates isolate metadata replay from exact lockfile authentication.
+    for path in ["cli_manifests/depth_fixture/versions/0.2.0.json", lock_path] {
+        git(root, &["reset", "--hard", &commit]);
+        let mut bytes = fs::read(root.join(path)).unwrap();
+        bytes.extend(b" \n");
+        write(root, path, bytes);
+        let substituted = super::in1_integration::candidate(&f, &parent);
+        assert_eq!(
+            crate::manifest_validate::run(crate::manifest_validate::Args {
+                root: Some(root.join("cli_manifests/depth_fixture")),
+                rules: None,
+                schema: None,
+                version_schema: None,
+                mode: crate::manifest_validate::Mode::Check,
+                json: false,
+                tip: None,
+            }),
+            0
+        );
+        let mut substituted_observation = acquisition.clone();
+        substituted_observation.candidate = admission::emitter::object(root, &substituted).unwrap();
+        substituted_observation.reference = freeze::acquisition::Reference {
+            run: 720,
+            attempt: 1,
+            job: 721,
+            artifact: 722,
+        };
+        host::observe(&f.api.3, &substituted_observation);
+        f.api.3.put(
+            &format!("freeze-inputs/{substituted}"),
+            serde_json::to_value(&observation).unwrap(),
+        );
+        check_integration(root, &parent).unwrap();
+        let decision = f
+            .api
+            .3
+            .records()
+            .into_iter()
+            .find(|r| r.candidate.commit == substituted)
+            .unwrap();
+        assert_eq!(decision.checkpoint, Checkpoint::ExecutionRequired);
+        assert!(decision
+            .reasons
+            .contains(&Reason::AcquisitionAuthorityUnavailable));
+    }
     git(root, &["reset", "--hard", &commit]);
     // Genuine combined candidate plus an unrelated edit, independently associated with its own
     // acquisition job: the remaining complete-tree equality must refuse through actual IN1.
