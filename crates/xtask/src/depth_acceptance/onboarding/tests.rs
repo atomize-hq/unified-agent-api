@@ -492,7 +492,74 @@ fn outside_generation_effect_and_foreign_entry_refuse_the_entire_batch() {
 
 #[test]
 fn maintenance_and_onboarding_authorities_cannot_substitute() {
-    let f = Fixture::new(Kind::Publication);
+    let mut f = Fixture::new(Kind::Publication);
+    f.record.acceptance_entries.push(f.accept().unwrap());
+    f.save();
+    let request_path = life::maintenance_request_path(AGENT);
+    let request = format!("agent_id = \"{AGENT}\"\nrequest_commit = \"abc1234\"\nrequest_recorded_at = \"{STAMP}\"\ntrigger_kind = \"fixture\"\nopened_from = \"docs/basis.md\"\n[detected_release]\ntarget_version = \"{VERSION}\"\n");
+    let commit = crate::git_inputs::command(&repo())
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .unwrap();
+    assert!(commit.status.success());
+    let closeout = encode(
+        &json!({"request_ref":request_path, "request_sha256":artifacts::digest(&request), "preflight_passed":true, "recorded_at":STAMP, "commit":String::from_utf8(commit.stdout).unwrap().trim(), "explicit_none_reason":"Private ownership proof"}),
+    );
+    crate::agent_maintenance::closeout::check_closeout_form(&closeout).unwrap();
+    f.after.insert(request_path, request);
+    f.after.insert(
+        format!("docs/agents/lifecycle/{AGENT}-maintenance/governance/maintenance-closeout.json"),
+        closeout,
+    );
+    // Control: the destination resolves this exact version when its Event has the right owner.
+    let mut maintenance = f.record.clone();
+    maintenance.event = Event::Maintenance {
+        request_commit: "abc1234".into(),
+        request_recorded_at: STAMP.into(),
+        trigger_kind: "fixture".into(),
+        opened_from: "docs/basis.md".into(),
+    };
+    maintenance.policy.selection.enrollment.lifecycle_path = LifecyclePath::Maintenance;
+    reseal(&mut maintenance);
+    let marker = crate::agent_maintenance::stand_down::marker_relative_path(
+        &format!("docs/agents/lifecycle/{AGENT}-maintenance"),
+        VERSION,
+    );
+    let marker_raw =
+        crate::agent_maintenance::stand_down::render_marker_toml(AGENT, VERSION, STAMP);
+    f.before.insert(marker.clone(), marker_raw.clone());
+    f.after.insert(marker, marker_raw);
+    let mut control = f.after.clone();
+    control.insert(RECORD.into(), encode(&maintenance));
+    let control = View::with_registry(source(&control), &f.view().registry, AGENT).unwrap();
+    assert_eq!(
+        artifacts::maintenance_owner(&control).unwrap().as_deref(),
+        Some(VERSION)
+    );
+    struct MaintenanceControl(DepthRecord);
+    impl super::super::manual::Host for MaintenanceControl {
+        fn bindings(
+            &self,
+            _: &Path,
+            _: &DepthRecord,
+        ) -> Result<(PolicyPart, ObligationsPart), String> {
+            Ok((self.0.policy.clone(), self.0.obligations.clone().unwrap()))
+        }
+        fn evidence(&self, _: &Path, _: &DepthRecord) -> Result<EvidenceVerdicts, String> {
+            Ok(crate::depth_evidence::test_results(Some(&self.0)))
+        }
+    }
+    assert!(matches!(
+        super::super::manual::acceptance(
+            &repo(),
+            &control,
+            &maintenance,
+            &source(&f.before),
+            &MaintenanceControl(maintenance.clone())
+        )
+        .unwrap(),
+        AcceptanceEntry::MaintenanceCloseout { .. }
+    ));
     struct Unreachable;
     impl super::super::manual::Host for Unreachable {
         fn bindings(
@@ -515,7 +582,7 @@ fn maintenance_and_onboarding_authorities_cannot_substitute() {
         &Unreachable,
     )
     .unwrap_err();
-    assert_eq!(error, "closeout has no exact candidate generation");
+    assert_eq!(error, "request Event contradicts recorded generation");
     let mut f = Fixture::new(Kind::Publication);
     f.record.event = Event::Maintenance {
         request_commit: "abc1234".into(),
@@ -534,3 +601,4 @@ mod connected;
 #[cfg(target_os = "linux")]
 pub(crate) use connected::connected_publication;
 mod adversarial;
+mod review_round1;

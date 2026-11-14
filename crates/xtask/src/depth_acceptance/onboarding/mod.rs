@@ -16,6 +16,7 @@ use crate::{
     runtime_advertising::source::Source,
 };
 
+mod advertising;
 mod binding;
 mod effects;
 mod proposed;

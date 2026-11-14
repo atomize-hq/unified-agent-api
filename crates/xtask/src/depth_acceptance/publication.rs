@@ -65,7 +65,7 @@ pub(super) fn qualifications(view: &View) -> Result<BTreeSet<Qualification>, Str
     }
     Ok(values)
 }
-fn cells(view: &View) -> Result<BTreeSet<(String, String)>, String> {
+pub(super) fn cells(view: &View) -> Result<BTreeSet<(String, String)>, String> {
     let raw = view
         .source
         .read(crate::capability_matrix::DEFAULT_OUT_PATH)?;

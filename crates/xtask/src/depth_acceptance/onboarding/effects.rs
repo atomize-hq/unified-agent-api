@@ -17,6 +17,12 @@ pub(super) fn check(
     if registry != &old_registry {
         return Err("onboarding cannot change registry authority".into());
     }
+    advertising::check(
+        &View::with_registry(before.clone(), registry, &owner.entry.agent_id)?,
+        owner,
+        record,
+        kind,
+    )?;
     let version = &record.policy.selection.enrollment.version;
     let packet = agent_lifecycle::publication_ready_path_for_entry(&owner.entry);
     let closeout = format!(
