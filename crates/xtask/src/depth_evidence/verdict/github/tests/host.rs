@@ -14,6 +14,16 @@ pub(crate) fn synthetic_host(root: &Path) -> SyntheticHost {
     SyntheticHost(Arc::new(Mutex::new(endpoints(root, p, &w, &commit, 1))))
 }
 impl SyntheticHost {
+    /// Test-owned fake host observations for independent process evaluation. These contain
+    /// source/artifact/population inputs, never evaluated verdicts or installed authority.
+    pub(crate) fn snapshot(&self) -> BTreeMap<String, Vec<u8>> {
+        self.0.lock().unwrap().0.clone()
+    }
+
+    pub(crate) fn from_snapshot(observations: BTreeMap<String, Vec<u8>>) -> Self {
+        Self(Arc::new(Mutex::new(Fake(observations, Some(ISOLATED)))))
+    }
+
     /// Model one onboarding producer over the actual connected ON2 implementation.
     pub(crate) fn onboarding(root: &Path) -> Self {
         let p = Profile::SyntheticOnboarding;

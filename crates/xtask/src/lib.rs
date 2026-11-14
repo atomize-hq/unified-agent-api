@@ -26,6 +26,7 @@ pub mod prepare_proving_run_closeout;
 pub mod prepare_publication;
 pub mod proving_run_closeout;
 pub mod publication_refresh;
+pub(crate) mod readonly_gates;
 pub mod recommend_next_agent_research;
 pub mod release_doc;
 pub mod repair_runtime_evidence;

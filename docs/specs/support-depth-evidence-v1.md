@@ -226,7 +226,7 @@ recognized live producer until the following CI adapter slice; it reports unveri
 accepting caller-supplied host assertions. It supplies no writer admission or production enrollment.
 Publisher consumption follows with that adapter, keeping existing production enrollment refusal.
 
-For depth-enrolled ON4 gates, the following bounded evaluation is specified, not installed
+For depth-enrolled ON4 gates, the following bounded evaluation is required
 (OR-P13, [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
 Before delivery, the depth-reading parts of the fixed charter checklist item 7 command inventory
 MUST run through the commands' shared checking functions in the proposal's scratch view, inside
@@ -251,6 +251,19 @@ candidate bytes; an admission-relevant change MUST fail independent evaluation, 
 change may pass fresh checks. No serialized verdict, environment token, reusable gate receipt or
 candidate-hosting step is introduced. Local preparation, independent checks, current IN1 admission
 and the terminal integration gate retain the separate meanings stated by the charter.
+
+Slice 10a implements the shared A-check machinery in `xtask/readonly_gates.rs`. The proposal
+entry borrows slice 7's fresh owning evaluation, requires the controller's exact expected record
+and runs support, capability check/audit, each applicable registered manifest validator and runtime-advertising
+conformance without delivery. Standalone support checking freshly authenticates committed inputs.
+Both runtime-advertising readers use the routed registry in check mode, and standalone check-mode
+consumers close their independently resolved route. Ordinary rendering and the validator without
+`--tip` retain production verdict selection. Per-root `--tip` and all-root IN1 retain owning
+admission. The connected proposal proof and independent fake-host process composition are
+credential-free machinery evidence. The registry-reader test conversions and full declared-candidate
+preflight test leg remain slice 10b, ON4 controller wiring remains slice 8 and the real protected
+host proof remains phase C. Results are recorded in the
+[slice 10a report](../agents/lifecycle/s10-readonly-gates-report.md).
 
 ## D2 isolated CI producer
 

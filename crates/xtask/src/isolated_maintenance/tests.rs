@@ -28,6 +28,7 @@ mod ma6_promotion;
 mod onboarding_scope;
 mod prepare;
 mod publication;
+mod readonly_gates;
 mod registry_tables;
 mod subject;
 #[cfg(unix)]

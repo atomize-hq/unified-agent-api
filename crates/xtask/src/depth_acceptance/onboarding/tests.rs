@@ -1,6 +1,7 @@
 //! Private fixtures prove owning predicates and aggregate detectors. Connected proof below
 //! consumes actual ON3 bytes and the independently authenticated slice-6 population.
 use super::*;
+mod readonly_gates;
 use crate::{
     agent_lifecycle as life,
     agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
