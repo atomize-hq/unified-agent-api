@@ -74,6 +74,136 @@ pub(super) fn inventory(plan: &Plan, candidate: &Tree, observation: &observed::O
     assert!(acquisition::authenticated(&before, &changed, &optional_paths, &optional).is_err());
 }
 
+pub(super) fn refrozen_inputs(
+    f: &Fixture,
+    args: &crate::agent_maintenance::prepare::Args,
+    registry: &AgentRegistry,
+    plan: &crate::manifest_acquisition::AcquisitionPlan,
+    acquisition: &observed::Observation,
+    freeze_observation: &Observation,
+) {
+    let root = f.root.path();
+    let commit = &acquisition.candidate.commit;
+    let parent = &acquisition.predecessor.commit;
+    let original_record = DepthRecord::parse(
+        &fs::read_to_string(
+            root.join("cli_manifests/depth_fixture/reports/0.2.0/depth-record.json"),
+        )
+        .unwrap(),
+        "depth_fixture",
+        "0.2.0",
+    )
+    .unwrap();
+    for (index, path) in plan.input_paths.iter().enumerate() {
+        git(root, &["reset", "--hard", commit]);
+        let original = fs::read(root.join(path)).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+        let mut bytes = original.clone();
+        bytes.extend(b" \n");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+            value
+        );
+        write(root, path, &bytes);
+        git(root, &["add", "--", path]);
+        // Re-freeze with the real MA2 writer, so candidate O binds the substituted bytes.
+        let prepared =
+            crate::agent_maintenance::prepare::build_with_registry(root, args, registry).unwrap();
+        crate::agent_maintenance::prepare::isolated_apply(root, &prepared, registry).unwrap();
+        git(root, &["reset", "--soft", parent]);
+        let substituted = super::super::in1_integration::candidate(f, parent);
+        assert_eq!(git(root, &["rev-parse", "HEAD^"]), *parent);
+        let record = DepthRecord::parse(
+            &fs::read_to_string(
+                root.join("cli_manifests/depth_fixture/reports/0.2.0/depth-record.json"),
+            )
+            .unwrap(),
+            "depth_fixture",
+            "0.2.0",
+        )
+        .unwrap();
+        let obligations = record.obligations.as_ref().unwrap();
+        assert_ne!(
+            obligations.identity,
+            original_record.obligations.as_ref().unwrap().identity,
+            "{path}"
+        );
+        assert_eq!(
+            obligations
+                .acquired_inputs
+                .iter()
+                .find(|input| input.path == *path)
+                .unwrap()
+                .sha256,
+            admission::digest(b"", &bytes),
+            "{path}"
+        );
+        assert_eq!(
+            crate::manifest_validate::run(crate::manifest_validate::Args {
+                root: Some(root.join("cli_manifests/depth_fixture")),
+                rules: None,
+                schema: None,
+                version_schema: None,
+                mode: crate::manifest_validate::Mode::Check,
+                json: false,
+                tip: None,
+            }),
+            0,
+            "{path}"
+        );
+        let mut acquired = acquisition.clone();
+        acquired.candidate = admission::emitter::object(root, &substituted).unwrap();
+        acquired.generation = Generation::from_record(&record);
+        acquired.reference = observed::Reference {
+            run: 800 + index as u64 * 10,
+            attempt: 1,
+            job: 801 + index as u64 * 10,
+            artifact: 802 + index as u64 * 10,
+        };
+        assert_eq!(acquired.outputs, acquisition.outputs);
+        assert_eq!(acquired.outputs[path].as_ref().unwrap().bytes, original);
+        super::host::observe(&f.api.3, &acquired);
+        let retained = observed::read(f.api.3.as_ref(), &substituted)
+            .unwrap()
+            .unwrap();
+        let publication = f.resolve().unwrap().admission_publication().unwrap();
+        retained
+            .require_binding(
+                root,
+                &publication,
+                &acquired.predecessor,
+                &acquired.candidate,
+                &acquired.generation,
+                plan,
+                &args.branch_name,
+            )
+            .unwrap();
+        let mut observation = freeze_observation.clone();
+        observation.generation = Generation::from_record(&record);
+        f.api.3.put(
+            &format!("freeze-inputs/{substituted}"),
+            serde_json::to_value(&observation).unwrap(),
+        );
+        check_integration(root, parent).unwrap();
+        let refused = f
+            .api
+            .3
+            .records()
+            .into_iter()
+            .find(|r| r.candidate.commit == substituted)
+            .unwrap();
+        assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired, "{path}");
+        assert!(
+            refused
+                .reasons
+                .contains(&Reason::AcquisitionAuthorityUnavailable),
+            "{path}: {:?}",
+            refused.reasons
+        );
+    }
+    git(root, &["reset", "--hard", commit]);
+}
+
 pub(super) fn host(
     f: &Fixture,
     publication: &Publication,

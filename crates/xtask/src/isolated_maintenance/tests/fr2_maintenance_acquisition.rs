@@ -292,6 +292,14 @@ fn fr2_ma2_combined_acquisition_and_freeze_real_in1() {
         &record,
         &observation,
     );
+    refusals::refrozen_inputs(
+        &f,
+        &args,
+        &registry,
+        &acquired_plan,
+        &acquisition,
+        &observation,
+    );
     // Canonical-looking candidate observation and fingerprint files cannot supply host authority.
     write(
         root,

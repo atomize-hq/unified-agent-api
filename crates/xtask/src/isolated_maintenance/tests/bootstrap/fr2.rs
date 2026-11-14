@@ -39,6 +39,14 @@ fn run(f: &Fixture) {
     .unwrap();
 }
 
+// Keep each substituted freeze/acquisition in one candidate commit over the intact protected tip.
+fn substituted_candidate(f: &Fixture, parent: &str) -> admission::Object {
+    git(f.root.path(), &["reset", "--soft", parent]);
+    let commit = candidate(f, parent);
+    assert_eq!(git(f.root.path(), &["rev-parse", "HEAD^"]), parent);
+    admission::emitter::object(f.root.path(), &commit).unwrap()
+}
+
 #[test]
 fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
     let f = public_on1::declared_chain_with_host_approval();
@@ -160,20 +168,17 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
             }
         }
         git(f.root.path(), &["add", "-f", &path]);
-        let changed = candidate(&f, &parent);
-        let changed_object = admission::emitter::object(f.root.path(), &changed).unwrap();
-        assert_eq!(
-            freeze::classify(
-                f.root.path(),
-                &publication,
-                &parent_object,
-                &changed_object,
-                &record,
-                Some(&observation)
-            )
-            .reason,
-            Reason::FreezeTreeMismatch
+        let changed_object = substituted_candidate(&f, &parent);
+        let refused = freeze::classify(
+            f.root.path(),
+            &publication,
+            &parent_object,
+            &changed_object,
+            &record,
+            Some(&observation),
         );
+        assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired);
+        assert_eq!(refused.reason, Reason::FreezeTreeMismatch);
     }
     git(f.root.path(), &["reset", "--hard", &freeze_commit]);
     let files: Vec<_> = tree
@@ -253,13 +258,103 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
         crate::support_matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
         &statement_path,
     ] {
+        git(f.root.path(), &["reset", "--hard", &present_commit]);
         let mut substituted = tree.clone();
         substituted.insert(
             path.into(),
             crate::freeze_transition::Entry::file("100644", b"substitution".to_vec()),
         );
         assert!(present.require_equal(&substituted).is_err(), "{path}");
+        // Re-enter admission with a real committed candidate: its own bytes must never
+        // become predecessor authority when the planner is recomputed.
+        write(f.root.path(), path, &substituted[path].bytes);
+        git(f.root.path(), &["add", "-f", path]);
+        let changed_object = substituted_candidate(&f, &parent);
+        let refused = freeze::classify(
+            f.root.path(),
+            &publication,
+            &parent_object,
+            &changed_object,
+            &record,
+            Some(&observation),
+        );
+        assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired, "{path}");
+        assert_eq!(refused.reason, Reason::FreezeTreeMismatch, "{path}");
     }
+    // ON2 may only consume acquisition already protected before the freeze. Each acquired
+    // byte substitution (and the OF-P4 statement above) keeps that protected predecessor intact.
+    let (_, acquired_paths) = crate::manifest_acquisition::plan::delivery_paths(
+        ROOT,
+        "0.2.0",
+        &["x86_64-unknown-linux-gnu".into()],
+    );
+    for path in acquired_paths {
+        git(f.root.path(), &["reset", "--hard", &present_commit]);
+        let mut bytes = fs::read(f.root.path().join(&path)).unwrap_or_else(|_| b"{}".to_vec());
+        bytes.extend(b" \n");
+        write(f.root.path(), &path, bytes);
+        let changed_object = substituted_candidate(&f, &parent);
+        let refused = freeze::classify(
+            f.root.path(),
+            &publication,
+            &parent_object,
+            &changed_object,
+            &record,
+            Some(&observation),
+        );
+        assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired, "{path}");
+        assert_eq!(
+            refused.reason,
+            Reason::AcquisitionAuthorityUnavailable,
+            "{path}"
+        );
+    }
+    // A coherent candidate acquisition plus a matching replacement OF-P4 statement still
+    // cannot replace the independently protected bytes. Both edits share the freeze commit.
+    git(f.root.path(), &["reset", "--hard", &present_commit]);
+    let path = format!("{ROOT}/snapshots/0.2.0/union.json");
+    let mut bytes = fs::read(f.root.path().join(&path)).unwrap();
+    bytes.extend(b" \n");
+    write(f.root.path(), &path, &bytes);
+    let mut replacement: toml_edit::DocumentMut =
+        std::str::from_utf8(&statement).unwrap().parse().unwrap();
+    let input = replacement["inputs"]
+        .as_array_of_tables_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|input| input["path"].as_str() == Some(&path))
+        .unwrap();
+    input["sha256"] = toml_edit::value(admission::digest(b"", &bytes));
+    write(f.root.path(), &statement_path, replacement.to_string());
+    crate::depth_record::acquisition::AcquisitionStatement::parse(
+        &replacement.to_string(),
+        "depth_fixture",
+        "0.2.0.toml",
+    )
+    .unwrap();
+    let changed_object = substituted_candidate(&f, &parent);
+    assert_eq!(
+        git(f.root.path(), &["rev-parse", "refs/remotes/origin/staging"]),
+        parent
+    );
+    assert_eq!(
+        git(
+            f.root.path(),
+            &["show", &format!("{parent}:{statement_path}")]
+        ),
+        std::str::from_utf8(&statement).unwrap().trim()
+    );
+    let refused = freeze::classify(
+        f.root.path(),
+        &publication,
+        &parent_object,
+        &changed_object,
+        &record,
+        Some(&observation),
+    );
+    assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired);
+    assert_eq!(refused.reason, Reason::AcquisitionAuthorityUnavailable);
+    git(f.root.path(), &["reset", "--hard", &freeze_commit]);
     // Candidate expected-output files and local predecessor substitutions cannot influence derivation.
     write(f.root.path(), "expected-output/record.json", "forged");
     write(f.root.path(), RECORD, "local substitution");

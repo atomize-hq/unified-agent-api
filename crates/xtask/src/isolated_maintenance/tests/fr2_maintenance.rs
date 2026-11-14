@@ -33,6 +33,8 @@ fn fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1() {
         &["update-ref", "refs/remotes/origin/staging", &parent],
     );
     let plan = build_prepare_plan(root, &args).unwrap();
+    #[cfg(unix)]
+    intervening_handoff_mode_change(root, &plan);
     apply_prepare_plan(root, &plan).unwrap();
     let freeze_commit = super::in1_integration::candidate(&f, &parent);
     let publication = f.resolve().unwrap().admission_publication().unwrap();
@@ -200,11 +202,34 @@ fn fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1() {
             crate::freeze_transition::Entry::file("100644", b"new acquisition bytes".to_vec()),
         );
         assert_eq!(
-            crate::freeze_transition::acquisition::validate(&candidate, &changed, &[path])
-                .unwrap_err(),
+            crate::freeze_transition::acquisition::validate(
+                &candidate,
+                &changed,
+                std::slice::from_ref(&path)
+            )
+            .unwrap_err(),
             "acquisition authority unavailable"
         );
+        git(root, &["reset", "--hard", &freeze_commit]);
+        write(root, &path, &changed[&path].bytes);
+        let commit = super::in1_integration::candidate(&f, &parent);
+        let object = admission::emitter::object(root, &commit).unwrap();
+        let refused = freeze::classify(
+            root,
+            &publication,
+            &parent_object,
+            &object,
+            &record,
+            Some(&observation),
+        );
+        assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired, "{path}");
+        assert_eq!(
+            refused.reason,
+            Reason::AcquisitionAuthorityUnavailable,
+            "{path}"
+        );
     }
+    git(root, &["reset", "--hard", &freeze_commit]);
     // An authenticated original request supplies generation variables. Candidate-selected
     // request timestamps cannot acquire authority by generating matching-looking packets.
     let mut changed = candidate.clone();
@@ -216,6 +241,21 @@ fn fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1() {
         .bytes
         .extend(b"\n# substituted request\n");
     assert!(expected.require_equal(&changed).is_err());
+    let request_path = format!("{maintenance}/governance/maintenance-request.toml");
+    write(root, &request_path, &changed[&request_path].bytes);
+    let commit = super::in1_integration::candidate(&f, &parent);
+    let object = admission::emitter::object(root, &commit).unwrap();
+    let refused = freeze::classify(
+        root,
+        &publication,
+        &parent_object,
+        &object,
+        &record,
+        Some(&observation),
+    );
+    assert_eq!(refused.checkpoint, Checkpoint::ExecutionRequired);
+    assert_eq!(refused.reason, Reason::FreezeTreeMismatch);
+    git(root, &["reset", "--hard", &freeze_commit]);
     // A same-commit acquisition output receives the distinct bounded refusal at real IN1.
     write(
         root,
@@ -247,4 +287,59 @@ fn fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1() {
         &["update-ref", "refs/remotes/origin/staging", &freeze_commit],
     );
     check_integration(root, &parent).unwrap();
+}
+
+#[cfg(unix)]
+fn intervening_handoff_mode_change(
+    root: &Path,
+    plan: &crate::agent_maintenance::prepare::PreparePlan,
+) {
+    use crate::agent_maintenance::prepare::BEFORE_APPLY;
+    use std::os::unix::fs::PermissionsExt;
+    const HANDOFF: &str = "docs/agents/lifecycle/depth_fixture-maintenance/HANDOFF.md";
+    struct ResetHook;
+    impl Drop for ResetHook {
+        fn drop(&mut self) {
+            BEFORE_APPLY.with(|hook| hook.set(None));
+        }
+    }
+    let before = plan
+        .files
+        .iter()
+        .map(|file| {
+            (
+                file.relative_path.clone(),
+                fs::read(root.join(&file.relative_path)).ok(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let index = fs::read(root.join(".git/index")).unwrap();
+    let mode = fs::metadata(root.join(HANDOFF))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o100, 0);
+    BEFORE_APPLY.with(|hook| {
+        hook.set(Some(|root| {
+            fs::set_permissions(root.join(HANDOFF), fs::Permissions::from_mode(0o755)).unwrap();
+        }))
+    });
+    let reset = ResetHook;
+    let error = apply_prepare_plan(root, plan).unwrap_err();
+    drop(reset);
+    assert!(error.to_string().contains(HANDOFF), "{error}");
+    assert!(error.to_string().contains("divergent"), "{error}");
+    assert_eq!(
+        fs::metadata(root.join(HANDOFF))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o100,
+        0o100
+    );
+    for (path, bytes) in before {
+        assert_eq!(fs::read(root.join(&path)).ok(), bytes, "{path}");
+    }
+    assert_eq!(fs::read(root.join(".git/index")).unwrap(), index);
+    fs::set_permissions(root.join(HANDOFF), fs::Permissions::from_mode(mode)).unwrap();
 }

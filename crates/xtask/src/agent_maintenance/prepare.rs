@@ -114,6 +114,7 @@ pub struct PreparePlan {
     /// `(operation, sha256)` of each acquired classification basis: the value a maintainer
     /// reviews and copies into a classified operation's `classification_basis`. Never authority.
     pub classification_bases: Vec<(String, String)>,
+    transition: crate::freeze_transition::Plan,
     context: guard::Context,
     /// The isolated route binding this plan was built under; `None` on the ordinary route.
     isolated: Option<crate::isolated_maintenance::RouteBinding>,
@@ -123,6 +124,11 @@ pub struct PreparePlan {
 pub struct PreparedFile {
     pub relative_path: String,
     pub contents: Vec<u8>,
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static BEFORE_APPLY: std::cell::Cell<Option<fn(&Path)>> = const { std::cell::Cell::new(None) };
 }
 
 impl Error {
@@ -258,6 +264,7 @@ pub(crate) fn build_with_registry(
         request,
         files,
         classification_bases,
+        transition: planned.transition,
         context,
         isolated: None,
     })

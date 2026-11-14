@@ -473,3 +473,65 @@ The sandbox blocks the existing
 while opening the MA4 evidence channel: `Operation not permitted (os error 1)`. That test and its
 assertions remain intact and require an unrestricted lead rerun. No other sandbox limitation was
 encountered by the requested validation commands. No existing test assertion was weakened or disabled. No changes have been committed or pushed.
+
+## Review round 2 fixes
+
+Status — all round 2 findings repaired and validation complete on `feat/fr2-freeze-planner`.
+HEAD remains `80ff35fb`; changes remain uncommitted and no push was performed.
+
+Scope: recompute refusal classifications from committed mutated candidates, connect acquired-input
+byte substitutions to real IN1 with original authenticated output bytes, and retain MA2's checked
+transition through delivery, including a final-recheck HANDOFF mode-change regression.
+
+### Repairs and regression evidence
+
+- Every ON2 complete-tree refusal mutation is now committed and sent through `freeze::classify`,
+  which recomputes the planner from the protected predecessor and independent writer inputs.
+  Each requires `ExecutionRequired` and `FreezeTreeMismatch`, including Cargo.lock, Cargo.toml,
+  build/workflow files, authority/lifecycle/record files, packet/publication outputs and OF-P4
+  statement bytes. Existing direct complete-tree assertions remain. Present-packet byte/mode
+  refusals also assert the checkpoint. Separate ON2 acquired-output substitutions require
+  `AcquisitionAuthorityUnavailable`. Each substituted ON2 candidate is one commit directly over
+  the intact protected predecessor. A coherent substituted union plus a valid matching OF-P4
+  statement in that same commit receives `AcquisitionAuthorityUnavailable`; the original
+  protected statement and protected ref are explicitly checked.
+- MA2's freeze-only acquired-output matrix and request-byte substitution now commit candidates
+  and re-run classification, retaining the direct low-level assertions and requiring the specific
+  execution-required refusal reason.
+- Combined MA2 acquisition reuses its existing fixture for each input path (shard, union, wrapper
+  coverage, and all coverage reports). Each independent whitespace-only substitution preserves
+  JSON values, is staged and re-frozen through the real guarded writer, produces a changed O
+  binding the new raw digest, and passes manifest validation. The independent host is updated
+  to the new candidate and generation; its original authenticated output inventory is kept
+  byte-for-byte. Host observation reading and binding must succeed before real IN1 requires
+  `ExecutionRequired` with `AcquisitionAuthorityUnavailable`. Every such candidate is a single
+  commit over the original protected predecessor.
+- `PreparePlan` retains `planned.transition`; MA2 guard delivery converts it with the canonical
+  `delivery::from_plan` checked mode/kind-aware mutations. The regression injects a HANDOFF.md
+  executable-bit change after the final route recheck. It reproduced successful delivery before
+  the fix (five writes) and now requires refusal before any output-byte or index change. The
+  test restores the mode and continues the genuine canonical freeze and real-IN1 success proof.
+
+### Round 2 validation
+
+Cargo commands use `env -u TMPDIR`; logs are ignored artifacts under `target/fr2-r2-*.log`.
+The first combined-input test attempt correctly hit the writer's working-tree/index agreement
+check; staging the substituted input before re-freezing corrected the fixture setup.
+
+| Command | Result | Test time |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib freeze_transition` | 7 passed | 0.00 s |
+| `cargo test -p xtask --lib agent_maintenance` | 50 passed, 1 socket-blocked, 1 existing ignored | 0.09 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance -- --nocapture` | 2 passed, including combined acquisition | 246.45 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap -- --nocapture` | 62 passed | 277.71 s |
+| `cargo test -p xtask --test agent_maintenance_prepare` | 54 passed | 18.23 s |
+| `make loc-check` | Pass; all Rust files within 700 code lines | — |
+| `make hygiene` and `git diff --check` | Pass | — |
+
+The sandbox again blocks
+`agent_maintenance::execute::runtime::tests::every_executor_failure_path_revokes_the_evidence_channel`
+while opening the MA4 evidence channel: `Operation not permitted (os error 1)`. The existing test
+and its assertions remain intact and need an unrestricted lead rerun. All other requested checks
+passed. No existing test assertion was weakened or disabled. No changes have been committed or pushed.
