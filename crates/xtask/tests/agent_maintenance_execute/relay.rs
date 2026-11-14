@@ -294,6 +294,17 @@ fn delivery_refusal_records_failure_in_caller_and_recovery_candidate() {
     ] {
         let report = read_json(&dir.join("validation-report.json"));
         assert_eq!(report["status"], "fail");
+        let execution = read_json(&dir.join("codex-execution.json"));
+        assert_eq!(report["codex_execution"], execution);
+        for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+            let path = Path::new(execution[field].as_str().unwrap());
+            assert!(path.starts_with(recovery.trim()), "{}", path.display());
+            assert!(path.is_file(), "{}", path.display());
+        }
+        assert_eq!(
+            execution["argv"].as_array().unwrap().last().unwrap(),
+            recovery.trim()
+        );
         let status = read_json(&dir.join("run-status.json"));
         assert_eq!(status["status"], "write_failed");
         assert_eq!(status["written_paths"], serde_json::json!([]));
@@ -316,9 +327,11 @@ fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
     for name in ["git", "bash", "mkdir", "cat", "dirname", "tr"] {
         symlink(format!("/usr/bin/{name}"), path.path().join(name)).unwrap();
     }
+    let temp = tempfile::tempdir().unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
         .current_dir(&fixture)
         .env("PATH", path.path())
+        .env("TMPDIR", temp.path())
         .args(execute_args("--write", Some(&binary)).into_iter().skip(1))
         .output()
         .unwrap();
@@ -334,4 +347,159 @@ fn gate_spawn_error_after_execution_finalizes_failure_without_delivery() {
             .join("validation-report.json"),
     );
     assert_eq!(report["status"], "fail");
+}
+
+#[test]
+fn delivery_removes_successful_holder_and_retains_only_reported_failure() {
+    for passed in [true, false] {
+        let fixture = prepare_execute_fixture("relay-holder-lifetime");
+        let output = "printf '%s\\n' \"$XTASK_AGENT_MAINTENANCE_RUN_DIR/codex-prompt.md\"; printf '%s\\n' \"$PWD/not-delivered\" >&2";
+        let binary = executor(
+            &fixture,
+            &format!("{output}\n    {}", if passed { ":" } else { "exit 23" }),
+        );
+        prepare(&fixture, &binary);
+        let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+        assert_eq!(out.exit_code == 0, passed, "{}", out.stderr);
+        let holders: Vec<_> = fs::read_dir(out.temp.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("uaa-relay-")
+            })
+            .collect();
+        let pointer = fixture
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID)
+            .join("recovery-candidate.txt");
+        if passed {
+            assert!(holders.is_empty(), "{holders:?}");
+            assert!(!pointer.exists());
+            let run_dir = pointer.parent().unwrap();
+            let execution = read_json(&run_dir.join("codex-execution.json"));
+            for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+                let path = Path::new(execution[field].as_str().unwrap());
+                assert!(path.is_file(), "{field}: {}", path.display());
+                assert!(path.starts_with(&fixture), "{}", path.display());
+            }
+            let argv = execution["argv"].as_array().unwrap();
+            assert_eq!(
+                argv.last().unwrap().as_str().unwrap(),
+                fixture.to_str().unwrap()
+            );
+            let report = read_json(&run_dir.join("validation-report.json"));
+            assert_eq!(report["codex_execution"], execution);
+            assert!(Path::new(report["preflight"]["binary"].as_str().unwrap()).is_file());
+            assert_eq!(
+                report["preflight"]["argv"]
+                    .as_array()
+                    .unwrap()
+                    .last()
+                    .unwrap(),
+                fixture.to_str().unwrap()
+            );
+            let stderr = fs::read_to_string(execution["stderr_path"].as_str().unwrap()).unwrap();
+            let original_root = Path::new(stderr.trim()).parent().unwrap();
+            assert!(!original_root.parent().unwrap().exists());
+            assert_eq!(
+                fs::read_to_string(execution["stdout_path"].as_str().unwrap()).unwrap(),
+                format!(
+                    "{}\nfake execute codex completed\n",
+                    original_root
+                        .join(EXECUTE_RUNS_ROOT)
+                        .join(EXECUTE_WRITE_RUN_ID)
+                        .join("codex-prompt.md")
+                        .display()
+                )
+            );
+            assert_eq!(
+                stderr,
+                format!("{}\n", original_root.join("not-delivered").display())
+            );
+            for name in [
+                "input-contract.json",
+                "codex-prompt.md",
+                "codex-execution.json",
+                "validation-report.json",
+                "run-status.json",
+                "written-paths.json",
+                "run-summary.md",
+            ] {
+                let path = run_dir.join(name);
+                let text = fs::read_to_string(&path).unwrap();
+                assert!(!text.contains("uaa-relay-"), "{}: {text}", path.display());
+            }
+        } else {
+            let recovery = fs::read_to_string(&pointer).unwrap();
+            let recovery = Path::new(recovery.trim());
+            assert!(recovery.join(NOTE).is_file());
+            assert!(out.stderr.contains(recovery.to_str().unwrap()));
+            assert_eq!(holders, vec![recovery.parent().unwrap().to_path_buf()]);
+            let run_dir = pointer.parent().unwrap();
+            let execution = read_json(&run_dir.join("codex-execution.json"));
+            for field in ["prompt_path", "stdout_path", "stderr_path", "binary"] {
+                let path = Path::new(execution[field].as_str().unwrap());
+                assert!(path.starts_with(recovery), "{}", path.display());
+                assert!(path.is_file(), "{}", path.display());
+            }
+            assert_eq!(
+                fs::read_to_string(run_dir.join("codex-stdout.log"))
+                    .unwrap()
+                    .trim(),
+                execution["prompt_path"].as_str().unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(run_dir.join("codex-stderr.log"))
+                    .unwrap()
+                    .trim(),
+                recovery.join("not-delivered").to_str().unwrap()
+            );
+        }
+    }
+}
+
+#[test]
+fn executor_recovery_pointer_is_rejected_and_replaced_by_host_diagnostics() {
+    for existing in [false, true] {
+        let fixture = prepare_execute_fixture("relay-reserved-recovery-pointer");
+        let binary = executor(
+            &fixture,
+            "printf '%s\\n' \"$PWD/forged\" > \"$XTASK_AGENT_MAINTENANCE_RUN_DIR/recovery-candidate.txt\"",
+        );
+        prepare(&fixture, &binary);
+        let pointer = fixture
+            .join(EXECUTE_RUNS_ROOT)
+            .join(EXECUTE_WRITE_RUN_ID)
+            .join("recovery-candidate.txt");
+        if existing {
+            fs::write(&pointer, "previous recovery pointer\n").unwrap();
+        }
+        let out = run_execute_cli(execute_args("--write", Some(&binary)), &fixture);
+        assert_ne!(out.exit_code, 0);
+        assert!(out.stderr.contains("protected request"), "{}", out.stderr);
+        assert!(
+            out.stderr.contains("recovery-candidate.txt"),
+            "{}",
+            out.stderr
+        );
+        assert!(!fixture.join(NOTE).exists());
+        let recovery = fs::read_to_string(pointer).unwrap();
+        let recovery = Path::new(recovery.trim());
+        assert!(recovery.join(NOTE).is_file());
+        assert!(out.stderr.contains(recovery.to_str().unwrap()));
+        assert_eq!(
+            fs::read_to_string(
+                recovery
+                    .join(EXECUTE_RUNS_ROOT)
+                    .join(EXECUTE_WRITE_RUN_ID)
+                    .join("recovery-candidate.txt")
+            )
+            .unwrap()
+            .trim(),
+            recovery.to_str().unwrap()
+        );
+    }
 }

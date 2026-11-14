@@ -12,10 +12,7 @@ use sha2::{Digest, Sha256};
 use xtask::agent_maintenance::execute;
 
 use crate::{
-    harness::{
-        fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, write_text,
-        HarnessOutput,
-    },
+    harness::{fixture_root, seed_gemini_approval_artifact, seed_release_touchpoints, write_text},
     release_doc, support_matrix,
 };
 
@@ -236,43 +233,12 @@ fn default_capability_matrix_markdown() -> String {
     include_str!("../../../../docs/specs/unified-agent-api/capability-matrix.md").to_string()
 }
 
-pub fn run_execute_cli<I, S>(argv: I, workspace_root: &Path) -> HarnessOutput
+pub fn run_execute_cli<I, S>(argv: I, workspace_root: &Path) -> crate::harness::CandidateOutput
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    let args = argv
-        .into_iter()
-        .map(|arg| arg.as_ref().to_string())
-        .collect::<Vec<_>>();
-
-    match Cli::try_parse_from(args) {
-        Ok(cli) => {
-            let mut stdout = Vec::new();
-            let mut stderr = String::new();
-            let exit_code = match cli.command {
-                Command::ExecuteAgentMaintenance(args) => {
-                    match execute::run_in_workspace(workspace_root, args, &mut stdout) {
-                        Ok(()) => 0,
-                        Err(err) => {
-                            stderr = format!("{err}\n");
-                            err.exit_code()
-                        }
-                    }
-                }
-            };
-            HarnessOutput {
-                exit_code,
-                stdout: String::from_utf8(stdout).expect("stdout must be utf-8"),
-                stderr,
-            }
-        }
-        Err(err) => HarnessOutput {
-            exit_code: err.exit_code(),
-            stdout: String::new(),
-            stderr: err.to_string(),
-        },
-    }
+    crate::harness::run_candidate_xtask(workspace_root, argv)
 }
 
 pub fn prepare_execute_fixture(prefix: &str) -> PathBuf {

@@ -11,6 +11,7 @@ use std::{
 };
 
 pub(crate) struct Candidate {
+    holder: PathBuf,
     pub root: PathBuf,
     pub before: Tree,
     pub baseline: String,
@@ -51,6 +52,7 @@ impl Candidate {
         let baseline = candidate_git::baseline(&root)?;
         let config = fs::read(root.join(".git/config")).map_err(tree::io)?;
         Ok(Self {
+            holder,
             root: root.clone(),
             before,
             baseline,
@@ -112,6 +114,7 @@ impl Candidate {
                 || path.split('/').any(|s| s == "automation-stand-down")
                 || path == format!("{}/input-contract.json", self.run_dir_rel)
                 || path == format!("{}/codex-prompt.md", self.run_dir_rel)
+                || path == format!("{}/recovery-candidate.txt", self.run_dir_rel)
             {
                 return Err(Error::Validation(format!(
                     "executor changed protected request/marker/frozen packet: {path}"
@@ -196,10 +199,7 @@ impl Candidate {
             if diagnostic && bound.contains(&path) {
                 continue;
             }
-            if self.protected.contains(&path)
-                || path == format!("{}/input-contract.json", self.run_dir_rel)
-                || path == format!("{}/codex-prompt.md", self.run_dir_rel)
-            {
+            if self.protects_delivery_path(&path) {
                 continue;
             }
             let Some(Node::File(bytes, _)) = after.get(&path) else {
@@ -245,6 +245,16 @@ impl Candidate {
             });
         }
         Ok(paths)
+    }
+    pub(super) fn protects_delivery_path(&self, path: &str) -> bool {
+        self.protected.iter().any(|protected| protected == path)
+            || path == format!("{}/input-contract.json", self.run_dir_rel)
+            || path == format!("{}/codex-prompt.md", self.run_dir_rel)
+    }
+    /// Explicit, best-effort cleanup after successful delivery only. Early returns and panics
+    /// deliberately retain the independent copy for recovery.
+    pub fn discard(self) {
+        let _ = fs::remove_dir_all(self.holder);
     }
     pub fn recovery(&self) -> PathBuf {
         self.root.clone()

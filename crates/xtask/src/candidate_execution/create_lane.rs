@@ -184,7 +184,6 @@ pub(super) fn execute<W: Write>(
         }
         Ok(validated)
     })();
-    let internal = matches!(execution, Err(Error::Internal(_)));
     let (mut report, mut written) = match checked {
         Ok(value) => value,
         Err(e) => (
@@ -212,19 +211,15 @@ pub(super) fn execute<W: Write>(
     // Phase 5: host-only diagnostics and expected-before delivery. The lifecycle attempt is
     // never copied out of the candidate; success is a separate trusted mutation in the same batch.
     let outcome: Result<(), Error> = (|| {
-        let diagnostics = diagnostics(
+        let delivery = finalized_diagnostics(
+            caller,
             context,
             &candidate,
+            observation.as_ref().ok(),
             &report,
             &written,
             execution.as_ref().ok(),
         )?;
-        let delivery = candidate_execution::finalized_tree(
-            &candidate.before,
-            observation.as_ref().ok(),
-            passed,
-            diagnostics,
-        );
         let trusted = if passed {
             let mut state = lifecycle::successful_runtime_state(context, prepared, &written)?;
             let digest = hex::encode(Sha256::digest(bytes(&written)?));
@@ -253,12 +248,34 @@ pub(super) fn execute<W: Write>(
             .map_err(candidate_error)?;
         Ok(())
     })();
+    finalize_delivery(caller, candidate, context, &mut report, &execution, outcome)?;
+    writeln!(
+        writer,
+        "OK: runtime-follow-on write validation complete.\nrun_id: {}\nvalidated_paths: {}",
+        context.run_id,
+        written.len()
+    )
+    .map_err(|e| Error::Internal(e.to_string()))
+}
+
+/// Complete both delivery outcomes before releasing a successful candidate.
+fn finalize_delivery(
+    caller: &Path,
+    candidate: Candidate,
+    context: &RuntimeContext,
+    report: &mut ValidationReport,
+    execution: &Result<(CodexExecutionEvidence, std::process::Output), Error>,
+    outcome: Result<(), Error>,
+) -> Result<(), Error> {
+    let passed = report.status == "pass";
+    let internal = matches!(execution, Err(Error::Internal(_)));
     if let Err(e) = outcome {
         report.status = "fail".into();
         report.errors.push(format!("delivery refused: {e}"));
-        let diagnostics = diagnostics(context, &candidate, &report, &[], execution.as_ref().ok())?;
+        let diagnostics = diagnostics(context, &candidate, report, &[], execution.as_ref().ok())?;
         let failed =
-            candidate_execution::finalized_tree(&candidate.before, None, false, diagnostics);
+            candidate_execution::finalized_tree(&candidate, caller, None, false, diagnostics)
+                .map_err(candidate_error)?;
         let diagnostic_error = candidate
             .deliver(caller, &failed, false, None)
             .err()
@@ -281,13 +298,8 @@ pub(super) fn execute<W: Write>(
             Error::Validation(message)
         });
     }
-    writeln!(
-        writer,
-        "OK: runtime-follow-on write validation complete.\nrun_id: {}\nvalidated_paths: {}",
-        context.run_id,
-        written.len()
-    )
-    .map_err(|e| Error::Internal(e.to_string()))
+    candidate.discard();
+    Ok(())
 }
 
 /// The route requires its original clean tree. Temporarily undo ONLY the controller's own
@@ -400,6 +412,52 @@ fn check_observed_depth_identity(
     prepared.check_support_depth(candidate_root, &context.approval, &state)
 }
 
+/// Regenerate host prose from the delivered evidence after rebasing its structured paths.
+fn finalized_diagnostics(
+    caller: &Path,
+    context: &RuntimeContext,
+    candidate: &Candidate,
+    observed: Option<&Tree>,
+    report: &ValidationReport,
+    written: &[String],
+    execution: Option<&(CodexExecutionEvidence, std::process::Output)>,
+) -> Result<Tree, Error> {
+    let diagnostics = diagnostics(context, candidate, report, written, execution)?;
+    let mut delivery = candidate_execution::finalized_tree(
+        candidate,
+        caller,
+        observed,
+        report.status == "pass",
+        diagnostics,
+    )
+    .map_err(candidate_error)?;
+    if report.status == "pass" {
+        let evidence_path = format!("{}/{CODEX_EXECUTION_FILE_NAME}", candidate.run_dir_rel);
+        if let Some(Node::File(data, _)) = delivery.get(&evidence_path) {
+            let evidence: CodexExecutionEvidence = serde_json::from_slice(data)
+                .map_err(|e| Error::Internal(format!("host execution evidence: {e}")))?;
+            let mut delivered_report = report.clone();
+            for check in &mut delivered_report.checks {
+                if check.name == "codex_exec" && check.ok {
+                    check.message = format!("codex exec completed via `{}`", evidence.binary);
+                }
+            }
+            let summary = render_run_summary(context, &delivered_report, written, Some(&evidence));
+            for (name, data) in [
+                (VALIDATION_REPORT_FILE_NAME, bytes(&delivered_report)?),
+                (RUN_SUMMARY_FILE_NAME, summary.into_bytes()),
+            ] {
+                if let Some(Node::File(content, _)) =
+                    delivery.get_mut(&format!("{}/{name}", candidate.run_dir_rel))
+                {
+                    *content = data;
+                }
+            }
+        }
+    }
+    Ok(delivery)
+}
+
 fn diagnostics(
     context: &RuntimeContext,
     candidate: &Candidate,
@@ -443,10 +501,12 @@ fn diagnostics(
         RUN_SUMMARY_FILE_NAME,
         render_run_summary(context, report, written, execution.map(|e| &e.0)).into_bytes(),
     );
-    insert(
-        "recovery-candidate.txt",
-        format!("{}\n", candidate.root.display()).into_bytes(),
-    );
+    if !passed {
+        insert(
+            "recovery-candidate.txt",
+            format!("{}\n", candidate.root.display()).into_bytes(),
+        );
+    }
     if let Some((evidence, output)) = execution {
         insert(CODEX_EXECUTION_FILE_NAME, bytes(evidence)?);
         insert(
