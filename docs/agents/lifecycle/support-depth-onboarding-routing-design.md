@@ -360,8 +360,14 @@ such in results and cannot close those requirements.
 
 ## Implementation slices
 
-Every identified slice is one reviewed PR: fourteen PRs, retaining the slice ids. The explicit
-landing order is **0 → 1 → 2 → 3 → 5 → 4 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+The original fourteen slices retain their ids. The 2026-11-13
+[shared freeze/readiness amendment and implementation](support-depth-freeze-readiness-design.md)
+is immediately next after slices 0–3 and 5, alongside slice 4 and before slice 6. The landing
+order is **0 → 1 → 2 → 3 → 5 → shared freeze/readiness work and 4 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+Its six inspections found activation blockers in retained IN1 authority, complete freeze-delta
+validation, receipt-free checkout/context authentication and genuine MA2 discovery. Its open
+questions, write scope, complete test matrix and phase C requirements are recorded in that
+design. The conditional evidence amendment grants no implemented checkpoint exception.
 The connected fixture chain grows from slices 2–3: each later slice consumes actual preceding
 outputs and adds its checkpoint; slice 12 finishes and documents it rather than first connecting
 independently seeded positives. These are future write scopes; this packet writes only
@@ -487,6 +493,10 @@ against the final enforcement revision. No slice installs a live profile or prod
     checkpoints; refuse a hand-assembled record.
 
 - **Slice 5 — Onboarding producer Event binding.**
+  - Freeze/readiness follow-on status, 2026-11-13 — the genuine historical-freeze positive and
+    progression against authenticated IN1 history, including a higher-stage admitted ancestor
+    without a producer run, require the shared slice above. Observed-source progression and the
+    existing closure-refusal characterization remain the implemented boundary.
   - Content: finite onboarding binding of the existing synthetic producer, exact approval-linked
     population authentication and fixture/adoption identities. Keep cases/receipt schema/obligations.
   - Write scope: `xtask/depth_ci/profile.rs`, relevant collector/archive code,
@@ -515,7 +525,7 @@ against the final enforcement revision. No slice installs a live profile or prod
   - Write scope: `xtask/prepare_publication.rs`, `xtask/prepare_publication/`, shared private assembly
     call site, `xtask/depth_acceptance/{publication,integration}.rs` for the reporting dispatch and
     new installed-route reporting tests. Keep the executor record immutable.
-  - Dependencies: 3, 5 and 4. Proving tests: real assembly files bound by delivered E, active-run selection,
+  - Dependencies: 3, 5, 4 and completed shared freeze/readiness work. Proving tests: real assembly files bound by delivered E, active-run selection,
     repaired-run alternative, stale/missing evidence and no-entry/no-qualification assertions.
 
 - **Slice 7 — Onboarding owning predicates, without public accepting writes.**

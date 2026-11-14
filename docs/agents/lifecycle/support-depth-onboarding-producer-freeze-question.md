@@ -1,4 +1,24 @@
-# Producer freeze attempts: unresolved policy question
+# Producer freeze attempts and the conditional readiness decision
+
+## Decision of 2026-11-13
+
+The [freeze/readiness design](support-depth-freeze-readiness-design.md) records option 3 adjusted
+from the maintainer-delegated consult and all six inspections. The
+[evidence amendment](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness)
+specifies the shared conditional rule for genuine maintenance MA2 and onboarding ON2 freezes.
+Every matching attempt stays visible, with an execution-receipt exception only for an exact
+independently authorized reporting checkpoint and no support credit. Initial implementation
+remains execution-required even before successful readiness admission.
+
+Activation is blocked by missing independently recoverable IN1 admission history/provenance,
+complete protected freeze-delta validation, receipt-free actual checkout/context authentication
+and genuine MA2 discovery. The design's [open items](support-depth-freeze-readiness-design.md#open-implementation-and-authority-items)
+state the exact questions and options. The shared implementation slice is immediately next,
+alongside slice 4 and before slice 6. This document's original investigation and validation
+below remain historical evidence. The current characterization still refuses genuine freeze
+source, and no reporting exception is implemented by this docs packet.
+
+## Original investigation
 
 Round-2 slice-5 investigation, starting at `45895c94`. This records a blocker, not a
 contract amendment or permission to filter the population.
@@ -156,11 +176,13 @@ higher-stage ancestor itself had no run. A round-3 attempt walked local Git hist
 freeze to each source; round-4 review found that walk reads unauthenticated local objects (no OID
 verification), caches incompletely and is unbounded. That walk was reverted.
 
-This gap belongs to the same decision as the freeze checkpoint. The maintainer-delegated consult
+This gap is now specified by the shared
+[freeze/readiness amendment](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness),
+with implementation pending on authenticated admission history. The maintainer-delegated consult
 (2026-11-13, option 3 adjusted) roots lifecycle authority in protected IN1 admission history: the
 freeze checkpoint and the readiness transition are independently authenticated IN1 admissions, and
 readiness is irreversible within the generation. IN1 already refuses backward progression at
-admission. The shared freeze/readiness amendment slice must therefore also define and test
+admission. The shared implementation slice must therefore authenticate that retained history and test
 progression for applicable attempts against that authenticated admission history, including:
 
 - a descendant restoring an earlier stage with no CI run on the higher-stage ancestor;

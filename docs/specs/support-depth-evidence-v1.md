@@ -208,6 +208,10 @@ head association alone is insufficient. Missing population facts or an unsupport
 unverified; a favorable selected receipt cannot hide another qualifying run. Contradictory passing
 and failing qualifying attempts yield unverified pending investigation.
 
+The [request-freeze checkpoint rule](#authenticated-request-freeze-checkpoints-and-implementation-readiness)
+defines the conditional receipt exception for the packet-bound synthetic maintenance and
+onboarding producer. Reporting checkpoints remain applicable population members.
+
 An authenticated authorized maintainer adoption must bind the exact mapping digest, reviewed
 source and reviewer/executor invocations, and attest independence and the substantive counterfactual
 for each assertion. The evaluator requires nonempty assertion/production bindings, complete case
@@ -318,8 +322,8 @@ Event's date, without filtering on a selected receipt or success. A canonical-re
 with the same frozen Event/P/O is applicable before artifact inspection, across pull_request,
 merge_group, workflow_dispatch and push. Every attempt from 1 through the authenticated attempt
 count is included. Unknown applicable events, missing/nonterminal attempts, absent/expired
-witnesses, changing totals/populations, duplicates or the 1,000-row/100-attempt bounds refuse
-verification. Foreign-repository heads are outside this producer profile. The approved collector
+required execution witnesses, changing totals/populations, duplicates or the
+1,000-row/100-attempt bounds refuse verification. Foreign-repository heads are outside this producer profile. The approved collector
 records checkout HEAD; a PR checkout must be the host head or a two-parent test merge whose second
 parent is that head. Workflow implementation and checkout commit agree. The adapter confirms
 source/tree, reviewed implementation, graph/configuration and current scoped inputs separately.
@@ -328,8 +332,8 @@ Successful collection/upload/binding steps in the exact attempt's `Rust tests (w
 must expose exactly one timestamped `DEPTH_ARTIFACT_BINDING=` JSON log record within the binding
 step. Its `id`, `name`, and `digest` agree with immutable API artifact metadata and the downloaded
 ZIP's SHA-256 and size. A failure elsewhere in that job does not erase a faithfully collected
-counterexample. All applicable attempts must agree on environment and content-addressed toolchain
-report; a favorable run never selects those current inputs by itself.
+counterexample. All execution-required attempts must agree on environment and content-addressed
+toolchain report; a favorable run never selects those current inputs by itself.
 
 The maintainer review/comment body contains exactly one fenced `depth-adequacy-v1` JSON object:
 
@@ -368,8 +372,8 @@ implementation integration or exact maintainer adoption, this diagnostic cannot 
 
 Producer approval includes the presence/absence of root `.cargo/config`, `.cargo/config.toml`,
 `rust-toolchain` and `rust-toolchain.toml`; the initial profile requires all four absent. Before
-artifact processing the adapter approves the independently authenticated run/attempt head's
-producer/workflow closure as well as the separately checked actual checkout. A witness-provided
+artifact processing for an execution-required attempt the adapter approves the independently
+authenticated run/attempt head's producer/workflow closure as well as the separately checked actual checkout. A witness-provided
 synthetic merge cannot approve an unreviewed executed workflow. Artifact decoding executes only
 the helper read from the immutable independently approved staging anchor, never executable bytes
 from a discovered candidate head.
@@ -475,6 +479,86 @@ unfavorable witnesses and missing/unfinished-producer refusals retained. Consume
 producer without producer self-admission. The complete CI result policy and terminal gate still
 govern MERGE. Existing channel/CORE fixture profiles retain whole-workflow completion; this
 foundation does not implement packet evidence, change their behavior or enable production results.
+
+## Authenticated request-freeze checkpoints and implementation readiness
+
+For the packet-bound synthetic maintenance and onboarding producer, the following shared rule
+specifies a conditional reporting-only exception for the genuine MA2 request freeze before MA4,
+and the genuine ON2 freeze before implementation. Its authority transport and exact protected
+freeze policy remain open implementation prerequisites in the
+[freeze/readiness design](../agents/lifecycle/support-depth-freeze-readiness-design.md#open-implementation-and-authority-items).
+An evaluator MUST refuse the exception while it cannot independently establish the required
+facts. These requirements are specified here and have no installed positive implementation.
+
+1. Applicability and complete independent population discovery MUST precede classification.
+   Every matching original Event/P/O run and attempt remains represented, across PRs and all
+   supported events, including reporting checkpoints, unsuccessful attempts, retries and missing
+   or nonterminal attempts. Each row MUST retain authenticated identity, observable outcome,
+   classification and its authority or reason. An independently generation-bound checkpoint
+   MUST NOT disappear solely because an auxiliary producer fixture is absent. Unavailable
+   required binding facts, ambiguous classification or incomplete/changing population prevents
+   verification. Every attempt from 1 through the authenticated attempt count and existing
+   pagination, duplicate, unsupported-event and discovery-bound refusals still apply.
+2. An applicable attempt MAY omit a support-execution receipt only if independently authenticated
+   as the exact authorized reporting-only request-freeze checkpoint in its permitted context.
+   Source differences, absent artifacts, lifecycle labels, timestamps, PR identity and selected
+   results supply no checkpoint authority. A checkpoint establishes zero successful obligations,
+   substantive execution, adoption or currentness. Verification still requires independently
+   qualifying execution and adoption for every due obligation. Checkpoints alone leave support
+   unverified.
+3. Protected IN1 MUST authorize the exact freeze-only transition against its authenticated
+   predecessor through independently approved policy. That authorization MUST bind the
+   authenticated repository identity and original Event/P/O/enrollment, predecessor and its
+   admission, exact admitted head/tree, actual checkout relationship, complete source/context
+   closure governing reporting versus execution, approved IN1 implementation/workflow provenance,
+   host admission run/check and attempt with its decision, and protected lifecycle history.
+   The policy MUST validate the complete permitted freeze delta, including paths, bytes and modes,
+   and reject hidden implementation, dependency, build or workflow changes. Candidate-authored
+   admission files and similarly named successful checks cannot establish authority.
+4. The admitted checkpoint and its permitted checkout/context relationships MUST be immutable
+   within the generation. Later admission or success MUST NOT replace that authority or
+   retrospectively exempt another candidate. Checkpoint eligibility does not seal the attempt
+   population. A later retry of the exact historical checkpoint MAY retain reporting status only
+   under that same authenticated context, without reopening the freeze window or clearing
+   execution evidence. A test merge, merge group, dispatch, push or retry MUST authenticate its
+   actual source, workflow and relevant inputs against the permitted relationship. Nominal head
+   association alone grants no exception.
+5. Readiness is the independently authenticated protected IN1 admission of the first
+   execution-required checkpoint, linked to the previously admitted freeze checkpoint and the
+   same original Event/P/O/enrollment with the bindings in rule 3. It is irreversible within the
+   generation and supplies zero execution, adoption or support credit. Applicable attempts'
+   lifecycle progression MUST be checked against authenticated IN1 admission history through
+   the shared progression predicate, including admitted higher-stage ancestors with no producer
+   run. A descendant rollback or a new freeze-labelled head after readiness, including another
+   PR, MUST NOT reopen reporting eligibility. Missing, conflicting, expired or revoked authority
+   leaves dependent conclusions unverified and cannot restore a freeze window.
+6. Every matching candidate without positively authenticated reporting authorization remains
+   execution-required. Initial implementation and later execution/publication/proving attempts
+   require ordinary execution authentication, even if unsuccessful, on another PR, before
+   readiness, or never admitted. A later successful readiness admission MUST NOT exempt those
+   attempts. Collection MUST neither invoke nor wait for its own packet admission. Structural
+   freeze authorization MUST NOT require the execution receipt waived by rule 2, and readiness
+   authentication MUST NOT become a prerequisite to the verdict authorizing that same admission.
+7. Reporting classification waives only the support-execution receipt. Repository, run/attempt,
+   original generation, head/tree, actual checkout, workflow/context, authority and observable
+   outcome MUST still be authenticated. Unknown, nonterminal, cancelled, aborted or failed
+   designated reporting/producer outcomes and failed collection prevent verification. A terminal
+   successful designated reporting/producer outcome is required at the existing `rust-tests`
+   scope. Whole-workflow completion remains governed separately before MERGE. If a designated
+   checkpoint invokes substantive support execution or supplies execution evidence, the exception
+   is invalid. The evaluator MUST retain and authenticate both passing and failing evidence and
+   apply the existing counterexample/conflict rules. Unexpected passing checkpoint output cannot
+   establish adopted support.
+8. Historical checkpoint source authentication establishes only that checkpoint's identity,
+   permitted delta and context. Every execution-required attempt MUST meet the existing complete
+   protected-staging source approval, actual built/workflow closure, indexed bytes/modes,
+   graph/configuration/compiled populations, toolchain/environment, provenance and current scoped
+   input predicates. A different historical execution closure cannot qualify through readiness.
+   Independent adoption, due obligations, separate maintenance/onboarding generations and
+   receipts, enrollment origin and currentness rules still apply. Collection MUST reuse the
+   existing command and `rust-tests` job under the source-installed finite profile selection.
+   CP-P5 consumer ordering, the terminal workflow/MERGE gate and the finite synthetic wrapper
+   scope continue to govern.
 
 ## Synthetic wrapper machinery-proof profile
 
@@ -651,6 +735,9 @@ needs fresh evidence and independent adoption of every due mapping.
 
 Initial implementation and later publication/proving runs on the same Event/P/O, including all
 retries, remain applicable even on another PR or without a witness (OR-P5, same design section).
+The exact pre-implementation freeze is subject to the shared
+[request-freeze checkpoint rule](#authenticated-request-freeze-checkpoints-and-implementation-readiness);
+ON2 implementation remains execution-required, including unsuccessful candidates before readiness.
 Missing, unfinished or aborted producers, failed evidence steps, revoked adoption, changed source
 or dependencies and incomplete/changing populations cannot qualify. Failed attempts remain
 observable. Terminal authenticated `rust-tests` producer evidence may qualify while the enclosing
