@@ -124,8 +124,8 @@ fn late_parent_retry_does_not_rewrite_existing_child_predecessors() {
         .find(|record| record.claims.run == first.claims.run && record.claims.attempt == 2)
         .unwrap();
     assert_eq!(
-        retry.inputs_identity().unwrap(),
-        first.inputs_identity().unwrap()
+        f.api.3.inputs_identity(&retry),
+        f.api.3.inputs_identity(&first)
     );
     assert_ne!(retry.claims.job, first.claims.job);
     assert_eq!(retry.predecessors, first.predecessors);

@@ -3,6 +3,7 @@ pub(crate) mod emitter;
 pub(crate) mod freeze;
 pub(crate) mod history;
 mod objects;
+pub(crate) mod observations;
 pub(crate) mod policy;
 mod record;
 pub(crate) mod transport;

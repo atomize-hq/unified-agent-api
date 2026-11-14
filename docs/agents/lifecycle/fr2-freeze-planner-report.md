@@ -1,5 +1,80 @@
 # FR2 freeze planner implementation report
 
+## Merge with final FR1
+
+Resolved the merge of `origin/integration/support-depth` (`40c08723`, including final FR1 PR #360)
+into `feat/fr2-freeze-planner` at `0b8a39e1`. This section was created before resolution.
+The merge result is staged and uncommitted for the lead.
+
+`Emitter::prepare()` computes FR2 checkpoint/transition classification from authenticated Git
+objects and independently read freeze/acquisition inputs before owning-predicate evaluation.
+A refused exact-freeze candidate retains `request_freeze`, its transition and first-decision
+bootstrap anchoring. Retention adds the reached owning decision and reasons. The consumed
+observations are pinned in normalized observed authority and retained for stability checks after
+planning, during closing reconstruction and around publication. The final stability read runs
+after artifact upload and before the exact job-log commitment. On a late failure, publication
+uploads the pinned decision with incompleteness and commits that final artifact identity.
+The fake host allocates a separate artifact identity for each upload. Closing read failures or changed
+observations add `observation_incomplete` while preserving captured classification and inputs.
+Unavailable initial observations abort capture before owning predicates and leave an incomplete
+host attempt. Successful observations of absent authority retain their execution-required meaning.
+
+Classification, transition and bootstrap anchoring remain substantive conflict-key inputs.
+Freeze reasons follow FR1's exclusion for all reasons. Predecessor commit/transition-digest pair
+normalization, invocation-event pinning and quarantine of incomplete/history-deficient decisions
+follow final FR1. History recognizes both legacy Bootstrap checkpoints and FR2's independent
+bootstrap flag. Host/fake interfaces retain both sets of methods, with absent production
+freeze/acquisition authority. `runtime_advertising/source.rs` retains captured nonregular paths
+and integration's batched immutable readers. Annex A and the evidence contract describe the
+combined classification and quarantine rules, including FR2b's authenticated acquisition delta.
+
+The new `fr2_classification_is_pinned_for_refusal_and_late_freeze_flake` regression first failed
+against the initial integration-based resolution with Bootstrap in place of RequestFreeze.
+It now checks an unavailable initial observation, an ordinary reached refusal, a late unavailable
+freeze read, a changed freeze observation and a freeze-read failure triggered by artifact upload.
+The upload-triggered case independently failed against the first repair because the retained
+record lacked incompleteness. It passes with the final observation before log commitment.
+Every reached refusal keeps the same classification,
+transition, normalized authority and substantive conflict key as a contradictory admission.
+Reconstruction rejects that contradiction. Late disturbances retain incompleteness.
+Four FR1 test cases now expect `FreezeAuthorityUnavailable` in their reason arrays for depth candidates
+with independently observed absent freeze authority. Their owning-decision, authority-equality,
+conflict and recovery assertions retain their original intent.
+
+Existing canonical admission, generation and input vectors pass. Python `json`/`hashlib`
+independently rechecked their exact sorted compact JSON bytes and NUL-domain digests.
+Optional FR2 fields retain their existing omission rules, and these literal bytes remain valid.
+
+### Merge validation
+
+Cargo commands used `env -u TMPDIR`. Logs are under ignored `target/fr2-merge-validation/`.
+The table records final runs after the resolution and regression updates.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `git diff --check` and `git diff --cached --check` | Pass, conflict markers cleared | — |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 87 passed | 22.31 s |
+| `cargo test -p xtask --lib freeze_transition` | 7 passed | 0.00 s |
+| `cargo test -p xtask --lib in1_integration` | 35 passed, 4 socket-blocked failures | 61.33 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | 3 passed, including combined MA2 acquisition and the new regression | 135.79 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 62 passed | 136.25 s |
+| `cargo test -p xtask --lib runtime_advertising` | 16 passed | 0.27 s |
+| `cargo test -p xtask --lib git_inputs` | 33 passed, 1 socket-blocked failure | 7.34 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 23.30 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` | Pass | — |
+
+Five requested test cases remain unverified beyond their socket-dependent fixture setup.
+All fail with `cannot open the MA4 evidence channel: Operation not permitted (os error 1)`.
+The IN1 cases are `in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. The `git_inputs` substring
+also selects `isolated_maintenance::tests::view::scratch_render_and_manifest_validation_borrow_git_inputs_for_delivered_ma4_evidence`,
+which hits the same socket restriction. These cases require the lead's unrestricted rerun.
+
 ## FR2a
 
 Status — FR2a implementation and validation complete, with five existing Unix-socket-blocked tests.
@@ -111,7 +186,8 @@ substitutions have no influence on the reconstructed plan.
 ### Admission record and FR2b seam
 
 The v1 record has optional `transition` fields `planner` and `writer_inputs`. `request_freeze`
-requires an admitted exact transition. The optional `bootstrap` flag independently represents
+records an exact transition captured before owning-predicate evaluation. Historical authority
+requires a complete admitted decision. The optional `bootstrap` flag independently represents
 first-decision anchoring when a depth transition has its own checkpoint kind. Earlier v1 records
 retain their canonical bytes because absent transition and false bootstrap fields are omitted.
 History accepts legacy bootstrap checkpoints and the independently anchored new representation.

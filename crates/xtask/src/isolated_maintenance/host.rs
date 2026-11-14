@@ -1,4 +1,6 @@
 use super::{Api, Profile, Repository};
+use crate::depth_acceptance::admission::observations;
+use serde_json::json;
 use serde_json::Value;
 use std::{
     collections::BTreeMap,
@@ -69,16 +71,36 @@ pub(super) struct Observation {
     pub(super) source: BTreeMap<String, (String, String)>,
     pub(super) registry: String,
 }
+// Every isolated read, including closing Context rechecks, participates in capture.
+fn read(api: &dyn Api, endpoint: &str) -> Result<Value, String> {
+    let response = api.json(endpoint);
+    observations::unavailable(endpoint, &response);
+    response
+}
 fn repository(api: &dyn Api, repository: &Repository) -> Result<String, String> {
     let prefix = format!("repos/{}", repository.name);
-    let identity = api.json(&prefix)?;
+    let identity = read(api, &prefix)?;
+    observations::fact(
+        &prefix,
+        "repository",
+        &json!([
+            identity["id"],
+            identity["owner"]["id"],
+            identity["full_name"]
+        ]),
+    );
     if identity["id"].as_u64() != Some(repository.id)
         || identity["owner"]["id"].as_u64() != Some(repository.owner)
         || identity["full_name"].as_str() != Some(repository.name)
     {
         return Err("isolated repository id, owner id or full name differs".into());
     }
-    let branch = api.json(&format!("{prefix}/branches/staging"))?;
+    let branch = read(api, &format!("{prefix}/branches/staging"))?;
+    observations::fact(
+        &format!("{prefix}/branches/staging"),
+        "protected_branch",
+        &json!([branch["name"], branch["protected"], branch["commit"]["sha"]]),
+    );
     if branch["name"] != "staging" || branch["protected"] != true {
         return Err("isolated binding requires protected staging".into());
     }
@@ -97,21 +119,42 @@ pub(super) fn observe(api: &dyn Api, profile: &Profile, head: &str) -> Result<Ob
         (profile.baseline.as_str(), head),
         (isolated_tip.as_str(), head),
     ] {
-        let relation = api.json(&format!("{base}/compare/{ancestor}...{target}"))?;
+        let relation = read(api, &format!("{base}/compare/{ancestor}...{target}"))?;
+        observations::fact(
+            &format!("{base}/compare/{ancestor}...{target}"),
+            "ancestry",
+            &json!([relation["status"], relation["merge_base_commit"]["sha"]]),
+        );
         if !matches!(relation["status"].as_str(), Some("ahead" | "identical"))
             || relation["merge_base_commit"]["sha"].as_str() != Some(ancestor)
         {
             return Err("isolated original installation baseline ancestry differs".into());
         }
     }
-    let commit = api.json(&format!("{base}/commits/{head}"))?;
+    let commit = read(api, &format!("{base}/commits/{head}"))?;
+    observations::fact(
+        &format!("{base}/commits/{head}"),
+        "candidate",
+        &commit["sha"],
+    );
     if commit["sha"].as_str() != Some(head) {
         return Err("candidate is not present in fixed isolated repository".into());
     }
-    let registry = api.json(&format!(
-        "{base}/contents/{}?ref={isolated_tip}",
-        crate::agent_registry::REGISTRY_RELATIVE_PATH
-    ))?;
+    let registry = read(
+        api,
+        &format!(
+            "{base}/contents/{}?ref={isolated_tip}",
+            crate::agent_registry::REGISTRY_RELATIVE_PATH
+        ),
+    )?;
+    observations::fact(
+        &format!(
+            "{base}/contents/{}?ref={isolated_tip}",
+            crate::agent_registry::REGISTRY_RELATIVE_PATH
+        ),
+        "registry",
+        &json!([registry["path"], registry["type"], registry["sha"]]),
+    );
     if registry["path"].as_str() != Some(crate::agent_registry::REGISTRY_RELATIVE_PATH)
         || registry["type"] != "file"
     {
@@ -122,10 +165,18 @@ pub(super) fn observe(api: &dyn Api, profile: &Profile, head: &str) -> Result<Ob
         .ok_or("missing protected governing registry identity")?
         .to_owned();
     oid(&registry)?;
-    let tree = api.json(&format!(
+    let tree = read(
+        api,
+        &format!(
+            "repos/{}/git/trees/{canonical_tip}?recursive=1",
+            profile.canonical.name
+        ),
+    )?;
+    let tree_endpoint = format!(
         "repos/{}/git/trees/{canonical_tip}?recursive=1",
         profile.canonical.name
-    ))?;
+    );
+    observations::fact(&tree_endpoint, "truncated", &tree["truncated"]);
     if tree["truncated"] != false {
         return Err("canonical producer tree unavailable or truncated".into());
     }
@@ -135,6 +186,22 @@ pub(super) fn observe(api: &dyn Api, profile: &Profile, head: &str) -> Result<Ob
     if rows.len() > 50_000 {
         return Err("canonical producer inventory exceeds bound".into());
     }
+    observations::population(
+        &tree_endpoint,
+        "approved_source",
+        rows.iter()
+            .filter(|row| {
+                row["path"].as_str().is_some_and(|path| {
+                    profile
+                        .scopes
+                        .iter()
+                        .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
+                }) && row["type"] != "tree"
+            })
+            .map(|r| json!([r["path"], r["sha"], r["mode"], r["type"]]))
+            .collect(),
+    );
+    observations::discovery(&tree_endpoint, true);
     let mut source = BTreeMap::new();
     for row in rows {
         let path = row["path"].as_str().ok_or("missing canonical tree path")?;

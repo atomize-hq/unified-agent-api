@@ -9,6 +9,7 @@ pub(super) struct Fake(
     pub(super) Mutex<BTreeMap<String, std::collections::VecDeque<Value>>>,
     pub(super) std::sync::atomic::AtomicUsize,
     pub(super) Arc<crate::depth_acceptance::admission::fake::MemoryHost>,
+    pub(super) std::sync::atomic::AtomicBool,
 );
 impl Api for Fake {
     fn admissions(&self) -> Result<Arc<dyn crate::depth_acceptance::admission::Host>, String> {
@@ -16,6 +17,9 @@ impl Api for Fake {
     }
     fn json(&self, endpoint: &str) -> Result<Value, String> {
         self.2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.4.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            return Err("one-shot isolated host transport unavailable".into());
+        }
         if let Some(value) = self
             .1
             .lock()

@@ -14,6 +14,7 @@ type CapturedFiles = BTreeMap<String, (Vec<u8>, bool)>;
 pub struct Source {
     root: PathBuf,
     commit: Option<String>,
+    immutable: Option<crate::git_inputs::immutable::Immutable>,
     proposed: BTreeMap<String, String>,
     captured: Option<Arc<CapturedFiles>>,
     nonregular: std::collections::BTreeSet<String>,
@@ -24,6 +25,7 @@ impl Source {
         Ok(Self {
             root: root.canonicalize().map_err(|e| e.to_string())?,
             commit: None,
+            immutable: None,
             proposed: BTreeMap::new(),
             captured: None,
             nonregular: Default::default(),
@@ -80,6 +82,10 @@ impl Source {
                 .trim()
                 .into(),
         );
+        source.immutable = Some(crate::git_inputs::immutable::Immutable::new(
+            &source.root,
+            source.commit.as_deref().ok_or("missing resolved commit")?,
+        ));
         Ok(source)
     }
 
@@ -337,6 +343,19 @@ impl Source {
     }
 
     fn git_bytes(&self, args: &[&str]) -> Result<Vec<u8>, String> {
+        if let Some(immutable) = &self.immutable {
+            if args.first() == Some(&"ls-tree") {
+                if let Some(rows) = immutable.rows(
+                    args.last().ok_or("missing source path")?,
+                    args.contains(&"-r"),
+                    args.contains(&"-t"),
+                ) {
+                    return Ok(rows);
+                }
+            } else if args.starts_with(&["cat-file", "blob"]) {
+                return immutable.blob(args[2]);
+            }
+        }
         let out = crate::git_inputs::command(&self.root)
             .arg("--literal-pathspecs")
             .args(args)
@@ -403,6 +422,9 @@ pub(crate) fn fingerprint(raw: &str) -> Result<String, String> {
 }
 
 #[cfg(test)]
+mod immutable_tests;
+
+#[cfg(test)]
 mod captured_tests {
     use super::*;
     #[test]
@@ -421,6 +443,45 @@ mod captured_tests {
         assert_eq!(source.read("data/regular").unwrap(), "bytes");
     }
 
+    #[test]
+    fn immutable_reads_use_constant_git_processes() {
+        let root = tempfile::tempdir().unwrap();
+        let workspace = Source::workspace(root.path()).unwrap();
+        workspace.git(&["init", "-q"]).unwrap();
+        fs::create_dir(root.path().join("scope")).unwrap();
+        for i in 0..64 {
+            fs::write(root.path().join(format!("scope/{i}")), format!("bytes {i}")).unwrap();
+        }
+        workspace.git(&["add", "."]).unwrap();
+        workspace
+            .git(&[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-qm",
+                "fixture",
+            ])
+            .unwrap();
+        let source = Source::tip(root.path(), "HEAD").unwrap();
+        crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.set(0));
+        for i in 0..64 {
+            assert_eq!(
+                source.clone().read(&format!("scope/{i}")).unwrap(),
+                format!("bytes {i}")
+            );
+            assert!(!source.executable(&format!("scope/{i}")).unwrap());
+        }
+        assert_eq!(source.paths("scope").unwrap().len(), 65);
+        assert_eq!(source.committed_files("scope").unwrap().len(), 64);
+        // Unix reuses one cat-file child; other platforms read each blob fresh (no stable store identity).
+        let expected = if cfg!(unix) { 3 } else { 3 + 63 };
+        assert_eq!(
+            crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.get()),
+            expected
+        );
+    }
     #[test]
     fn captured_views_never_reopen_executor_files_or_git_objects() {
         let root = tempfile::tempdir().unwrap();

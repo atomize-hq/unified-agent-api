@@ -9,6 +9,8 @@ use std::path::Path;
 
 pub(crate) use crate::isolated_maintenance::acquisition;
 mod acquisition_checks;
+mod captured;
+pub(crate) use captured::Captured;
 pub(crate) mod authority;
 mod objects;
 

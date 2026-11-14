@@ -1,5 +1,5 @@
 //! Final integration reuses owning predicates; entries and route labels grant no authority.
-use super::{input::View, manual, promotion};
+use super::{admission::observations, input::View, manual, promotion};
 use crate::{
     agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
     depth_record::AcceptanceEntry,
@@ -29,8 +29,10 @@ impl crate::isolated_maintenance::Route {
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
         let mut emitter = self.context().admission_emitter()?;
+        let observations = super::admission::observations::Capture::start()?;
         let outcome = self.evaluate_admitted_publication(root, revision, validate, &mut emitter);
-        emitter.finish(root, outcome)
+        let outcome = observations::after_decision(outcome, || Ok(()));
+        emitter.finish(root, outcome, observations.finish())
     }
 
     fn evaluate_admitted_publication<T>(
@@ -45,14 +47,16 @@ impl crate::isolated_maintenance::Route {
         if self.context().bootstrap_pending()? {
             let initial = binding::capture(root, revision, self.context())?;
             emitter.parent = Some(initial.parent.clone());
+            emitter.prepare(root)?;
             if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
                 if checkpoint.publication_changed {
                     checkpoint
                         .with_view(root, |view| bootstrap::publication(view, &initial.parent))?;
                 }
                 let outcome = checkpoint.with_registry(root, validate);
-                initial.recheck(root, self.context())?;
-                return outcome;
+                return observations::after_decision(outcome, || {
+                    initial.recheck(root, self.context())
+                });
             }
         }
         let captured = self.capture(root)?;
@@ -62,6 +66,7 @@ impl crate::isolated_maintenance::Route {
         };
         let binding = binding::capture(root, revision, context)?;
         emitter.parent = Some(binding.parent.clone());
+        emitter.prepare(root)?;
         // Only onboarding can observe a first declaration. Maintenance keeps its existing
         // admission even when its parent lacks the subject entry or depth table.
         let checkpoint = if context.bootstrap_declared_onboarding() {
@@ -74,8 +79,7 @@ impl crate::isolated_maintenance::Route {
                 checkpoint.with_view(root, |view| bootstrap::publication(view, &binding.parent))?;
             }
             let outcome = checkpoint.with_registry(root, validate);
-            binding.recheck(root, context)?;
-            return outcome;
+            return observations::after_decision(outcome, || binding.recheck(root, context));
         }
         let outcome = crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
             root,
@@ -91,8 +95,7 @@ impl crate::isolated_maintenance::Route {
                 validate()
             },
         );
-        binding.recheck(root, context)?;
-        outcome
+        observations::after_decision(outcome, || binding.recheck(root, context))
     }
 }
 

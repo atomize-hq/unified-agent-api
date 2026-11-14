@@ -1,5 +1,495 @@
 # FR1 admission history implementation report
 
+## Review round 7 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `1ce898d0`, subject to
+four Unix-socket sandbox failures detailed below.
+This section was started before code changes. Changes remain uncommitted.
+
+`inputs_identity` removes `claims`, `decision` and `reasons` from canonical record JSON and
+replaces the audit predecessor identities with the sorted unique set of predecessor commit and
+transition-digest pairs. The transition digest hashes canonical `[old_state, new_state]` under
+`support-depth-in1-transition-v1` followed by NUL. The input domain remains
+`support-depth-in1-inputs-v1` followed by NUL. Checkpoint classification and substantive
+repository/object/policy/generation/root/blob/observed-authority facts remain included. Raw
+predecessor identities and emitting session claims remain authenticated in retained record bytes.
+Equivalent predecessor retries have identical conflict keys regardless of representative selection.
+
+Reconstruction authenticates and indexes every retained record before comparing reached decisions.
+Every reached admission/refusal participates under its substantive key, including quarantined
+records. The sole-reason incomplete-only refusal remains exempt. Missing, refused, quarantined,
+non-ancestor or superseded predecessor references and inconsistent Bootstrap classification mark
+a record history-deficient. Any observation-incomplete or history-deficient record is quarantined
+from frontiers, readiness, progression and generation-history completion. Unresolved audit references
+contribute no authenticated predecessor pair. Quarantine leaves retained bytes intact and allows
+healthy retries and other candidates to reconstruct. Object/provenance integrity, history gaps,
+bounds, duplicate identities and identical-key contradictions continue to refuse.
+
+Two round-6 assertions used the broader secondary comparison that omitted checkpoint and all
+predecessors. The round-7 substantive-key rule supersedes those assertions. Their tests now
+verify quarantine/recovery for different substantive keys and refusal for contradictory reached
+decisions over the same deficient key. The general history-integrity test likewise now requires quarantine for
+missing predecessors and inconsistent classification, while preserving object/blob rejection.
+The remaining round-4 through round-6 regressions retain their behavior. This interpretation was
+raised during implementation and follows the round-7 substantive-key rule.
+
+### Round 7 regressions and vectors
+
+After correcting the new fixtures' protected-root binding, both required regressions failed
+against inherited production logic. Retry reordering allowed a contradictory reached admission,
+and concurrent parent admission returned `missing predecessor admissions or bootstrap anchoring`.
+The repaired lineage tests pass. The real IN1 publication regression also passes through input
+capture, changed-frontier detection, incomplete reached-admission retention, healthy complete
+retry, independent sibling admission and a later complete contradiction refusing reconstruction.
+Additional coverage checks missing-reference quarantine, exclusion from progression and generation
+history, propagation to a referencing descendant, and continued object-integrity rejection.
+
+Python `json`/`hashlib` independently generated the updated literal canonical input vector and
+transition digest using compact sorted-key UTF-8 and NUL-terminated domains. Admission and
+generation payloads/digests remain the existing literals.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Predecessor transition | `98e4ae1846fa06900dc1f159fee09db39fe3ddcaa8d3c57a8ae03988e07f1ad9` |
+| Substantive evaluated inputs | `d4d8e94e1aae330ce60f2c13c2f2b1f5c3b3ff90f14d54b19479d6b81bd9a399` |
+
+### Round 7 validation
+
+Cargo uses `env -u TMPDIR`. Logs are under ignored `target/fr1-round7-validation/`.
+The final requested test groups report 257 passing tests and four fixture failures. The two groups
+with updated test-only projection assertions were rerun after those edits. The final depth and IN1
+results below are from those reruns. Clippy initially caught one cloned-reference slice in a new
+test, which was corrected before the successful final run.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 83 passed | 52.80 s |
+| `cargo test -p xtask --lib in1_integration` | 35 passed, 4 sandbox failures | 236.44 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 131.54 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 365.21 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` | Pass | — |
+| `git diff --check` | Pass | — |
+
+The four IN1 fixture failures are
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. Each fails before its
+socket-dependent assertions with `cannot open the MA4 evidence channel: Operation not permitted
+(os error 1)`. Those assertions remain unverified in this sandbox. Both round-6 post-capture
+history-failure regressions, all socket-free round-4/5 observed-authority regressions, the new
+retry-reordering and quarantine tests, and the real concurrent-parent recovery/contradiction
+regression pass. The connected ON2 bootstrap admission/observation case also passes. All tracked
+changes remain inside this worktree, uncommitted, with HEAD still `1ce898d0`.
+
+## Review round 6 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `e0efb49b`, subject to
+four Unix-socket sandbox failures detailed below. This section was started before code changes.
+Changes remain uncommitted.
+
+`Emitter::prepare` runs immediately after the authenticated parent binding and before the
+owning policy predicates on both finite-bootstrap and enrolled routes. It resolves the complete
+history frontier and all content-addressed record inputs. Retention clones this captured record
+and fills only the decision/reasons, pinned normalized authority and independently authenticated
+session association. It never reconstructs identity-bearing fields from fallible emission reads.
+A failed retention-time history reconstruction preserves the reached admission/refusal, appends
+`observation_incomplete`, publishes the pinned inputs and returns failure. Closing frontier changes
+also fail without replacing the captured predecessors. The independent session event must equal
+the invocation event obtained before policy evaluation.
+
+The chosen history rule checks complete frontier coverage and Bootstrap classification for every
+reached decision, including reached-incomplete admissions/refusals. Inconsistent reached admissions
+refuse verification. A refusal with missing/superseded predecessors or inconsistent classification
+is explicitly marked incomplete and non-authoritative in reconstructed `History::incomplete`.
+It still compares against every reached admission over all remaining pinned facts, omitting exactly
+`predecessors` and `checkpoint` from that secondary canonical comparison projection. Retained
+bytes and the full evaluated-input identity stay intact.
+Only incomplete-only refusals remain exempt from conflict comparisons. All incomplete records
+remain ineligible for successful history/readiness. The evidence contract, freeze/readiness design
+and Annex A IN1 row state these rules.
+
+Validation caught a compatibility problem in an initial strict-rejection implementation. A refused
+stacked candidate can precede a later successful admission for its ancestor, which supersedes the
+old observed frontier. A focused regression reproduced `missing or inconsistent predecessor
+admissions`. The final rule uses the packet's explicit incomplete/non-authoritative alternative,
+preserves the older refusal and retains its remaining-facts contradiction check.
+
+Initial input capture must succeed before the owning policy predicates can run and a complete
+record can be published. Failed capture leaves the scheduler attempt incomplete and unverified.
+Present malformed lifecycle/depth bytes now fail capture. Null states/generation, empty input/evidence maps
+and lists, and empty predecessor lists represent successful lookups of actual absence. This
+extends the repair beyond the reported history fallback to the state and depth parsing paths.
+
+### Round 6 identity-field audit
+
+`inputs_identity` still hashes the existing canonical record representation under the existing
+domain. The following table covers every record field, including normalized/excluded fields.
+Schema version 1, the canonical encoding and existing digest domains apply. Literal vectors
+continue passing with the refactored input normalization.
+
+| Field | Pinned source and failure handling |
+| --- | --- |
+| `schema_version` | Fixed schema constant `1` in the prepared record. |
+| `kind` | Fixed `in1_admission` constant in the prepared record. |
+| `repository` | Captured source-installed repository name/id/owner, independently checked by history and isolated-host binding. |
+| `generation` | Typed parse of authenticated candidate depth-record blob before predicates. Null only when the path is absent. Read/parse errors abort capture. |
+| `generation_sha256` | Derived from the pinned generation with the existing canonical generation domain. Errors abort capture. |
+| `candidate` | Captured checkout commit with bounded, rehashed Git commit/tree reads before predicates. Errors abort capture. |
+| `parent` | Authenticated binding parent with rehashed Git commit/tree reads before predicates. Errors abort capture. |
+| `checkout` | Exact copy of the pinned candidate object. |
+| `head_relationship` | Fixed `exact_head` invariant from authenticated binding. |
+| `old_state` | Parent lifecycle path/blob/stage read and parsed before predicates. Null only for actual absence or a route with no applicable state path. Read/parse errors abort capture. |
+| `new_state` | Candidate lifecycle path/blob/stage read and parsed before predicates, with the same absence/error rule as old state. |
+| `checkpoint` | Bootstrap for an authenticated empty parent frontier, unclassified for an existing frontier, resolved before predicates. Retention never substitutes a classification on error. |
+| `predecessors` | Sorted unique successful identities from authenticated complete parent history before predicates. A failed read aborts capture. Closing history errors preserve these identities. |
+| `enrollment_anchor` | Source-installed baseline commit/tree authenticated by bounded history resolution before predicates. |
+| `policy` | Source-installed implementation/workflow/job/app/closure snapshot. History authenticates its source against the protected installation anchor before predicates. |
+| `protected_tip` | Captured authenticated host tip with rehashed commit/tree reads before predicates. |
+| `canonical_tip` | Captured authenticated canonical host root, preserved in the prepared record. |
+| `accepted_origin` | Deterministically derived from the pinned repository name. |
+| `registry_blob` | Captured authenticated protected-registry blob from the isolated context, preserved before predicates. |
+| `inputs` | Candidate authoritative paths and acquired/execution paths resolved by bounded, rehashed Git blob reads before predicates. An absent path is omitted only after a successful lookup. Any source read error aborts capture. |
+| `observed_authority` | Normalized authenticated facts accumulate during evaluation and pin at the first reached owning decision. Closing/emission failures track incompleteness separately. |
+| `producer_context` | Explicit FR1 reserved null constant. FR3 will supply its owning association. |
+| `execution_evidence` | Sorted deduplicated identities projected from the pinned parsed depth record before predicates. Empty means the authenticated record has no execution references or is absent. |
+| `claims.event` | Independent invocation event from the host before predicates. Session publication checks exact equality with that pinned event. |
+| `claims.run`, `claims.attempt`, `claims.job`, `claims.check` | Independent session associations normalized to zero by `inputs_identity`, then authenticated through retained job/attempt/artifact facts. |
+| `decision` | Normalized to admitted by `inputs_identity`. The separately pinned reached value remains a conflict side. |
+| `reasons` | Cleared by `inputs_identity`. Incompleteness changes eligibility without changing the reached conflict identity. |
+
+### Round 6 regressions
+
+Both required post-capture tests failed against inherited code. The first-admission reproduction
+retained Unclassified, and the existing-frontier reproduction retained empty predecessors.
+The one-shot fake-host fault ignores every history read while observation capture is active and
+fails the first reconstruction read inside `retain()`. Subsequent publication reads succeed.
+Both repaired cases retain the original policy refusal with incompleteness, preserve the exact
+frontier/checkpoint, and accept a healthy contradictory retry far enough to retain its reached
+admission with identical normalized authority and evaluated-input identity. Independent history
+then rejects `conflicting decisions over identical inputs`.
+
+- `post_capture_history_failure_preserves_bootstrap_refusal_conflict` covers first-admission Bootstrap.
+- `post_capture_history_failure_preserves_predecessors_and_refusal_conflict` covers an existing successful parent frontier.
+- `missing_refusal_predecessors_cannot_hide_a_reached_conflict` detects the contradiction despite an omitted parent admission.
+- `missing_refusal_bootstrap_is_incomplete_and_still_conflicts` marks a reached-incomplete first refusal with Unclassified incomplete and detects a later contradictory admission.
+- `later_parent_admission_preserves_a_refusals_original_inputs` preserves the retained bytes while explicitly marking the superseded frontier incomplete.
+- `failed_input_capture_cannot_reach_policy_or_publish_default_projections` supplies malformed authenticated lifecycle bytes and verifies policy remains unevaluated, with an incomplete attempt and unavailable historical authority.
+
+### Round 6 validation
+
+Cargo validation uses `env -u TMPDIR`. Logs are under ignored
+`target/fr1-round6-validation/`. Groups ran concurrently. Durations below are test execution
+times reported by Cargo, with build and lock waits excluded. Initial reproduction and diagnostic
+logs are retained in that directory with the `initial-` prefix.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 79 passed | 106.46 s |
+| `cargo test -p xtask --lib in1_integration` | 34 passed, 4 sandbox failures | 163.33 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 155.85 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 541.29 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` | Pass | — |
+| `git diff --check` | Pass | — |
+
+The four IN1 failures are the connected cases
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. All fail during fixture
+preparation with `cannot open the MA4 evidence channel: Operation not permitted (os error 1)`.
+Their socket-dependent assertions remain unverified in this sandbox. Both required round-6
+post-capture regressions and the failed-input-capture guard pass in the final IN1 group. All
+existing socket-free producer-backed observed-authority regressions also pass. The final bootstrap
+run has passed the connected ON2 admission/observation case that exposed the initial strict-rule
+compatibility failure. Across the four requested test groups, 252 tests passed and four failed
+in socket-dependent fixture preparation. Final diff, formatting, LOC and repository hygiene
+checks pass. HEAD remains `e0efb49b` on the requested branch.
+
+## Review round 5 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `c5b4c99f`, subject to
+four Unix-socket sandbox failures detailed below.
+This section was started before code changes. Changes remain uncommitted; nothing was pushed.
+
+P1 preserves the owning decision before closing checks. `observations::after_decision` pins the
+admitted/refused result and normalized substantive facts before the captured-context and binding
+rechecks, including the finite bootstrap registry path. Nested closing boundaries cannot overwrite
+that result. Failed closing rechecks record sticky incompleteness separately and preserve the
+original refusal diagnostic alongside a closing error. Late availability facts cannot salt the
+pinned identity. Before any substantive decision, unavailable reads retain their fixed availability
+fact and the incomplete-only refusal behavior.
+
+The emitter retains the reached decision and owning reason, appending `observation_incomplete`
+when closing fails. Record validation permits exactly the matching ordered combinations
+`[owning_predicates_satisfied, observation_incomplete]` on admitted and
+`[owning_predicate_refused, observation_incomplete]` on refused, plus the existing incomplete-only
+refused form. Only that sole-reason form is excluded from conflict comparisons. Every incomplete
+record is excluded from readiness, successful predecessor frontiers, generation-history completion
+and progression. The independent job association and fake publisher require failure for every
+incomplete record, even a reached admission. Invocation success still requires closing checks and
+publication to succeed.
+
+P2 authenticates author login and current permission before fallible adoption parsing and source
+or mapping processing. Unauthorized malformed adoption JSON and prose take the same ignored path;
+neither truncates the authorized population or subsequent stability facts.
+
+Both new regressions failed against inherited code: unauthorized malformed JSON returned
+`invalid exact adequacy adoption`, and the policy refusal plus one-shot late flake retained only
+`observation_incomplete`. Regression coverage now includes:
+
+- `late_flake_preserves_reached_policy_refusal_and_conflicts_with_later_admission`: real producer
+  reads, deliberate refusal and one-shot late isolated read failure, followed by an admission with
+  the same authority/input identities. Independent history rejects their contradictory decisions.
+- `unauthorized_malformed_adoption_cannot_salt_a_reached_conflict`: malformed unauthorized JSON
+  admits, then an edit to prose accompanies a reached contradictory refusal. Authority and inputs
+  remain identical, and history rejects the conflict. The ordinary-prose edit test remains.
+- `late_isolated_host_flake_preserves_reached_admission_and_retry_recovers`: a reached admission
+  retains both reasons, remains ineligible, and a complete retry preserves authority and recovers.
+- Unit coverage pins decision-boundary facts, sticky incomplete-only failures, reached decisions
+  with closing failures, reason combinations, failed job association, conflict participation and
+  exclusion of incomplete admissions from successful predecessor authority.
+
+The evidence contract, freeze/readiness design and Annex A IN1 row describe these rules. Schema
+fields, canonical JSON and digest domains are unchanged. Python `json`/`hashlib` independently
+recomputed the existing literal vectors and two newly permitted reason combinations, using sorted
+keys, compact UTF-8 and NUL-terminated domains. The new vectors modify only decision/reasons of
+`tests/vectors/admission.json`; their evaluated-input identity remains the existing literal.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Normalized observed authority (unchanged) | `a740cc927410b5d84653e5d424e74b60ad767838b47dc9c6659762f118ed442d` |
+| Admission (unchanged) | `ab204698473c5cb9cba16156b4eafc8e9effca90a996d6478103f0c865b3d358` |
+| Evaluated inputs (unchanged) | `79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec` |
+| Generation (unchanged) | `141491450471d7ce945131a830e01fff76967b19d8034d7765d0088b946804f4` |
+| Reached admission with incomplete closing | `320064f43916c987960b73578ececb81e17fe5922905ba728fa71d58174c154d` |
+| Reached refusal with incomplete closing | `34e074e7ce7a02d2981ab2fc08b5e6404d3c723be041e2605031d00d0c517fea` |
+
+### Round 5 validation
+
+Cargo commands use `env -u TMPDIR`; logs and elapsed wall times are under ignored
+`target/fr1-round5-validation/`. Groups ran concurrently, so wall times include contention and
+build-lock waits. No sandbox restrictions were bypassed.
+
+| Command | Result | Wall time |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | 1.89 s |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | 24.07 s |
+| `cargo test -p xtask --lib depth_acceptance` | 76 passed | 101.55 s |
+| `cargo test -p xtask --lib in1_integration` | 31 passed, 4 sandbox failures | 198.68 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 144.48 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 290.35 s |
+| `make loc-check` | Pass | 0.10 s |
+| `make hygiene` | Pass | Under 1 s |
+| `git diff --check` | Pass | Under 1 s |
+
+The four IN1 failures are the existing connected cases
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. Each fails during fixture
+preparation with `cannot open the MA4 evidence channel: Operation not permitted (os error 1)`.
+Their socket-dependent assertions remain unverified in this sandbox. All seven socket-free
+producer-backed authority regressions pass in the final IN1 group, including both required
+round-5 reproductions and the reached-admission late-flake recovery case. Across the requested
+four test groups, 246 tests passed and four failed during socket-dependent fixture preparation.
+The final diff and repository hygiene checks pass; HEAD remains `c5b4c99f`.
+
+## Review round 4 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `7fb60ec8`, subject to
+four Unix-socket sandbox failures detailed below. This section was started before code changes.
+Changes remain uncommitted.
+
+P1 is repaired at predicate ownership boundaries. The producer adapter records transport
+availability while approved predicates project normalized repository/anchor, packet PR,
+applicable Event/P/O workflow/run/attempt, producer job/required step, artifact binding and
+witness-byte facts. Ignored out-of-scope runs contribute no content facts, and the closing
+comparison records explicit discovery stability.
+Canonical population sorting preserves multiplicity and removes incidental response order.
+The stability recheck compares the same normalized workflow identity fields, allowing unrelated
+IR-P3 workflow progress. Matching authorized adoptions commit author login/id, accepted permission,
+endorsement identity, source/mapping and exact referenced body-byte digests. Ordinary comments,
+unauthorized records, unrelated artifacts/jobs, ignored log text and unused metadata contribute
+no content facts. Discovery records start and successful bounded exhaustion independently of
+ignored-row counts or page boundaries. Relevant empty normalized arrays commit absence, including
+an exhausted population with no authorized adoptions. Existing source/transport/population limits,
+canonical encoding, domains and the 65,536-byte admission bound apply.
+
+P2 is repaired by recording normalized isolated-host reads in `Context::recheck`, including the
+closing captured-context and binding rechecks. Facts cover repository identity/protection/tips,
+ancestry/candidate corroboration, governing registry and approved-scope canonical source inventory.
+A transport failure is sticky across later successful reads. Producer object acquisition failures
+and retained-history transport failures during predicate evaluation also mark the observation
+incomplete. A bound invocation with any unavailable evaluation read
+retains a refused decision with the sole bounded reason `observation_incomplete`. It cannot return
+success or supply readiness. Record validation rejects combining that reason with admission or
+other reasons. History excludes incomplete observations from both sides of conflict comparisons,
+while reached contradictory decisions sharing identical normalized authority continue to refuse.
+The binding-error early return now preserves incomplete refusals after an authenticated parent
+has been captured. Capture ends before the emitter reconstructs history and publishes its record.
+
+Implementation changes are in `depth_acceptance/admission/{observations,emitter,record,history,transport}.rs`,
+`depth_evidence/verdict/github/{population,transport,artifact,adoption}.rs` and
+`isolated_maintenance/host.rs`, relative to `crates/xtask/src/`.
+
+Regression coverage includes the following cases.
+
+- `ordinary_comment_edit_cannot_salt_a_reached_conflict` completes the same producer reads,
+  edits only an ordinary PR comment and retains a deliberately contradictory reached refusal.
+  Both authority and input identities remain identical, and history refuses the conflict.
+- `reordered_populations_and_unrelated_workflow_progress_preserve_identity` reverses multi-row
+  workflow/job/artifact populations and changes unrelated enclosing workflow state/metadata
+  and an ignored out-of-scope run's head.
+  Admission and normalized identities remain stable.
+- `late_isolated_host_flake_is_retained_incomplete_and_retry_recovers` first retains an admission,
+  completes the same producer reads, then injects one unavailable isolated read into the final
+  captured recheck inside `with_integration_publication`. The later binding recheck succeeds.
+  IN1 retains an ineligible incomplete refusal, reconstructs history and admits the next complete
+  retry with the first admission's input identity.
+- `incomplete_observation_is_never_eligible_or_a_conflict_side` supplies an incomplete refusal
+  with exactly an admission's authority and input identity. History accepts retries around it,
+  then still rejects a reached contradictory refusal. Invalid reason/decision combinations refuse.
+- `history_transport_unavailability_is_sticky_while_reached_refusal_is_complete` covers
+  unavailable JSON/log history reads followed by restored reads and a reached identity refusal.
+- Observation unit tests cover fixed normalized facts, deduplication, canonical population order,
+  multiplicity, explicit absence, sticky unavailability, arbitrary error-text exclusion and scope.
+  Existing disturbed/restored producer and candidate-owned witness-copy regressions remain covered.
+  The witness-copy test now checks repeat stability for each committed candidate, since normalized
+  isolated-host corroboration includes the candidate commit. Its evidence identities remain stable.
+
+The original raw-response implementation failed the ordinary-comment/workflow-metadata reproduction.
+The repaired socket-free producer-backed regression group passes all six tests. During development,
+a fake-host array-indexing error was corrected and the witness-copy expectation was updated for
+isolated-host candidate corroboration. The LOC gate required placing the incomplete-history test
+in the existing `tests/policy.rs` child module. Full validation also caught loss of the original
+isolated-binding diagnostic when marking an observation incomplete. The returned error now
+preserves that diagnostic, and its dedicated moved-tip regression passes.
+
+Literal vectors were computed independently with Python `json` and `hashlib`, using sorted keys,
+compact UTF-8 JSON and the terminating NUL in each domain. The normalized observation fixture
+commits discovery start/completion, an empty run population and the digest of bytes `[1,2,3]`.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Normalized observed authority | `a740cc927410b5d84653e5d424e74b60ad767838b47dc9c6659762f118ed442d` |
+| Admission with that authority | `ab204698473c5cb9cba16156b4eafc8e9effca90a996d6478103f0c865b3d358` |
+| Evaluated inputs with that authority | `79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec` |
+
+The evidence contract's `observed_authority` bullet and reason rules, freeze/readiness design and
+Annex A IN1 row now specify normalized authoritative facts and the incomplete-observation rule.
+
+### Round 4 validation
+
+Cargo validation uses `env -u TMPDIR` to select the default writable temporary directory.
+The groups ran concurrently, so runtimes include contention. Final runs include normalized
+applicable populations, retained-history availability and preservation of binding diagnostics.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 16.93 s including build-lock wait |
+| `cargo test -p xtask --lib depth_acceptance` | 72 passed, 97.82 s tests |
+| `cargo test -p xtask --lib in1_integration` | 29 passed, 4 Unix-socket sandbox failures, 182.05 s tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed, 439.58 s tests |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed, 133.90 s tests |
+| `make loc-check` | Pass |
+| `make hygiene` | Pass |
+| `git diff --check` | Pass |
+
+The four sandbox failures are the connected IN1 tests
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_refuses_forged_closeout_entries_in_admission_and_observation` and
+`in1_reauthenticates_population_in_admission_and_post_push_observation`.
+All fail in fixture preparation with `cannot open the MA4 evidence channel: Operation not
+permitted (os error 1)`. Their socket-dependent assertions remain unverified in this sandbox.
+All five socket-free producer-backed authority regressions pass in the final IN1 group, including
+ordinary-comment conflict, reordered/ignored population, late-flake recovery, disturbed/restored
+producer authority and candidate witness-copy cases. The moved-tip diagnostic regression also passes.
+
+
+## Previous round 3 observed host authority repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `7624f1ec`, subject to
+four Unix-socket sandbox failures detailed below. Changes are uncommitted for the lead.
+The report was started before implementation.
+
+The lead reproduced `in1_reauthenticates_population_in_admission_and_post_push_observation`.
+The previous evaluated-input identity omitted independently authenticated host observations,
+so a host-disturbed refusal and a host-restored admission collided over identical repository
+inputs. Required `observed_authority` now binds the producer host facts consumed during this IN1
+invocation into the canonical record and evaluated-input identity.
+
+The approved producer API adapter records canonical JSON responses and complete binary response
+digests for population, attempt, witness artifact, producer job/log and adoption/permission reads.
+Empty responses commit observed absence. Transport failures commit a fixed `unavailable` state,
+excluding arbitrary error text. Domain-separated per-read commitments are sorted and deduplicated,
+then hashed under `support-depth-in1-observed-authority-v1` followed by NUL. Only its fixed-size
+lowercase SHA-256 digest enters the record. Existing response/population bounds govern discovery.
+Capture ends before history reconstruction/publication, keeping retries independent of their own
+new artifacts. Record schema version 1, canonical UTF-8 JSON and the 65,536-byte bound apply.
+The admission/input literal vectors and independent observation-domain vectors cover the addition.
+The new capture lives in `crates/xtask/src/depth_acceptance/admission/observations.rs`, with scoped
+wiring in `integration.rs` and emission in `admission/emitter.rs`. Producer authentication wraps
+its existing host API in `depth_evidence/verdict/github/{population,transport}.rs` under the same
+`crates/xtask/src` root.
+
+Regression coverage includes the following cases.
+
+- `depth_acceptance::admission::tests::observed_authority_distinguishes_decisions_but_unchanged_facts_still_conflict`
+  authenticates distinct-fact decisions and refuses contradictory decisions sharing the same facts.
+- `isolated_maintenance::tests::in1_integration::observed_authority::in1_retains_disturbed_and_restored_host_authority_without_a_conflict`
+  drives real producer reads and real IN1 publication/history across two disturbed-attempt states
+  and revoked adoption, restoring and admitting after every refusal through the socket-free
+  assembler fixture already used by view-evaluation tests.
+- `isolated_maintenance::tests::in1_integration::observed_authority::candidate_witness_copy_cannot_select_observed_authority_or_avoid_conflicts`
+  commits candidate-owned altered/genuine copies of the actual hosted witness archive and a forged
+  `admission.json`, checks stable authority digests, then requires conflict refusal for contradictory
+  decisions with that authority and the same repository inputs.
+- Observation tests pin canonical response/digest bytes, deduplication, read-order independence,
+  empty/unavailable distinctions, error-text exclusion and invocation/drop isolation.
+
+The existing socket-dependent reauthentication regression reaches MA4 channel creation and
+receives `Operation not permitted` before its host-disturbance assertions in this sandbox.
+The new producer-backed regressions pass without requiring that channel. The Python archive
+reader returns opaque admission bytes, so this schema addition requires Rust/schema/vector edits.
+The design, evidence contract and Annex A IN1 sentence describe the new observed authority.
+
+### Host authority repair validation
+
+Cargo commands use `env -u TMPDIR` to select the default writable temporary directory.
+The final runs cover the completed source. Test groups ran concurrently, so runtimes include
+contention.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 19.55 s including build-lock wait |
+| `cargo test -p xtask --lib depth_acceptance` | 69 passed, 49.90 s tests |
+| `cargo test -p xtask --lib in1_integration` | 26 passed, 4 Unix-socket sandbox failures, 135.94 s tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed, 357.81 s tests |
+| `make loc-check` | Pass |
+| `git diff --check` | Pass |
+| `make hygiene` | Pass |
+| Focused new producer-backed regressions | 2 passed, 147.75 s tests |
+
+The four IN1 sandbox failures are `connected::{in1_closeout_candidate_admission_and_post_push_observation,
+in1_prepared_closeout_candidate_admission_and_post_push_observation,
+in1_refuses_forged_closeout_entries_in_admission_and_observation,
+in1_reauthenticates_population_in_admission_and_post_push_observation}`. Each receives
+`cannot open the MA4 evidence channel: Operation not permitted (os error 1)` during fixture
+preparation. Full socket-capable validation remains a lead-side check.
+
+
+## Previous round status
+
 Status — round-2 repairs are implemented in `feat/fr1-admission-history` over `8246eb35`.
 Changes are uncommitted. Requested validation completed with the default TMPDIR. Four existing
 IN1 closeout cases are blocked by the sandbox Unix-socket restriction. All other requested checks pass.
@@ -163,12 +653,13 @@ and SHA-256 over `support-depth-in1-admission-v1` + NUL + canonical bytes.
 | `predecessors`, `enrollment_anchor` | Sorted unique successful parent-frontier decisions and independent first-record anchor |
 | `policy` | Approved implementation/workflow/closure and fixed workflow/job/app identities |
 | `protected_tip`, `canonical_tip`, `accepted_origin`, `registry_blob`, `inputs` | Observed roots, accepted repository and authoritative input blobs |
+| `observed_authority` | Required canonical digest of normalized producer and isolated-host facts, authorized adoptions and explicit completeness/absence |
 | `producer_context`, `execution_evidence` | Nullable context and consumed evidence identities; producer absence is representable |
 | `claims` | Run, attempt, emitting job, check and event |
 
 Generation and evaluated-input identities have their own digest domains. Input identity includes
-root snapshots and excludes retry association and outcome, allowing conflict detection without
-conflating distinct observations. Refusals retain bounded reason enums, not arbitrary error text.
+root snapshots and the independently computed `observed_authority`, and excludes retry association
+and outcome, allowing conflict detection across decisions over the same observed facts. Refusals retain bounded reason enums, not arbitrary error text.
 
 ## Runtime policy identity and approval
 

@@ -343,3 +343,5 @@ fn intervening_handoff_mode_change(
     assert_eq!(fs::read(root.join(".git/index")).unwrap(), index);
     fs::set_permissions(root.join(HANDOFF), fs::Permissions::from_mode(mode)).unwrap();
 }
+
+mod pinning;

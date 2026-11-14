@@ -177,7 +177,10 @@ actual checkout commit/tree, evaluated source/context and permitted host-head re
 old/proposed lifecycle state, checkpoint kind, decision and bounded reason codes. It also contains predecessor admission
 identities, independently approved IN1 source/workflow and complete relevant policy/dependency
 closure, observed protected roots/tips, accepted origin, registry anchor and other authoritative
-inputs, consumed reporting-context/execution-evidence identities where applicable, and host
+inputs, a canonical digest of normalized independently authenticated producer and isolated-host
+facts (including authorized adoptions and explicit discovery completeness/absence, with canonical
+population ordering), consumed reporting-context/execution-evidence identities
+where applicable, and host
 workflow/run/attempt/job/check/event claims. An admission without a depth producer is representable.
 The first record binds an independently authenticated bootstrap/enrollment anchor. Earlier
 admissions must never be invented to fill a pre-mechanism history gap.
@@ -221,9 +224,40 @@ Use v1 bounds of 1,000 runs and 100 attempts for each independently enumerated h
 record. Existing object/source/artifact bounds also apply. Exceeding a bound yields `unverified`
 with complete-discovery failure. Required history is never truncated. Keep records immutable by
 decision identity and separately authenticate retries. Conflicting decisions over identical policy
-and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
-commitments, stale roots or changed populations prevent verification. Distinguish decisions over
-different root snapshots. Revocation changes present eligibility while preserving historical
+and authoritative inputs, object mismatches, gaps, ambiguous/duplicate commitments, bound overflow,
+stale roots or changed populations prevent verification. Distinguish decisions over
+different root snapshots and observed host authority. Candidate-authored files cannot select the
+observed-authority digest. Author login and current permission precede fallible adoption-body
+parsing; unauthorized prose and malformed adoption JSON cannot truncate normalized capture.
+After initial input capture succeeds, an unavailable read before a substantive decision produces
+a retained refusal with the sole reason `observation_incomplete`, excluded from identical-input conflict comparisons. At the owning
+boundary, pin the reached decision, owning reason and normalized facts. Closing context/binding
+rechecks still run; failures append `observation_incomplete` without relabeling the reached
+admission/refusal or salting its authority commitment. Such reached decisions remain conflict
+sides. Capture every other evaluated-input field before invoking the owning policy predicates,
+including the authenticated predecessor frontier and its Bootstrap/unclassified classification,
+immutable generation/state/input/evidence projections, root/policy snapshots and independently
+supplied invocation event. Failed reads or malformed present state/depth bytes abort input capture
+before a substantive decision and leave an incomplete, unverified attempt. Successful lookups can
+represent actual absence. Retention reuses the captured fields. A retention-time history failure
+adds incompleteness while preserving the reached decision and its full conflict identity. The
+emitting session event must match the captured event. The substantive conflict key binds
+candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+evaluated blobs, normalized observed authority, checkpoint classification and generation. Replace
+the audit predecessor identities with a sorted set of predecessor commit/transition-digest pairs.
+The transition digest covers canonical `[old_state, new_state]` under the NUL-terminated
+`support-depth-in1-transition-v1` domain. Exclude emitting session claims, decision and reasons.
+Equivalent predecessor retries yield the same key. Retained predecessor identities authenticate
+the audit trail. Every reached decision participates in key-based conflict comparison.
+
+History quarantines every observation-incomplete or history-deficient record, including admissions
+with missing/superseded predecessor references or inconsistent Bootstrap classification. Only
+complete records contribute frontier completeness, readiness, generation-history completion and
+progression. Quarantined records preserve accountability while allowing healthy retries and other
+candidates to reconstruct. Reconstruction fails only for genuine integrity failures, including
+object mismatches, gaps, bounds, duplicate identities and contradictory reached decisions over
+one substantive key. Incomplete-only refusals remain exempt from conflict comparison. Every
+observation-incomplete record requires a failed emitting job. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification
 requires the evidence to remain available.

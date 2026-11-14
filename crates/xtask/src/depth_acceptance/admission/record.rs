@@ -4,7 +4,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const RECORD_LIMIT: usize = 65_536;
 pub(crate) const DOMAIN: &[u8] = b"support-depth-in1-admission-v1\0";
@@ -91,6 +91,7 @@ pub(crate) enum Reason {
     FreezeAuthorityMismatch,
     AcquisitionAuthorityUnavailable,
     FreezePlanningRefused,
+    ObservationIncomplete,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -137,6 +138,8 @@ pub(crate) struct Record {
     pub registry_blob: String,
     /// Path -> Git blob identity for every authoritative input consumed by this decision.
     pub inputs: BTreeMap<String, String>,
+    /// Canonical commitment to independently read host facts, including observed absence.
+    pub observed_authority: String,
     /// FR2/FR3 supply authenticated freeze and producer-context references.
     pub producer_context: Option<String>,
     pub execution_evidence: Vec<String>,
@@ -164,26 +167,78 @@ impl Record {
     pub(crate) fn identity(&self) -> Result<String, String> {
         Ok(digest(DOMAIN, &self.canonical()?))
     }
-    /// A retry's host association is excluded. Root snapshots and all evaluated inputs remain.
-    pub(crate) fn inputs_identity(&self) -> Result<String, String> {
-        let mut inputs = self.clone();
-        inputs.claims = Claims {
-            run: 0,
-            attempt: 0,
-            job: 0,
-            check: 0,
-            event: self.claims.event.clone(),
-        };
-        inputs.decision = Decision::Admitted;
-        inputs.reasons.clear();
+    /// The caller supplies authenticated predecessor records from the retained audit references.
+    /// Equivalent retries contribute the same commit/transition pair to this sorted set.
+    pub(crate) fn inputs_identity(&self, predecessors: &[&Record]) -> Result<String, String> {
+        let mut inputs = serde_json::to_value(self).map_err(|e| e.to_string())?;
+        let inputs = inputs
+            .as_object_mut()
+            .ok_or("IN1 inputs must be an object")?;
+        inputs.remove("claims");
+        inputs.remove("decision");
+        inputs.remove("reasons");
+        let transitions = predecessors
+            .iter()
+            .map(|prior| {
+                Ok((
+                    prior.candidate.commit.clone(),
+                    digest(
+                        b"support-depth-in1-transition-v1\0",
+                        &canonical(&(&prior.old_state, &prior.new_state))?,
+                    ),
+                ))
+            })
+            .collect::<Result<BTreeSet<_>, String>>()?;
+        inputs.insert(
+            "predecessors".into(),
+            serde_json::to_value(transitions).map_err(|e| e.to_string())?,
+        );
         Ok(digest(
             b"support-depth-in1-inputs-v1\0",
-            &canonical(&inputs)?,
+            &canonical(inputs)?,
         ))
+    }
+    /// A reached admission with failed closing observations cannot grant historical authority.
+    pub(crate) fn successful(&self) -> bool {
+        self.decision == Decision::Admitted
+            && !self.reasons.contains(&Reason::ObservationIncomplete)
     }
     fn validate(&self) -> Result<(), String> {
         if self.schema_version != 1 || self.kind != "in1_admission" {
             return Err("unsupported IN1 control record version/kind".into());
+        }
+        if self.reasons.contains(&Reason::ObservationIncomplete) {
+            let mut reached = self.reasons.as_slice();
+            if reached.last() != Some(&Reason::ObservationIncomplete) {
+                return Err("IN1 incompleteness must follow reached reasons".into());
+            }
+            reached = &reached[..reached.len() - 1];
+            let owning = match self.decision {
+                Decision::Admitted => Reason::OwningPredicatesSatisfied,
+                Decision::Refused => Reason::OwningPredicateRefused,
+            };
+            let valid = match reached {
+                [] => self.decision == Decision::Refused,
+                [reason] => *reason == owning,
+                [reason, freeze] => {
+                    *reason == owning
+                        && matches!(
+                            freeze,
+                            Reason::ExactFreezeTree
+                                | Reason::FreezeTreeMismatch
+                                | Reason::FreezeAuthorityUnavailable
+                                | Reason::FreezeAuthorityMismatch
+                                | Reason::AcquisitionAuthorityUnavailable
+                                | Reason::FreezePlanningRefused
+                        )
+                }
+                _ => false,
+            };
+            if !valid {
+                return Err(
+                    "IN1 incomplete observation has inconsistent reached decision/reasons".into(),
+                );
+            }
         }
         for object in [
             &self.candidate,
@@ -199,6 +254,7 @@ impl Record {
         oid(&self.registry_blob)?;
         oid(&self.policy.workflow_commit)?;
         sha256(&self.policy.implementation)?;
+        sha256(&self.observed_authority)?;
         if self.policy.workflow_id == 0
             || self.policy.app_id == 0
             || self.policy.job_key.is_empty()
@@ -261,10 +317,10 @@ impl Record {
         }
         if self.checkpoint == Checkpoint::RequestFreeze
             && (self.transition.is_none()
-                || self.decision != Decision::Admitted
-                || !self.reasons.contains(&Reason::ExactFreezeTree))
+                || (!self.reasons.contains(&Reason::ExactFreezeTree)
+                    && self.reasons != [Reason::ObservationIncomplete]))
         {
-            return Err("IN1 request freeze lacks an admitted exact transition".into());
+            return Err("IN1 request freeze lacks a captured exact transition".into());
         }
         for state in self.old_state.iter().chain(&self.new_state) {
             oid(&state.blob)?;

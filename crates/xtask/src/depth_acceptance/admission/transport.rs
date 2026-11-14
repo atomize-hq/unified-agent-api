@@ -31,6 +31,8 @@ pub(crate) trait Host: Send + Sync {
     fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
         Ok(None)
     }
+    /// Independently supplied invocation event, pinned before owning predicate evaluation.
+    fn event(&self) -> Result<String, String>;
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
     fn upload(&self, claims: &Claims, bytes: &[u8]) -> Result<u64, String>;
     fn commit(&self, claims: &Claims, line: &str) -> Result<(), String>;
@@ -80,14 +82,31 @@ impl Publication {
     }
 }
 impl Session {
-    pub(crate) fn publish(&self, record: &Record) -> Result<(), String> {
+    pub(crate) fn publish(
+        &self,
+        record: &mut Record,
+        recheck: impl FnOnce() -> Result<(), String>,
+    ) -> Result<(), String> {
         if record.claims != self.claims {
             return Err("IN1 emitter claims changed".into());
         }
         let bytes = record.canonical()?;
-        let artifact = self.publication.host.upload(&self.claims, &bytes)?;
+        let mut artifact = self.publication.host.upload(&self.claims, &bytes)?;
         if artifact == 0 {
             return Err("IN1 upload returned no artifact identity".into());
+        }
+        // Close freeze observations after upload, while the retained commitment is still open.
+        // A late failure publishes the pinned decision with incompleteness in a fresh artifact.
+        let closing = recheck();
+        if closing.is_err() && !record.reasons.contains(&Reason::ObservationIncomplete) {
+            record.reasons.push(Reason::ObservationIncomplete);
+            artifact = self
+                .publication
+                .host
+                .upload(&self.claims, &record.canonical()?)?;
+            if artifact == 0 {
+                return Err("IN1 upload returned no artifact identity".into());
+            }
         }
         self.publication
             .host
@@ -99,7 +118,7 @@ impl Session {
             self.claims.run,
             self.claims.attempt,
         )?;
-        if self.publication.host.json("git/ref/heads/staging")?["object"]["sha"]
+        if observed_json(self.publication.host.as_ref(), "git/ref/heads/staging")?["object"]["sha"]
             != record.protected_tip.commit
         {
             return Err("IN1 protected root changed around publication".into());
@@ -107,7 +126,7 @@ impl Session {
         if retained != *record {
             return Err("IN1 published decision differs from evaluated decision".into());
         }
-        Ok(())
+        closing
     }
 }
 pub(crate) fn commitment(digest: &str, artifact: u64) -> String {
@@ -123,7 +142,7 @@ impl Snapshot {
     fn read(host: &dyn Host, authority: &Authority) -> Result<Self, String> {
         let mut observations = vec![];
         for path in ["", "git/ref/heads/staging", "in1/revocations"] {
-            observations.push((path.into(), host.json(path)?));
+            observations.push((path.into(), observed_json(host, path)?));
         }
         let repository = &observations[0].1;
         if repository["id"] != authority.repository.id
@@ -154,7 +173,7 @@ impl Snapshot {
             }
             for attempt in 1..=count {
                 let path = format!("actions/runs/{id}/attempts/{attempt}");
-                let details = host.json(&path)?;
+                let details = observed_json(host, &path)?;
                 for key in [
                     "head_sha",
                     "path",
@@ -235,7 +254,7 @@ impl Snapshot {
         for (path, before) in &self.observations {
             if !path.starts_with(RUNS)
                 && !path.starts_with(&artifact_query)
-                && publication.host.json(path)? != *before
+                && observed_json(publication.host.as_ref(), path)? != *before
             {
                 return Err("IN1 roots or earlier attempts changed around publication".into());
             }
@@ -244,7 +263,7 @@ impl Snapshot {
     }
     pub(super) fn recheck(&self, host: &dyn Host, _: &Authority) -> Result<(), String> {
         for (path, before) in &self.observations {
-            if host.json(path)? != *before {
+            if observed_json(host, path)? != *before {
                 return Err("IN1 roots or host population changed during discovery".into());
             }
         }
@@ -257,7 +276,7 @@ pub(super) fn authenticate(
     run: u64,
     attempt: u64,
 ) -> Result<Record, String> {
-    let details = host.json(&format!("actions/runs/{run}/attempts/{attempt}"))?;
+    let details = observed_json(host, &format!("actions/runs/{run}/attempts/{attempt}"))?;
     if details["id"] != run
         || details["run_attempt"] != attempt
         || details["workflow_id"] != authority.policy.workflow_id
@@ -294,7 +313,7 @@ pub(super) fn authenticate(
     {
         return Err("IN1 incomplete or wrong-attempt job".into());
     }
-    let logs = host.bytes(&format!("actions/jobs/{job_id}/logs"), 16_777_216)?;
+    let logs = observed_bytes(host, &format!("actions/jobs/{job_id}/logs"), 16_777_216)?;
     if logs.len() > 16_777_216 {
         return Err("IN1 job log bound exceeded".into());
     }
@@ -348,7 +367,11 @@ pub(super) fn authenticate(
     {
         return Err("IN1 expired or wrong-run artifact".into());
     }
-    let zip = host.bytes(&format!("actions/artifacts/{artifact_id}/zip"), 2_097_152)?;
+    let zip = observed_bytes(
+        host,
+        &format!("actions/artifacts/{artifact_id}/zip"),
+        2_097_152,
+    )?;
     if zip.len() > 2_097_152
         || artifact["size_in_bytes"].as_u64() != Some(zip.len() as u64)
         || artifact["digest"] != format!("sha256:{}", digest_bytes(&zip))
@@ -367,7 +390,7 @@ pub(super) fn authenticate(
         || record.repository != authority.repository
         || record.enrollment_anchor != authority.anchor
         || job["conclusion"]
-            != if record.decision == Decision::Admitted {
+            != if record.successful() {
                 "success"
             } else {
                 "failure"
@@ -415,7 +438,7 @@ pub(crate) fn list(
     let mut total = None;
     for page in 1..=10 {
         let path = format!("{path}?per_page=100&page={page}");
-        let value = host.json(&path)?;
+        let value = observed_json(host, &path)?;
         let count = value["total_count"]
             .as_u64()
             .ok_or("IN1 missing population total")?;
@@ -455,4 +478,17 @@ fn string<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     value[key]
         .as_str()
         .ok_or_else(|| format!("IN1 missing {key}"))
+}
+
+// Producer evaluation may consult retained history while capture is active. Only availability
+// belongs here. Emission/reconstruction after capture cannot feed its own artifacts into identity.
+fn observed_json(host: &dyn Host, path: &str) -> Result<Value, String> {
+    let response = host.json(path);
+    super::observations::unavailable(&format!("admission/{path}"), &response);
+    response
+}
+fn observed_bytes(host: &dyn Host, path: &str, limit: usize) -> Result<Vec<u8>, String> {
+    let response = host.bytes(path, limit);
+    super::observations::unavailable(&format!("admission/{path}"), &response);
+    response
 }
