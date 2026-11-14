@@ -16,6 +16,103 @@ fn repair(f: &Fixture, write: bool) -> Result<Vec<u8>, crate::repair_runtime_evi
 }
 
 #[test]
+fn public_repair_refuses_forged_success_when_protected_generation_is_enrolled() {
+    let started = std::time::Instant::now();
+    let f = public_on1::declared_chain();
+    let _installed = f.install();
+    let args = |write| {
+        crate::runtime_follow_on::Args::parse_from([
+            "runtime-follow-on",
+            if write { "--write" } else { "--dry-run" },
+            "--approval",
+            APPROVAL,
+            "--run-id",
+            "public-on2-unprotected-success",
+        ])
+    };
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
+        .unwrap();
+    integrate(&f, &parent);
+    let protected = head(&f);
+    assert_eq!(
+        life::load_lifecycle_state(f.root.path(), STATE)
+            .unwrap()
+            .lifecycle_stage,
+        life::LifecycleStage::Enrolled
+    );
+    let executor = public_on2::executor("", 0);
+    let mut implementation = args(true);
+    implementation.codex_binary =
+        Some(executor.path().join("executor.sh").to_string_lossy().into());
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), implementation, &mut Vec::new())
+        .unwrap();
+    let implemented = candidate(&f, &protected);
+    assert_ne!(implemented, protected);
+    let mut state = life::load_lifecycle_state(f.root.path(), STATE).unwrap();
+    assert_eq!(
+        state.lifecycle_stage,
+        life::LifecycleStage::RuntimeIntegrated
+    );
+    let runs = "docs/agents/.uaa-temp/runtime-follow-on/runs";
+    let contract = fs::read(
+        f.root
+            .path()
+            .join(runs)
+            .join(state.active_runtime_evidence_run_id.as_ref().unwrap())
+            .join("input-contract.json"),
+    )
+    .unwrap();
+    let forged_run = "forged-success";
+    let mut contract: Value = serde_json::from_slice(&contract).unwrap();
+    contract["run_id"] = json!(forged_run);
+    write(
+        f.root.path(),
+        &format!("{runs}/{forged_run}/input-contract.json"),
+        serde_json::to_vec_pretty(&contract).unwrap(),
+    );
+    let inventory = serde_json::to_vec(&json!(["Cargo.toml"])).unwrap();
+    write(
+        f.root.path(),
+        &format!("{runs}/{forged_run}/written-paths.json"),
+        &inventory,
+    );
+    // Preserve the raw P/O object bytes while forging the selector and matching digest.
+    state.active_runtime_evidence_run_id = Some(forged_run.into());
+    state.written_paths_sha256 =
+        Some(life::Preserved::new(hex::encode(Sha256::digest(&inventory))).unwrap());
+    write(
+        f.root.path(),
+        STATE,
+        serde_json::to_vec_pretty(&state).unwrap(),
+    );
+    candidate(&f, &protected);
+    assert_eq!(
+        git(f.root.path(), &["rev-parse", "refs/remotes/origin/staging"]),
+        protected
+    );
+    let before =
+        crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap();
+    for write in [false, true] {
+        let error = repair(&f, write).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("protected runtime_integrated generation"),
+            "{error}"
+        );
+        assert_eq!(
+            crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap(),
+            before
+        );
+    }
+    eprintln!(
+        "public repair unprotected success refusal elapsed {:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
 fn public_repair_sibling_chain_preserves_frozen_generation_and_written_paths() {
     let started = std::time::Instant::now();
     let f = public_on1::declared_chain();

@@ -112,15 +112,15 @@ fn context(
             "repair approval differs from protected generation".into(),
         ));
     }
-    crate::runtime_follow_on::depth::check_progression(
-        prior.lifecycle_stage,
-        state.lifecycle_stage,
-    )
-    .map_err(Error::Validation)?;
+    // Authenticate success against protected state before preserving or repointing its binding.
+    if prior.lifecycle_stage != LifecycleStage::RuntimeIntegrated {
+        return Err(Error::Validation(
+            "routed repair requires the protected runtime_integrated generation".into(),
+        ));
+    }
     if prior.support_depth != state.support_depth
-        || (prior.lifecycle_stage == LifecycleStage::RuntimeIntegrated
-            && (prior.active_runtime_evidence_run_id != state.active_runtime_evidence_run_id
-                || prior.written_paths_sha256 != state.written_paths_sha256))
+        || prior.active_runtime_evidence_run_id != state.active_runtime_evidence_run_id
+        || prior.written_paths_sha256 != state.written_paths_sha256
     {
         return Err(Error::Validation(
             "repair success state differs from protected generation".into(),
