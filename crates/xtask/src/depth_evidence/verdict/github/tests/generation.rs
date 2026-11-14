@@ -357,13 +357,114 @@ fn canonical_maintenance_generation_association_refusals_and_fixture_independenc
 }
 
 #[test]
+fn ordinary_later_request_preserves_retained_evaluation_and_target_refusals() {
+    let f = Fixture::new_for(P);
+    let root = f.root.path();
+    let at = source(root, ISOLATED, &f.commit).unwrap();
+    let target = P.resolve_generation(&at).unwrap().unwrap().record;
+    let path = crate::agent_lifecycle::maintenance_request_path(P.agent_id());
+    let request: toml_edit::DocumentMut = fs::read_to_string(root.join(&path))
+        .unwrap()
+        .parse()
+        .unwrap();
+    let mut ordinary = request.clone();
+    ordinary.remove("support_depth");
+    ordinary["detected_release"]["target_version"] = toml_edit::value("0.3.0");
+    ordinary["request_commit"] = toml_edit::value("a".repeat(40));
+    write(root, &path, ordinary.to_string());
+    let later = commit(root);
+    let at = source(root, ISOLATED, &later).unwrap();
+    assert!(P.resolve_generation(&at).unwrap().is_none());
+    assert!(P
+        .resolve_inputs(&mut at.clone(), Some(&target), false)
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        P.resolve_inputs(&mut at.clone(), Some(&target), true)
+            .err()
+            .unwrap(),
+        "associated head replaced maintenance generation"
+    );
+    let host = EvidenceHost::for_test(ISOLATED, &f.commit);
+    let resolved = resolve_profile_in(&f.api, root, P, Some(&host)).unwrap();
+    assert_eq!(resolved.original, target);
+    assert_eq!(resolved.runs.len(), 11);
+    let mut api = f.api.clone();
+    let query = api
+        .0
+        .keys()
+        .find(|p| p.contains("/runs?created="))
+        .unwrap()
+        .clone();
+    api.change(query.strip_prefix(&api.endpoint("")).unwrap(), |value| {
+        let mut later_run = value["workflow_runs"][0].clone();
+        later_run["id"] = json!(44);
+        later_run["head_sha"] = json!(later);
+        later_run["pull_requests"] = json!([]);
+        value["workflow_runs"]
+            .as_array_mut()
+            .unwrap()
+            .push(later_run);
+        value["total_count"] = json!(2);
+    });
+    assert_eq!(
+        resolve_profile_in(&api, root, P, Some(&host))
+            .unwrap()
+            .runs
+            .len(),
+        11
+    );
+
+    let mut stripped = request;
+    stripped.remove("support_depth");
+    let mut changed_version = stripped.clone();
+    changed_version["detected_release"]["target_version"] = toml_edit::value("0.3.0");
+    let mut malformed_binding = ordinary.clone();
+    malformed_binding["support_depth"] = toml_edit::value("invalid");
+    let mut malformed_field = ordinary;
+    malformed_field["request_commit"] = toml_edit::value(42);
+    for (raw, expected) in [
+        ("[".into(), "invalid maintenance generation request"),
+        (
+            malformed_field.to_string(),
+            "invalid maintenance generation request",
+        ),
+        (
+            malformed_binding.to_string(),
+            "invalid maintenance generation request",
+        ),
+        (
+            stripped.to_string(),
+            "maintenance generation request missing support_depth",
+        ),
+        (
+            changed_version.to_string(),
+            "maintenance generation request missing support_depth",
+        ),
+    ] {
+        write(root, &path, raw);
+        let head = commit(root);
+        let at = source(root, ISOLATED, &head).unwrap();
+        for associated in [false, true] {
+            let error = P
+                .resolve_inputs(&mut at.clone(), Some(&target), associated)
+                .err()
+                .unwrap();
+            assert!(error.contains(expected), "{error}");
+        }
+        let error = P.resolve_generation(&at).err().unwrap();
+        assert!(error.contains(expected), "{error}");
+    }
+}
+
+#[test]
 fn unavailable_canonical_report_never_becomes_unrelated_absence() {
     use crate::support_depth::acquisition_inputs::Inputs;
-    struct Unavailable(crate::runtime_advertising::source::Source);
+    struct Unavailable(crate::runtime_advertising::source::Source, String);
     impl Inputs for Unavailable {
         fn optional(&mut self, path: &str) -> Result<Option<Vec<u8>>, String> {
-            if path == REPORT {
-                return Err("authenticated report transport unavailable".into());
+            if path == self.1 {
+                return Err("authenticated generation transport unavailable".into());
             }
             self.0.optional_bytes(path)
         }
@@ -374,11 +475,16 @@ fn unavailable_canonical_report_never_becomes_unrelated_absence() {
     let f = Fixture::new_for(P);
     let at = source(f.root.path(), ISOLATED, &f.commit).unwrap();
     let target = P.resolve_generation(&at).unwrap().unwrap().record;
-    let error = P
-        .resolve_inputs(&mut Unavailable(at), Some(&target), false)
-        .err()
-        .unwrap();
-    assert_eq!(error, "authenticated report transport unavailable");
+    for path in [
+        REPORT.into(),
+        crate::agent_lifecycle::maintenance_request_path(P.agent_id()),
+    ] {
+        let error = P
+            .resolve_inputs(&mut Unavailable(at.clone(), path), Some(&target), false)
+            .err()
+            .unwrap();
+        assert_eq!(error, "authenticated generation transport unavailable");
+    }
 }
 
 #[test]

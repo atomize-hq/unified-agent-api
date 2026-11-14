@@ -346,3 +346,48 @@ storage use. Changes remain uncommitted on `feat/fr3-reporting-context`; nothing
 
 The affected publication, MA5, MA6, view-evaluation and connected IN1 results will be recorded
 when their validation run completes.
+
+## Round 3 fix
+
+The ordinary 0.3.0 request coexists with the retained 0.2.0 depth report. That report's Event
+makes the head relevant during discovery, and the evaluator's initial target lookup treats every
+checkout as relevant. Both paths previously required `support_depth` before distinguishing an
+ordinary later packet. Retained-report relevance triggers the parse failure before ancestry checks.
+
+The resolver now parses an optional support-depth binding while retaining required typed request
+fields and propagating request/report read and parse failures. A supported same-agent ordinary
+request to another version, with a different Event, resolves to no active depth generation.
+Evaluation then selects the fully parsed retained versioned statement from the caller's immutable
+HEAD and projects its Event/P/O. Historical producer heads still use canonical request/report
+resolution. Explicit packet-PR association refuses replacement, and discovery still checks retained
+admission ancestry after an absent binding.
+
+Removing `support_depth` from the target-version request yields an error and therefore
+unverified/refusal under design §4. Changing only its version also refuses while its Event matches
+the target. The new socket-free
+`ordinary_later_request_preserves_retained_evaluation_and_target_refusals` reproduced the original
+missing-field panic before the fix. It covers ordinary resolution, retained evaluation/population,
+associated replacement, malformed TOML/typed fields/bindings and stripped target requests. The
+transport regression now covers unreadable requests as well as reports.
+
+Every Cargo/test command uses `TMPDIR=$PWD/target/tmp`. Changes remain uncommitted on
+`feat/fr3-reporting-context` for the lead.
+
+| Check | Round 3 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass |
+| `cargo test -p xtask --lib depth_ci` | 8 passed |
+| `cargo test -p xtask --lib depth_evidence::verdict::github::tests::generation` | 4 passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr3_reporting -- --test-threads=1` | 1 passed |
+| Additional `cargo test -p xtask --lib depth_evidence::verdict -- --test-threads=1` | 76 passed, 7 onboarding fixture failures |
+| `make loc-check`, `make hygiene`, `git diff --check` | Pass |
+
+The requested MA6 replay test was attempted before and after the fix. Both runs stop before the
+reported path because the sandbox denies the MA4 evidence-channel socket with
+`Operation not permitted (os error 1)`.
+
+The additional verdict run's seven onboarding fixtures fail in their existing producer build
+before resolver execution. Cargo discovers the enclosing repository workspace from the required
+`target/tmp` location and reports that the standalone fixture package believes it belongs to that
+workspace. Details are in the ignored `target/fr3-round3-verdict-tests.log`.

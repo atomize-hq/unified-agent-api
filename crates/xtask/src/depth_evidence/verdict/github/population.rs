@@ -72,9 +72,18 @@ pub(super) fn resolve_generation_inputs(
         // MA5/MA6 evaluate post-entry proposals with unstaged report bytes. Generation authority
         // stays at the caller's immutable checkout, including when the view lives in scratch.
         // Proposed build/acquired inputs below retain all GitInputs freshness checks.
-        resolver
-            .committed_generation(&view.provenance("HEAD")?)?
-            .record
+        let committed = view.provenance("HEAD")?;
+        match resolver.resolve_generation(&committed)? {
+            Some(binding) => binding.record,
+            None => {
+                // An ordinary later packet has no active depth generation. Evaluation still
+                // selects the retained versioned statement at this immutable checkout.
+                let mut retained = p.record(&committed.read(depth_ci::onboarding::RECORD)?)?;
+                retained.execution = None;
+                retained.acceptance_entries.clear();
+                retained
+            }
+        }
     } else {
         resolver.current_generation(view)?.record
     };

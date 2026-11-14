@@ -66,12 +66,27 @@ pub(crate) fn resolve(
     let request = request
         .map_err(|e| format!("invalid maintenance generation request: {e}"))?
         .ok_or("maintenance generation request missing")?;
-    let mut record = report
-        .map_err(|e| format!("invalid maintenance generation report: {e}"))?
-        .ok_or("maintenance generation report missing")?;
-    if request.artifact_version != "2"
-        || request.agent_id != p.agent_id()
-        || request.detected_release.target_version != p.version()
+    let report = report.map_err(|e| format!("invalid maintenance generation report: {e}"))?;
+    if request.artifact_version != "2" || request.agent_id != p.agent_id() {
+        return Err("maintenance generation version, agent or enrollment mismatch".into());
+    }
+    let Some(support_depth) = &request.support_depth else {
+        // A later ordinary packet can coexist with this version's retained report. A target
+        // request stripped of its binding, or an independently associated replacement, refuses.
+        if request.detected_release.target_version != p.version()
+            && target.map_or(true, |t| t.event != request.event())
+            && report.as_ref().map_or(true, |r| r.event != request.event())
+        {
+            return if associated {
+                Err("associated head replaced maintenance generation".into())
+            } else {
+                Ok(None)
+            };
+        }
+        return Err("maintenance generation request missing support_depth".into());
+    };
+    let mut record = report.ok_or("maintenance generation report missing")?;
+    if request.detected_release.target_version != p.version()
         || record.policy.selection.enrollment.lifecycle_path
             != crate::agent_registry::support_depth::LifecyclePath::Maintenance
     {
@@ -79,8 +94,8 @@ pub(crate) fn resolve(
     }
     if let Some(reason) = record.request_mismatch(&RequestBinding {
         event: request.event(),
-        policy_identity: Some(request.support_depth.policy_identity.clone()),
-        obligations_identity: request.support_depth.obligations_identity.clone(),
+        policy_identity: Some(support_depth.policy_identity.clone()),
+        obligations_identity: support_depth.obligations_identity.clone(),
     }) {
         return Err(format!(
             "maintenance generation request/report mismatch: {reason}"
@@ -152,7 +167,7 @@ struct Request {
     trigger_kind: String,
     opened_from: String,
     detected_release: Release,
-    support_depth: SupportDepthBinding,
+    support_depth: Option<SupportDepthBinding>,
     #[serde(default)]
     support_surface_audit: Audit,
 }
