@@ -397,6 +397,7 @@ fn create_candidate_relative_holder_name_preserves_publication_digest() {
         lifecycle_state_path: context.lifecycle_state_path.clone(),
         run_id: context.run_id.clone(),
         run_dir: candidate.root.join(&candidate.run_dir_rel),
+        wrapper_only: context.wrapper_only,
     };
     let (execution, observed) = candidate.execute_observed(|| {
         write(&candidate.root, &relative, &source);
