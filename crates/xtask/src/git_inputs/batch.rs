@@ -1,99 +1,62 @@
 use super::*;
-use std::{io::Write, process::Stdio};
 
-/// Keep failures per path so callers can interleave freeze comparisons and recording in the
-/// original order. A later read failure must not hide an earlier changed-during-freeze error.
+/// Stream one path and blob at a time, reusing the entry listing and cat-file child. This
+/// bounds additional payload memory to one working file plus one blob, including files larger
+/// than any fixed chunk budget, without imposing an input size limit. Consumers compare and
+/// record each result before requesting the next, preserving per-path error precedence.
 pub(super) fn read_many(
     root: &Path,
     paths: &[&str],
     borrowed: Option<&(PathBuf, String)>,
-) -> Vec<Result<Input, String>> {
-    let full: Vec<_> = paths.iter().map(|path| safe_path(root, path)).collect();
-    if full.iter().all(Result::is_err) {
-        return full
-            .into_iter()
-            .map(|result| Err(result.unwrap_err()))
-            .collect();
-    }
-    let entries = match entries(root, borrowed) {
-        Ok(entries) => entries,
-        // A recursive tree listing can encounter an unavailable unrelated subtree. Preserve
-        // the bounded single-path result and exact Git errors on exceptional repositories.
-        Err(_) => {
-            return paths
-                .iter()
-                .map(|path| read(root, path, borrowed))
-                .collect()
+) -> impl Iterator<Item = Result<Input, String>> {
+    let root = root.to_owned();
+    let borrowed = borrowed.cloned();
+    let paths: Vec<_> = paths.iter().map(|path| (*path).to_owned()).collect();
+    let mut entries = None;
+    let object_root = borrowed
+        .as_ref()
+        .map_or(root.as_path(), |(caller, _)| caller.as_path());
+    let mut blobs = immutable::BlobReader::new(object_root);
+    paths.into_iter().map(move |path| {
+        let full = safe_path(&root, &path)?;
+        let entries = entries.get_or_insert_with(|| load_entries(&root, borrowed.as_ref()));
+        let entries = match entries {
+            Ok(entries) => entries,
+            // Recursive listings can fail on unrelated unavailable subtrees. Unsorted and
+            // duplicate tree entries also need Git's original bounded pathspec walk.
+            Err(_) => return read(&root, &path, borrowed.as_ref()),
+        };
+        let mut index = entries.get(path.as_bytes()).cloned().unwrap_or_default();
+        if borrowed.is_none() {
+            // Literal ls-files pathspecs include descendants of a requested directory.
+            let prefix = format!("{path}/").into_bytes();
+            for (_, rows) in entries
+                .range(prefix.clone()..)
+                .take_while(|(p, _)| p.starts_with(&prefix))
+            {
+                index.extend(rows);
+            }
         }
-    };
-    let pending: Vec<_> = paths
-        .iter()
-        .zip(full)
-        .map(|(path, full)| {
-            let full = full?;
-            let mut index = entries.get(path.as_bytes()).cloned().unwrap_or_default();
-            if borrowed.is_none() {
-                // Literal ls-files pathspecs include descendants, even for a requested directory.
-                let prefix = format!("{path}/").into_bytes();
-                for (_, rows) in entries
-                    .range(prefix.clone()..)
-                    .take_while(|(p, _)| p.starts_with(&prefix))
-                {
-                    index.extend(rows);
-                }
+        let (input, object) = prepare(&full, &path, index, borrowed.is_some())?;
+        if let Some(object) = object {
+            if input.bytes.as_ref() != Some(&blobs.read(&object)?) {
+                return Err(format!("working bytes disagree with index: {path}"));
             }
-            prepare(&full, path, index, borrowed.is_some())
-        })
-        .collect();
-    let objects: Vec<_> = pending
-        .iter()
-        .filter_map(|result| {
-            result
-                .as_ref()
-                .ok()
-                .and_then(|(_, object)| object.as_deref())
-        })
-        .collect();
-    let object_root = borrowed.map_or(root, |(caller, _)| caller.as_path());
-    let mut blobs = blobs(object_root, &objects).into_iter();
-    pending
-        .into_iter()
-        .zip(paths)
-        .map(|(result, path)| {
-            let (input, object) = result?;
-            if object.is_some() {
-                let staged = blobs.next().ok_or("missing batch blob result")??;
-                if input.bytes.as_ref() != Some(&staged) {
-                    return Err(format!("working bytes disagree with index: {path}"));
-                }
-            }
-            Ok(input)
-        })
-        .collect()
+        }
+        Ok(input)
+    })
 }
 
-fn entries(
+fn load_entries(
     root: &Path,
     borrowed: Option<&(PathBuf, String)>,
 ) -> Result<BTreeMap<Vec<u8>, Vec<u8>>, String> {
-    // Neither ls-files nor ls-tree supports stdin pathspecs. Read the index/tree once and
-    // select literal paths locally, keeping argv bounded and unrelated non-UTF8 paths opaque.
-    let rows = if let Some((caller, commit)) = borrowed {
-        git(
-            caller,
-            &[
-                "--literal-pathspecs",
-                "ls-tree",
-                "-r",
-                "-t",
-                "-z",
-                "--full-tree",
-                commit,
-            ],
-        )?
-    } else {
-        git(root, &["--literal-pathspecs", "ls-files", "--stage", "-z"])?
-    };
+    // Keep argv bounded and unrelated non-UTF8 paths opaque. Both borrowed readers share
+    // the ordering/ancestor/duplicate validation before selecting from a complete tree.
+    if let Some((caller, commit)) = borrowed {
+        return Ok(immutable::Index::load(caller, commit)?.into_entries());
+    }
+    let rows = git(root, &["--literal-pathspecs", "ls-files", "--stage", "-z"])?;
     let mut entries = BTreeMap::<Vec<u8>, Vec<u8>>::new();
     for row in rows.split(|b| *b == 0).filter(|r| !r.is_empty()) {
         let tab = row
@@ -167,80 +130,4 @@ pub(super) fn prepare(
         },
         Some(object),
     ))
-}
-
-fn blobs(root: &Path, objects: &[&str]) -> Vec<Result<Vec<u8>, String>> {
-    if objects.is_empty() {
-        return Vec::new();
-    }
-    let output = batch_output(root, objects);
-    let mut remaining = output.as_deref().unwrap_or_default();
-    objects
-        .iter()
-        .map(|object| {
-            // Exceptional missing/corrupt/non-blob objects use the original command for its exact
-            // error (and Git's blob conversion semantics). Successful batches use two processes.
-            take_blob(&mut remaining, object).or_else(|_| git(root, &["cat-file", "blob", object]))
-        })
-        .collect()
-}
-
-fn batch_output(root: &Path, objects: &[&str]) -> Result<Vec<u8>, String> {
-    let mut child = command(root)
-        .args(["cat-file", "--batch"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    let mut stdin = child.stdin.take().ok_or("missing Git batch stdin")?;
-    // Drain stdout/stderr while writing requests, including batches larger than pipe capacity.
-    std::thread::scope(|scope| {
-        let writer = scope.spawn(move || {
-            for object in objects {
-                writeln!(stdin, "{object}")?;
-            }
-            Ok::<_, std::io::Error>(())
-        });
-        let output = child.wait_with_output().map_err(|e| e.to_string());
-        let written = writer
-            .join()
-            .map_err(|_| "Git batch writer panicked".to_owned())?;
-        let output = output?;
-        if !output.status.success() {
-            return Err(format!(
-                "git cat-file: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-        written.map_err(|e| e.to_string())?;
-        Ok(output.stdout)
-    })
-}
-
-fn take_blob(remaining: &mut &[u8], object: &str) -> Result<Vec<u8>, String> {
-    let newline = remaining
-        .iter()
-        .position(|b| *b == b'\n')
-        .ok_or("invalid Git batch header")?;
-    let header = std::str::from_utf8(&remaining[..newline]).map_err(|e| e.to_string())?;
-    let fields: Vec<_> = header.split(' ').collect();
-    *remaining = &remaining[newline + 1..];
-    if fields.len() == 2 && fields[1] == "missing" {
-        return Err("missing Git batch object".into());
-    }
-    if fields.len() != 3 || fields[0] != object {
-        return Err("invalid Git batch object".into());
-    }
-    let size: usize = fields[2].parse().map_err(|_| "invalid Git batch size")?;
-    let end = size.checked_add(1).ok_or("invalid Git batch size")?;
-    let bytes = remaining.get(..end).ok_or("truncated Git batch object")?;
-    if bytes[size] != b'\n' {
-        return Err("invalid Git batch terminator".into());
-    }
-    *remaining = &remaining[end..];
-    if fields[1] != "blob" {
-        return Err("non-blob Git batch object".into());
-    }
-    Ok(bytes[..size].to_vec())
 }

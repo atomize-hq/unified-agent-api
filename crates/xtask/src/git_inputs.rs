@@ -193,15 +193,27 @@ impl GitInputs {
 
     /// Observe every file and directory in a relevant build scope, including untracked additions.
     pub(crate) fn files_under(&mut self, path: &str) -> Result<Vec<String>, String> {
-        self.files_under_listing(path, &listing::Listing::default())
+        safe_path(&self.root, path)?;
+        let start = listing::Listing::snapshot(&self.root, self.borrowed.is_some());
+        let mut observed = Vec::new();
+        let result = self.files_under_listing(path, &start, &mut observed)?;
+        listing::verify(
+            &self.root,
+            self.borrowed.as_ref(),
+            &self.directories,
+            observed,
+        )?;
+        Ok(result)
     }
 
     fn files_under_listing(
         &mut self,
         path: &str,
         listing: &listing::Listing,
+        observed: &mut Vec<(String, Result<Vec<String>, String>)>,
     ) -> Result<Vec<String>, String> {
         let names = list_cached(&self.root, path, self.borrowed.as_ref(), Some(listing))?;
+        observed.push((path.to_owned(), Ok(names.clone())));
         let children: Vec<_> = self
             .record_directory(path, names)?
             .into_iter()
@@ -227,19 +239,16 @@ impl GitInputs {
         };
         // Refuse reads through a stale binding, consuming its error at the original optional
         // boundary so an earlier directory or path-validation failure retains precedence.
-        let mut inputs = match binding {
-            Ok(()) => batch::read_many(&self.root, &paths, self.borrowed.as_ref()),
-            Err(error) => vec![Err(error); paths.len()],
-        }
-        .into_iter();
+        let mut inputs = batch::read_many(&self.root, &paths, self.borrowed.as_ref());
         let mut result = Vec::new();
         for (child, directory) in children {
             if directory? {
-                result.extend(self.files_under_listing(&child, listing)?);
+                result.extend(self.files_under_listing(&child, listing, observed)?);
             } else {
                 let bytes = if self.proposed.is_some() && self.files.contains_key(&child) {
                     self.files[&child].bytes.clone()
                 } else {
+                    binding.as_ref().map_err(Clone::clone)?;
                     if self.proposed.is_none() {
                         self.recheck_borrowed()?;
                     }
@@ -275,6 +284,11 @@ impl GitInputs {
 
     pub(crate) fn verify(&self) -> Result<(), String> {
         self.recheck_borrowed()?;
+        let start = if self.directories.is_empty() {
+            listing::Listing::default()
+        } else {
+            listing::Listing::snapshot(&self.root, self.borrowed.is_some())
+        };
         let paths: Vec<_> = self.files.keys().map(String::as_str).collect();
         let inputs = batch::read_many(&self.root, &paths, self.borrowed.as_ref());
         for ((path, expected), input) in self.files.iter().zip(inputs) {
@@ -282,14 +296,22 @@ impl GitInputs {
                 return Err(format!("bound input changed during freeze: {path}"));
             }
         }
-        let listing = listing::Listing::default();
-        for (path, expected) in &self.directories {
-            if list_cached(&self.root, path, self.borrowed.as_ref(), Some(&listing))? != *expected {
-                return Err(format!(
-                    "acquisition directory changed during freeze: {path}"
-                ));
-            }
-        }
+        let observed = self
+            .directories
+            .keys()
+            .map(|path| {
+                (
+                    path.clone(),
+                    list_cached(&self.root, path, self.borrowed.as_ref(), Some(&start)),
+                )
+            })
+            .collect();
+        listing::verify(
+            &self.root,
+            self.borrowed.as_ref(),
+            &self.directories,
+            observed,
+        )?;
         self.recheck_borrowed()?;
         Ok(())
     }
@@ -487,6 +509,8 @@ fn list_cached(
         let tail = file.strip_prefix(&prefix).ok_or("unexpected Git path")?;
         names.insert(tail.split('/').next().ok_or("empty Git path")?.to_string());
     }
+    #[cfg(test)]
+    tests::directory_observed(path);
     Ok(names.into_iter().collect())
 }
 

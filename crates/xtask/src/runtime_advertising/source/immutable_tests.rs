@@ -300,3 +300,31 @@ fn immutable_clones_stay_on_resolved_commit_after_head_moves() {
     );
     assert_eq!(cached.paths("dir"), single.paths("dir"));
 }
+
+#[test]
+fn warm_immutable_reads_observe_removed_and_corrupt_blobs() {
+    for corrupt in [false, true] {
+        let root = fixture();
+        let cached = Source::tip(root.path(), "HEAD").unwrap();
+        let mut single = cached.clone();
+        single.immutable = None;
+        assert_eq!(cached.read("bound").unwrap(), "regular");
+        let object = single.git(&["rev-parse", "HEAD:bound"]).unwrap();
+        let object = object.trim();
+        let loose = root
+            .path()
+            .join(format!(".git/objects/{}/{}", &object[..2], &object[2..]));
+        fs::remove_file(&loose).unwrap();
+        if corrupt {
+            fs::write(loose, b"corrupt loose object").unwrap();
+        }
+        let expected = single.optional_bytes("bound");
+        assert!(expected.is_err());
+        assert_eq!(cached.clone().optional_bytes("bound"), expected);
+        // A failed stream must allow subsequent reads of other available blobs.
+        assert_eq!(
+            cached.optional_bytes("dir/a"),
+            single.optional_bytes("dir/a")
+        );
+    }
+}

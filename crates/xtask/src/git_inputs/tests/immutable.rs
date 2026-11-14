@@ -65,7 +65,7 @@ fn borrowed_single_reads_share_objects_and_recheck_working_files() {
 }
 
 #[test]
-fn nested_directory_listing_and_verification_use_one_git_listing() {
+fn nested_directory_listing_and_verification_use_two_git_snapshots() {
     let root = fixture();
     fs::create_dir(root.path().join("scope")).unwrap();
     for i in 0..64 {
@@ -75,10 +75,10 @@ fn nested_directory_listing_and_verification_use_one_git_listing() {
     GIT_COMMANDS.with(|count| count.set(0));
     assert!(view.files_under("scope").unwrap().is_empty());
     assert_eq!(view.directories.len(), 129);
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 1);
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 2);
     GIT_COMMANDS.with(|count| count.set(0));
     view.verify().unwrap();
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 1);
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 2);
     fs::create_dir(root.path().join("scope/0/new")).unwrap();
     assert_eq!(
         view.verify(),
@@ -170,6 +170,10 @@ fn malformed_borrowed_trees_and_non_blob_objects_match_single_reads() {
         String::from_utf8(git(root.path(), &["rev-parse", "HEAD:bound"]).unwrap()).unwrap();
     let tree = String::from_utf8(git(root.path(), &["rev-parse", "HEAD^{tree}"]).unwrap()).unwrap();
     let missing = "1".repeat(40);
+    fs::create_dir(root.path().join("scope")).unwrap();
+    for path in ["scope/bound", "scope/z"] {
+        fs::write(root.path().join(path), "initial").unwrap();
+    }
     for entries in [
         vec![("bound", object.trim()), ("bound", object.trim())],
         vec![("z", object.trim()), ("bound", object.trim())],
@@ -182,41 +186,75 @@ fn malformed_borrowed_trees_and_non_blob_objects_match_single_reads() {
             raw.extend_from_slice(format!("100644 {name}\0").as_bytes());
             raw.extend(hex::decode(object).unwrap());
         }
-        let mut child = command(root.path())
-            .args(["hash-object", "-t", "tree", "--literally", "-w", "--stdin"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
-        child.stdin.take().unwrap().write_all(&raw).unwrap();
-        let output = child.wait_with_output().unwrap();
-        assert!(output.status.success());
-        let tree = String::from_utf8(output.stdout).unwrap();
-        let commit = String::from_utf8(
-            git(
-                root.path(),
-                &[
-                    "-c",
-                    "user.name=Test",
-                    "-c",
-                    "user.email=test@example.com",
-                    "commit-tree",
-                    tree.trim(),
-                    "-m",
-                    "malformed fixture",
-                ],
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        let borrowed = (root.path().to_owned(), commit.trim().to_owned());
+        let tree = literal_tree(root.path(), &raw);
+        let borrowed = tree_commit(root.path(), &tree);
         let cache = Immutable::new(&borrowed.0, &borrowed.1);
         for path in ["bound", "absent", "bound/child", "../bad"] {
+            assert_eq!(
+                batch::read_many(root.path(), &[path], Some(&borrowed))[0],
+                read(root.path(), path, Some(&borrowed)),
+                "batch {path}"
+            );
             assert_eq!(
                 read_cached(root.path(), path, Some(&borrowed), Some(&cache)),
                 read(root.path(), path, Some(&borrowed)),
                 "{path}"
             );
         }
+
+        // Exercise traversal's batched read against the old optional/required path, including
+        // partial recording and error precedence. A captured proposal avoids requiring a live
+        // isolated-registry binding for this reader-level malformed-object fixture.
+        let mut raw = b"40000 scope\0".to_vec();
+        raw.extend(hex::decode(&tree).unwrap());
+        let borrowed = tree_commit(root.path(), &literal_tree(root.path(), &raw));
+        let mut view = GitInputs::new(root.path()).unwrap();
+        view.immutable = Some(Immutable::new(&borrowed.0, &borrowed.1));
+        view.borrowed = Some(borrowed);
+        view.proposed = Some(
+            crate::runtime_advertising::source::Source::captured(
+                root.path(),
+                ["scope/bound", "scope/z"]
+                    .into_iter()
+                    .map(|path| (path.into(), (b"initial".to_vec(), false)))
+                    .collect(),
+            )
+            .unwrap(),
+        );
+        equivalent_traversal(&view);
     }
+}
+
+fn literal_tree(root: &Path, raw: &[u8]) -> String {
+    let mut child = command(root)
+        .args(["hash-object", "-t", "tree", "--literally", "-w", "--stdin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(raw).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    String::from_utf8(output.stdout).unwrap().trim().into()
+}
+
+fn tree_commit(root: &Path, tree: &str) -> (PathBuf, String) {
+    let commit = git(
+        root,
+        &[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit-tree",
+            tree,
+            "-m",
+            "malformed fixture",
+        ],
+    )
+    .unwrap();
+    (
+        root.to_owned(),
+        String::from_utf8(commit).unwrap().trim().into(),
+    )
 }

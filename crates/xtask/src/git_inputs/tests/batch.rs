@@ -1,5 +1,12 @@
 use super::*;
-use crate::git_inputs::batch::read_many;
+
+pub(super) fn read_many(
+    root: &Path,
+    paths: &[&str],
+    borrowed: Option<&(PathBuf, String)>,
+) -> Vec<Result<Input, String>> {
+    crate::git_inputs::batch::read_many(root, paths, borrowed).collect()
+}
 
 fn equivalent(root: &Path, paths: &[&str], borrowed: Option<&(PathBuf, String)>) {
     let actual = read_many(root, paths, borrowed);
@@ -294,4 +301,31 @@ fn single_unmerged_stage_and_gitlink_modes_match_the_single_reader() {
     equivalent(root.path(), &["bound", "bound/child"], None);
     let borrowed = commit(root.path());
     equivalent(root.path(), &["bound", "bound/child"], Some(&borrowed));
+}
+
+#[test]
+fn streamed_batches_fetch_each_blob_only_when_consumed() {
+    for borrowed in [false, true] {
+        let root = fixture();
+        fs::write(root.path().join("second"), "initial").unwrap();
+        git(root.path(), &["add", "."]).unwrap();
+        let commit = commit(root.path());
+        let borrowed = borrowed.then_some(&commit);
+        let object =
+            String::from_utf8(git(root.path(), &["rev-parse", ":bound"]).unwrap()).unwrap();
+        let object = object.trim();
+        let mut inputs =
+            crate::git_inputs::batch::read_many(root.path(), &["bound", "second"], borrowed);
+        assert!(inputs.next().unwrap().is_ok());
+        fs::remove_file(root.path().join(format!(
+            ".git/objects/{}/{}",
+            &object[..2],
+            &object[2..]
+        )))
+        .unwrap();
+        let expected = read(root.path(), "second", borrowed);
+        assert!(expected.is_err());
+        assert_eq!(inputs.next().unwrap(), expected);
+        assert!(inputs.next().is_none());
+    }
 }
