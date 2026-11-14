@@ -42,3 +42,26 @@ how a non-runtime approval loads.
 
 `crates/xtask/src/isolated_maintenance/tests/onboarding_scope.rs` checks these templates against
 the isolated scope.
+
+## Onboarding producer binding
+
+Slice 5 reuses the existing `depth-synthetic-collect` command, `depth_ci_synthetic` case target,
+eleven obligations, receipt format, artifact and evidence namespace. The compiled onboarding
+binding reads the committed ON2 output at
+`cli_manifests/depth_fixture/reports/0.2.0/depth-record.json`, the installed finite approval above,
+and its sibling `lifecycle-state.json`. It checks the actual approval Event, frozen lifecycle
+P/O object and successful implementation state. The maintenance `../record.json` remains the
+maintenance producer input. Each binding authenticates its own Event/P/O and adoption source.
+
+The onboarding graph binds the immutable approval, contract, acquired inputs and complete wrapper
+build closure. The record's E/entries and later lifecycle stages are checked as frozen-generation
+projections, allowing reporting and publication/proving checkpoints to retain Event/P/O. The
+approval-linked staging PR supplies independent adoption for every due mapping. Every matching
+`ci.yml` run and every attempt remains applicable regardless of its PR association or witness
+availability. Terminal producer evidence can verify while its workflow runs.
+
+`depth_evidence/verdict/github/tests/onboarding.rs` uses private clones of immutable outputs from
+the actual public ON1/acquisition/declaration/ON2 chain. Each test owns its mutable fake host and
+repository. Source and adoption comparisons execute against their actual committed objects.
+Later publication/proving run fixtures exercise population binding, with owning ON3–ON5 delivery
+and native protected CI scheduling reserved for their implementation slices and phase C.

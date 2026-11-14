@@ -634,3 +634,6 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, unix))]
+pub(crate) use tests::onboarding_producer_workspace;

@@ -58,9 +58,7 @@ pub(super) fn witness(
         return Err("nonterminal/wrong-attempt producer job".into());
     }
     // IR-P3: an aborted producer stays unverified; a job that failed elsewhere still counts.
-    if profile == crate::depth_ci::profile::Profile::Synthetic
-        && !matches!(job["conclusion"].as_str(), Some("success" | "failure"))
-    {
+    if profile.synthetic() && !matches!(job["conclusion"].as_str(), Some("success" | "failure")) {
         return Err("aborted or unconcluded producer job".into());
     }
     let steps = job["steps"].as_array().ok_or("missing job steps")?;
