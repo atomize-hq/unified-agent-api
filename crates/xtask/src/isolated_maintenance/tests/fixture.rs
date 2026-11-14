@@ -321,3 +321,24 @@ mod runtime_follow_on_policy;
 
 #[path = "runtime_follow_on.rs"]
 mod runtime_follow_on;
+
+// Inject drift only after registry authentication has completed, before the consumer closes.
+type RegistryObserver = Box<dyn FnOnce()>;
+thread_local! {
+    static REGISTRY_OBSERVER: std::cell::RefCell<Option<RegistryObserver>> = const { std::cell::RefCell::new(None) };
+}
+pub(super) struct RegistryObservation(Option<RegistryObserver>);
+impl Drop for RegistryObservation {
+    fn drop(&mut self) {
+        REGISTRY_OBSERVER.with(|slot| *slot.borrow_mut() = self.0.take());
+    }
+}
+pub(super) fn after_registry_read(observer: RegistryObserver) -> RegistryObservation {
+    RegistryObservation(REGISTRY_OBSERVER.with(|slot| slot.replace(Some(observer))))
+}
+pub(in crate::isolated_maintenance) fn registry_observed() {
+    let observer = REGISTRY_OBSERVER.with(|slot| slot.take());
+    if let Some(observer) = observer {
+        observer();
+    }
+}

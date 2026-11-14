@@ -7,7 +7,11 @@ use crate::{
 };
 
 mod checkers;
+mod drift;
+mod facts;
 mod process;
+mod standalone;
+mod validator;
 
 const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.json";
 const PRODUCTION_REFUSAL: &str =
@@ -162,10 +166,7 @@ fn readonly_gates_generation_and_neutral_writers_keep_their_controls() {
         .depth
         .as_ref()
         .unwrap();
-    assert!(depth.promises.iter().all(|p| !p.qualified
-        && p.obligations
-            .iter()
-            .all(|o| o.result == crate::depth_record::DepthResult::Unverified)));
+    facts::assert_unverified(depth);
     assert!(EvidenceVerdicts::take_publication_evaluations().is_empty());
     assert_eq!(
         crate::runtime_advertising::run_in_workspace(

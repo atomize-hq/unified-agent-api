@@ -669,7 +669,6 @@ fn public_on3_connected_repaired_runtime_selection_and_real_in1() {
 
 /// Slice 7 consumes the same actual ON3 checkpoint and independent admission/observation,
 /// then exercises private owning predicates. The ON3 refusal matrices retain their own tests.
-#[test]
-fn private_onboarding_predicates_from_connected_on3() {
+pub(crate) fn private_onboarding_predicates_from_connected_on3() {
     connected(false, true);
 }

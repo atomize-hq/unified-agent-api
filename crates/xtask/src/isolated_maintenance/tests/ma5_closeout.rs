@@ -26,7 +26,8 @@ fn executor(dir: &Path) -> String {
     use std::os::unix::fs::PermissionsExt;
     let path = dir.join("executor.sh");
     let exe = dir.join("assembler");
-    std::fs::copy(std::env::current_exe().unwrap(), &exe).unwrap();
+    // Keep the running image readable when another Cargo build replaces its pathname.
+    std::fs::copy("/proc/self/exe", &exe).unwrap();
     std::fs::write(
         &path,
         format!(

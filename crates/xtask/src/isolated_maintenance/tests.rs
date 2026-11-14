@@ -10,6 +10,8 @@ use std::{collections::BTreeMap, fs};
 mod authority;
 mod authority_gaps;
 mod bootstrap;
+#[cfg(target_os = "linux")]
+pub(crate) use bootstrap::public_on3::private_onboarding_predicates_from_connected_on3 as connected_onboarding_publication;
 mod declared_test_leg;
 #[cfg(unix)]
 pub(crate) use bootstrap::public_on2::producer_workspace as onboarding_producer_workspace;

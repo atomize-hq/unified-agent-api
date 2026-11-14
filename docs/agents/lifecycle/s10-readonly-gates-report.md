@@ -661,3 +661,99 @@ ON3 failures solely from missing clone-local Git author identity; the final run 
 that correction. Socket-blocked tests: none. The known ForeignLoader flake was outside these
 focused filters. No `readonly_gates` implementation or test file was edited.
 All `target/s10-declared-*` checkout directories were deleted after collecting results.
+## Review round 1 fixes
+
+This round starts from `082df1fb` and addresses the five slice 10a findings. Changes remain
+uncommitted for the lead.
+
+### Validator applicability
+
+The authenticated registry's manifest-root inventory now requires validation by default. The
+explicit schema-free exemptions match the exact `aider` and `gemini_cli` agent/root pairs in
+`cli_manifests/aider/VALIDATOR_SPEC.md`, `cli_manifests/gemini_cli/VALIDATOR_SPEC.md` and the
+Annex B adoption inventory in `docs/specs/support-depth-contract.md`. Declared or retained depth
+and partial validator prerequisites still require complete validation for an exempt root.
+Deleting prerequisites from a required root therefore preserves its validator obligation.
+
+The committed-deletion regression removes Codex's `RULES.json`, `SCHEMA.json` and
+`VERSION_METADATA_SCHEMA.json`, commits that candidate in the disposable fixture, and leaves
+publication artifacts unchanged. Against the original implementation it failed at `unwrap_err`
+because the shared checker returned `Ok(())`. With the applicability fix it reaches Codex's
+missing-input I/O refusal. Both the existing borrowed-scope case and the proposal adapter also
+exercise deletion of all three prerequisites from scratch.
+
+### Proposal and standalone refusals
+
+The connected private-predicate ON3 test entry now lives under
+`depth_acceptance::onboarding::tests::readonly_gates`, making the requested filter nonempty.
+The full suite executes this connected scenario once. Each proposal mutation calls
+`check_proposed` and asserts a substantive refusal from its intended A checker.
+
+| Checker | Substantive mutation | Required refusal |
+| --- | --- | --- |
+| Support matrix | Replace the published support JSON | Support-matrix regeneration refusal |
+| Capability matrix | Replace the published capability Markdown | Capability-matrix regeneration refusal |
+| Capability audit | Publish only Codex's existing capability inventory and regenerate its matrix | Orthogonality refusal naming `agent_api.tools.results.v1` and `[codex]` |
+| Validator | Add an unknown version-metadata field | `VERSION_METADATA_SCHEMA_INVALID` |
+| Runtime advertising | Append an unsupported Rust item to generated runtime data | `runtime advertising data is stale or unsupported` |
+
+A test-only, thread-local hook applies proposal mutations at entry to the shared A checks,
+after the coherent proposal's owning/evidence evaluation. A drop guard restores the scratch
+files before closing observations. This makes the runtime assertion reach the A checker after
+the earlier GitInputs and onboarding-effect checks have accepted the control proposal.
+
+Temporarily omitting the shared runtime checker made the new proposal regression fail at the
+runtime mutation because `check_proposed` returned `Ok(())`. The original runtime assertion
+stopped at the earlier GitInputs refusal, which could conceal that omission.
+
+The independently launched test process also exercises invalid committed candidates through
+each standalone checking wrapper. The audit case commits its lifecycle input before rendering
+and committing the current capability matrix, preserving the standalone route's clean-input
+requirement. The validator invokes the public command and asserts exit
+code 2, then checks its exact violation-code list through the same check implementation. Every
+case compares caller state immediately before and after checking. The support command's fresh
+evaluation assertion now immediately follows that command and checks the committed owning
+entry, before any other evaluation runs. The validator also has its own positive public-command
+check in the independent process.
+
+Temporarily replacing only the standalone runtime check with a successful authenticated no-op
+made the independent child fail at the invalid committed runtime candidate because the wrapper
+returned `Ok(())`. The earlier passing-input-only command checks all succeeded in that run.
+
+### Closing observations and exact depth inventories
+
+Two dedicated tests inject host-identity or protected-parent drift immediately after the
+capability consumer's successful final registry read. One uses `with_readonly_route`, and the
+other uses the capability standalone wrapper. They assert the specific identity/protected-tip
+refusals and unchanged caller state. Temporarily removing both wrappers' closing rechecks made
+both regressions fail because the wrappers returned `Ok(())`.
+
+The generation control now asserts the exact `run`/`CORE` promise and its eleven obligation
+identities before checking qualification and results. Two small regressions reject empty
+promises and empty obligations. Restoring the original nested `all` assertion made both tests
+fail because their empty inputs produced no panic.
+
+The independent process builds its invalid-candidate fixture after dropping its positive
+fixture's route and evidence guards. Its Linux executor copier reads the running executable
+inode, matching the independent-process launcher, so a concurrent Cargo rebuild can replace
+the executable's pathname while the child continues using its running image.
+
+### Focused validation
+
+Cargo used offline dependency resolution. Temporary omission mutations were restored before
+final validation.
+
+| Validation | Result |
+| --- | --- |
+| `make fmt-check` | Passed |
+| `cargo clippy --offline -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test --offline -p xtask --lib readonly_gates` | 9 passed, 1 ignored subprocess entry invoked by its parent |
+| `cargo test --offline -p xtask --lib depth_acceptance::onboarding::tests::readonly_gates -- --nocapture` | 1 passed |
+| `cargo test --offline -p xtask --test validator_spec_roots` | 3 passed |
+| `make loc-check` | Passed |
+| `git diff --check` | Passed |
+
+The final broader library filter includes the relocated connected proposal entry. Its ignored
+independent-process entry is invoked explicitly by the passing two-phase parent test. The
+standalone audit setup was corrected to commit its lifecycle input before matrix generation,
+and the resulting final-run two-phase test passed all five standalone refusal cases.

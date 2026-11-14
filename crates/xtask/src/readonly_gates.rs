@@ -8,6 +8,9 @@ use crate::{
 };
 use std::path::Path;
 
+#[cfg(test)]
+pub(crate) mod test_hooks;
+
 /// Slice 8 calls this after materializing its complete post-entry publication in scratch.
 /// The caller holds the scratch registry binding. No verdict escapes the borrowed scope.
 #[allow(dead_code)] // Slice 8 owns the ON4 call site.
@@ -67,6 +70,8 @@ pub(crate) fn with_readonly_route<T>(
 /// committed evaluation. Running these functions creates no publication or admission output.
 #[allow(dead_code)] // Used by check_proposed before the ON4 controller is connected.
 pub(crate) fn check_shared(root: &Path) -> Result<(), String> {
+    #[cfg(test)]
+    let _restore = test_hooks::enter(root);
     // The three outer commands precede preflight, which repeats these A leaves.
     crate::support_matrix::check_publication(root)?;
     crate::capability_matrix::check_publication(root)?;
@@ -76,13 +81,19 @@ pub(crate) fn check_shared(root: &Path) -> Result<(), String> {
     let inputs = crate::git_inputs::GitInputs::for_bound_evidence(root)?;
     let baseline = inputs.provenance("HEAD")?;
     for entry in &registry.agents {
-        // Some registered roots explicitly have no validator schemas yet. Their spec/pointer
-        // assertions are T leaves. Declared/retained depth and partial validator inputs still
-        // require the full checker, including its missing-input refusals.
+        // Applicability comes from the registry inventory, independent of candidate presence.
+        // These two reviewed exemptions match cli_manifests/{aider,gemini_cli}/VALIDATOR_SPEC.md
+        // and support-depth-contract.md's Annex B adoption inventory. Any declaration, retained
+        // record or partial prerequisite still requires full validation of an exempt root.
+        let schema_free = matches!(
+            (entry.agent_id.as_str(), entry.manifest_root.as_str()),
+            ("aider", "cli_manifests/aider") | ("gemini_cli", "cli_manifests/gemini_cli")
+        );
         let reports = format!("{}/reports", entry.manifest_root);
         let records = source.paths(&reports)?;
         let prior_records = baseline.paths(&reports)?;
-        let mut validate = entry.support_depth.is_some()
+        let mut validate = !schema_free
+            || entry.support_depth.is_some()
             || records
                 .iter()
                 .chain(&prior_records)

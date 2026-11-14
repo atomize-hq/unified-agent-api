@@ -81,7 +81,15 @@ fn independent_process() {
     let _reader = host.install();
     std::env::set_current_dir(root).unwrap();
     // These are the actual command entry points, with the fixed command arguments.
+    EvidenceVerdicts::take_publication_evaluations();
     crate::support_matrix::run(crate::support_matrix::Args { check: true }).unwrap();
+    let evaluations = EvidenceVerdicts::take_publication_evaluations();
+    let entries = super::super::ma5_closeout::record(root).acceptance_entries;
+    assert!(!entries.is_empty());
+    assert!(
+        evaluations.contains(&entries),
+        "standalone support check did not evaluate the committed entry"
+    );
     crate::capability_matrix::run(crate::capability_matrix::Args {
         check: true,
         out: None,
@@ -89,7 +97,11 @@ fn independent_process() {
     .unwrap();
     crate::capability_publication::check_in_workspace(root).unwrap();
     crate::runtime_advertising::run(crate::runtime_advertising::Args { check: true }).unwrap();
-    gates::with_committed_evaluation(root, || gates::check_shared(root)).unwrap();
+    let parent = git(root, &["rev-parse", "HEAD^"]);
+    assert_eq!(
+        super::super::publication::validate_candidate(root, &parent),
+        0
+    );
     assert!(!EvidenceVerdicts::take_publication_evaluations().is_empty());
     assert_eq!(
         crate::capability_matrix::run(crate::capability_matrix::Args {
@@ -100,5 +112,8 @@ fn independent_process() {
         "capability-matrix: unsupported depth write (declared enrollment)"
     );
     assert_eq!(super::super::ma5_closeout::snapshot(root), before);
+    drop(_reader);
+    drop(_route);
+    super::standalone::invalid_entries();
     println!("independent read-only gate checks passed");
 }
