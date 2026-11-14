@@ -1,22 +1,32 @@
-# Producer freeze attempts and the conditional readiness decision
+# Producer freeze attempts and the freeze/readiness mechanism decisions
 
-## Decision of 2026-11-13
+## Round-2 docs decision
 
-The [freeze/readiness design](support-depth-freeze-readiness-design.md) records option 3 adjusted
-from the maintainer-delegated consult and all six inspections. The
+The [freeze/readiness design](support-depth-freeze-readiness-design.md#four-mechanism-decisions)
+resolves the four mechanism questions using the second consult in
+`.codex/guidance/2026-11-13-chatgpt-pro-freeze-checkpoint.md`. The
 [evidence amendment](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness)
-specifies the shared conditional rule for genuine maintenance MA2 and onboarding ON2 freezes.
-Every matching attempt stays visible, with an execution-receipt exception only for an exact
-independently authorized reporting checkpoint and no support credit. Initial implementation
-remains execution-required even before successful readiness admission.
+specifies the shared rule for genuine maintenance MA2 and onboarding ON2 freezes. Every matching
+attempt stays visible. Only a positively authenticated exact reporting checkpoint may omit
+support-execution receipts, with zero support credit. Initial implementation remains
+execution-required even before successful readiness admission.
 
-Activation is blocked by missing independently recoverable IN1 admission history/provenance,
-complete protected freeze-delta validation, receipt-free actual checkout/context authentication
-and genuine MA2 discovery. The design's [open items](support-depth-freeze-readiness-design.md#open-implementation-and-authority-items)
-state the exact questions and options. The shared implementation slice is immediately next,
-alongside slice 4 and before slice 6. This document's original investigation and validation
-below remain historical evidence. The current characterization still refuses genuine freeze
-source, and no reporting exception is implemented by this docs packet.
+The selected mechanisms are versioned protected-IN1 admission records with exact-job/attempt log
+commitments and independent bounded history, a pure exact complete-tree freeze planner shared
+with real writers, collector-emitted reporting context before its later admission, and canonical
+maintenance request/report binding shared by collection and discovery. The evaluator joins
+context, admission and protected history. Production/live activation requires phase-C proof of
+emitter isolation and host transport, including the trusted `rust-tests` reporting branch before
+candidate code. Required tests must survive any reviewed workflow-layout amendment.
+
+After existing slices 0–3 and 5, land
+**4 → FR1 → FR2 → FR3 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+[FR1–FR3](support-depth-freeze-readiness-design.md#ordered-implementation-sub-slices) deliver the
+shared isolated mechanisms and genuine freeze positives. Slices 6–9 then connect ON3 E, owning
+predicates and actual ON4/ON5 writers with closure-stability proofs. FR1 owns the deferred
+rollback-over-unobserved-history fix below. All these additions remain pending. This docs packet
+implements no reporting exception or admission-history authentication. The original investigation,
+measured validation and current genuine-freeze source refusal below remain historical evidence.
 
 ## Original investigation
 
@@ -162,13 +172,14 @@ bind). Two native-context tests independently reproduce `ForeignLoader` because
 explicitly create their fixtures under `/tmp`. Neither restriction is changed or
 worked around here. The lead must run those tests unrestricted.
 
-P1 remains deliberately unimplemented pending the decision above. Phase C still
-must prove real protected CI/needs ordering (including the recursive workspace
+At the original validation boundary, P1 remained unimplemented pending the policy decision.
+The round-2 docs decision now specifies its mechanisms, with FR1–FR3 implementation pending.
+Phase C still must prove real protected CI/needs ordering (including the recursive workspace
 test leg), independent adoption, terminal producers before failure-preserving
 consumers/same-run IN1, and the terminal workflow/gate before conditional MERGE.
 No real host call, live profile, production enablement, commit or push was made.
 
-## Deferred: rollback over unobserved history
+## Deferred rollback over unobserved history
 
 Round 3 found that producer discovery's progression check compares only authenticated sources that
 received CI runs: a descendant that restores an earlier lifecycle stage passes when the
@@ -178,12 +189,13 @@ verification), caches incompletely and is unbounded. That walk was reverted.
 
 This gap is now specified by the shared
 [freeze/readiness amendment](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness),
-with implementation pending on authenticated admission history. The maintainer-delegated consult
-(2026-11-13, option 3 adjusted) roots lifecycle authority in protected IN1 admission history: the
-freeze checkpoint and the readiness transition are independently authenticated IN1 admissions, and
+with implementation assigned to FR1. The maintainer-delegated consult
+(option 3 adjusted and its second consult) roots lifecycle authority in protected IN1 admission
+history. The freeze checkpoint and the readiness transition are independently authenticated IN1 admissions, and
 readiness is irreversible within the generation. IN1 already refuses backward progression at
-admission. The shared implementation slice must therefore authenticate that retained history and test
-progression for applicable attempts against that authenticated admission history, including:
+admission. FR1 must authenticate retained records against separate host observations, independently
+discover bounded history beyond producer heads, verify Git object identities and apply the shared
+progression predicate to every applicable candidate. The pending cases include
 
 - a descendant restoring an earlier stage with no CI run on the higher-stage ancestor;
 - a new freeze-labelled head after readiness, including on another PR.

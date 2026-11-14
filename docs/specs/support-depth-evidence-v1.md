@@ -209,7 +209,7 @@ unverified; a favorable selected receipt cannot hide another qualifying run. Con
 and failing qualifying attempts yield unverified pending investigation.
 
 The [request-freeze checkpoint rule](#authenticated-request-freeze-checkpoints-and-implementation-readiness)
-defines the conditional receipt exception for the packet-bound synthetic maintenance and
+defines the authenticated receipt exception for the packet-bound synthetic maintenance and
 onboarding producer. Reporting checkpoints remain applicable population members.
 
 An authenticated authorized maintainer adoption must bind the exact mapping digest, reviewed
@@ -483,12 +483,13 @@ foundation does not implement packet evidence, change their behavior or enable p
 ## Authenticated request-freeze checkpoints and implementation readiness
 
 For the packet-bound synthetic maintenance and onboarding producer, the following shared rule
-specifies a conditional reporting-only exception for the genuine MA2 request freeze before MA4,
-and the genuine ON2 freeze before implementation. Its authority transport and exact protected
-freeze policy remain open implementation prerequisites in the
-[freeze/readiness design](../agents/lifecycle/support-depth-freeze-readiness-design.md#open-implementation-and-authority-items).
-An evaluator MUST refuse the exception while it cannot independently establish the required
-facts. These requirements are specified here and have no installed positive implementation.
+specifies the reporting-only exception for the genuine MA2 request freeze before MA4 and genuine
+ON2 freeze before implementation. The mechanisms below govern its implementation. Production/live
+activation MUST remain closed until separately authorized phase C proves trusted-emitter isolation
+and exact host transport in the real workflow layout. The
+[freeze/readiness design](../agents/lifecycle/support-depth-freeze-readiness-design.md#four-mechanism-decisions)
+records delivery and qualification obligations. This docs amendment specifies pending behavior.
+An evaluator MUST refuse the exception whenever required authority cannot be established.
 
 1. Applicability and complete independent population discovery MUST precede classification.
    Every matching original Event/P/O run and attempt remains represented, across PRs and all
@@ -507,14 +508,23 @@ facts. These requirements are specified here and have no installed positive impl
    qualifying execution and adoption for every due obligation. Checkpoints alone leave support
    unverified.
 3. Protected IN1 MUST authorize the exact freeze-only transition against its authenticated
-   predecessor through independently approved policy. That authorization MUST bind the
-   authenticated repository identity and original Event/P/O/enrollment, predecessor and its
-   admission, exact admitted head/tree, actual checkout relationship, complete source/context
+   predecessor through independently approved policy. The combined reporting-context, admission
+   and protected-history proof MUST bind authenticated repository identity, original
+   Event/P/O/enrollment, predecessor and its admission, exact admitted head/tree, actual checkout relationship, complete source/context
    closure governing reporting versus execution, approved IN1 implementation/workflow provenance,
    host admission run/check and attempt with its decision, and protected lifecycle history.
-   The policy MUST validate the complete permitted freeze delta, including paths, bytes and modes,
-   and reject hidden implementation, dependency, build or workflow changes. Candidate-authored
-   admission files and similarly named successful checks cannot establish authority.
+   An independently approved pure transition planner shared with the real MA2 and ON2 freeze
+   writers MUST derive the complete expected committed tree from the authenticated predecessor,
+   original request/approval, authoritative generation/writer inputs, retained entries/work and
+   approved policy identity. IN1 MUST require complete candidate-tree equality, including exact
+   bytes, modes, object kinds, creates, replacements, deletions and preservation everywhere else.
+   The plan MUST cover every actual writer effect, executable packet content and reporting/runtime
+   projections. Variable inputs MUST have explicit independently authenticated sources. IN1 MUST
+   NOT execute candidate writers or packets, trust candidate expected-output files or policy
+   selection, or substitute local workspace bytes for the authenticated predecessor. Hidden
+   implementation, dependency, build, workflow and unrelated changes fail reporting eligibility.
+   Candidate-authored admission files and similarly named successful checks cannot establish
+   authority.
 4. The admitted checkpoint and its permitted checkout/context relationships MUST be immutable
    within the generation. Later admission or success MUST NOT replace that authority or
    retrospectively exempt another candidate. Checkpoint eligibility does not seal the attempt
@@ -529,7 +539,11 @@ facts. These requirements are specified here and have no installed positive impl
    generation and supplies zero execution, adoption or support credit. Applicable attempts'
    lifecycle progression MUST be checked against authenticated IN1 admission history through
    the shared progression predicate, including admitted higher-stage ancestors with no producer
-   run. A descendant rollback or a new freeze-labelled head after readiness, including another
+   run. History discovery MUST be independent of producer discovery, verify commit/tree/blob
+   identities against authenticated anchors and exhaust relevant parent relationships from the
+   generation anchor to candidate/protected roots. Predecessor references MUST cross-check that
+   history. Relevant host populations and protected roots MUST be rechecked before acceptance.
+   A descendant rollback or a new freeze-labelled head after readiness, including another
    PR, MUST NOT reopen reporting eligibility. Missing, conflicting, expired or revoked authority
    leaves dependent conclusions unverified and cannot restore a freeze window.
 6. Every matching candidate without positively authenticated reporting authorization remains
@@ -553,12 +567,88 @@ facts. These requirements are specified here and have no installed positive impl
    permitted delta and context. Every execution-required attempt MUST meet the existing complete
    protected-staging source approval, actual built/workflow closure, indexed bytes/modes,
    graph/configuration/compiled populations, toolchain/environment, provenance and current scoped
-   input predicates. A different historical execution closure cannot qualify through readiness.
+   input predicates. Source approval MUST be evaluated against independently obtained protected
+   staging at evaluation time. Earlier execution at identical source S MAY qualify after S reaches
+   that staging with all other predicates satisfied. An execution at S1 followed by current S2
+   still fails exact source equality. A different historical execution closure cannot qualify
+   through readiness.
    Independent adoption, due obligations, separate maintenance/onboarding generations and
    receipts, enrollment origin and currentness rules still apply. Collection MUST reuse the
    existing command and `rust-tests` job under the source-installed finite profile selection.
    CP-P5 consumer ordering, the terminal workflow/MERGE gate and the finite synthetic wrapper
    scope continue to govern.
+9. Protected IN1 MUST emit a canonical versioned admission record after the required terminal
+   producer dependency, owning/progression/freeze checks and per-root freshness loops, and before
+   successful admission completion. The record MUST contain its schema/kind, repository and
+   original Event/P/O/enrollment/generation identity, candidate and parent commit/tree,
+   actual checkout commit/tree, evaluated source/context and head relationship, old/proposed
+   lifecycle state, checkpoint kind, decision and bounded reasons, predecessor admission identities,
+   approved IN1 source/workflow
+   and complete relevant policy/dependency closure, observed protected roots/tips, accepted origin,
+   registry anchor and other authoritative inputs, consumed context/evidence identities where
+   applicable, and host workflow/run/attempt/job/check/event claims. Admissions without depth
+   producers MUST be representable. The first record MUST bind an authenticated bootstrap or
+   enrollment anchor. IN1 MUST retain reached refusal decisions. Failed publication, crashes or
+   cancellation cannot establish successful authenticated admission. Admission records the
+   decision over observed roots before integration. Subsequent protected lineage MUST be
+   independently authenticated. Bounded reconstruction supplies a cross-check of the retained
+   decision and MUST NOT replace it with a later re-evaluation.
+10. The existing collector's trusted reporting path MUST emit a canonical versioned reporting-only
+    context record before its own IN1 admission. It MUST contain schema/kind, repository and
+    original Event/P/O/enrollment, host run/attempt/job/event/head/workflow and relevant
+    dispatch/input identities, actual candidate-data checkout commit/tree and permitted head
+    relationship, separately identified approved collector/policy source and relevant build/workflow
+    closure, complete relevant source/context/configuration and required indexed/worktree
+    observations, dispatcher mode, observation that the enrolled substantive path was not invoked,
+    reporting outcome and candidate/predecessor references or digests. The claim is bounded to
+    the approved dispatcher's isolated observation of its enrolled path. Context publication and
+    terminal producer observation MUST precede independent IN1 checks/admission publication.
+    The evaluator MUST join context, admission and protected history. The producer MUST NOT
+    depend on its own future admission or require that admission's digest in its payload.
+11. Each control record MUST have deterministic canonical bytes and a format-specific
+    domain-separated digest, be published through the existing proof transport, and have a
+    fixed-format versioned commitment binding kind, payload digest and returned artifact identity
+    in the exact emitting job's host-retained log. The evaluator MUST independently authenticate
+    approved policy/workflow provenance and the exact emitting job/run/attempt/event, using
+    attempt-specific job enumeration and that job's log, then verify artifact identity and payload
+    bytes. Same-name checks, aggregate-log matches and same-run artifact membership alone grant
+    no authority. Missing, duplicate, ambiguous or conflicting commitments, wrong-job or
+    cross-attempt replay and substituted bytes MUST prevent verification. Retries MUST have
+    separately authenticated observations. Decision identities MUST be immutable. Conflicting
+    decisions over identical policy/authoritative inputs MUST prevent verification. Different root
+    snapshots MUST remain distinguishable. Revocation MUST affect present eligibility while
+    preserving historical readiness and execution accountability.
+12. Trusted emitters MUST be isolated from candidate-controlled processes that could alter their
+    runtime, inputs, observations or publication. Protected IN1 MUST use a clean separate
+    VM-backed hosted job executing independently approved policy/dependencies with candidate
+    material as bounded data. The existing `rust-tests` reporting branch MUST be selected and run before any
+    candidate-controlled code in that job, with exclusively trusted execution through publication
+    and no concurrent candidate processes. Candidate code, builds/tests/helpers, local actions,
+    packets, build scripts and candidate executable caches MUST NOT execute in trusted emitter
+    runtimes. A second process/directory, later step, signature or approved workflow provenance
+    alone cannot establish isolation. Required tests MUST be preserved through a reviewed layout.
+    Phase C MUST prove that layout and transport, with a reviewed workflow-layout amendment if
+    needed before activation. Collection continues to use the existing command/job and finite
+    profile. CP-P5 read-only host credentials MUST NOT become signing authority.
+13. Independently enumerated host streams MUST enforce 1,000-run and 100-attempt limits.
+    Admission-history resolution MUST enforce a 1,000-unique-commit bound, and each canonical
+    decision/context control record MUST be at most 64 KiB. Existing source/object/artifact bounds
+    remain required. Exhaustion MUST yield `unverified` without truncating required discovery.
+    Retention MUST be explicitly configured. Unavailable, expired or deleted required payloads,
+    commitments, history or provenance MUST yield `unverified`. Verification requires continued
+    availability of all required evidence.
+14. Maintenance collection and discovery MUST use the same canonical binding resolver over the
+    authenticated standing request and canonical versioned depth report at exact immutable host
+    heads. It MUST validate supported structures/versions, agreement on original request/approval,
+    frozen P/O, enrollment/agent and all existing binding fields, and re-derive values required by
+    existing policy before enumerating matching attempts. Auxiliary fixture presence, absence or
+    contents MUST NOT decide generation membership. Coherent records identifying another
+    generation with no conflicting authenticated association receive out-of-generation treatment.
+    A target binding in either record with the other missing, malformed, stale or contradictory,
+    ambiguous report entries, or removed/replaced required records at a head independently
+    associated through admission/enrollment history MUST yield `unverified`. Heads without an
+    independent target-generation association retain ordinary unrelated-head treatment. Records
+    supply authenticated input evidence. Reporting authorization requires the combined proof.
 
 ## Synthetic wrapper machinery-proof profile
 

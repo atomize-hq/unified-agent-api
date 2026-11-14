@@ -1,13 +1,13 @@
 # Support depth freeze checkpoints and implementation readiness
 
-Status — documentation decision and implementation requirements, 2026-11-13. The reporting
-exception is conditional on authority that the current implementation cannot recover. The open
-items below block activation. This packet supplies no implementation or executed proof.
+Status — round-2 documentation decisions and implementation requirements. The four mechanisms
+are specified below. FR1–FR3 and connected writer proofs remain pending. Production/live activation
+requires phase-C emitter-isolation and transport qualification. This packet supplies docs changes.
 
-The decision follows the maintainer-delegated consult of 2026-11-13,
-`.codex/guidance/2026-11-13-chatgpt-pro-freeze-checkpoint.md`, supplied for this inspection as
-`frz-guidance.md`. That advisory recommends option 3 adjusted. Local inspection determines the
-limits recorded here. The normative rule is in the
+The decision follows the maintainer-delegated guidance
+`.codex/guidance/2026-11-13-chatgpt-pro-freeze-checkpoint.md`, including its
+“Second consult (2026-11-14)”, supplied as `frz-guidance.md`. The second consult resolves the four
+mechanisms for option 3 adjusted. Local inspection determines the implementation gaps recorded here. The normative rule is in the
 [evidence contract](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness).
 The [original question](support-depth-onboarding-producer-freeze-question.md) retains the
 characterization and deferred rollback case.
@@ -36,7 +36,7 @@ independently recover the recommended historical IN1 authority today. Its progre
 committed lifecycle data and does not authenticate a past IN1 decision. A higher-stage ancestor
 with no producer run remains outside that comparison. The slice needs a bounded, independently
 authenticated admission-history resolver covering every applicable attempt, reusing the shared
-progression predicate. Open item 1 defines the authority choice.
+progression predicate. Decision 1 below selects the retained authority mechanism.
 
 In process, `isolated_maintenance/tests/fixture.rs:6-30,147-187` supplies fake repository, tip,
 source and ancestry API observations. `isolated_maintenance/tests/bootstrap.rs:66-90` commits a candidate, calls the
@@ -67,8 +67,7 @@ changes without this check certifying a reporting-only context. The record-free 
 whole-tree allowlist (`isolated_maintenance/onboarding/checkpoint.rs:148-214`) shows a reusable
 comparison pattern, but covers different transitions. The slice needs exact writer-derived
 paths, bytes, modes, additions and deletions against the authenticated predecessor for both
-freezes, and rejection of every additional behavior-affecting change. Open item 2 records how
-that definition is to be established.
+freezes, and rejection of every additional behavior-affecting change. Decision 2 below defines the complete-tree planner.
 
 ### 3. Consumer ordering
 
@@ -100,7 +99,7 @@ deliberately absent. Nominal head equality would lose the current protection. Th
 independent actual checkout, workflow, inputs and relevant source/context authentication for
 each reporting attempt. PR test merges against changed bases, merge groups, dispatch inputs,
 pushes and retries must each satisfy the sealed permitted relationship. Unsupported or missing
-context stays unverified. Open item 3 records the required transport choice.
+context stays unverified. Decision 3 below defines the context record and transport.
 
 ### 5. Maintenance discovery
 
@@ -113,7 +112,7 @@ commits producer inputs and serves one run. The connected positive therefore sup
 the genuine MA2 freeze. The real request and canonical versioned report already carry generation
 bindings (`agent_maintenance/prepare/depth.rs:148-200`), so discovery can be repaired. The slice
 must authenticate those bindings at actual MA2 before fixture insertion, retain its CI attempts,
-and refuse unavailable required binding facts. Open item 4 records the binding alternatives.
+and refuse unavailable required binding facts. Decision 4 below selects canonical request/report binding.
 
 ### 6. Source-currentness path
 
@@ -140,7 +139,7 @@ the real integration/qualification sequence with those same properties.
 
 ## Decision and normative scope
 
-Adopt option 3 adjusted as a conditional rule shared by maintenance MA2 before MA4 and the exact
+Adopt option 3 adjusted as a specified rule shared by maintenance MA2 before MA4 and the exact
 onboarding ON2 freeze before ON2 implementation. Complete Event/P/O discovery comes first.
 Only a positively authenticated exact freeze checkpoint may omit an execution receipt. All
 other matching candidates require execution, including failures before any readiness admission.
@@ -155,67 +154,242 @@ when the higher-stage admitted ancestor had no producer run. A new freeze-labell
 or another PR cannot reopen the exception. A retry of the exact historical checkpoint can retain
 its reporting classification after readiness only with its original authorized context.
 
-## Open implementation and authority items
+## Four mechanism decisions
 
-These questions require resolution before a positive checkpoint exception can ship. Missing
-authority leaves the generation unverified under the normative rule. The current exact-closure
-characterization remains accurate until the shared implementation is installed.
+These decisions adopt the second consult's mechanisms. Their implementations are pending.
+Missing authority yields `unverified`. FR1–FR3 must deliver positive isolated behavior as well as
+refusals. Production/live activation remains closed until phase C qualifies the real emitters
+and transport.
 
-1. **Retained IN1 authority.** Exact question — which independently recoverable host representation
-   authenticates each freeze/readiness admission decision, its approved IN1 policy/workflow,
-   check/run and attempt, predecessor admission and protected lifecycle history? Option A is
-   bounded reconstruction from host check/run/attempt data plus authenticated immutable source
-   and protected lineage. Option B is a protected-policy-emitted, host-authenticated decision
-   payload retained through existing proof storage, with independently checked provenance and
-   predecessor links. Both require exact format, discovery bounds, retention, conflict/revocation
-   handling and freshness semantics before use. Option C keeps reporting exceptions unavailable
-   until one of those mechanisms is specified and implemented. A candidate-authored record or a
-   similarly named successful check supplies no option. This packet leaves A/B selection open.
-2. **Exact freeze definition.** Exact question — will protected IN1 replay each freeze writer
-   against the authenticated predecessor and compare its complete result, or validate a finite
-   writer-derived path/structure policy with exact expected bytes and modes? Either option must
-   account for the full outputs listed below and reject implementation/dependency/build/workflow
-   changes, including changes hidden in packet or profile material. Current structural checks
-   alone cannot authorize the exception. The slice must specify this shared policy before use.
-3. **Receipt-free context.** Exact question — will existing attempt/job/log facts authenticated
-   by approved workflow provenance establish actual checkout/context and absence of substantive
-   execution, or is a reporting-only payload from the existing collector required? Both options
-   must bind the eight authority facts below, retain outcome/attempt history and detect unexpected
-   substantive execution. Neither permits inference from missing artifacts or nominal head.
-   Choose this with item 1 so producers can report without waiting on their own IN1 admission.
-4. **MA2 binding.** Exact question — should discovery derive the maintenance generation from its
-   authenticated standing request and canonical versioned depth report, or should MA2 atomically
-   emit the existing producer profile binding? Either option must retain an independently known
-   same-generation freeze when the auxiliary fixture is absent. The latter must also account for
-   the fixture's location inside the protected execution closure. Later fixture insertion is
-   insufficient. The slice must implement and prove the chosen binding on genuine MA2.
+### 1. Retained IN1 admission authority
 
-## Shared implementation slice
+Choose option B, a canonical versioned IN1 admission record emitted by protected IN1. Bounded
+reconstruction cross-checks the retained decision, its inputs and lineage. Re-evaluating current
+observations cannot establish a past protected decision on its own.
 
-This is the immediately next shared amendment/implementation work after slices 0–3 and 5,
-alongside slice 4, and before slice 6. Slice 4 may proceed independently. Slice 6 depends on both
-repair and the completed shared classifier/authority work. Remaining slice ids keep their order.
-Resolve the authority/context choices above first, then implement one shared classifier inside
-complete population evaluation. This work includes the deferred rollback-over-unobserved-history
-case. It must finish before treating slice 5's producer positive as a genuine historical-freeze
-positive or starting phase C.
+The record contains schema version and record kind, canonical repository identity, original
+Event/P/O/enrollment and generation identity, candidate and parent commit/tree identities,
+actual checkout commit/tree, evaluated source/context and permitted host-head relationship,
+old/proposed lifecycle state, checkpoint kind, decision and bounded reason codes. It also contains predecessor admission
+identities, independently approved IN1 source/workflow and complete relevant policy/dependency
+closure, observed protected roots/tips, accepted origin, registry anchor and other authoritative
+inputs, consumed reporting-context/execution-evidence identities where applicable, and host
+workflow/run/attempt/job/check/event claims. An admission without a depth producer is representable.
+The first record binds an independently authenticated bootstrap/enrollment anchor. Earlier
+admissions must never be invented to fill a pre-mechanism history gap.
 
-### Write scope and dependencies
+Protected IN1 emits after terminal producer observation under CP-P5, authenticated candidate,
+predecessor, history and policy checks, owning predicates, shared progression and freeze planning,
+and the required per-root freshness/tip loops. Required record publication precedes successful
+admission completion. Retain explicit refusals when a decision is reached. Crashes, cancellation
+or failed publication leave incomplete attempts. A refusal establishes no readiness or substantive
+counterexample by itself. Admission records observed roots and a decision before integration.
+Subsequent protected lineage is independently established after the ref update.
 
-- Shared private IN1 authority/history and exact freeze-delta checks in
-  `depth_acceptance/integration*`, `runtime_follow_on/depth/`, `agent_maintenance/prepare/` and
-  `isolated_maintenance/`. Reuse owning predicates and `check_progression`. Define the retained
-  authority representation through open item 1 before introducing serialized fields.
-- Population/classification/context handling in `depth_evidence/verdict/github/`, the existing
-  evaluation population representation, and focused `depth_ci/` collector/profile/archive paths
-  as required by open items 3–4. Every applicable row retains identity, outcome, classification
-  and authority/reason. Reporting rows carry no successful execution mapping.
-- Connected maintenance/onboarding fixtures and focused tests in the existing depth evidence,
-  IN1, freeze and isolated-maintenance suites. Update Annex A with measured proof boundaries in
-  that implementation PR. Canonical workflow scheduling/host activation belongs to phase C.
-- Dependencies are the evidence amendment, resolution of open items 1–4, existing IR-P1/IR-P3 and
-  CP-P5, and slices 0–3 and 5. ON3–ON5 writers and slice 10's gate work retain their own scopes.
-  Receipt/record revision 1, eleven obligations, cases and finite synthetic selection still govern.
+Both control-record kinds use deterministic canonical bytes and a format-specific domain-separated
+digest. Publish through the existing proof transport. Emit a fixed-format, versioned commitment
+with record kind, payload digest and returned artifact identity in that exact emitting job's
+host-retained log. The evaluator resolves the approved workflow job through attempt-specific host
+job enumeration, authenticates policy provenance and job/run/attempt/event identities, fetches
+that job's log and artifact, and verifies the commitment and canonical payload. Same-run artifact
+membership, a check name or aggregate workflow-log search supplies insufficient association.
+Candidate-authored records and copied commitment text in another job fail authentication.
+
+Admission-history discovery is independent of producer-population discovery. Starting at the
+authenticated generation anchor, exhaust the relevant admission attempts and parent relationships
+to candidate/protected roots, verifying commit/tree/blob identities against authenticated anchors.
+Include higher-stage admitted ancestors without producer runs. Predecessor references cross-check
+the full relevant history. The shared progression predicate consumes that history for every
+applicable candidate, in either API listing order. Recheck roots and host populations before
+accepting. An advanced fake protected tip alone supplies no admission decision.
+
+Use v1 bounds of 1,000 runs and 100 attempts for each independently enumerated host stream,
+1,000 unique commits per admission-history resolution and 64 KiB per canonical decision/context
+record. Existing object/source/artifact bounds also apply. Exceeding a bound yields `unverified`
+with complete-discovery failure. Required history is never truncated. Keep records immutable by
+decision identity and separately authenticate retries. Conflicting decisions over identical policy
+and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
+commitments, stale roots or changed populations prevent verification. Distinguish decisions over
+different root snapshots. Revocation changes present eligibility while preserving historical
+readiness and execution accountability. Explicitly configure retention for records, logs and
+provenance. Expiration or deletion of any required authority yields `unverified`. Verification
+requires the evidence to remain available.
+
+### 2. Exact freeze transition planning
+
+Use a pure writer-derived transition planner shared with the real MA2 and ON2 freeze writers.
+Approved code takes the authenticated predecessor tree, original request/approval and generation
+inputs, independently derived writer inputs, retained entries/work and approved planner/policy
+identity. It returns exact create/replace/delete/preserve operations with bytes, modes and object
+kinds. Applying the plan to the predecessor determines the complete expected committed tree.
+Protected IN1 independently requires equality with the entire candidate tree, including every
+preserved path. Extra unrelated edits also lose reporting eligibility and remain applicable.
+
+The plan covers every writer effect listed below, including exact executable packet content,
+reporting projections and the approved runtime renderer's actual output. Variable values such as
+run ids and generated timestamps need explicit independently authenticated input sources bound by
+the policy. Candidate-selected values cannot become authority merely by making equality pass.
+Writer extraction must make those inputs explicit and test their provenance.
+
+IN1 uses approved planner code over authenticated Git objects. It must never execute candidate
+writers, generated packets or candidate local actions, consume candidate-produced expected-output
+directories, or accept a candidate-selected policy version. Local worktree bytes cannot substitute
+for the authenticated predecessor. Complete equality rejects hidden implementation, dependency,
+build and workflow changes and arbitrary bytes inside permitted packet/profile/report locations.
+Real writers materialize the same pure plan through their existing checked delivery boundaries.
+
+### 3. Reporting-context record and noncircular join
+
+The existing collector emits a versioned reporting-only context record from a trusted dispatcher
+branch. That branch is selected before candidate-controlled code executes in the job. The record
+contains schema version and reporting-only kind, canonical repository and original
+Event/P/O/enrollment, host run/attempt/job/event/head/workflow and dispatch/input identities,
+actual candidate-data checkout commit/tree and permitted head relationship, separately identified
+approved collector/policy source and build/workflow closure, complete relevant source/context
+observations and selected configuration, required indexed/worktree observations, selected mode,
+an explicit observation that the enrolled substantive execution path was not invoked, reporting
+outcome, and references/digests matching the candidate and predecessor. The trusted source may
+inspect an older candidate tree as bounded data. Ordinary job metadata and successful step
+statuses cannot replace this record.
+
+The sequence is producer context publication, terminal producer, independent IN1 exact-transition
+and context checks, IN1 admission publication, then consuming evaluator join with protected history.
+The producer may reference an admitted predecessor. Its record cannot require its own future
+admission's digest or success. The eight authority facts below belong to this combined proof.
+The collector observes the selected dispatcher path and the absence of invocation of the enrolled
+substantive path within its isolated runtime. Its claim is bounded to that observation.
+
+Use the same canonicalization, 64 KiB bound and exact-job/attempt log commitment protocol as IN1.
+Each retry needs its own authenticated context. Wrong checkout/tree, changed test-merge base,
+wrong parent relationship, changed workflow/dispatch inputs, substituted payload, wrong job or
+cross-attempt replay prevents the exception. Missing later IN1 authority yields `unverified`.
+Substantive execution indications or receipts invalidate reporting classification for both passing
+and failing outcomes. Preserve and authenticate those observations under the existing
+counterexample/conflict rules. Failed, aborted, cancelled or nonterminal reporting and failed
+collection prevent verification. A late historical freeze retry cannot clear execution failures.
+
+### Trusted emitter isolation
+
+Emitter isolation means candidate-controlled processes cannot modify, share or impersonate the
+trusted emitter's runtime, inputs, observations or publication. Protected IN1 requires a clean,
+separate VM-backed hosted job running independently approved policy and dependencies. Candidate
+trees, records, packets and artifacts are bounded data. Candidate code, local actions, generated
+packets, build scripts and candidate-produced executable caches stay outside that runtime.
+The collector's trusted `rust-tests` reporting branch must run before any candidate-controlled
+process and exclusively use trusted code through publication, with no concurrent candidate
+processes. Separate processes, directories, later steps, approved workflow bytes, provenance and
+signatures alone cannot provide this boundary against a same-user attacker.
+
+Phase C must prove this separation in the real workflow layout. Today `ci.yml`'s `rust-tests`
+executes `cargo test --workspace --all-targets` before collection and restores a Rust cache.
+That order cannot establish reporting-emitter isolation. Preserve required tests through a reviewed
+workflow arrangement. If the existing job convention cannot provide separation, phase C needs a
+reviewed workflow-layout amendment before activation. A clean downstream IN1 cannot recover
+runtime truth from a contaminated reporting emitter. CP-P5's read-only credential reference serves
+host reads. This mechanism adds no private signing key or paid service.
+
+### 4. Canonical MA2 generation binding
+
+Producer collection and population discovery must share one resolver over the authenticated
+standing request and canonical versioned depth report at each exact immutable host head. Validate
+supported versions/structures, agreement on original request/approval, frozen P/O, enrollment and
+agent identity and every existing binding field, and re-derive required values using approved
+logic. Resolve one coherent binding, then enumerate every matching run attempt before examining
+substantive artifacts. The auxiliary fixture's presence, absence or content has no generation
+authority. Committed records supply authenticated input evidence through their Git identities.
+Protected admission and the evaluator join supply checkpoint authority.
+
+Coherent records identifying another generation receive ordinary out-of-generation treatment
+when no authenticated association conflicts. A target request with a missing, malformed, stale
+or contradictory report, or the reverse, yields `unverified`. Independently associated heads whose
+required records were removed/replaced also yield `unverified`. Ambiguous report entries refuse.
+Heads with no independent target-generation association retain ordinary unrelated-head treatment.
+This avoids granting every repository head membership while retaining genuine MA2 before fixture
+insertion. Producer witnesses and discovery must resolve the identical maintenance generation.
+Maintenance and onboarding evidence remain separate.
+
+## Ordered implementation sub-slices
+
+Each sub-slice is a separately reviewable PR into the integration branch. After existing slices
+0–3 and 5, land **4 → FR1 → FR2 → FR3 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+All three require this evidence amendment and existing IR-P1/IR-P3 and CP-P5 contracts. They retain
+receipt/record revision 1, eleven obligations, existing cases and finite compiled synthetic
+selection. Their new control records have independent versions. Every implementation PR updates
+Annex A with its measured boundaries. Canonical workflow deployment belongs to phase C.
+
+### FR1 — Admission record, publication and independent history
+
+- Write scope covers private IN1 decision capture/emission in `depth_acceptance/integration*`,
+  the shared progression interface in `runtime_follow_on/depth/`, admission-history resolution
+  in `depth_evidence/verdict/github/`, and `isolated_maintenance/` host/fixture support. Add the
+  canonical record/parser and fake-host job/log/commitment/artifact protocol in those owning
+  modules and focused existing IN1/evidence suites.
+- Depends on slices 0–5 in the landing order above. Deliver the real IN1-predicate emitter,
+  authenticated bootstrap/enrollment anchor, fake-host publication, bounded independently
+  discovered admission history and progression over it. This closes slice 5's deferred
+  rollback-over-unobserved-history case, including ancestors with no producer. FR2/FR3 add the
+  exact freeze and reporting-context predicates to these interfaces.
+- Proving tests accept an actual IN1 decision through independently modeled host facts. Refuse
+  candidate JSON, same-name checks, same-run wrong-job artifacts, wrong-attempt commitments,
+  missing publication/predecessors, object-hash mismatches, history gaps and every bound overflow.
+  Test retries, conflicting records, revocation, changing roots/populations and first-record
+  anchoring. A higher-stage admitted ancestor with no producer blocks descendant rollback in
+  both API orders and on another PR. Fake tip advance cannot manufacture authority.
+
+### FR2 — Shared exact freeze planner and IN1 complete-tree check
+
+- Write scope covers pure planning extraction in `agent_maintenance/prepare*`,
+  `runtime_follow_on/depth/` and their shared reporting renderer interfaces, private IN1
+  freeze-only validation, and focused writer/IN1/isolated-route tests. Keep existing checked
+  materialization and acceptance boundaries.
+- Depends on FR1. Deliver the planner used by real MA2/ON2 writers and independently by IN1
+  over authenticated predecessors and authoritative inputs. Cover every actual committed effect,
+  byte, mode and object kind, with complete expected-tree equality.
+- Proving tests compare genuine MA2 and ON2 outputs with complete planned trees and reviewed
+  canonical packet/reporting/runtime output expectations. Two calls to the shared planner alone
+  cannot establish canonical correctness. Refuse extra implementation/dependency/build/workflow
+  edits, unrelated edits, unexpected packet/profile/report bytes, additions, deletions, mode and
+  object-kind changes, and wrong predecessor/approval/Event/P/O/enrollment/policy identities.
+  Identical authenticated inputs plan deterministically. Candidate expected-output files have
+  no influence. Validate provenance for variable writer inputs.
+
+### FR3 — Reporting context, canonical binding and population join
+
+- Write scope covers reporting-context schema/emitter/dispatcher instrumentation in existing
+  `depth_ci/` collector/profile/archive paths, canonical maintenance binding shared with
+  `depth_evidence/verdict/github/`, population representation/classifier/evaluator join and
+  independent fake-host observations, plus connected maintenance/onboarding tests in the existing
+  evidence, IN1 and isolated-route suites.
+- Depends on FR1 and FR2. Deliver context first and admission later, full retained population,
+  genuine MA2/ON2 reporting positives with zero support credit, canonical binding for both producer
+  and discovery, the refusal matrix below and source-currentness proofs available at this stage.
+  Positive isolated classification must execute the completed mechanisms.
+- Proving tests include genuine older freeze CI followed by qualifying execution/adoption, actual
+  MA2 before fixture insertion, fixture absence/mismatch/mutation independence, target request
+  with missing/mismatching report and the reverse, ambiguous binding, coherent unrelated heads,
+  producer/discovery identity agreement and maintenance/onboarding separation. Refuse nominal
+  head plus green steps without context, wrong checkout/base/parents/inputs, candidate records,
+  wrong job, cross-attempt replay, substituted bytes and missing later IN1. Passing/failing
+  substantive execution invalidates reporting mode consistently. Test every late retry separately
+  and producer non-self-admission. Execute every positive/boundary and refusal row below.
+- Prove evaluation-time source approval now. Earlier execution at S can qualify after identical
+  S reaches protected staging with all other predicates satisfied and the earlier run retained.
+  S1 followed by current S2 still refuses. Measure real MA2/ON2 rendering closure stability and
+  existing available publication writers. Real ON3–ON5 writer closure stability is delivered
+  in slices 6–9 as those writers connect.
+
+### Connected-chain consumers in slices 6–9
+
+Slice 6 consumes FR1–FR3 for controller-owned ON3 reporting E/files/publication, runtime selection
+and IN1 reporting admission. Slice 7 adds onboarding owning predicates, exact binding/currentness
+and publication/proving entry derivation. Slice 10 supplies read-only gates before slice 8.
+Slice 8 delivers ON4 with its real publication writer, exact entry, post-entry evaluation and IN1.
+Slice 9 delivers both ON5 writers and their owning IN1 predicates through actual preparation and
+closeout. Each extends the preceding real-writer chain and compares the protected closure.
+Typed lifecycle projections alone cannot establish ON3–ON5 writer stability. Slice 12 completes
+the connected proof documentation after these incremental proofs. Later completion reports must
+state in-process implementation/connection and pending phase-C host qualification at their actual
+measured boundary. These are pending deliverables in this packet.
 
 ### Exact freeze material to validate
 
@@ -234,8 +408,8 @@ rendered packet bytes and reporting structures so their executable prompt or pro
 cannot silently select substantive support execution. Authenticate the complete historical
 source/context separately from current execution-source approval.
 
-The authority for freeze and readiness must bind all eight semantic facts from consult section 2A.
-These are required bindings whose serialized representation remains open.
+The combined reporting-context, IN1 admission and protected-history proof must bind all eight
+semantic facts from consult section 2A. The reporting payload precedes its own admission.
 
 1. Authenticated repository identity and original Event/P/O/enrollment.
 2. Authenticated predecessor and its admission.
@@ -286,6 +460,21 @@ Connected positives must exercise real freeze writers and shared IN1 predicates 
 fake protected history. Explicitly model the new host authority facts instead of substituting
 candidate-authored admission files.
 
+## Fake-host proof boundary
+
+The in-process proof must state that it establishes predicate, classification, binding and history
+behavior against the modeled host protocol, authentication checks against supplied independent
+fake-host observations, and real-writer/source-closure behavior within the isolated route.
+Admission observations must be separate from producer artifacts. Fixtures invoke the actual IN1
+predicate and model its publication before advancing protected history.
+
+Real issuance by GitHub, exact real job/log/artifact association, deployed emitter isolation,
+merge-queue/retry/retention behavior and credentials require phase C. The fixture assumes control
+of its test process remains trusted. Control of that process permits fabrication of modeled
+authority. Candidate inputs must fail to satisfy modeled authority when
+independent facts are missing or contradictory. Use the existing compiled isolated route and its
+trust binding. A committed record cannot select a trusted fake host or install a live profile.
+
 ## Phase C requirements
 
 1. Resolve the disposable-repository arrangement and separately authorized test-only trust binding.
@@ -296,9 +485,9 @@ candidate-authored admission files.
 2. Push the genuine freeze so normal CI triggers, then implementation and publication. Independently
    discover the freeze run in the final complete population and prove all eleven obligations
    through execution and independent mapping adoption.
-3. Recover actual protected IN1 authority, policy/workflow provenance, check/run attempts,
-   predecessor and retained lifecycle history using the chosen representation. Prove a
-   higher-stage admission with no producer run still prevents rollback.
+3. Recover versioned IN1 records and actual policy/workflow provenance, exact job/run attempts,
+   job-log commitments, artifacts and predecessor/anchor identities through the specified transport.
+   Prove a higher-stage admission with no producer run still prevents rollback.
 4. Exercise actual PR/test-merge and merge-group checkouts, dispatch/push context and actual
    workflow provenance against the classifier's permitted relationships.
 5. Rerun the historical freeze after readiness. Authenticate the new attempt without reopening
@@ -314,21 +503,41 @@ candidate-authored admission files.
    gates from slice 10, including the recursive workspace-test leg, failure-preserving consumers
    after terminal producers, same-run IN1, and terminal workflow/direct checks/gate before native
    conditional MERGE. Review scheduling/latency in ordinary CI. Post-tip observation remains due.
+9. Prove emitter isolation in the reviewed real workflow layout, including the trusted `rust-tests`
+   reporting branch before candidate code and a clean separate protected IN1 job. Preserve every
+   required test. Record any necessary workflow-layout amendment before activation. Attempt forged
+   candidate payloads, copied commitment lines in wrong-job logs and misleading same-name checks
+   and artifacts. Authenticate actual PR/test-merge/merge-group and dispatch contexts separately.
+10. Prove missing-authority refusal for deleted/expired records, logs and provenance, failed
+    publication, conflicting decisions, changed populations and stale roots. Configure retention
+    explicitly and exercise bound exhaustion and historical attempts through exact-job retrieval.
 
-Official host documentation supports attempt-specific retrieval and historical rerun identity.
-GitHub's branch protection can require an expected app as check source, and merge queues test
-combined changes against the current base. These host facts inform the required authentication
-work. Local implementation of that work remains open. Sources checked 2026-11-13.
-[Workflow attempts](https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run-attempt),
-[reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs),
-[protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches),
-[merge queues](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue).
+GitHub documents job-specific logs and attempt-specific job enumeration. The ordinary run-jobs
+endpoint defaults to the latest jobs, so historical authentication must deliberately select each
+attempt. This supplies platform primitives for the proposed transport. Its deployment remains a
+phase-C proof obligation. Sources checked for this docs revision.
+[Workflow jobs](https://docs.github.com/en/rest/actions/workflow-jobs).
+
+GitHub documents shared step access within a job and clean VM-backed hosted execution. Combined
+with the repository's test-before-collection ordering, this motivates the explicit runtime
+separation obligation above.
+[Workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idsteps),
+[hosted runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners),
+[secure use](https://docs.github.com/en/actions/reference/security/secure-use).
+
+GitHub's documented default retention is 90 days, with a configurable public-repository range of
+1–90 days. The current workflow requests 30 days for existing proof artifacts. Phase C must check
+the effective lifetime of every required payload, commitment and provenance object. Availability
+bounds verification lifetime.
+[Retention](https://docs.github.com/en/organizations/managing-organization-settings/configuring-the-retention-period-for-github-actions-artifacts-and-logs-in-your-organization).
 
 ## Adaptation of the consult
 
-The section-6 draft is incorporated as a conditional normative rule. The inspection does not
-support treating current IN1 as an independently recoverable admission-history service, and no
-serialized admission fields are invented here. Open items 1–4 are prerequisites to activating
-the exception. Successful readiness cannot exempt unsuccessful earlier implementation attempts.
-The complete test matrix and phase C scope are retained. Existing single-staging execution
-approval still refuses differing historical execution closures.
+All four second-consult recommendations and its four draft tightenings are adopted. The earlier
+single shared implementation slice is delivered as FR1–FR3 at the maintainer's requested review
+boundaries. The connected ON3 E, owning-predicate and ON4/ON5 writer work stays in slices 6–9,
+consuming those interfaces. Source approval at evaluation time is settled by local inspection.
+Real writer stability still requires the actual ON3–ON5 operations. All proving tests and real-host
+qualification above remain pending. Production/live activation requires phase-C emitter isolation
+and exact transport. Existing execution-source approval, complete population and adverse-history
+requirements continue to apply.

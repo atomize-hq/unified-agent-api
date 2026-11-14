@@ -360,14 +360,22 @@ such in results and cannot close those requirements.
 
 ## Implementation slices
 
-The original fourteen slices retain their ids. The 2026-11-13
-[shared freeze/readiness amendment and implementation](support-depth-freeze-readiness-design.md)
-is immediately next after slices 0–3 and 5, alongside slice 4 and before slice 6. The landing
-order is **0 → 1 → 2 → 3 → 5 → shared freeze/readiness work and 4 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
-Its six inspections found activation blockers in retained IN1 authority, complete freeze-delta
-validation, receipt-free checkout/context authentication and genuine MA2 discovery. Its open
-questions, write scope, complete test matrix and phase C requirements are recorded in that
-design. The conditional evidence amendment grants no implemented checkpoint exception.
+The original fourteen slices retain their ids. The round-2
+[freeze/readiness design](support-depth-freeze-readiness-design.md#ordered-implementation-sub-slices)
+specifies three separately reviewable PRs into the integration branch after existing slices 0–3
+and 5. The remaining landing order is
+**4 → FR1 → FR2 → FR3 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+FR1 delivers versioned IN1 admission/emission, fake-host exact-job publication/commitments and
+independent bounded history/progression, closing slice 5's deferred unobserved-history rollback.
+FR2 shares an exact pure transition planner with real MA2/ON2 freeze writers and installs IN1's
+complete expected-tree check. FR3 adds trusted collector reporting context, canonical MA2 binding
+for collection/discovery, population classification, the noncircular evaluator join, genuine MA2/ON2
+freeze positives, refusal coverage and available evaluation-time source-currentness proofs.
+Their write scopes, dependencies, minimum tests and fake-host limits are in that design. All are
+pending. Production/live activation requires phase-C emitter isolation and exact host transport,
+including a reviewed workflow-layout amendment if the existing layout cannot provide isolation.
+Slices 6–9 consume FR1–FR3 for ON3 reporting E, owning predicates and real ON4/ON5 operations,
+proving protected-closure stability through those actual writers as they connect.
 The connected fixture chain grows from slices 2–3: each later slice consumes actual preceding
 outputs and adds its checkpoint; slice 12 finishes and documents it rather than first connecting
 independently seeded positives. These are future write scopes; this packet writes only
@@ -525,7 +533,7 @@ against the final enforcement revision. No slice installs a live profile or prod
   - Write scope: `xtask/prepare_publication.rs`, `xtask/prepare_publication/`, shared private assembly
     call site, `xtask/depth_acceptance/{publication,integration}.rs` for the reporting dispatch and
     new installed-route reporting tests. Keep the executor record immutable.
-  - Dependencies: 3, 5, 4 and completed shared freeze/readiness work. Proving tests: real assembly files bound by delivered E, active-run selection,
+  - Dependencies: 3, 5, 4 and FR1–FR3. Proving tests: real assembly files bound by delivered E, active-run selection,
     repaired-run alternative, stale/missing evidence and no-entry/no-qualification assertions.
 
 - **Slice 7 — Onboarding owning predicates, without public accepting writes.**
