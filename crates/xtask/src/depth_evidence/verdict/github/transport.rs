@@ -33,13 +33,12 @@ impl<A: Api> Api for Observed<'_, A> {
     }
     fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String> {
         let result = self.0.bytes(endpoint, limit);
-        crate::depth_acceptance::admission::observations::bytes(endpoint, &result);
+        crate::depth_acceptance::admission::observations::unavailable(endpoint, &result);
         result
     }
     fn json(&self, endpoint: &str) -> Result<Value, String> {
-        let result = self.0.json(endpoint);
-        crate::depth_acceptance::admission::observations::json(endpoint, &result);
-        result
+        let bytes = self.bytes(endpoint, 16_777_216)?;
+        serde_json::from_slice(&bytes).map_err(|_| "invalid GitHub response".into())
     }
 }
 pub(super) struct Github {
@@ -151,6 +150,8 @@ pub(in crate::depth_evidence::verdict) fn capture(
 
 /// Exhaust the endpoint; refuse truncation, changing totals and duplicate identities.
 pub(super) fn list(api: &impl Api, path: &str, member: Option<&str>) -> Result<Vec<Value>, String> {
+    let stream = api.endpoint(path);
+    crate::depth_acceptance::admission::observations::discovery(&stream, false);
     let mut rows = vec![];
     let mut seen = BTreeSet::new();
     let mut total = None;
@@ -185,6 +186,7 @@ pub(super) fn list(api: &impl Api, path: &str, member: Option<&str>) -> Result<V
             if total.is_some_and(|n| n != rows.len() as u64) {
                 return Err("incomplete host population".into());
             }
+            crate::depth_acceptance::admission::observations::discovery(&stream, true);
             return Ok(rows);
         }
     }
@@ -207,7 +209,7 @@ pub(super) fn source(root: &Path, repository: &str, commit: &str) -> Result<Sour
         return Ok(source);
     }
     // Only object acquisition, no refs/working files/FETCH_HEAD. Never use local remote URLs.
-    capture(
+    let acquired = capture(
         Command::new("/usr/bin/timeout")
             .args(["60", "git", "--no-replace-objects", "-C"])
             .arg(root)
@@ -220,7 +222,12 @@ pub(super) fn source(root: &Path, repository: &str, commit: &str) -> Result<Sour
                 commit,
             ]),
         1_048_576,
-    )?;
+    );
+    crate::depth_acceptance::admission::observations::unavailable(
+        &format!("repos/{repository}/git/objects/{commit}"),
+        &acquired,
+    );
+    acquired?;
     Source::tip(root, commit)
 }
 pub(super) fn required_string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {

@@ -61,3 +61,73 @@ impl SyntheticHost {
             .page("issues/9/comments", None, vec![]);
     }
 }
+
+impl SyntheticHost {
+    /// Candidate-controlled ordinary comments are present in both evaluations.
+    pub(crate) fn ordinary_comment(&self, body: &str) {
+        let mut fake = self.0.lock().unwrap();
+        fake.change("issues/9/comments?per_page=100&page=1", |v| {
+            let rows = v.as_array_mut().unwrap();
+            rows.retain(|row| row["id"] != 999);
+            rows.push(json!({"id":999,"body":body,"user":{"id":999,"login":"candidate"}}));
+        });
+    }
+    /// Change ordering across multi-member populations and unrelated enclosing workflow state.
+    pub(crate) fn incidental_population(&self, runs: &str, reverse: bool) {
+        let mut fake = self.0.lock().unwrap();
+        fake.change(runs, |v| {
+            let rows = v["workflow_runs"].as_array_mut().unwrap();
+            if rows.len() == 1 {
+                let mut other = rows[0].clone();
+                other["id"] = json!(900);
+                other["head_repository"]["full_name"] = json!("unrelated/repository");
+                rows.push(other);
+            }
+            for r in rows.iter_mut() {
+                if r["id"] == 900 {
+                    r["head_sha"] = json!(if reverse {
+                        "ignored edited head"
+                    } else {
+                        "ignored original head"
+                    });
+                }
+                r["status"] = json!(if reverse { "completed" } else { "in_progress" });
+                r["conclusion"] = json!(if reverse { "success" } else { "failure" });
+                r["updated_at"] = json!(if reverse { "today" } else { "yesterday" });
+                r["display_title"] = json!(if reverse { "edited" } else { "original" });
+            }
+            if reverse {
+                rows.reverse();
+            }
+            v["total_count"] = json!(rows.len());
+        });
+        for raw in fake.0.values_mut() {
+            let Ok(mut value) = serde_json::from_slice::<Value>(raw) else {
+                continue;
+            };
+            if let Some(object) = value.as_object_mut() {
+                for key in ["jobs", "artifacts"] {
+                    if let Some(rows) = object.get_mut(key).and_then(Value::as_array_mut) {
+                        if rows.len() == 1 {
+                            let mut other = rows[0].clone();
+                            other["id"] = json!(900);
+                            other["name"] = json!("unrelated producer");
+                            rows.push(other);
+                        }
+                        if reverse {
+                            rows.reverse();
+                        }
+                        let count = rows.len();
+                        object.insert("total_count".into(), json!(count));
+                    }
+                }
+            }
+            if value["run_attempt"].is_number() {
+                value["status"] = json!(if reverse { "completed" } else { "in_progress" });
+                value["conclusion"] = json!(if reverse { "success" } else { "failure" });
+                value["updated_at"] = json!(if reverse { "today" } else { "yesterday" });
+            }
+            *raw = serde_json::to_vec(&value).unwrap();
+        }
+    }
+}

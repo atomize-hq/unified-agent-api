@@ -1,5 +1,6 @@
 //! Independently discover every matching Event/P/O run and attempt before inspecting outcomes.
 use super::*;
+use crate::depth_acceptance::admission::observations;
 
 pub(super) fn resolve_profile_inputs(
     api: &impl Api,
@@ -28,8 +29,19 @@ pub(super) fn resolve_profile_inputs(
     // IR-P1 authenticated ids, not the name alone, before and after discovery.
     let same_host = || -> Result<(), String> {
         match host {
-            Some(h) if !h.same_repository(&api.json(&api.identity_endpoint())?) => {
-                Err("isolated repository id, owner id or name differs from the binding".into())
+            Some(h) => {
+                let value = api.json(&api.identity_endpoint())?;
+                observations::fact(
+                    &api.identity_endpoint(),
+                    "repository",
+                    &json!([value["id"], value["owner"]["id"], value["full_name"]]),
+                );
+                if !h.same_repository(&value) {
+                    return Err(
+                        "isolated repository id, owner id or name differs from the binding".into(),
+                    );
+                }
+                Ok(())
             }
             _ => Ok(()),
         }
@@ -50,6 +62,11 @@ pub(super) fn resolve_profile_inputs(
     })?;
     let definition = depth_ci::reference("", &view.required(p.contract())?).sha256;
     let anchor_value = api.json(&api.endpoint("git/ref/heads/staging"))?;
+    observations::fact(
+        &api.endpoint("git/ref/heads/staging"),
+        "anchor",
+        &anchor_value["object"]["sha"],
+    );
     let anchor = sha(required_string(&anchor_value["object"], "sha")?)?;
     if host.is_some_and(|h| h.tip() != anchor) {
         return Err("isolated protected staging differs from the authenticated binding".into());
@@ -116,6 +133,20 @@ pub(super) fn resolve_profile_inputs(
         .iter()
         .filter(|p| p["base"]["repo"]["full_name"] == repository && p["base"]["ref"] == "staging")
         .collect::<Vec<_>>();
+    observations::population(
+        &api.endpoint(&format!("commits/{request}/pulls")),
+        "packet_pr",
+        pulls
+            .iter()
+            .map(|p| {
+                json!([
+                    p["number"],
+                    p["base"]["repo"]["full_name"],
+                    p["base"]["ref"]
+                ])
+            })
+            .collect(),
+    );
     if pulls.len() != 1 {
         return Err("generation has no unique authenticated packet PR".into());
     }
@@ -153,6 +184,15 @@ pub(super) fn resolve_profile_inputs(
         }
         applicable.push((run, head, candidate));
     }
+    let applicable_runs: Vec<_> = applicable
+        .iter()
+        .map(|(run, _, _)| (*run).clone())
+        .collect();
+    observations::population(
+        &api.endpoint(&query),
+        "runs",
+        run_facts(&applicable_runs, ir_p3),
+    );
     let candidates = applicable
         .iter()
         .map(|(run, _, _)| sha(required_string(run, "head_sha")?).map(str::to_owned))
@@ -181,6 +221,11 @@ pub(super) fn resolve_profile_inputs(
         for attempt in 1..=count {
             let attempt_run =
                 api.json(&api.endpoint(&format!("actions/runs/{id}/attempts/{attempt}")))?;
+            observations::population(
+                &api.endpoint(&format!("actions/runs/{id}/attempts/{attempt}")),
+                "attempt",
+                run_facts(std::slice::from_ref(&attempt_run), ir_p3),
+            );
             if attempt_run["id"] != id
                 || attempt_run["run_attempt"] != attempt
                 || attempt_run["head_sha"] != run["head_sha"]
@@ -295,28 +340,42 @@ pub(super) fn check_stable(
 ) -> Result<(), String> {
     // Do not allow an attempt created during discovery to disappear from the population. Under
     // IR-P3 unrelated workflow progress may continue, so only run identities must hold still.
-    let identities = |rows: &[Value]| -> Vec<Value> {
-        rows.iter()
-            .map(|r| {
-                if ir_p3 {
-                    json!([
-                        r["id"],
-                        r["run_attempt"],
-                        r["head_sha"],
-                        r["path"],
-                        r["head_repository"]["full_name"],
-                        r["event"]
-                    ])
-                } else {
-                    r.clone()
-                }
-            })
-            .collect()
-    };
-    if identities(inventory) != identities(&list(api, query, Some("workflow_runs"))?)
-        || *anchor_value != api.json(&api.endpoint("git/ref/heads/staging"))?
-    {
+    let current = list(api, query, Some("workflow_runs"))?;
+    let anchor = api.json(&api.endpoint("git/ref/heads/staging"))?;
+    observations::fact(
+        &api.endpoint("git/ref/heads/staging"),
+        "anchor",
+        &anchor["object"]["sha"],
+    );
+    let stable = run_facts(inventory, ir_p3) == run_facts(&current, ir_p3);
+    observations::fact(&api.endpoint(query), "population_stable", &stable);
+    if !stable || anchor_value["object"]["sha"] != anchor["object"]["sha"] {
         return Err("host population or approved anchor changed during read".into());
     }
     Ok(())
+}
+
+/// The enclosing workflow may progress under IR-P3. Producer terminal state is job-owned.
+fn run_facts(rows: &[Value], ir_p3: bool) -> Vec<Value> {
+    let mut facts: Vec<_> = rows
+        .iter()
+        .map(|r| {
+            json!([
+                r["id"],
+                r["run_attempt"],
+                r["head_sha"],
+                r["path"],
+                r["head_repository"]["full_name"],
+                r["event"],
+                r["workflow_id"],
+                if ir_p3 {
+                    Value::Null
+                } else {
+                    r["status"].clone()
+                }
+            ])
+        })
+        .collect();
+    facts.sort_by_cached_key(Value::to_string);
+    facts
 }

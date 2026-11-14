@@ -32,6 +32,7 @@ pub(super) fn resolve(
     let original = original_for(&source(root, api.repository(), &w.build.source_commit)?, p)?;
     let obligations = p.obligations(&original);
     let mut adopted = vec![];
+    let mut authorized = vec![];
     let mut mappings = std::collections::BTreeMap::new();
     for (kind, values) in [
         (EndorsementKind::IssueComment, comments),
@@ -130,6 +131,11 @@ pub(super) fn resolve(
                         body_sha256: depth_ci::reference("", raw.as_bytes()).sha256,
                         mapping_sha256: entry.mapping_sha256.clone(),
                     };
+                    authorized.push(serde_json::json!([
+                        endorsement,
+                        value["user"]["id"],
+                        permission["permission"]
+                    ]));
                     adopted.push((
                         mapping.clone(),
                         Adoption {
@@ -142,6 +148,11 @@ pub(super) fn resolve(
             }
         }
     }
+    crate::depth_acceptance::admission::observations::population(
+        &api.endpoint(&format!("issues/{pr}/authorized-adoptions")),
+        "adoptions",
+        authorized,
+    );
     // Deterministic choice among equivalent valid adoptions; never select among execution runs.
     adopted.sort_by_key(|(_, a)| a.endorsement.id);
     let mut complete = vec![];

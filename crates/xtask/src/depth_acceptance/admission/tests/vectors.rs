@@ -18,7 +18,7 @@ fn fixed_canonical_bytes_and_domain_digests() {
     assert_eq!(Record::parse(admission).unwrap(), record);
     assert_eq!(
         record.identity().unwrap(),
-        "5087538cbbc8c99460d218fc6256b7cbc98d196e681fbc9798f36bf479b2c1da"
+        "ab204698473c5cb9cba16156b4eafc8e9effca90a996d6478103f0c865b3d358"
     );
     assert_eq!(
         record.generation.as_ref().unwrap().identity().unwrap(),
@@ -26,6 +26,6 @@ fn fixed_canonical_bytes_and_domain_digests() {
     );
     assert_eq!(
         record.inputs_identity().unwrap(),
-        "0b11d7f709932f9c7711c2504efa47ba2abb8208ebd16857b49779d26ef0d7da"
+        "79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec"
     );
 }

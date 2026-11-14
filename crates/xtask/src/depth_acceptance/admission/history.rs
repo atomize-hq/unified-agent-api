@@ -224,9 +224,10 @@ pub(super) fn resolve(
             return Err("IN1 authority mismatch".into());
         }
         let key = record.inputs_identity()?;
-        if decisions
-            .insert(key, record.decision)
-            .is_some_and(|prior| prior != record.decision)
+        if !record.reasons.contains(&Reason::ObservationIncomplete)
+            && decisions
+                .insert(key, record.decision)
+                .is_some_and(|prior| prior != record.decision)
         {
             return Err("IN1 conflicting decisions over identical inputs".into());
         }

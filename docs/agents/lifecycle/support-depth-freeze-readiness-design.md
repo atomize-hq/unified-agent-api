@@ -177,8 +177,9 @@ actual checkout commit/tree, evaluated source/context and permitted host-head re
 old/proposed lifecycle state, checkpoint kind, decision and bounded reason codes. It also contains predecessor admission
 identities, independently approved IN1 source/workflow and complete relevant policy/dependency
 closure, observed protected roots/tips, accepted origin, registry anchor and other authoritative
-inputs, a canonical digest of consumed independently authenticated producer host observations
-(including observed absence/refusal), consumed reporting-context/execution-evidence identities
+inputs, a canonical digest of normalized independently authenticated producer and isolated-host
+facts (including authorized adoptions and explicit discovery completeness/absence, with canonical
+population ordering), consumed reporting-context/execution-evidence identities
 where applicable, and host
 workflow/run/attempt/job/check/event claims. An admission without a depth producer is representable.
 The first record binds an independently authenticated bootstrap/enrollment anchor. Earlier
@@ -226,7 +227,9 @@ decision identity and separately authenticate retries. Conflicting decisions ove
 and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
 commitments, stale roots or changed populations prevent verification. Distinguish decisions over
 different root snapshots and observed host authority. Candidate-authored files cannot select the
-observed-authority digest. Revocation changes present eligibility while preserving historical
+observed-authority digest. Any unavailable evaluation read produces a retained
+`observation_incomplete` refusal, excluded from identical-input conflict comparisons and readiness.
+Reached contradictory decisions over identical normalized facts still refuse. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification
 requires the evidence to remain available.

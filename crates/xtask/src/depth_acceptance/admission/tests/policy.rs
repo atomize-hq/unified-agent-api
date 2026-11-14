@@ -114,3 +114,59 @@ fn same_run_wrong_job_artifact_with_valid_digest_and_copied_commitment_refuses()
         .unwrap()
         .contains("independent host association"));
 }
+
+#[test]
+fn incomplete_observation_is_never_eligible_or_a_conflict_side() {
+    let first = retained();
+    let host = fixture().host.fork();
+    let mut incomplete = first.clone();
+    incomplete.decision = Decision::Refused;
+    incomplete.reasons = vec![Reason::ObservationIncomplete];
+    assert_eq!(
+        incomplete.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+    let refused = publish(&host, incomplete.clone());
+    publish(&host, first.clone());
+    let history = resolve(host.fork()).unwrap();
+    assert!(history.eligible(&first.identity().unwrap()).unwrap());
+    assert!(!history.eligible(&refused.identity().unwrap()).unwrap());
+    // An incomplete refusal must also preserve detection of a later reached contradiction.
+    incomplete.reasons = vec![Reason::OwningPredicateRefused];
+    publish(&host, incomplete);
+    assert!(resolve(host)
+        .err()
+        .unwrap()
+        .contains("conflicting decisions over identical inputs"));
+    let mut malformed = first;
+    malformed.reasons = vec![Reason::ObservationIncomplete];
+    assert!(malformed.canonical().is_err());
+    malformed.decision = Decision::Refused;
+    malformed.reasons.push(Reason::OwningPredicateRefused);
+    assert!(malformed.canonical().is_err());
+}
+
+#[test]
+fn history_transport_unavailability_is_sticky_while_reached_refusal_is_complete() {
+    let first = retained();
+    for path in [
+        String::new(),
+        format!("actions/jobs/{}/logs", first.claims.job),
+    ] {
+        let host = fixture().host.fork();
+        let original = host.facts.lock().unwrap().remove(&path).unwrap();
+        let capture = observations::Capture::start().unwrap();
+        assert!(resolve(host.fork()).is_err());
+        host.facts.lock().unwrap().insert(path, original);
+        resolve(host).unwrap();
+        assert!(capture.finish().unwrap().incomplete);
+    }
+    let host = fixture().host.fork();
+    host.change("", |value| value["id"] = json!(999));
+    let capture = observations::Capture::start().unwrap();
+    assert!(resolve(host)
+        .err()
+        .unwrap()
+        .contains("repository identity mismatch"));
+    assert!(!capture.finish().unwrap().incomplete);
+}

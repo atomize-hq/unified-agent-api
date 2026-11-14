@@ -94,7 +94,13 @@ fn candidate_witness_copy_cannot_select_observed_authority_or_avoid_conflicts() 
         candidate(&f, &parent);
         authenticate(&f, &parent).unwrap();
         let current = f.api.3.records().pop().unwrap();
-        assert_eq!(current.observed_authority, first.observed_authority);
+        // Isolated host corroboration follows the new candidate commit. Re-evaluating that
+        // same candidate must preserve authority despite its candidate-owned witness copies.
+        assert_ne!(current.candidate, first.candidate);
+        assert_eq!(current.execution_evidence, first.execution_evidence);
+        authenticate(&f, &parent).unwrap();
+        let retry = f.api.3.records().pop().unwrap();
+        assert_eq!(retry.observed_authority, current.observed_authority);
     }
     let mut refusal = f.api.3.records().pop().unwrap();
     refusal.decision = Decision::Refused;
@@ -132,4 +138,124 @@ fn candidate_witness_copy_cannot_select_observed_authority_or_avoid_conflicts() 
         error.contains("conflicting decisions over identical inputs"),
         "{error}"
     );
+}
+
+#[test]
+fn ordinary_comment_edit_cannot_salt_a_reached_conflict() {
+    let (f, host) = connected::frozen(false);
+    let _installed = f.install();
+    let _reader = host.install();
+    let parent = head(&f);
+    local(&f, &parent);
+    let next = candidate(&f, &parent);
+    host.ordinary_comment("ordinary original comment");
+    authenticate(&f, &parent).unwrap();
+    let first = f.api.3.records().pop().unwrap();
+    host.ordinary_comment("candidate edited this ordinary comment");
+    let route = Route(f.resolve().unwrap());
+    let evidence = route.context().evidence_host(f.root.path()).unwrap();
+    let error = route
+        .with_admitted_publication(f.root.path(), &parent, || {
+            crate::depth_evidence::EvidenceVerdicts::assemble_view_fixture(
+                f.root.path(),
+                &evidence,
+            )?;
+            Err::<(), _>("deliberate reached contradictory decision".into())
+        })
+        .unwrap_err();
+    assert!(
+        error.contains("deliberate reached contradictory decision"),
+        "{error}"
+    );
+    let refusal = f.api.3.records().pop().unwrap();
+    assert_eq!(refusal.reasons, [Reason::OwningPredicateRefused]);
+    assert_eq!(refusal.observed_authority, first.observed_authority);
+    assert_eq!(
+        refusal.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+    let error = f
+        .resolve()
+        .unwrap()
+        .admission_publication()
+        .unwrap()
+        .resolve(f.root.path(), &[parent, next])
+        .err()
+        .unwrap();
+    assert!(
+        error.contains("conflicting decisions over identical inputs"),
+        "{error}"
+    );
+}
+
+#[test]
+fn reordered_populations_and_unrelated_workflow_progress_preserve_identity() {
+    let (f, host) = connected::frozen(false);
+    let _installed = f.install();
+    let _reader = host.install();
+    let parent = head(&f);
+    local(&f, &parent);
+    candidate(&f, &parent);
+    host.incidental_population(RUNS, false);
+    authenticate(&f, &parent).unwrap();
+    let first = f.api.3.records().pop().unwrap();
+    host.incidental_population(RUNS, true);
+    authenticate(&f, &parent).unwrap();
+    let second = f.api.3.records().pop().unwrap();
+    assert_eq!(second.observed_authority, first.observed_authority);
+    assert_eq!(
+        second.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+}
+
+#[test]
+fn late_isolated_host_flake_is_retained_incomplete_and_retry_recovers() {
+    let (f, host) = connected::frozen(false);
+    let root = f.root.path();
+    let _installed = f.install();
+    let _reader = host.install();
+    let parent = head(&f);
+    local(&f, &parent);
+    let next = candidate(&f, &parent);
+    authenticate(&f, &parent).unwrap();
+    let first = f.api.3.records().pop().unwrap();
+    let route = Route(f.resolve().unwrap());
+    let evidence = route.context().evidence_host(root).unwrap();
+    let error = route
+        .with_admitted_publication(root, &parent, || {
+            crate::depth_evidence::EvidenceVerdicts::assemble_view_fixture(root, &evidence)?;
+            // All producer reads have completed. The next isolated read is the final captured
+            // recheck in with_integration_publication. The subsequent binding recheck succeeds.
+            f.api.4.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        })
+        .unwrap_err();
+    assert!(error.contains("observation incomplete"), "{error}");
+    assert!(!f.api.4.load(std::sync::atomic::Ordering::SeqCst));
+    let refusal = f.api.3.records().pop().unwrap();
+    assert_eq!(refusal.decision, Decision::Refused);
+    assert_eq!(refusal.reasons, [Reason::ObservationIncomplete]);
+    assert_ne!(refusal.observed_authority, first.observed_authority);
+    let history = f
+        .resolve()
+        .unwrap()
+        .admission_publication()
+        .unwrap()
+        .resolve(root, &[parent.clone(), next.clone()])
+        .unwrap();
+    assert!(!history.eligible(&refusal.identity().unwrap()).unwrap());
+    authenticate(&f, &parent).unwrap();
+    let retry = f.api.3.records().pop().unwrap();
+    assert_eq!(retry.decision, Decision::Admitted);
+    assert_eq!(
+        retry.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+    f.resolve()
+        .unwrap()
+        .admission_publication()
+        .unwrap()
+        .resolve(root, &[parent, next])
+        .unwrap();
 }

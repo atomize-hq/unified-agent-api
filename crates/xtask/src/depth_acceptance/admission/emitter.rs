@@ -25,7 +25,7 @@ impl Emitter {
         &self,
         root: &Path,
         outcome: Result<T, String>,
-        observed_authority: Result<String, String>,
+        observed_authority: Result<observations::Authority, String>,
     ) -> Result<T, String> {
         // Invalid invocation bindings have no authenticated predecessor to record. Preserve
         // their existing refusal. A reached owning decision is retained with bounded reasons.
@@ -36,9 +36,16 @@ impl Emitter {
             .as_ref()
             .err()
             .is_some_and(|e| e.contains("isolated IN1 binding"))
+            && !observed_authority.as_ref().is_ok_and(|a| a.incomplete)
         {
             return outcome;
         }
+        let incomplete = observed_authority.as_ref().is_ok_and(|a| a.incomplete);
+        let outcome = match (incomplete, outcome) {
+            (true, Err(error)) => Err(format!("IN1 host observation incomplete: {error}")),
+            (true, Ok(_)) => Err("IN1 host observation incomplete".into()),
+            (false, outcome) => outcome,
+        };
         let retained = observed_authority
             .and_then(|authority| self.retain(root, outcome.is_ok(), authority))
             .and_then(|()| self.context.recheck(root));
@@ -55,7 +62,7 @@ impl Emitter {
         &self,
         root: &Path,
         admitted: bool,
-        observed_authority: String,
+        observed_authority: observations::Authority,
     ) -> Result<(), String> {
         let parent = self
             .parent
@@ -161,6 +168,8 @@ impl Emitter {
             },
             reasons: vec![if admitted {
                 Reason::OwningPredicatesSatisfied
+            } else if observed_authority.incomplete {
+                Reason::ObservationIncomplete
             } else {
                 Reason::OwningPredicateRefused
             }],
@@ -175,7 +184,7 @@ impl Emitter {
             ),
             registry_blob: self.registry_blob.clone(),
             inputs,
-            observed_authority,
+            observed_authority: observed_authority.identity,
             producer_context: None,
             execution_evidence,
             claims: session.claims.clone(),

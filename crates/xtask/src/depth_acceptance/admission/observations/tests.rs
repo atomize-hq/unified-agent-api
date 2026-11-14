@@ -1,56 +1,81 @@
 use super::*;
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[test]
-fn canonical_host_facts_deduplicate_and_preserve_absence_and_unavailability() {
+fn canonical_facts_deduplicate_and_preserve_absence_and_unavailability() {
     let capture = Capture::start().unwrap();
-    json(
-        "population",
-        &Ok(json!({"total_count":0,"workflow_runs":[]})),
-    );
-    bytes("artifact/1", &Ok(vec![1, 2, 3]));
+    discovery("population", false);
+    discovery("population", true);
+    population("population", "runs", vec![]);
+    fact("artifact/1", "witness_bytes", &digest(b"", &[1, 2, 3]));
     let first = capture.finish().unwrap();
-    // Independently computed with Python json/hashlib over the literal tagged responses.
+    assert!(!first.incomplete);
+    // Independently computed with Python json/hashlib from these normalized facts.
     assert_eq!(
-        first,
-        "98e4022e58aae5cff89ac327fad6aebb9b35b30bee4fc8901fbfd22ae1df9f42"
+        first.identity,
+        "a740cc927410b5d84653e5d424e74b60ad767838b47dc9c6659762f118ed442d"
     );
     let capture = Capture::start().unwrap();
-    bytes("artifact/1", &Ok(vec![1, 2, 3]));
-    json(
-        "population",
-        &Ok(json!({"workflow_runs":[],"total_count":0})),
-    );
-    bytes("artifact/1", &Ok(vec![1, 2, 3]));
+    fact("artifact/1", "witness_bytes", &digest(b"", &[1, 2, 3]));
+    population("population", "runs", vec![]);
+    discovery("population", true);
+    discovery("population", false);
+    discovery("population", true);
     assert_eq!(capture.finish().unwrap(), first);
     let capture = Capture::start().unwrap();
-    json("population", &Err("unavailable at a local path".into()));
-    let unavailable = capture.finish().unwrap();
-    assert_ne!(unavailable, first);
+    unavailable::<Value>("population", &Err("unavailable at a local path".into()));
+    let failed = capture.finish().unwrap();
+    assert!(failed.incomplete);
     let capture = Capture::start().unwrap();
-    json("population", &Err("another transport error".into()));
-    assert_eq!(capture.finish().unwrap(), unavailable);
-    let capture = Capture::start().unwrap();
-    json("population", &Ok(json!([])));
-    assert_ne!(capture.finish().unwrap(), unavailable);
+    unavailable::<Value>("population", &Err("another transport error".into()));
+    unavailable("population", &Ok(json!([])));
+    assert_eq!(capture.finish().unwrap(), failed);
+    assert_ne!(failed.identity, first.identity);
 }
 
 #[test]
 fn observation_capture_is_scoped_and_cleared_on_drop() {
     let capture = Capture::start().unwrap();
     assert!(Capture::start().is_err());
-    bytes("discarded", &Ok(vec![1]));
+    unavailable::<Value>("discarded", &Err("unavailable".into()));
     drop(capture);
     let capture = Capture::start().unwrap();
-    // Pin the empty observation set independently of runtime-generated fixture identities.
+    let empty = capture.finish().unwrap();
+    assert!(!empty.incomplete);
     assert_eq!(
-        capture.finish().unwrap(),
+        empty.identity,
         "abf865743b3665009809797970ea64fffa1a48c25cdf1b6b58cf134d8db63845"
     );
+}
+
+#[test]
+fn population_order_preserves_authority_but_multiplicity_and_absence_change_it() {
     let capture = Capture::start().unwrap();
-    bytes("artifact/1", &Err("unavailable".into()));
-    let unavailable = capture.finish().unwrap();
+    population(
+        "jobs",
+        "producer_jobs",
+        vec![json!([2, "success"]), json!([1, "failure"])],
+    );
+    let first = capture.finish().unwrap();
     let capture = Capture::start().unwrap();
-    bytes("artifact/1", &Ok(vec![]));
-    assert_ne!(capture.finish().unwrap(), unavailable);
+    population(
+        "jobs",
+        "producer_jobs",
+        vec![json!([1, "failure"]), json!([2, "success"])],
+    );
+    assert_eq!(capture.finish().unwrap(), first);
+    let capture = Capture::start().unwrap();
+    population(
+        "jobs",
+        "producer_jobs",
+        vec![
+            json!([1, "failure"]),
+            json!([2, "success"]),
+            json!([2, "success"]),
+        ],
+    );
+    assert_ne!(capture.finish().unwrap(), first);
+    let capture = Capture::start().unwrap();
+    population("jobs", "producer_jobs", vec![]);
+    assert_ne!(capture.finish().unwrap(), first);
 }

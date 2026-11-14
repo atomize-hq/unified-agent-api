@@ -1,6 +1,120 @@
 # FR1 admission history implementation report
 
-## Observed host authority repair
+## Review round 4 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `7fb60ec8`, subject to
+four Unix-socket sandbox failures detailed below. This section was started before code changes.
+Changes remain uncommitted.
+
+P1 is repaired at predicate ownership boundaries. The producer adapter records transport
+availability while approved predicates project normalized repository/anchor, packet PR,
+applicable Event/P/O workflow/run/attempt, producer job/required step, artifact binding and
+witness-byte facts. Ignored out-of-scope runs contribute no content facts, and the closing
+comparison records explicit discovery stability.
+Canonical population sorting preserves multiplicity and removes incidental response order.
+The stability recheck compares the same normalized workflow identity fields, allowing unrelated
+IR-P3 workflow progress. Matching authorized adoptions commit author login/id, accepted permission,
+endorsement identity, source/mapping and exact referenced body-byte digests. Ordinary comments,
+unauthorized records, unrelated artifacts/jobs, ignored log text and unused metadata contribute
+no content facts. Discovery records start and successful bounded exhaustion independently of
+ignored-row counts or page boundaries. Relevant empty normalized arrays commit absence, including
+an exhausted population with no authorized adoptions. Existing source/transport/population limits,
+canonical encoding, domains and the 65,536-byte admission bound apply.
+
+P2 is repaired by recording normalized isolated-host reads in `Context::recheck`, including the
+closing captured-context and binding rechecks. Facts cover repository identity/protection/tips,
+ancestry/candidate corroboration, governing registry and approved-scope canonical source inventory.
+A transport failure is sticky across later successful reads. Producer object acquisition failures
+and retained-history transport failures during predicate evaluation also mark the observation
+incomplete. A bound invocation with any unavailable evaluation read
+retains a refused decision with the sole bounded reason `observation_incomplete`. It cannot return
+success or supply readiness. Record validation rejects combining that reason with admission or
+other reasons. History excludes incomplete observations from both sides of conflict comparisons,
+while reached contradictory decisions sharing identical normalized authority continue to refuse.
+The binding-error early return now preserves incomplete refusals after an authenticated parent
+has been captured. Capture ends before the emitter reconstructs history and publishes its record.
+
+Implementation changes are in `depth_acceptance/admission/{observations,emitter,record,history,transport}.rs`,
+`depth_evidence/verdict/github/{population,transport,artifact,adoption}.rs` and
+`isolated_maintenance/host.rs`, relative to `crates/xtask/src/`.
+
+Regression coverage includes the following cases.
+
+- `ordinary_comment_edit_cannot_salt_a_reached_conflict` completes the same producer reads,
+  edits only an ordinary PR comment and retains a deliberately contradictory reached refusal.
+  Both authority and input identities remain identical, and history refuses the conflict.
+- `reordered_populations_and_unrelated_workflow_progress_preserve_identity` reverses multi-row
+  workflow/job/artifact populations and changes unrelated enclosing workflow state/metadata
+  and an ignored out-of-scope run's head.
+  Admission and normalized identities remain stable.
+- `late_isolated_host_flake_is_retained_incomplete_and_retry_recovers` first retains an admission,
+  completes the same producer reads, then injects one unavailable isolated read into the final
+  captured recheck inside `with_integration_publication`. The later binding recheck succeeds.
+  IN1 retains an ineligible incomplete refusal, reconstructs history and admits the next complete
+  retry with the first admission's input identity.
+- `incomplete_observation_is_never_eligible_or_a_conflict_side` supplies an incomplete refusal
+  with exactly an admission's authority and input identity. History accepts retries around it,
+  then still rejects a reached contradictory refusal. Invalid reason/decision combinations refuse.
+- `history_transport_unavailability_is_sticky_while_reached_refusal_is_complete` covers
+  unavailable JSON/log history reads followed by restored reads and a reached identity refusal.
+- Observation unit tests cover fixed normalized facts, deduplication, canonical population order,
+  multiplicity, explicit absence, sticky unavailability, arbitrary error-text exclusion and scope.
+  Existing disturbed/restored producer and candidate-owned witness-copy regressions remain covered.
+  The witness-copy test now checks repeat stability for each committed candidate, since normalized
+  isolated-host corroboration includes the candidate commit. Its evidence identities remain stable.
+
+The original raw-response implementation failed the ordinary-comment/workflow-metadata reproduction.
+The repaired socket-free producer-backed regression group passes all six tests. During development,
+a fake-host array-indexing error was corrected and the witness-copy expectation was updated for
+isolated-host candidate corroboration. The LOC gate required placing the incomplete-history test
+in the existing `tests/policy.rs` child module. Full validation also caught loss of the original
+isolated-binding diagnostic when marking an observation incomplete. The returned error now
+preserves that diagnostic, and its dedicated moved-tip regression passes.
+
+Literal vectors were computed independently with Python `json` and `hashlib`, using sorted keys,
+compact UTF-8 JSON and the terminating NUL in each domain. The normalized observation fixture
+commits discovery start/completion, an empty run population and the digest of bytes `[1,2,3]`.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Normalized observed authority | `a740cc927410b5d84653e5d424e74b60ad767838b47dc9c6659762f118ed442d` |
+| Admission with that authority | `ab204698473c5cb9cba16156b4eafc8e9effca90a996d6478103f0c865b3d358` |
+| Evaluated inputs with that authority | `79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec` |
+
+The evidence contract's `observed_authority` bullet and reason rules, freeze/readiness design and
+Annex A IN1 row now specify normalized authoritative facts and the incomplete-observation rule.
+
+### Round 4 validation
+
+Cargo validation uses `env -u TMPDIR` to select the default writable temporary directory.
+The groups ran concurrently, so runtimes include contention. Final runs include normalized
+applicable populations, retained-history availability and preservation of binding diagnostics.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 16.93 s including build-lock wait |
+| `cargo test -p xtask --lib depth_acceptance` | 72 passed, 97.82 s tests |
+| `cargo test -p xtask --lib in1_integration` | 29 passed, 4 Unix-socket sandbox failures, 182.05 s tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed, 439.58 s tests |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed, 133.90 s tests |
+| `make loc-check` | Pass |
+| `make hygiene` | Pass |
+| `git diff --check` | Pass |
+
+The four sandbox failures are the connected IN1 tests
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_refuses_forged_closeout_entries_in_admission_and_observation` and
+`in1_reauthenticates_population_in_admission_and_post_push_observation`.
+All fail in fixture preparation with `cannot open the MA4 evidence channel: Operation not
+permitted (os error 1)`. Their socket-dependent assertions remain unverified in this sandbox.
+All five socket-free producer-backed authority regressions pass in the final IN1 group, including
+ordinary-comment conflict, reordered/ignored population, late-flake recovery, disturbed/restored
+producer authority and candidate witness-copy cases. The moved-tip diagnostic regression also passes.
+
+
+## Previous round 3 observed host authority repair
 
 Status — implemented and validated on `feat/fr1-admission-history` over `7624f1ec`, subject to
 four Unix-socket sandbox failures detailed below. Changes are uncommitted for the lead.
@@ -238,7 +352,7 @@ and SHA-256 over `support-depth-in1-admission-v1` + NUL + canonical bytes.
 | `predecessors`, `enrollment_anchor` | Sorted unique successful parent-frontier decisions and independent first-record anchor |
 | `policy` | Approved implementation/workflow/closure and fixed workflow/job/app identities |
 | `protected_tip`, `canonical_tip`, `accepted_origin`, `registry_blob`, `inputs` | Observed roots, accepted repository and authoritative input blobs |
-| `observed_authority` | Required canonical digest of consumed producer host observations, including absence/refusal |
+| `observed_authority` | Required canonical digest of normalized producer and isolated-host facts, authorized adoptions and explicit completeness/absence |
 | `producer_context`, `execution_evidence` | Nullable context and consumed evidence identities; producer absence is representable |
 | `claims` | Run, attempt, emitting job, check and event |
 

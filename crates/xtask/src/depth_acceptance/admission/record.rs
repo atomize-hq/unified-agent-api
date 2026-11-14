@@ -85,6 +85,7 @@ pub(crate) enum Checkpoint {
 pub(crate) enum Reason {
     OwningPredicatesSatisfied,
     OwningPredicateRefused,
+    ObservationIncomplete,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -168,6 +169,14 @@ impl Record {
     fn validate(&self) -> Result<(), String> {
         if self.schema_version != 1 || self.kind != "in1_admission" {
             return Err("unsupported IN1 control record version/kind".into());
+        }
+        if self.reasons.contains(&Reason::ObservationIncomplete)
+            && (self.decision != Decision::Refused
+                || self.reasons != [Reason::ObservationIncomplete])
+        {
+            return Err(
+                "IN1 incomplete observation must be a refusal with its sole bounded reason".into(),
+            );
         }
         for object in [
             &self.candidate,
