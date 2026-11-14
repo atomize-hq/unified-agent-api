@@ -317,9 +317,12 @@ fn inherited_alternate_index_cannot_supply_missing_caller_evidence_binding() {
     let before = fs::read(root.join(format!("reports/{VERSION}/depth-record.json"))).unwrap();
     let caller_index = fs::read(temp.path().join(".git/index")).unwrap();
     let alternate_index = fs::read(&index).unwrap();
+    // The refused candidate is retained for recovery; keep it in a test-owned directory.
+    let retained = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .current_dir(temp.path())
         .env("GIT_INDEX_FILE", &index)
+        .env("TMPDIR", retained.path())
         .args(
             mh::execute_args("--write", Some(&binary))
                 .into_iter()
