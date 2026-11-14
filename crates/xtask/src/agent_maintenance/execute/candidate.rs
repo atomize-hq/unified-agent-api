@@ -44,6 +44,9 @@ impl Candidate {
             staged_evidence: None,
         })
     }
+    pub fn discard(self) {
+        self.independent.discard();
+    }
     pub fn observe(&self) -> Result<Tree, Error> {
         self.independent.observe().map_err(Into::into)
     }

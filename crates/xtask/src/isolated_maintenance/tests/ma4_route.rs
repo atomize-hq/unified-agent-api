@@ -27,17 +27,57 @@ fn executor(dir: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-fn dry_run(root: &Path, binary: &str) -> Result<String, String> {
+#[derive(Debug)]
+pub(super) struct RunError {
+    message: String,
+    _recovery: Option<crate::candidate_execution::TestHolder>,
+}
+impl std::ops::Deref for RunError {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.message
+    }
+}
+impl std::fmt::Display for RunError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+impl RunError {
+    fn new(message: String) -> Self {
+        let recovery = message
+            .rsplit_once("candidate retained at ")
+            .map(|(_, path)| {
+                let candidate = Path::new(path.trim());
+                assert!(
+                    candidate.is_dir(),
+                    "reported recovery path must be retained"
+                );
+                crate::candidate_execution::TestHolder::new(candidate)
+            });
+        Self {
+            message,
+            _recovery: recovery,
+        }
+    }
+}
+
+fn dry_run(root: &Path, binary: &str) -> Result<String, RunError> {
     run(root, binary, false, "ma4-route")
 }
 
 /// A dry run and then a write run under one run id.
-pub(super) fn run_as(root: &Path, binary: &str, run_id: &str) -> Result<String, String> {
+pub(super) fn run_as(root: &Path, binary: &str, run_id: &str) -> Result<String, RunError> {
     run(root, binary, false, run_id)?;
     run(root, binary, true, run_id)
 }
 
-pub(super) fn run(root: &Path, binary: &str, write: bool, run_id: &str) -> Result<String, String> {
+pub(super) fn run(
+    root: &Path,
+    binary: &str,
+    write: bool,
+    run_id: &str,
+) -> Result<String, RunError> {
     let mut out = Vec::new();
     execute::run_in_workspace(
         root,
@@ -51,7 +91,7 @@ pub(super) fn run(root: &Path, binary: &str, write: bool, run_id: &str) -> Resul
         &mut out,
     )
     .map(|()| String::from_utf8_lossy(&out).into_owned())
-    .map_err(|e| e.to_string())
+    .map_err(|e| RunError::new(e.to_string()))
 }
 
 #[test]
