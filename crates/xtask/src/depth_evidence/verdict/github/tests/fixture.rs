@@ -387,6 +387,10 @@ pub(super) fn onboarding_workspace() -> tempfile::TempDir {
             &format!("on2-freeze:{}", depth_ci::onboarding::STATE),
         ],
     );
+    // Replay the final-source projection from the genuine freeze. Keeping the real
+    // implementation as its parent would itself be a runtime_integrated -> enrolled rollback.
+    git(root.path(), &["tag", "on2-implementation"]);
+    git(root.path(), &["reset", "--soft", "on2-freeze"]);
     install_onboarding_producer(root.path());
     // The upstream reporting admission needed this source; wrapper-only evidence does not.
     fs::remove_dir_all(root.path().join("crates/agent_api/src")).unwrap();
