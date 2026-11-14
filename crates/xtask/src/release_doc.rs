@@ -1,3 +1,12 @@
+#[cfg(test)]
+#[path = "../tests/support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+#[cfg(test)]
+#[path = "../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{fs, path::Path};
 
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
@@ -94,8 +103,25 @@ mod tests {
 
     #[test]
     fn registry_release_packages_follow_registry_order_and_append_tail_packages() {
-        let registry = AgentRegistry::parse(include_str!("../data/agent_registry.toml"))
-            .expect("parse registry");
+        let registry =
+            AgentRegistry::parse(registry_fixture::undeclared_registry()).expect("parse registry");
+
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let candidate = candidate_registry::registry(&root);
+        let mut expected: Vec<String> = candidate
+            .agents
+            .iter()
+            .filter(|entry| entry.release.docs_release_track == "crates-io")
+            .map(|entry| entry.package_name.clone())
+            .collect();
+        expected.extend([
+            WRAPPER_EVENTS_PACKAGE_NAME.to_string(),
+            ROOT_AGENT_API_PACKAGE_NAME.to_string(),
+        ]);
+        assert_eq!(registry_release_packages(&candidate, "crates-io"), expected);
+        let committed = fs::read_to_string(root.join(RELEASE_DOC_PATH)).unwrap();
+        assert!(committed.contains(&render_release_doc_block(&expected)));
+        assert_eq!(candidate_registry::registry(&root), candidate);
 
         assert_eq!(
             registry_release_packages(&registry, "crates-io"),

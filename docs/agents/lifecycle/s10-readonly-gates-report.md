@@ -197,3 +197,309 @@ S/T execution, re-observation and checked delivery. No live profile is installed
 
 The final worktree contains the requested source, focused tests, Annex A/evidence notes and this
 report. Changes are uncommitted for the lead, and no push was performed.
+
+## Slice 10b
+
+Work follows the design's registry-reader inventory in packet order. Site numbers below identify
+the design baseline. Changes remain uncommitted for the lead.
+
+### Per-site progress
+
+| Site | Treatment | Status |
+| --- | --- | --- |
+| `xtask/agent_maintenance/support_audit/tests.rs:258` | P | done |
+| `xtask/agent_maintenance/support_audit/tests.rs:424` | C | done |
+| `xtask/isolated_maintenance/tests.rs:149` | U | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:36` | P | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:88` | P | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:109` | P | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:138` | C/U | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:150` | C/U | done |
+| `xtask/release_doc.rs:97` | P | done |
+| `crates/xtask/tests/agent_lifecycle_state.rs:143` | C | done |
+| `crates/xtask/tests/agent_lifecycle_state.rs:357` | P | done |
+| `crates/xtask/tests/agent_lifecycle_state.rs:524` | P | done |
+| `crates/xtask/tests/agent_maintenance_audit_status.rs:459` | P | done |
+| `crates/xtask/tests/agent_maintenance_audit_status.rs:516` | P | done |
+| `crates/xtask/tests/agent_maintenance_audit_status_debt_baseline.rs:237` | P | done |
+| `crates/xtask/tests/agent_maintenance_audit_status_debt_baseline.rs:338` | P | done |
+| `crates/xtask/tests/agent_maintenance_closeout.rs:107` | P | done |
+| `crates/xtask/tests/agent_maintenance_closeout.rs:121` | P | done |
+| `crates/xtask/tests/agent_maintenance_closeout/write_outputs.rs:241` | P | done |
+| `crates/xtask/tests/agent_maintenance_execute.rs:34` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare.rs:496` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare.rs:556` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/depth_binding.rs:11` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:248` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:415` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:440` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:460` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:540` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/from_request.rs:565` | P | done |
+| `crates/xtask/tests/agent_maintenance_refresh.rs:70` | P | done |
+| `crates/xtask/tests/agent_maintenance_refresh.rs:84` | P | done |
+| `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs:14` | P | done |
+| `crates/xtask/tests/agent_maintenance_refresh/automated_requests.rs:61` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:264` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:545` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:575` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:602` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:629` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:655` | P | done |
+| `crates/xtask/tests/agent_maintenance_watch.rs:691` | P | done |
+| `crates/xtask/tests/agent_registry.rs:41` | P | done |
+| `crates/xtask/tests/agent_registry.rs:234` | C/U | done |
+| `crates/xtask/tests/agent_registry.rs:251` | P | done |
+| `crates/xtask/tests/agent_registry.rs:264` | P | done |
+| `crates/xtask/tests/agent_registry.rs:323` | P | done |
+| `crates/xtask/tests/agent_registry.rs:353` | P | done |
+| `crates/xtask/tests/agent_registry.rs:398` | P | done |
+| `crates/xtask/tests/agent_registry.rs:452` | P | done |
+| `crates/xtask/tests/agent_registry.rs:482` | P | done |
+| `crates/xtask/tests/agent_registry.rs:521` | P | done |
+| `crates/xtask/tests/agent_registry.rs:629` | P | done |
+| `crates/xtask/tests/agent_registry.rs:637` | P | done |
+| `crates/xtask/tests/agent_registry.rs:678` | P | done |
+| `crates/xtask/tests/agent_registry.rs:714` | P | done |
+| `crates/xtask/tests/agent_registry.rs:741` | P | done |
+| `crates/xtask/tests/agent_registry/non_runtime.rs:79` | P | done |
+| `crates/xtask/tests/agent_registry/support_depth.rs:65` | U | done |
+| `crates/xtask/tests/agent_registry/support_depth.rs:85` | P | done |
+| `crates/xtask/tests/c0_spec_validate/depth_records/acceptance/publication.rs:15` | P | done |
+| `crates/xtask/tests/c0_spec_validate/depth_records/acceptance/publication.rs:176` | P | done |
+| `crates/xtask/tests/c0_spec_validate/depth_records/acceptance/relay_boundary.rs:37` | P | done |
+| `crates/xtask/tests/c8_capability_matrix_unit.rs:49` | P | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_parity.rs:34` | P | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:38` | C/P | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:90` | C | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:112` | P | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_staleness.rs:48` | P | done |
+| `crates/xtask/tests/depth_synthetic_governing.rs:83` | P | done |
+| `crates/xtask/tests/depth_synthetic_governing.rs:84` | P | done |
+| `crates/xtask/tests/depth_synthetic_governing.rs:116` | U | done |
+| `crates/xtask/tests/prepare_publication_entrypoint.rs:90` | P | done |
+| `crates/xtask/tests/runtime_advertising/fixtures.rs:41` | P | done |
+| `crates/xtask/tests/support/agent_maintenance_closeout_harness.rs:95` | P | done |
+| `crates/xtask/tests/support/agent_maintenance_harness.rs:354` | P | done |
+| `crates/xtask/tests/support/agent_maintenance_harness.rs:404` | P | done |
+| `crates/xtask/tests/support/agent_maintenance_refresh_harness.rs:230` | P | done |
+| `crates/xtask/tests/support_depth.rs:60` | P | done |
+| `crates/xtask/tests/validator_spec_roots.rs:89` | C | done |
+| `crates/xtask/tests/validator_spec_roots.rs:128` | C | done |
+| `crates/xtask/tests/validator_spec_roots.rs:158` | C | done |
+| `xtask/isolated_maintenance/tests.rs:149-154` | U | done |
+| `xtask/isolated_maintenance/tests/registry_tables.rs:139` | U | done |
+| `crates/xtask/tests/agent_registry/support_depth.rs:66` | U | done |
+| `crates/xtask/tests/agent_lifecycle_support_depth.rs:56` | U | done |
+| `xtask/prepare_publication/acquired_inputs_tests.rs:260` | P | done |
+| `crates/xtask/tests/agent_maintenance_prepare/depth_binding.rs:10` | P | done |
+| `crates/xtask/tests/depth_record/onboarding_binding.rs:230` | P | done |
+| `crates/xtask/tests/c0_spec_validate/depth_records/acceptance/attribution.rs:7-11` | P | done |
+| `crates/xtask/tests/onboard_agent_entrypoint/governing_validation.rs:85-87` | P | done |
+| `crates/xtask/tests/runtime_follow_on_entrypoint.rs:79` | P | done |
+
+### Treatment details
+
+The shared immutable ordinary registry is `crates/xtask/tests/fixtures/undeclared_registry.toml`.
+Every ordinary registry builder uses `tests/support/registry_fixture.rs`. Existing scratch
+workspaces still materialize their command inputs from those shared bytes. The fixed ordinary lifecycle sample helpers also read the frozen lifecycle corpus. All production
+`AgentRegistry::load` and `parse` behavior is preserved. Repeated helper module imports are
+intentional because the harnesses embed source tests under separate module roots.
+
+Candidate checks use `tests/support/candidate_registry.rs`. Ordinary discovery uses the existing
+routed registry reader. The declared-checkout leg launches the private library-test child
+`isolated_maintenance::tests::declared_test_leg::authenticated_registry_child` independently.
+That child first verifies no installed route arrived, installs its own fixed synthetic test
+profile and fake host observations, authenticates the actual committed checkout through the
+real route, verifies production parsing still refuses its declaration, and closes the route
+before returning exact checked bytes or checker results. A failed child fails its caller.
+Actual spec, lifecycle, debt and release-artifact readers repeat authentication after reading.
+Capability reproduction runs the actual candidate generator inside the authenticated child.
+The declared runtime check and Claude adoption validation also execute inside that child.
+
+The lifecycle round-trip test continues to parse, validate and serialize every actual committed
+state byte for byte, including depth-bearing states. Its ordinary absence assertions now apply
+to the frozen ordinary lifecycle objects in `tests/fixtures/undeclared_lifecycle_states.json`.
+All existing test names are preserved. Annex A has no renamed test references to update.
+
+The deliberate orphan-lifecycle deletion, ordinary request binding, legacy approval attribution,
+ON1 before-declaration scaffold and ordinary runtime-input absence assertions retain their
+original assertions. Their setup is already deliberately ordinary or is now supplied by the
+shared ordinary harness.
+
+### Additional fixture consumers
+
+These setup consumers also embedded or copied the changing registry. Their ordinary fixture
+inputs now use the same shared helper so the declared workspace leg reaches their assertions.
+
+| Site | Treatment | Status |
+| --- | --- | --- |
+| `tests/support/onboard_agent_harness.rs` ordinary scaffold registry seed | P | done |
+| `src/isolated_maintenance/tests/fixture.rs` ordinary baseline before isolated enrollment | P | done |
+| `src/isolated_maintenance/tests/bootstrap.rs` ordinary and pre-declaration controls | P | done |
+| `src/isolated_maintenance/tests/bootstrap/public_on1.rs` ordinary and no-route controls | P | done |
+| `src/isolated_maintenance/tests/bootstrap/regressions.rs` ordinary renderer control | P | done |
+| `src/isolated_maintenance/tests/in1_integration/regressions.rs` ordinary baseline before onboarding | P | done |
+| `src/isolated_maintenance/tests/onboarding_scope.rs` ordinary baseline before onboarding | P | done |
+| `src/isolated_maintenance/tests/runtime_follow_on.rs` ordinary baseline before enrollment | P | done |
+| `src/runtime_follow_on/depth/policy_tests.rs` ordinary baseline before policy resolution | P | done |
+| `src/agent_maintenance/request/depth_tests.rs` ordinary request fixtures | P | done |
+| `src/agent_maintenance/stand_down/tests.rs` ordinary watcher fixtures | P | done |
+| `src/candidate_execution/create_lane_tests.rs` ordinary context before bound depth | P | done |
+| `src/depth_acceptance/manual/tests.rs` ordinary manual-entry fixtures | P | done |
+| `src/depth_acceptance/onboarding/tests.rs` ordinary baseline before declaration | P | done |
+| `src/depth_evidence/verdict/tests/native_admission.rs` ordinary fallback control | P | done |
+| `src/support_matrix/depth/tests/generator.rs` ordinary unpublished-root control | P | done |
+| `tests/agent_maintenance_prepare/depth_core/fixture.rs` ordinary baseline before enrollment | P | done |
+| `tests/agent_maintenance_audit_status_target_version.rs` ordinary version-mismatch setup | P | done |
+| `tests/c6_spec_report_iu_validator.rs` ordinary validator fixtures | P | done |
+| `tests/support_depth_debt.rs` ordinary declared-debt fixture seed | P | done |
+| `tests/support_depth_freeze/fixture.rs` ordinary baseline before freeze | P | done |
+| `tests/support_matrix_consistency.rs` ordinary publication-control fixtures | P | done |
+| `tests/support_matrix_derivation.rs` ordinary derivation fixtures | P | done |
+| `tests/support_matrix_entrypoint.rs` ordinary command fixtures | P | done |
+| `tests/support_matrix_staleness.rs` ordinary freshness fixtures | P | done |
+| `tests/runtime_advertising/behavior.rs` ordinary host/feature/config-domain control | P | done |
+| `tests/runtime_advertising.rs` actual candidate conformance checker | C | done |
+| `tests/agent_lifecycle_state.rs` ordinary Claude adoption mutation fixture | P | done |
+
+| `tests/agent_maintenance_prepare/from_request.rs` explicit-plan/CLI ordinary workspace | P | done |
+| `tests/agent_maintenance_refresh/planning_and_apply.rs` four cwd-resolving ordinary controls | P | done |
+| `tests/c8_capability_matrix_unit.rs` two cwd-resolving runtime-inventory controls | P | done |
+| `tests/onboard_agent_entrypoint/governing_validation.rs` ordinary pre-existing root inventory | P | done |
+| `tests/support_matrix_derivation.rs` actual committed runtime-support data equality | C | done |
+| `tests/support/registry_fixture.rs` shared immutable ordinary workspace and process isolation | P | done |
+
+Paths in this additional table are relative to `crates/xtask/`.
+
+### Declared workspace leg
+
+`scripts/s10_declared_test_leg.py` snapshots the current tracked and untracked source files into
+a new disposable checkout under `target/`, installs the reviewed synthetic registry entry,
+manifest-root templates and a synthetic lifecycle object, then commits that fixture checkout.
+It uses the onboarding declaration by default. `--lifecycle-path maintenance` selects the
+reviewed maintenance declaration. Each checkout carries one lifecycle path as the existing
+isolated scope requires. The production profile stays absent.
+
+The runner uses offline Cargo and a dedicated build cache under `target/s10-declared-build`.
+It independently builds the private test reader and supplies that reader only to test helpers.
+It rebuilds workspace packages before testing because Cargo dep-info can otherwise reuse an
+executable naming a previous fixture checkout. Cached external dependencies remain available
+between fixture runs in that dedicated cache. Successful completion also checks that the
+committed fixture checkout stayed clean.
+
+Run each full-workspace leg with a fresh destination.
+
+```sh
+python3 scripts/s10_declared_test_leg.py --destination target/s10-declared-workspace-onboarding
+python3 scripts/s10_declared_test_leg.py --destination target/s10-declared-workspace-maintenance --lifecycle-path maintenance
+```
+
+Each default invocation executes `cargo test --offline --workspace` in its depth-declared,
+committed fixture checkout. Full-workspace execution is reserved for the lead as requested.
+Focused validation passed in both declared and ordinary checkouts.
+
+
+### Validation discoveries
+
+The wider declared maintenance run found five affected integration targets beyond the direct
+parser calls. The explicit-plan/CLI control now uses an ordinary seeded workspace. Its positive uses the real
+Clap parser, argument conversion and public workspace command entry to compare the exact preview.
+The binary command fixes its root at compile time, so changing cwd cannot provide that control.
+The mixed-argument and missing-mode refusals continue through the actual CLI executable. Four refresh
+controls and two capability runtime-inventory controls resolve production inputs through cwd.
+They now execute every original assertion in a test-owned child with a shared immutable ordinary
+workspace as cwd, preserving concurrency isolation. The child asserts that exactly its intended
+test passed. The onboarding scaffold prerequisite copier now selects only roots named by the
+ordinary fixture registry plus the shared support-publication artifact, preserving the empty-root creation precondition. The actual committed
+runtime-support-data equality check now runs its real renderer inside the authenticated child.
+The declared fixture includes an empty current manifest and version inventory for that renderer.
+
+
+
+### Final focused validation
+
+All Cargo validation used offline dependency resolution with `TMPDIR` unset. The parent checkout
+remains on `feat/s10-readonly-gates` at `7eb5932c`. The implementation changes are uncommitted.
+
+| Validation | Result |
+| --- | --- |
+| `make fmt-check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `make loc-check` | Passed, 700-code-line cap |
+| Focused ordinary integration targets listed below | All 30 passed |
+| Same 30 targets over a committed onboarding-declared fixture checkout | Passed in one final complete focused run, with a clean fixture checkout afterward |
+| Maintenance-declared rerun of the five initially affected targets plus `agent_registry` | All six passed, with a clean fixture checkout afterward |
+| Library filters listed below over ordinary and committed maintenance-declared checkouts | All 19 nonempty filters passed |
+| Final dedicated-cache runner with `-- -p xtask --test agent_registry` | 24 passed over the committed onboarding-declared checkout, including production depth refusals and actual-candidate routed reading |
+| `git diff --check` | Passed |
+
+The ordinary return run initially reused the depth fixture crate's acquired-binary test executable
+from a declared checkout. Rebuilding that package at the ordinary source path made the affected
+`depth_synthetic_governing` target pass. The runner now uses its dedicated cache so subsequent
+fixture runs keep their build outputs together. The final dedicated-cache registry run passed.
+
+No focused test remains failed or socket-blocked. The full `cargo test --workspace` execution
+remains for the lead, using the two exact runner commands above.
+
+#### Integration targets
+
+Each target was invoked with `cargo test -p xtask --test <target>` through a combined focused
+Cargo invocation. The ordinary `depth_synthetic_governing` target also has its successful
+package-rebuild rerun.
+
+- `agent_lifecycle_state`
+- `agent_lifecycle_support_depth`
+- `agent_maintenance_audit_status`
+- `agent_maintenance_audit_status_debt_baseline`
+- `agent_maintenance_audit_status_target_version`
+- `agent_maintenance_closeout`
+- `agent_maintenance_drift`
+- `agent_maintenance_execute`
+- `agent_maintenance_prepare`
+- `agent_maintenance_refresh`
+- `agent_maintenance_watch`
+- `agent_registry`
+- `c0_spec_validate`
+- `c6_spec_report_iu_validator`
+- `c8_capability_matrix_unit`
+- `c8_spec_capability_matrix_parity`
+- `c8_spec_capability_matrix_registry_driven`
+- `c8_spec_capability_matrix_staleness`
+- `depth_synthetic_governing`
+- `onboard_agent_entrypoint`
+- `prepare_publication_entrypoint`
+- `runtime_advertising`
+- `support_depth`
+- `support_depth_debt`
+- `support_depth_freeze`
+- `support_matrix_consistency`
+- `support_matrix_derivation`
+- `support_matrix_entrypoint`
+- `support_matrix_staleness`
+- `validator_spec_roots`
+
+#### Library filters
+
+Each filter was invoked with `cargo test -p xtask --lib <filter>`. Three initially misspelled
+filter paths matched zero tests and were corrected to the nonempty module paths recorded here.
+
+- `agent_maintenance::request::depth_tests`
+- `agent_maintenance::stand_down::tests`
+- `agent_maintenance::support_audit_tests`
+- `runtime_follow_on::depth_candidate::create_candidate`
+- `depth_acceptance::manual::tests`
+- `depth_acceptance::onboarding::tests`
+- `depth_evidence::verdict::tests::native_admission`
+- `isolated_maintenance::tests::canonical_ordinary_registry_and_isolated_protected_declaration_are_distinct`
+- `isolated_maintenance::tests::registry_tables`
+- `isolated_maintenance::tests::onboarding_scope`
+- `isolated_maintenance::tests::fixture::runtime_follow_on::runtime_follow_on_freezes_p_record_object_and_contract_then_o`
+- `isolated_maintenance::tests::bootstrap::bootstrap_absent_and_unselected_subject_require_exact_approval_and_scaffold`
+- `isolated_maintenance::tests::bootstrap::bootstrap_route_absence_keeps_production_depth_refusal`
+- `isolated_maintenance::tests::bootstrap::public_on1::public_on1_absent_route_keeps_ordinary_success_and_depth_refusal`
+- `isolated_maintenance::tests::bootstrap::regressions::bootstrap_current_rejects_populated_and_foreign_input_identities`
+- `isolated_maintenance::tests::in1_integration::regressions::in1_proposal_error_precedes_equal_head_and_parent`
+- `runtime_follow_on_policy`
+- `release_doc::tests`
+- `support_matrix::depth::tests::generator`

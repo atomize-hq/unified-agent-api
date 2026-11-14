@@ -1,5 +1,9 @@
 #![allow(dead_code, unused_imports)]
 
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 #[path = "../src/freeze_transition.rs"]
 mod freeze_transition;
 
@@ -58,7 +62,7 @@ use harness::{fixture_root, write_text};
 use prepare::{apply_prepare_plan, build_prepare_plan, Args};
 use request::load_request_envelope;
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 
 #[path = "agent_maintenance_prepare/from_request.rs"]
 mod from_request_tests;

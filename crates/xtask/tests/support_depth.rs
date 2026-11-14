@@ -1,7 +1,11 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use serde_json::{json, Value};
 use xtask::{agent_registry::support_depth::SupportDepth, support_depth::resolve_policy};
 
-const REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const DEBT: &str = "### `support-debt-authorization-contract-target-version-v1`\n";
 
 fn declaration() -> Value {

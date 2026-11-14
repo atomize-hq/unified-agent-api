@@ -1,5 +1,9 @@
 #![allow(dead_code, unused_imports)]
 
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 #[path = "../src/freeze_transition.rs"]
 mod freeze_transition;
 
@@ -72,7 +76,7 @@ use audit_status::{
 use harness::{fixture_root, write_text};
 use prepare::{apply_prepare_plan, build_prepare_plan, Args as PrepareArgs};
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const REQUEST_PATH: &str =
     "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
 const TARGET_VERSION: &str = "0.98.0";

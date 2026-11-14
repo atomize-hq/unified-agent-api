@@ -185,10 +185,11 @@ fn explicit_cli_conversion_preserves_every_field() {
 
 #[test]
 fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("repo root");
+    let fixture = fixture_root("prepare-explicit-cli");
+    let root = fixture.as_path();
+    seed_registry(root);
+    seed_support_files(root);
+    seed_debt(root, false);
     let mut explicit = args();
     explicit.target_version = "999.0.0".to_string();
     explicit.latest_stable = "999.0.1".to_string();
@@ -201,20 +202,13 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
             .map(|path| format!("planned: {path}\n"))
             .collect::<String>()
     );
-    let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
-        .args(explicit_cli_args())
-        .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
-        .output()
-        .expect("run xtask");
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        String::from_utf8(output.stdout).expect("utf8 stdout"),
-        expected
-    );
+    let parsed = prepare::Cli::try_parse_from(explicit_cli_args())
+        .expect("parse explicit CLI")
+        .into_args()
+        .expect("explicit CLI arguments");
+    let mut output = Vec::new();
+    prepare::run_in_workspace(root, parsed, &mut output).expect("run explicit CLI plan");
+    assert_eq!(String::from_utf8(output).expect("utf8 stdout"), expected);
 
     let mixed = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args([
@@ -225,6 +219,7 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
             "codex",
             "--dry-run",
         ])
+        .current_dir(root)
         .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
         .output()
         .expect("run mixed CLI");
@@ -233,6 +228,7 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
 
     let missing_mode = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["prepare-agent-maintenance", "--from-request", REQUEST_PATH])
+        .current_dir(root)
         .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
         .output()
         .expect("run from-request without mode");

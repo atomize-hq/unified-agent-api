@@ -2,6 +2,14 @@
 //! the inputs each registry entry names, and an enrolled agent outside the compiled built-in
 //! inventory gets its own column without any code change.
 
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -32,10 +40,9 @@ fn write(path: &Path, contents: &str) {
 
 /// A workspace holding the registry and, for every entry, exactly the files the capability
 /// matrix reads for it: the root's `current.json` and the lifecycle state, where committed.
-fn seed(dir: &Path, registry_text: &str) {
+fn seed(dir: &Path, registry_text: &str, registry: &AgentRegistry) {
     write(&dir.join("Cargo.toml"), "[workspace]\nmembers = []\n");
     write(&dir.join(REGISTRY_RELATIVE_PATH), registry_text);
-    let registry = AgentRegistry::parse(registry_text).unwrap();
     for entry in &registry.agents {
         let lifecycle = lifecycle_state_path_for_entry(entry);
         let manifest = format!("{}/current.json", entry.manifest_root);
@@ -78,28 +85,26 @@ fn header_backends(markdown: &str) -> Vec<String> {
 
 #[test]
 fn registry_inputs_alone_reproduce_the_checked_in_matrix() {
-    let temp = tempfile::tempdir().unwrap();
-    let registry = read(&repo_root().join(REGISTRY_RELATIVE_PATH));
-    seed(temp.path(), &registry);
-    let generated = generate(temp.path());
+    let parsed = candidate_registry::registry(&repo_root());
+    let generated = candidate_registry::capability_markdown(&repo_root());
     assert_eq!(
         generated,
         read(&repo_root().join(DEFAULT_OUT_PATH)),
         "the checked-in capability matrix must be exactly what the registry's inputs generate"
     );
-    let parsed = AgentRegistry::parse(&registry).unwrap();
     let mut enrolled: Vec<String> = parsed
         .capability_matrix_entries()
         .map(|entry| entry.agent_id.clone())
         .collect();
     enrolled.sort();
     assert_eq!(header_backends(&generated), enrolled);
+    assert_eq!(candidate_registry::registry(&repo_root()), parsed);
 }
 
 #[test]
 fn an_enrolled_agent_outside_the_built_in_inventory_gets_a_column() {
     assert!(!BUILT_IN_AGENTS.contains(&NEW_AGENT));
-    let canonical = read(&repo_root().join(REGISTRY_RELATIVE_PATH));
+    let canonical = registry_fixture::undeclared_registry();
     let template = canonical
         .split("[[agents]]")
         .find(|block| block.contains(&format!("agent_id = \"{TEMPLATE_AGENT}\"")))
@@ -108,8 +113,8 @@ fn an_enrolled_agent_outside_the_built_in_inventory_gets_a_column() {
     let registry = format!("{canonical}\n{entry}");
 
     let temp = tempfile::tempdir().unwrap();
-    seed(temp.path(), &registry);
     let parsed = AgentRegistry::parse(&registry).unwrap();
+    seed(temp.path(), &registry, &parsed);
     let new_entry = parsed.find(NEW_AGENT).unwrap();
     let template_entry = parsed.find(TEMPLATE_AGENT).unwrap();
     for (from, to) in [

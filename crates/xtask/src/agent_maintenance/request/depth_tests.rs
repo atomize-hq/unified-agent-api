@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 
 fn request_text(table: &str) -> String {
@@ -48,7 +52,7 @@ fn event() -> Event {
 fn fixture(agent: &str, with_o: bool) -> (tempfile::TempDir, AgentRegistry, DepthRecord) {
     let root = tempfile::tempdir().unwrap();
     let mut registry =
-        AgentRegistry::parse_unenforced(include_str!("../../../data/agent_registry.toml")).unwrap();
+        AgentRegistry::parse_unenforced(registry_fixture::undeclared_registry()).unwrap();
     let entry = registry
         .agents
         .iter_mut()
@@ -318,9 +322,7 @@ fn seed_loader_request(
     table: Option<&SupportDepthBinding>,
 ) -> PathBuf {
     let mut registry_doc: toml_edit::DocumentMut =
-        include_str!("../../../data/agent_registry.toml")
-            .parse()
-            .unwrap();
+        registry_fixture::undeclared_registry().parse().unwrap();
     let codex = registry.find("codex").unwrap();
     let entry = registry_doc["agents"]
         .as_array_of_tables_mut()

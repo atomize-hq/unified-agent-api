@@ -1,3 +1,11 @@
+#[path = "../../../tests/support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::{json, Value};
@@ -255,7 +263,8 @@ fn try_derive_audit(
     authorization_observed_targets: &[&str],
     union: Option<&Value>,
 ) -> Result<SupportSurfaceAudit, String> {
-    let registry = AgentRegistry::load(repo_root()).expect("load registry");
+    let registry =
+        AgentRegistry::parse(registry_fixture::undeclared_registry()).expect("ordinary registry");
     let entry = registry.find(agent_id).expect("registry entry");
     let workspace = tempfile::TempDir::new().expect("workspace");
     let debt_path = workspace.path().join(NON_TUI_SUPPORT_DEBT_PATH);
@@ -421,7 +430,7 @@ fn a_missing_root_command_remains_a_required_uplift() {
 
 #[test]
 fn every_debt_row_is_rooted_at_its_agent_id() {
-    let registry = AgentRegistry::load(repo_root()).expect("load registry");
+    let registry = candidate_registry::registry(repo_root());
     for row in load_debt_inventory(repo_root()).expect("load debt inventory") {
         assert!(
             registry.find(&row.agent_id).is_some(),
@@ -438,6 +447,7 @@ fn every_debt_row_is_rooted_at_its_agent_id() {
             row.agent_id
         );
     }
+    assert_eq!(candidate_registry::registry(repo_root()), registry);
 }
 
 #[test]

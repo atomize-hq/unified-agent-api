@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{
     agent_lifecycle::LifecycleDepth, depth_record::onboarding::OnboardingApproval,
@@ -16,7 +20,7 @@ fn runtime_follow_on_policy_resolves_onboarding_and_preserves_p_on_refreeze() {
         REGISTRY_RELATIVE_PATH,
         format!(
             "{}\n{}",
-            include_str!("../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
             include_str!(
                 "../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml"
             )

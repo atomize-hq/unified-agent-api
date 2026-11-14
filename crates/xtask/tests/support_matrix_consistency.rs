@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,7 +12,7 @@ use xtask::support_matrix::{
     ManifestSupportState, PointerPromotionState, UaaSupportState,
 };
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = registry_fixture::undeclared_registry();
 
 fn make_temp_dir(prefix: &str) -> PathBuf {
     let now = SystemTime::now()

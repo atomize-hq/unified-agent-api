@@ -1,4 +1,8 @@
 //! Slice 5: only the installed synthetic onboarding route can freeze a dry-run packet.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{agent_lifecycle as life, runtime_follow_on as runtime};
 use sha2::{Digest, Sha256};
@@ -33,7 +37,7 @@ fn setup(acquired: bool) -> Fixture {
         REGISTRY_RELATIVE_PATH,
         format!(
             "{}\n{}",
-            include_str!("../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
             include_str!(
                 "../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml"
             )

@@ -1,4 +1,8 @@
 //! Credential-free scope/IN1 checkpoints and public ON1; no independent host queue proof.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{agent_lifecycle as life, depth_acceptance::check_integration};
 
@@ -35,7 +39,7 @@ fn setup(scaffold: bool) -> Fixture {
     write(
         f.root.path(),
         REGISTRY_RELATIVE_PATH,
-        include_str!("../../../data/agent_registry.toml"),
+        registry_fixture::undeclared_registry(),
     );
     write(
         f.root.path(),
@@ -279,7 +283,7 @@ fn preparation_refuses_every_binding_and_acceptance_effect() {
             },
             4 => { let raw=fs::read_to_string(f.root.path().join(APPROVAL)).unwrap(); write(f.root.path(), APPROVAL, raw.replace("abc1234","abc5678")); },
             5 => f.registry(|d| { d["agents"].as_array_of_tables_mut().unwrap().iter_mut().find(|e| e["agent_id"].as_str()==Some("depth_fixture")).unwrap()["display_name"]=toml_edit::value("Changed"); }),
-            6 => write(f.root.path(), REGISTRY_RELATIVE_PATH, format!("{}\n{DECLARED}", include_str!("../../../data/agent_registry.toml"))),
+            6 => write(f.root.path(), REGISTRY_RELATIVE_PATH, format!("{}\n{DECLARED}", registry_fixture::undeclared_registry())),
             7 => { let mut v:Value = serde_json::from_slice(&fs::read(f.root.path().join(STATE)).unwrap()).unwrap(); v["support_depth"]=json!({"policy_identity":"a".repeat(64)}); write(f.root.path(),STATE,serde_json::to_vec(&v).unwrap()); },
             8 => write(f.root.path(), "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/publication-ready.json", "{}"),
             9 => write(f.root.path(), "cli_manifests/codex/versions/0.156.1.json", r#"{"status":"validated"}"#),
@@ -343,10 +347,7 @@ fn bootstrap_route_absence_keeps_production_depth_refusal() {
     write(
         f.root.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     f.commit();
     assert!(route(f.root.path()).unwrap().is_none());
@@ -370,10 +371,7 @@ fn bootstrap_scratch_view_keeps_exact_registry_bytes() {
     write(
         scratch.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     assert!(captured.bind_view(&view).is_err());
 }
@@ -388,10 +386,7 @@ fn bootstrap_creation_refuses_depth_tables_invented_metadata_and_non_scaffold_fi
             0 => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
             1 => write(
                 f.root.path(),

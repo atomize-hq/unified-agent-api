@@ -1,3 +1,7 @@
+#[path = "registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+pub(crate) mod registry_fixture;
+
 use std::{collections::BTreeSet, fs, path::Path};
 
 use sha2::{Digest, Sha256};
@@ -227,7 +231,7 @@ pub fn automated_request_toml(agent_id: &str, basis_ref: &str) -> String {
 
 pub fn automated_request_with_execution_contract_toml(agent_id: &str, basis_ref: &str) -> String {
     let registry =
-        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+        xtask::agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
             .expect("parse seeded registry");
     let entry = registry
         .find(agent_id)

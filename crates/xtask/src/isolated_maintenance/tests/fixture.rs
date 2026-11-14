@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use serde_json::json;
@@ -116,7 +120,7 @@ impl Fixture {
         let table: crate::agent_registry::support_depth::SupportDepth =
             serde_json::from_value(declaration).unwrap();
         // The production registry remains unchanged; serialize the fixture with its existing TOML.
-        let mut raw = include_str!("../../../data/agent_registry.toml").to_owned();
+        let mut raw = registry_fixture::undeclared_registry().to_owned();
         if *subject == scope::SYNTHETIC {
             raw = format!("{raw}\n{SYNTHETIC_AGENT}")
                 .replace("{{ISOLATED_OWNER}}", "fixture")

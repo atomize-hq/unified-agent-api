@@ -1,3 +1,11 @@
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 // The registry's per-unit policy uses the shared surface identity from the public audit module.
 use xtask::agent_maintenance;
 
@@ -17,7 +25,7 @@ use agent_registry::{
     REGISTRY_RELATIVE_PATH,
 };
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const CLAUDE_NPM_RELEASE_WATCH_UPSTREAM: &str =
     "source_kind = \"npm_dist_tag\"\npackage = \"@anthropic-ai/claude-code\"\ndist_tag = \"stable\"";
 const CLAUDE_GCS_RELEASE_WATCH_UPSTREAM: &str = "source_kind = \"gcs_object_listing\"\nbucket = \"claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819\"\nprefix = \"claude-code-releases\"\nversion_marker = \"manifest.json\"";
@@ -225,21 +233,15 @@ fn seeded_registry_parses_successfully() {
 
 #[test]
 fn workspace_loader_reads_seeded_registry() {
-    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("workspace root")
-        .to_path_buf();
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
 
-    let registry = AgentRegistry::load(&workspace_root).expect("load registry from workspace");
-    assert_eq!(
-        registry
-            .agents
-            .iter()
-            .map(|agent| agent.agent_id.as_str())
-            .collect::<Vec<_>>(),
-        vec!["codex", "claude_code", "opencode", "gemini_cli", "aider"]
-    );
+    let registry = candidate_registry::registry(&workspace_root);
+    let actual = xtask::agent_registry::AgentRegistry::parse_unenforced(
+        &std::fs::read_to_string(workspace_root.join(REGISTRY_RELATIVE_PATH)).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(registry, actual);
+    assert_eq!(candidate_registry::registry(&workspace_root), registry);
     assert_eq!(
         workspace_root.join(REGISTRY_RELATIVE_PATH),
         workspace_root.join("crates/xtask/data/agent_registry.toml")

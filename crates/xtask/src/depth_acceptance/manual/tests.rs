@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{
     agent_maintenance::closeout_proposal::Proposal,
@@ -125,7 +129,7 @@ impl Fixture {
         write(
             r,
             REGISTRY_RELATIVE_PATH,
-            include_str!("../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
         );
         write(r, REQUEST, format!("agent_id = \"codex\"\nrequest_commit = \"abc\"\nrequest_recorded_at = \"{STAMP}\"\ntrigger_kind = \"upstream_release_detected\"\nopened_from = \"docs/basis.md\"\n[detected_release]\ntarget_version = \"1.2.3\"\n"));
         write(r, EVIDENCE, "private producer fixture");

@@ -1,5 +1,9 @@
 //! Private fixtures prove owning predicates and aggregate detectors. Connected proof below
 //! consumes actual ON3 bytes and the independently authenticated slice-6 population.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 mod readonly_gates;
 use crate::{
@@ -58,7 +62,7 @@ impl Fixture {
     fn new(kind: Kind) -> Self {
         let registry = format!(
             "{}\n{}",
-            include_str!("../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
             include_str!(
                 "../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml"
             )

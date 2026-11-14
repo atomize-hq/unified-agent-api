@@ -2,6 +2,10 @@
 //! `support_matrix_depth.rs`): the rows the record implies, the facts it decides, and the records
 //! publication refuses.
 
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{fs, path::Path, process::Command};
 
 use crate::support_matrix::{derive_rows, derive_rows_for_test_roots};
@@ -258,7 +262,7 @@ fn publication_fails_on_a_record_it_cannot_read_or_that_its_root_does_not_adopt(
     // A root the support matrix does not publish holds no record, since its depth facts would be
     // published nowhere.
     let temp = workspace(record(), true);
-    let registry = include_str!("../../../../data/agent_registry.toml");
+    let registry = registry_fixture::undeclared_registry();
     let at = registry.find("agent_id = \"aider\"").unwrap();
     let unpublished = format!(
         "{}{}",

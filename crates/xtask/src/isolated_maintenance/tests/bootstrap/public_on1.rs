@@ -1,4 +1,8 @@
 //! Public ON1 starts the connected, credential-free onboarding chain.
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use clap::Parser;
 
@@ -289,10 +293,7 @@ fn public_on1_refuses_divergent_scaffolds_and_retained_acceptance() {
             _ => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
         }
         f.commit();
@@ -321,10 +322,7 @@ fn public_on1_creation_admission_refuses_injected_table_record_and_entry() {
             0 => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
             1 => write(f.root.path(), RECORD, "{}"),
             _ => write(
@@ -370,10 +368,7 @@ fn public_on1_absent_route_keeps_ordinary_success_and_depth_refusal() {
     write(
         f.root.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     let before = fs::read(f.root.path().join(STATE)).unwrap();
     assert!(crate::onboard_agent::run_in_workspace(
