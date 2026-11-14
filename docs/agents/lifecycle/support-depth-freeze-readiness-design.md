@@ -62,7 +62,7 @@ dry-run packet (`runtime_follow_on/depth.rs:245-290`, `runtime_follow_on/depth/p
 reporting publication (`runtime_follow_on/depth/reporting.rs:11-48`). IN1 re-derives onboarding P/O, checks the
 enrolled parent, approval, retained execution, entries/work and lifecycle object
 (`runtime_follow_on/depth/integration.rs:84-178`). It does not compare the entire candidate delta against an exact
-freeze-only output plan. A candidate can combine a structurally valid freeze with implementation
+freeze output plan. A candidate can combine a structurally valid freeze with implementation
 changes without this check certifying a reporting-only context. The record-free bootstrap's
 whole-tree allowlist (`isolated_maintenance/onboarding/checkpoint.rs:148-214`) shows a reusable
 comparison pattern, but covers different transitions. The slice needs exact writer-derived
@@ -218,12 +218,15 @@ requires the evidence to remain available.
 ### 2. Exact freeze transition planning
 
 Use a pure writer-derived transition planner shared with the real MA2 and ON2 freeze writers.
-Approved code takes the authenticated predecessor tree, original request/approval and generation
-inputs, independently derived writer inputs, retained entries/work and approved planner/policy
-identity. It returns exact create/replace/delete/preserve operations with bytes, modes and object
-kinds. Applying the plan to the predecessor determines the complete expected committed tree.
+Approved code takes the authenticated predecessor tree plus any independently validated acquisition
+delta, original request/approval and generation inputs, independently derived writer inputs,
+retained entries/work and approved planner/policy identity. It returns the exact freeze
+create/replace/delete/preserve operations with bytes, modes and object kinds. The complete expected
+committed tree equals predecessor + validated acquisition delta + planned freeze delta.
 Protected IN1 independently requires equality with the entire candidate tree, including every
-preserved path. Extra unrelated edits also lose reporting eligibility and remain applicable.
+preserved path. Genuine MA2 is an authenticated combined acquisition + freeze transition in its
+existing single transport commit. Extra unrelated edits also lose reporting eligibility and remain
+applicable.
 
 The plan covers every writer effect listed below, including exact executable packet content,
 reporting projections and the approved runtime renderer's actual output. Variable values such as
@@ -237,6 +240,100 @@ directories, or accept a candidate-selected policy version. Local worktree bytes
 for the authenticated predecessor. Complete equality rejects hidden implementation, dependency,
 build and workflow changes and arbitrary bytes inside permitted packet/profile/report locations.
 Real writers materialize the same pure plan through their existing checked delivery boundaries.
+
+#### Acquisition authority at the MA2 commit boundary
+
+Inspection at `19d541ca` confirms that `parity-acquire.yml` generates acquisition outputs, stages
+the exact inputs, re-freezes, publishes/validates, stages the complete delivery, audits, verifies
+the checked bytes and creates one commit. The admission plan must reproduce that boundary.
+Acquisition authority validates the acquisition delta before it becomes planner input. Freeze
+authority then derives every remaining freeze output from the authenticated predecessor with that
+validated delta applied. Complete-tree equality admits only those two deltas. The existing
+transport continues to deliver their combined tree in one commit.
+[Workflow](../../../.github/workflows/parity-acquire.yml),
+[transport contract](../../specs/maintenance-request-contract-v1.md#preparation-delivery-transport).
+
+The acquisition delta is bounded by the independently resolved `AcquisitionPlan.output_paths` for
+the authenticated agent/version/targets and protected descriptor. Its `input_paths` enumerate
+per-target/union snapshots, `wrapper_coverage.json` and `coverage.*.json`. `output_paths` additionally
+names `versions/<version>.json` and `artifacts.lock.json`. Optional missing outputs retain their
+authenticated absence. Metadata must match the existing `--status reported` generator and retain
+the existing acceptance boundaries. Changed paths outside that exact set must be planned freeze
+outputs or refuse. O's derivation also references `RULES.json` and `SCHEMA.json`. Both remain authenticated
+predecessor prerequisites with their existing policy authority. Their inclusion in O grants no
+acquisition-write permission. Packet, profile, source, dependency, workflow, registry and unrelated
+changes cannot acquire authority through an acquisition label.
+[Resolved paths](../../../crates/xtask/src/manifest_acquisition/plan.rs),
+[O derivation](../../../crates/xtask/src/support_depth/acquisition.rs).
+
+Existing checks supply the following acquisition constraints and byte bindings.
+
+- O's `acquired_inputs` bind exact paths and SHA-256 digests for RULES, SCHEMA, union, target shards,
+  wrapper coverage and coverage reports. Shared derivation validates their schemas, reconciles
+  union/shards through `manifest_union::intake::validate`, and reconciles coverage reports and
+  wrapper claims through `manifest_report::intake::validate`. Those semantic validators consume
+  union/report timestamps and omit optional union raw-help conflict evidence from reconciliation.
+  The finite bootstrap path additionally uses the existing `validate_bytes` variants and canonical
+  encoding checks. Independently authenticated references or complete producer bytes are required
+  to bind every byte, including timestamps, provenance and encoding, at MA2.
+  [Derivation](../../../crates/xtask/src/support_depth/acquisition.rs),
+  [union intake](../../../crates/xtask/src/manifest_union/intake.rs),
+  [report intake](../../../crates/xtask/src/manifest_report/intake.rs),
+  [finite bootstrap checks](../../../crates/xtask/src/isolated_maintenance/onboarding/inputs.rs).
+- The workflow records archive SHA-256, size, version, target, asset, URL and applicable package
+  provenance in the lockfile, checks npm's published integrity/shasum when applicable, and verifies
+  the archive digest and size again on each target runner before snapshot capture. These checks
+  constrain the downloaded assets. Validation of the complete lockfile must also authenticate its
+  exact serialized contents and preserve predecessor rows and top-level content according to the
+  existing acquisition writer. `manifest-validate` checks manifest/version schemas, required files,
+  report/wrapper invariants, pointers and publication coherence. The workflow then runs
+  `maintenance-audit-status` over the staged candidate before final transport verification.
+  These validators supply no complete lockfile byte authentication.
+  [Workflow acquisition checks](../../../.github/workflows/parity-acquire.yml),
+  [manifest validation](../../../crates/xtask/src/manifest_validate.rs).
+- OF-P4's maintainer statement supplies onboarding provenance through its exact path/digest/command
+  set at the named protected integration ref. The dry run requires equality of every acquired
+  input with both statement and ref; IN1 repeats the check against its pinned parent. Its authority
+  covers exactly O's acquired-input set. Version metadata and lockfile are outside that set.
+  OF-P4 introduces no maintenance statement requirement. A same-candidate statement cannot supply
+  protected onboarding provenance.
+  [Charter rules 13–14](../../specs/cli-agent-onboarding-charter.md),
+  [statement parser](../../../crates/xtask/src/depth_record/acquisition.rs),
+  [dry-run checks](../../../crates/xtask/src/runtime_follow_on/depth.rs),
+  [IN1 checks](../../../crates/xtask/src/runtime_follow_on/depth/integration.rs).
+- `maintenance_transport.py` captures acquisition fingerprints before freeze, checks staged input
+  bytes, preserves checked delivery fingerprints through audit/commit and bundles present output
+  bytes. The workflow uploads that existing checked bundle. This protects local delivery integrity.
+  To use that bundle, independent admission must authenticate the acquisition job/run/attempt,
+  approved workflow and inputs, and bind it to the candidate and predecessor through the
+  retained-authority mechanism. Candidate files and self-asserted fingerprints cannot supply that
+  association.
+  [Transport implementation](../../../scripts/maintenance_transport.py),
+  [bundle upload](../../../.github/workflows/parity-acquire.yml).
+
+**Explicit FR2 prerequisites.** The current evaluator has no independent acquisition-job/bundle join
+for MA2's newly acquired target snapshots, union, wrapper coverage or coverage reports. Their
+candidate O references and semantic validators alone cannot authenticate complete acquired bytes.
+`versions/<version>.json` and the entire `artifacts.lock.json` additionally lack O/OF-P4 digest
+coverage. Metadata's schema/status checks cannot authenticate its timestamp, preserved notes and
+validation fields or exact encoding. Lock checksums cannot authenticate the complete lockfile's
+rows, ancillary fields and encoding. FR2 must bind these exact existing acquisition outputs through
+authenticated acquisition observations or independently reproduce complete producer bytes from
+authenticated inputs, including release metadata/timestamps and predecessor contents. It must also
+establish exact presence/absence, modes and object kinds for every acquisition output. The present
+bundle copies file contents and carries no complete absence/mode manifest. Missing authentication
+for any of these facts refuses checkpoint admission. Acquisition grants no exception for extra
+bytes or changes. These are prerequisites for the combined admission predicate, with the existing
+workflow transport and single commit preserved.
+[Metadata planner](../../../crates/xtask/src/manifest_version_metadata.rs),
+[transport fingerprinting and bundle copy](../../../scripts/maintenance_transport.py).
+
+ON2 has no analogous combined acquisition boundary under OF-P3/OF-P4. Direct input-only acquisition
+and its reviewed integration-branch statement precede the dry-run freeze. Its authenticated
+predecessor already holds those inputs, so the ON2 acquisition delta is empty. The freeze planner
+must preserve them and refuse acquisition or statement changes carried only in the freeze commit.
+[Charter rules 12–14](../../specs/cli-agent-onboarding-charter.md),
+[OF-P3/OF-P4 decisions](support-depth-onboarding-freeze-decisions.md).
 
 ### 3. Reporting-context record and noncircular join
 
@@ -343,7 +440,10 @@ Annex A with its measured boundaries. Canonical workflow deployment belongs to p
   freeze-only validation, and focused writer/IN1/isolated-route tests. Keep existing checked
   materialization and acceptance boundaries.
 - Depends on FR1. Deliver the planner used by real MA2/ON2 writers and independently by IN1
-  over authenticated predecessors and authoritative inputs. Cover every actual committed effect,
+  over authenticated predecessors and authoritative inputs. Resolve the explicit acquisition
+  authentication prerequisites above. Admit MA2's combined acquisition + freeze commit through
+  predecessor + validated acquisition delta + planned freeze delta equality. ON2 uses its already
+  admitted acquisition with an empty acquisition delta. Cover every actual committed effect,
   byte, mode and object kind, with complete expected-tree equality.
 - Proving tests compare genuine MA2 and ON2 outputs with complete planned trees and reviewed
   canonical packet/reporting/runtime output expectations. Two calls to the shared planner alone
@@ -352,6 +452,15 @@ Annex A with its measured boundaries. Canonical workflow deployment belongs to p
   object-kind changes, and wrong predecessor/approval/Event/P/O/enrollment/policy identities.
   Identical authenticated inputs plan deterministically. Candidate expected-output files have
   no influence. Validate provenance for variable writer inputs.
+- Prove the actual MA2 transport boundary with one commit containing acquisition snapshots,
+  coverage, metadata, lockfile and planned request/record/packet/reporting outputs. Run the existing
+  acquisition validators, authenticate the acquisition bytes and predecessor, then require real
+  IN1 complete-tree admission and exact canonical freeze output. Refuse that same combined commit
+  with an unrelated edit added, including an edit inside an acquisition-owned file that preserves
+  schema/semantic validity but changes authenticated bytes. Refuse missing acquisition authority,
+  substituted metadata/lockfile bytes, missing/extra files and altered modes/object kinds. Prove
+  ON2's actual separate boundary over protected OF-P4 inputs and refuse same-commit acquisition or
+  statement substitution.
 
 ### FR3 — Reporting context, canonical binding and population join
 
@@ -407,6 +516,8 @@ inputs are authenticated prerequisites. They gain no freeze-write permission. Co
 rendered packet bytes and reporting structures so their executable prompt or profile content
 cannot silently select substantive support execution. Authenticate the complete historical
 source/context separately from current execution-source approval.
+MA2's acquisition writes use the separately validated acquisition delta specified above, in the
+same transport commit as the freeze delta. ON2 preserves its predecessor's acquired inputs.
 
 The combined reporting-context, IN1 admission and protected-history proof must bind all eight
 semantic facts from consult section 2A. The reporting payload precedes its own admission.
@@ -430,7 +541,9 @@ carry forward all of consult section 8. They are pending tests, with no new test
 | --- | --- |
 | Reproduced defect | Genuine freeze head with matching Event/P/O and older closure stays visible with zero support credit. Later qualifying execution/adoption can verify the generation. |
 | Real MA2 discovery | Serve CI at actual MA2 before delayed fixture insertion. Missing/mismatching auxiliary fixture cannot hide it. |
+| Real MA2 combined commit | One transport commit containing authenticated acquisition and exact planned freeze passes complete-tree admission with zero support credit. |
 | ON2 split | Actual freeze is reporting-only with authenticated authority. Implementation is execution-required. |
+| ON2 acquisition boundary | Acquisition and OF-P4 statement are already admitted on protected integration before freeze. The freeze commit preserves them. |
 | Freeze retries | Include attempt 1 and every retry, including one after readiness, with independently authenticated context and sealed membership. |
 | Other PRs/events | Same-generation attempts across PRs, pull_request, merge_group, workflow_dispatch and push remain in one complete population. |
 | Only checkpoints | Complete successful reporting-only attempts leave support unverified. |
@@ -441,6 +554,7 @@ carry forward all of consult section 8. They are pending tests, with no new test
 | --- | --- |
 | Forged authority | Stage edits, copied admission files, wrong generation/enrollment/repository and similarly named green checks grant no exception. |
 | Implementation hidden in freeze | Source, dependency, build configuration or workflow changes outside the exact permitted freeze delta refuse reporting classification. |
+| Extra change in combined MA2 | Add an unrelated edit to the genuine acquisition + freeze commit. Complete-tree equality refuses, including altered authenticated acquisition bytes that still pass semantic validation. Missing metadata/lockfile or other acquisition-byte authority also refuses. |
 | Failure before readiness | Initial implementation failure, abort, missing witness or absent admission remains blocking after a later successful admission. |
 | Backward progression | A higher-stage authenticated admission with no producer run still blocks a descendant rollback. A new freeze-labelled head after readiness, including another PR, cannot reopen the exception. Exercise both API listing orders. |
 | Changed actual checkout | A freeze head test-merged against implementation changes cannot inherit historical reporting authority. |

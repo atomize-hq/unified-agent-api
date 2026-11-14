@@ -507,17 +507,33 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
    substantive execution, adoption or currentness. Verification still requires independently
    qualifying execution and adoption for every due obligation. Checkpoints alone leave support
    unverified.
-3. Protected IN1 MUST authorize the exact freeze-only transition against its authenticated
-   predecessor through independently approved policy. The combined reporting-context, admission
-   and protected-history proof MUST bind authenticated repository identity, original
+3. Protected IN1 MUST authorize the exact freeze transition, including MA2's authenticated combined
+   acquisition + freeze transition, against its authenticated predecessor through independently
+   approved policy. The combined reporting-context, admission and protected-history proof MUST
+   bind authenticated repository identity, original
    Event/P/O/enrollment, predecessor and its admission, exact admitted head/tree, actual checkout relationship, complete source/context
    closure governing reporting versus execution, approved IN1 implementation/workflow provenance,
    host admission run/check and attempt with its decision, and protected lifecycle history.
    An independently approved pure transition planner shared with the real MA2 and ON2 freeze
-   writers MUST derive the complete expected committed tree from the authenticated predecessor,
-   original request/approval, authoritative generation/writer inputs, retained entries/work and
-   approved policy identity. IN1 MUST require complete candidate-tree equality, including exact
-   bytes, modes, object kinds, creates, replacements, deletions and preservation everywhere else.
+   writers MUST derive the exact freeze delta from the authenticated predecessor plus any
+   independently validated acquisition delta, original request/approval, authoritative
+   generation/writer inputs, retained entries/work and approved policy identity. For genuine MA2,
+   acquisition and freeze MAY share the existing single transport commit. The acquisition delta
+   MUST be authenticated through existing acquisition authority, using the exact resolved
+   acquisition output paths, acquired-input references, lockfile checksums and contents, applicable
+   OF-P4 maintainer acquisition statement, and existing acquisition validators. OF-P4 supplies
+   onboarding provenance only from the named protected integration ref. Each changed acquisition
+   output MUST have independently authenticated exact bytes, presence/absence, mode and object
+   kind. A path label, candidate digest or semantic validation alone supplies no such authority.
+   Any output lacking byte-for-byte acquisition authentication MUST remain an explicit FR2
+   prerequisite and MUST refuse checkpoint admission until resolved. Version metadata and the
+   complete lockfile lie outside O's acquired-input references. Only the authenticated
+   acquisition outputs MAY enter that delta. Registry, RULES, SCHEMA and other policy inputs retain
+   their existing prerequisite authority. The freeze delta MUST equal the shared planner output
+   over those authenticated inputs. The complete expected tree MUST equal the authenticated
+   predecessor + validated acquisition delta + planned freeze delta. IN1 MUST require complete
+   candidate-tree equality, including exact bytes, modes, object kinds, creates, replacements,
+   deletions and preservation everywhere else.
    The plan MUST cover every actual writer effect, executable packet content and reporting/runtime
    projections. Variable inputs MUST have explicit independently authenticated sources. IN1 MUST
    NOT execute candidate writers or packets, trust candidate expected-output files or policy
@@ -525,6 +541,11 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
    implementation, dependency, build, workflow and unrelated changes fail reporting eligibility.
    Candidate-authored admission files and similarly named successful checks cannot establish
    authority.
+   ON2's existing boundary has acquisition and its OF-P4 statement admitted on the integration
+   branch before the dry-run freeze. Its checkpoint therefore has an empty acquisition delta and
+   MUST preserve those predecessor inputs. Candidate-only acquisition or statement bytes MUST
+   refuse. These rules preserve the existing MA2 transport commit boundary.
+   [Acquisition authority inspection and FR2 prerequisites](../agents/lifecycle/support-depth-freeze-readiness-design.md#acquisition-authority-at-the-ma2-commit-boundary).
 4. The admitted checkpoint and its permitted checkout/context relationships MUST be immutable
    within the generation. Later admission or success MUST NOT replace that authority or
    retrospectively exempt another candidate. Checkpoint eligibility does not seal the attempt
