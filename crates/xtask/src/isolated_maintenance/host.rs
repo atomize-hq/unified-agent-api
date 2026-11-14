@@ -195,3 +195,9 @@ pub(super) fn oid(value: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+impl Observation {
+    pub(super) fn canonical_tip(&self) -> &str {
+        &self.canonical_tip
+    }
+}

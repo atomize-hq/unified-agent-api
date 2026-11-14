@@ -1,4 +1,5 @@
 //! Check 9: semantic acceptance detection and current record-wide entry matching.
+pub(crate) mod admission;
 mod artifacts;
 mod input;
 mod integration;

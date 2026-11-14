@@ -28,10 +28,23 @@ impl crate::isolated_maintenance::Route {
         revision: &str,
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
+        let mut emitter = self.context().admission_emitter()?;
+        let outcome = self.evaluate_admitted_publication(root, revision, validate, &mut emitter);
+        emitter.finish(root, outcome)
+    }
+
+    fn evaluate_admitted_publication<T>(
+        self,
+        root: &Path,
+        revision: &str,
+        validate: impl FnOnce() -> Result<T, String>,
+        emitter: &mut super::admission::emitter::Emitter,
+    ) -> Result<T, String> {
         // Only bootstrap lacks a resolved enrollment. Existing routes must retain their
         // capture -> proposal -> binding error order, including competing input failures.
         if self.context().bootstrap_pending()? {
             let initial = binding::capture(root, revision, self.context())?;
+            emitter.parent = Some(initial.parent.clone());
             if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
                 if checkpoint.publication_changed {
                     checkpoint
@@ -48,6 +61,7 @@ impl crate::isolated_maintenance::Route {
             return Err("isolated IN1 binding lost its captured authority".into());
         };
         let binding = binding::capture(root, revision, context)?;
+        emitter.parent = Some(binding.parent.clone());
         // Only onboarding can observe a first declaration. Maintenance keeps its existing
         // admission even when its parent lacks the subject entry or depth table.
         let checkpoint = if context.bootstrap_declared_onboarding() {

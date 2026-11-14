@@ -671,6 +671,76 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     independent target-generation association retain ordinary unrelated-head treatment. Records
     supply authenticated input evidence. Reporting authorization requires the combined proof.
 
+### IN1 admission control record v1
+
+The isolated FR1 route uses an independently versioned `in1_admission` JSON object. Canonical
+bytes are compact UTF-8 JSON with lexicographically ordered object members, decimal integers,
+ordered arrays and no trailing newline. Parsing MUST reproduce those exact bytes. Unknown
+members, duplicate members, alternate encodings, unsupported versions and payloads exceeding
+65,536 bytes MUST refuse. The identity is SHA-256 over the literal UTF-8 domain
+`support-depth-in1-admission-v1` followed by one NUL byte and the canonical payload. Generation
+identity uses the separate `support-depth-in1-generation-v1` NUL-terminated domain over canonical
+generation bytes.
+
+The record contains the following fields.
+
+- `schema_version` is `1` and `kind` is `in1_admission`.
+- `repository` records the host name, numeric repository id and owner id.
+- `generation` contains the original Event, complete selection/enrollment, P identity and
+  optional O identity. `generation_sha256` binds its canonical identity. Both are null for
+  record-free bootstrap/preparation.
+- `candidate`, `parent`, `checkout`, `enrollment_anchor` and `protected_tip` each contain full
+  commit and tree identities. FR1 emits `head_relationship` as `exact_head`.
+- `old_state` and `new_state` contain lifecycle path, authenticated blob identity and stage when
+  present. The blob preserves the complete evaluated lifecycle state.
+- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR1 emits `bootstrap`
+  for the first anchored decision and `unclassified` thereafter. `request_freeze` and
+  `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
+  or `refused`. Reasons are the bounded enums `owning_predicates_satisfied` and
+  `owning_predicate_refused`, with at most sixteen entries.
+- `predecessors` is a sorted unique list of retained successful decision identities at every
+  applicable parent frontier. Late retries remain independently discoverable and cannot rewrite
+  an earlier child's predecessor references. No earlier decision is synthesized.
+- `policy` names independently supplied implementation/workflow provenance, workflow id, job key,
+  app id and the approved closure. The isolated FR1 route resolves `workflow_commit` from the
+  source-installed authenticated protected installation commit, independently of candidate JSON.
+  `closure` records Git tree/blob ids for `crates`, `Cargo.toml`, `Cargo.lock`, `.github`,
+  `.github/workflows/ci.yml`, `scripts`, `scripts/depth_ci_archive.py` and installed profile scopes.
+  The evaluator rehashes bounded Git objects and requires each evaluated source object to equal
+  the independently protected anchor's object, as producer closure approval does. Root Cargo and
+  toolchain overrides remain unsupported. `implementation` is SHA-256 of canonical closure JSON
+  prefixed by `support-depth-in1-git-policy-v1` and a NUL byte; it summarizes those Git identities,
+  never uncommitted files or a compile-time directory inventory. Candidate-provided hashes cannot
+  approve policy. Phase C must bind the deployed evaluator to that approved source and runtime.
+  `canonical_tip`, `accepted_origin`, `registry_blob` and `inputs` bind observed authority and
+  evaluated input blob identities.
+- `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
+  FR3 supplies the reporting-context association. An admission without a producer is supported.
+- `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
+
+The fixed commitment line has exactly this form, with a lowercase 64-character payload digest
+and a positive decimal returned artifact id.
+
+```text
+IN1_ADMISSION_V1 kind=in1_admission sha256=<digest> artifact=<id>
+```
+
+It MUST appear exactly once in the approved job's retained log within its binding step interval.
+Attempt-specific job enumeration MUST authenticate the workflow job key, app, check and attempt.
+The downloaded proof artifact MUST contain exactly one regular `admission.json` entry. Its host
+archive digest/size, canonical payload digest, provenance and association claims MUST agree.
+Required publication precedes successful completion. Upload/log failure leaves an incomplete
+attempt. The fake host models these facts independently of producer artifacts.
+
+Independent discovery permits at most 1,000 runs and 100 attempts per run in each host stream,
+1,000 unique commits per resolution and 64 KiB per control record. Every relevant parent is
+traversed to the authenticated enrollment anchor, with commit/tree/blob content hashes checked.
+Complete populations and protected roots are checked again after resolution and at consumption.
+Overflow, gaps, missing predecessors, conflicts over identical evaluated inputs or unavailable
+required publication yield unverified authority. Revocation removes present eligibility and
+preserves historical progression. These are credential-free modeled-host predicates. Deployed
+GitHub policy provenance, emitter isolation, retention and transport qualification remain phase C.
+
 ## Synthetic wrapper machinery-proof profile
 
 The maintainer approved MP-P1 in the

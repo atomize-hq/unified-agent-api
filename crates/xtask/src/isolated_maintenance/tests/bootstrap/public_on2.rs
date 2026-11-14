@@ -135,7 +135,7 @@ fn public_on2_release_watch_accepts_actual_on1_empty_current() {
 
 #[test]
 fn public_on2_connected_freeze_write_admission_and_observation() {
-    let f = public_on1::declared_chain();
+    let f = public_on1::declared_chain_with_host_approval();
     let _installed = f.install();
     let parent = head(&f);
     crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
@@ -214,6 +214,11 @@ fn public_on2_connected_freeze_write_admission_and_observation() {
     local(&f, &implementation);
     check_integration(f.root.path(), &parent).unwrap();
     assert_eq!(fs::read(f.root.path().join(RECORD)).unwrap(), record_bytes);
+    crate::depth_evidence::prove_unobserved_admission(
+        f.root.path(),
+        f.resolve().unwrap().admission_publication().unwrap(),
+        f.api.3.clone(),
+    );
     let before =
         crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap();
     let error =

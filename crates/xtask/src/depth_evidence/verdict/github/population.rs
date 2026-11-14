@@ -122,6 +122,15 @@ pub(super) fn resolve_profile_inputs(
         .ok_or("missing packet PR number")?;
     let query = format!("actions/workflows/ci.yml/runs?created=%3E%3D{date}");
     let inventory = list(api, &query, Some("workflow_runs"))?;
+    let candidates = inventory
+        .iter()
+        .filter(|run| run["head_repository"]["full_name"] == repository)
+        .map(|run| sha(required_string(run, "head_sha")?).map(str::to_owned))
+        .collect::<Result<Vec<_>, _>>()?;
+    let admissions = host
+        .map(|host| host.admission_history(root, &candidates))
+        .transpose()?
+        .flatten();
     let mut runs = vec![];
     let mut progression = progression::Onboarding::default();
     for run in &inventory {
@@ -152,6 +161,11 @@ pub(super) fn resolve_profile_inputs(
         }
         // Approve the API-derived execution head before trusting any witness source claims.
         let head_sha = sha(required_string(run, "head_sha")?)?;
+        if let Some(history) = &admissions {
+            if p == Profile::SyntheticOnboarding {
+                history.check_candidate(root, head_sha, &candidate, depth_ci::onboarding::STATE)?;
+            }
+        }
         progression.observe(root, head_sha, &head, p, &candidate)?;
         profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
@@ -181,6 +195,19 @@ pub(super) fn resolve_profile_inputs(
                 );
             }
             if p == Profile::SyntheticOnboarding && w.build.source_commit != head_sha {
+                if let Some(host) = host {
+                    if let Some(history) =
+                        host.admission_history(root, std::slice::from_ref(&w.build.source_commit))?
+                    {
+                        history.check_candidate(
+                            root,
+                            &w.build.source_commit,
+                            &built_original,
+                            depth_ci::onboarding::STATE,
+                        )?;
+                        history.recheck()?;
+                    }
+                }
                 progression.observe(
                     root,
                     &w.build.source_commit,
@@ -241,6 +268,9 @@ pub(super) fn resolve_profile_inputs(
     }
     check_stable(api, &query, &inventory, &anchor_value, ir_p3)?;
     same_host()?;
+    if let Some(history) = admissions {
+        history.recheck()?;
+    }
     view.verify()?;
     Ok(Resolved {
         profile: p,

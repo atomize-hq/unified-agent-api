@@ -149,6 +149,14 @@ fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, Stri
             next.lifecycle_stage,
         )?;
     }
+    let host = captured.evidence_host(root)?;
+    let candidate = super::resolve(root, "HEAD")?;
+    if let Some(history) = host.admission_history(root, std::slice::from_ref(&candidate))? {
+        for record in new.records.values() {
+            history.check_candidate(root, &candidate, record, &path)?;
+        }
+        history.recheck()?;
+    }
     captured.recheck(root)?;
     Ok(true)
 }

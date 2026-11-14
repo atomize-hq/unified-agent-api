@@ -1,8 +1,11 @@
 # Support depth freeze checkpoints and implementation readiness
 
-Status — round-2 documentation decisions and implementation requirements. The four mechanisms
-are specified below. FR1–FR3 and connected writer proofs remain pending. Production/live activation
-requires phase-C emitter-isolation and transport qualification. This packet supplies docs changes.
+Status — round-2 mechanisms specified; FR1 implemented for the credential-free isolated route.
+FR1 supplies canonical protected-IN1 decision publication and independent bounded admission
+history, including progression over admitted ancestors without producer runs. FR2/FR3 and the
+remaining connected writer proofs are pending. Production/live activation requires phase-C
+emitter-isolation and transport qualification. See the [FR1 report](fr1-admission-history-report.md)
+for schema, policy identity, proving-test coverage and measured validation.
 
 The decision follows the maintainer-delegated guidance
 `.codex/guidance/2026-11-13-chatgpt-pro-freeze-checkpoint.md`, including its
@@ -156,7 +159,8 @@ its reporting classification after readiness only with its original authorized c
 
 ## Four mechanism decisions
 
-These decisions adopt the second consult's mechanisms. Their implementations are pending.
+These decisions adopt the second consult's mechanisms. FR1 implements admission publication and
+history under the isolated route; complete freeze planning and reporting-context joins remain pending.
 Missing authority yields `unverified`. FR1–FR3 must deliver positive isolated behavior as well as
 refusals. Production/live activation remains closed until phase C qualifies the real emitters
 and transport.
@@ -416,6 +420,15 @@ Annex A with its measured boundaries. Canonical workflow deployment belongs to p
 
 ### FR1 — Admission record, publication and independent history
 
+Delivered for the isolated route; live activation remains closed. Policy provenance uses runtime
+Git tree/blob identities of the source-installed protected installation commit, checked against
+that independently authenticated anchor. The fixed closure includes `crates`, Cargo manifest/lock,
+`.github`, `scripts` (including the exact workflow and archive reader) and installed profile
+scopes. Candidate records cannot select the protected anchor or substitute their own identities.
+The Python proof transport only decodes one bounded regular `admission.json`; Rust owns canonical
+record parsing, digest and authority checks. No compile-time repository hashing is used.
+The [report](fr1-admission-history-report.md) maps every FR1 proving item to executable tests.
+
 - Write scope covers private IN1 decision capture/emission in `depth_acceptance/integration*`,
   the shared progression interface in `runtime_follow_on/depth/`, admission-history resolution
   in `depth_evidence/verdict/github/`, and `isolated_maintenance/` host/fixture support. Add the
@@ -535,7 +548,11 @@ semantic facts from consult section 2A. The reporting payload precedes its own a
 ### Proving tests
 
 Parameterize maintenance and onboarding where their rule is shared. The following requirements
-carry forward all of consult section 8. They are pending tests, with no new test result claimed.
+carry forward all of consult section 8 across FR1–FR3 and the later connected writer slices.
+FR1's retained-admission authentication, bounded history and backward-progression tests are
+implemented for the isolated route; the [FR1 report](fr1-admission-history-report.md) records
+results and sandbox limits. Exact reporting-checkpoint classification, complete freeze planning,
+reporting-context joins and the remaining connected writer proofs below are still pending.
 
 | Positive or boundary | Required result |
 | --- | --- |
@@ -651,7 +668,8 @@ All four second-consult recommendations and its four draft tightenings are adopt
 single shared implementation slice is delivered as FR1–FR3 at the maintainer's requested review
 boundaries. The connected ON3 E, owning-predicate and ON4/ON5 writer work stays in slices 6–9,
 consuming those interfaces. Source approval at evaluation time is settled by local inspection.
-Real writer stability still requires the actual ON3–ON5 operations. All proving tests and real-host
+Real writer stability still requires the actual ON3–ON5 operations. FR1's modeled-host admission
+and unobserved-ancestor rollback proofs are delivered; FR2/FR3, later writer proofs and real-host
 qualification above remain pending. Production/live activation requires phase-C emitter isolation
 and exact transport. Existing execution-source approval, complete population and adverse-history
 requirements continue to apply.

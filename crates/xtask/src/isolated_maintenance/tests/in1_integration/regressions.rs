@@ -158,6 +158,9 @@ struct ParentRace {
 }
 const PARENT: &str = "refs/heads/in1-parent";
 impl Api for ParentRace {
+    fn admissions(&self) -> Result<Arc<dyn crate::depth_acceptance::admission::Host>, String> {
+        self.api.admissions()
+    }
     fn json(&self, endpoint: &str) -> Result<serde_json::Value, String> {
         if endpoint == "repos/fixture/isolated/branches/staging" {
             match self.reads.fetch_add(1, Ordering::SeqCst) + 1 {

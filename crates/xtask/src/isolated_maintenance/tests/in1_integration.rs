@@ -2,6 +2,7 @@
 use super::*;
 use crate::depth_acceptance::check_integration;
 
+pub(super) mod admission;
 mod maintenance_observation;
 mod regressions;
 

@@ -125,7 +125,22 @@ pub(super) fn declared_chain() -> Fixture {
 /// Producer fixtures need actual writer outputs; the ordinary connected tests above/below
 /// separately prove IN1 admission/observation. Do not replay that unrelated proof during setup.
 pub(super) fn declared_chain_for(producer: bool) -> Fixture {
+    declared_chain_from(setup(false), producer)
+}
+
+/// Establish a full host commit identity before ON1 and the first retained IN1 decision.
+pub(super) fn declared_chain_with_host_approval() -> Fixture {
     let f = setup(false);
+    let raw = fs::read_to_string(f.root.path().join(APPROVAL))
+        .unwrap()
+        .replace("abc1234", &f.baseline);
+    write(f.root.path(), APPROVAL, raw);
+    f.commit();
+    local(&f, &head(&f));
+    declared_chain_from(f, false)
+}
+
+fn declared_chain_from(f: Fixture, producer: bool) -> Fixture {
     canonical_context_for(&f, producer);
     assert!(!f.root.path().join(ROOT).exists());
     let _installed = f.install();

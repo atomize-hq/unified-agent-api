@@ -32,6 +32,25 @@ class ArchiveTests(unittest.TestCase):
             raw=io.BytesIO()
             with zipfile.ZipFile(raw,'w') as output:output.writestr(item,'{}')
             with self.assertRaises(ValueError):archive.witness(raw.getvalue())
+    def test_in1_exact_single_control_entry_and_64k_boundary(self):
+        # The archive reader returns bytes; canonical JSON belongs to the Rust parser.
+        value=b'x'*65536
+        self.assertEqual(archive.in1(self.zipped([('admission.json',value)])),value)
+        for entries in [[], [('admission.json','{}'),('admission.json','{}')],
+            [('admission.json','{}'),('extra','{}')], [('../admission.json','{}')],
+            [('witness.json','{}')], [('admission.json','x'*65537)]]:
+            with self.subTest(entries=[e[0] for e in entries]),self.assertRaises(ValueError):
+                archive.in1(self.zipped(entries))
+        with self.assertRaises(ValueError):archive.in1(b'x'*(2*archive.MAX+1))
+    def test_in1_non_regular_and_encrypted_entries_refuse(self):
+        for mode in [stat.S_IFLNK,stat.S_IFDIR,stat.S_IFIFO]:
+            item=zipfile.ZipInfo('admission.json');item.external_attr=(mode|0o644)<<16
+            raw=io.BytesIO()
+            with zipfile.ZipFile(raw,'w') as output:output.writestr(item,'{}')
+            with self.assertRaises(ValueError):archive.in1(raw.getvalue())
+        raw=bytearray(self.zipped([('admission.json','{}')]))
+        central=raw.index(b'PK\x01\x02');raw[central+8]|=1
+        with self.assertRaises(ValueError):archive.in1(bytes(raw))
     def package(self,root):
         source=root/'source';(source/'src').mkdir(parents=True);(source/'src/lib.rs').write_bytes(b'pub fn original() {}')
         raw=io.BytesIO()

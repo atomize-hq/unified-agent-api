@@ -64,9 +64,28 @@ def witness(raw):
         if not isinstance(value,dict):raise ValueError('witness requires an object')
         return value
 
+def in1(raw):
+    """Decode transport only; Rust owns canonical JSON parsing and authentication."""
+    if len(raw)>2*MAX:raise ValueError('control archive exceeds bounds')
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        entries=archive.infolist()
+        if len(entries)!=1 or entries[0].filename!='admission.json' or entries[0].file_size>65536:
+            raise ValueError('expected one bounded admission.json')
+        entry=entries[0]
+        if entry.flag_bits&1 or stat.S_IFMT(entry.external_attr>>16) not in (0,stat.S_IFREG):
+            raise ValueError('unsupported control entry')
+        with archive.open(entry) as stream:
+            value=stream.read(65537)
+        if len(value)>65536 or len(value)!=entry.file_size:
+            raise ValueError('control payload exceeds bounds or declared size')
+        return value
+
 if __name__=='__main__':
     try:
         if sys.argv[1]=='registry': value=registry(*sys.argv[2:])
+        elif sys.argv[1]=='in1':
+            sys.stdout.buffer.write(in1(sys.stdin.buffer.read(2*MAX+1)))
+            sys.exit(0)
         elif sys.argv[1]=='witness':value=witness(sys.stdin.buffer.read(2*MAX+1))
         else:raise ValueError('unknown archive operation')
         json.dump(value,sys.stdout,separators=(',',':'))
