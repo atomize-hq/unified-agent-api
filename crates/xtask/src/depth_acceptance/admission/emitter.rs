@@ -21,7 +21,12 @@ pub(crate) fn object(root: &Path, commit: &str) -> Result<Object, String> {
     Ok(Objects::new(root).commit(commit)?.object)
 }
 impl Emitter {
-    pub(crate) fn finish<T>(&self, root: &Path, outcome: Result<T, String>) -> Result<T, String> {
+    pub(crate) fn finish<T>(
+        &self,
+        root: &Path,
+        outcome: Result<T, String>,
+        observed_authority: Result<String, String>,
+    ) -> Result<T, String> {
         // Invalid invocation bindings have no authenticated predecessor to record. Preserve
         // their existing refusal. A reached owning decision is retained with bounded reasons.
         if self.parent.is_none() && outcome.is_err() {
@@ -34,8 +39,8 @@ impl Emitter {
         {
             return outcome;
         }
-        let retained = self
-            .retain(root, outcome.is_ok())
+        let retained = observed_authority
+            .and_then(|authority| self.retain(root, outcome.is_ok(), authority))
             .and_then(|()| self.context.recheck(root));
         match (outcome, retained) {
             (Ok(value), Ok(())) => Ok(value),
@@ -46,7 +51,12 @@ impl Emitter {
             )),
         }
     }
-    fn retain(&self, root: &Path, admitted: bool) -> Result<(), String> {
+    fn retain(
+        &self,
+        root: &Path,
+        admitted: bool,
+        observed_authority: String,
+    ) -> Result<(), String> {
         let parent = self
             .parent
             .as_deref()
@@ -165,6 +175,7 @@ impl Emitter {
             ),
             registry_blob: self.registry_blob.clone(),
             inputs,
+            observed_authority,
             producer_context: None,
             execution_evidence,
             claims: session.claims.clone(),

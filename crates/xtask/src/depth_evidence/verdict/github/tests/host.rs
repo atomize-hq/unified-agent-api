@@ -21,6 +21,12 @@ impl SyntheticHost {
             fake.lock().unwrap().bytes(endpoint, limit)
         }))
     }
+    /// The genuine first attempt's hosted witness archive, for candidate-copy regressions.
+    pub(crate) fn witness_archive(&self) -> Vec<u8> {
+        let fake = self.0.lock().unwrap();
+        fake.bytes(&fake.endpoint("actions/artifacts/101/zip"), 2_097_152)
+            .unwrap()
+    }
     /// An independent copy, so a test can change it without changing this host.
     pub(crate) fn fork(&self) -> Self {
         Self(Arc::new(Mutex::new(self.0.lock().unwrap().clone())))

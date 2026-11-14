@@ -637,7 +637,7 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     cross-attempt replay and substituted bytes MUST prevent verification. Retries MUST have
     separately authenticated observations. Decision identities MUST be immutable. Conflicting
     decisions over identical policy/authoritative inputs MUST prevent verification. Different root
-    snapshots MUST remain distinguishable. Revocation MUST affect present eligibility while
+    snapshots and independently observed host authority MUST remain distinguishable. Revocation MUST affect present eligibility while
     preserving historical readiness and execution accountability.
 12. Trusted emitters MUST be isolated from candidate-controlled processes that could alter their
     runtime, inputs, observations or publication. Protected IN1 MUST use a clean separate
@@ -714,6 +714,22 @@ The record contains the following fields.
   approve policy. Phase C must bind the deployed evaluator to that approved source and runtime.
   `canonical_tip`, `accepted_origin`, `registry_blob` and `inputs` bind observed authority and
   evaluated input blob identities.
+- `observed_authority` is a lowercase SHA-256 commitment to the producer host observations actually
+  consumed during this IN1 evaluation, including population/attempt/job/artifact/log reads,
+  downloaded witness bytes, adoption comments/reviews and reviewer permissions. Approved host
+  adapters compute it independently of candidate files. Successful empty responses commit absence
+  and unavailable reads commit a fixed refusal state, excluding arbitrary error text. Each read
+  hashes canonical `[endpoint, kind, SHA256(response)]`, with `kind` equal to `json` or `bytes`,
+  under the NUL-terminated `support-depth-in1-host-read-v1` domain. The canonical response is `["json", value]` for JSON,
+  `["bytes", SHA256(bytes)]` for binary data or `["unavailable"]` for transport refusal. SHA-256
+  digests use lowercase hexadecimal. The sorted unique set of read commitments is encoded
+  canonically and hashed under `support-depth-in1-observed-authority-v1` followed by NUL.
+  The empty set represents an evaluation consuming no producer host observations. The capture ends
+  before admission-history reconstruction and publication. Repeated reads and read order preserve
+  identity. Existing host response and population bounds govern the consumed reads. This required
+  fixed-size digest participates in evaluated-input identity, so restored host facts distinguish a
+  later decision while contradictions over the same
+  repository inputs and observed authority still refuse.
 - `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
   FR3 supplies the reporting-context association. An admission without a producer is supported.
 - `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.

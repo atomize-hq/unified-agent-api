@@ -201,6 +201,38 @@ fn retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs() {
 }
 
 #[test]
+fn observed_authority_distinguishes_decisions_but_unchanged_facts_still_conflict() {
+    let first = retained();
+    let host = fixture().host.fork();
+    let mut refusal = first.clone();
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    assert_eq!(
+        refusal.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+    refusal.observed_authority = digest(b"test missing authority\0", b"[]");
+    assert_ne!(
+        refusal.inputs_identity().unwrap(),
+        first.inputs_identity().unwrap()
+    );
+    let refused = publish(&host, refusal.clone());
+    let history = resolve(host.fork()).unwrap();
+    assert!(history.eligible(&first.identity().unwrap()).unwrap());
+    assert!(!history.eligible(&refused.identity().unwrap()).unwrap());
+    refusal.decision = Decision::Admitted;
+    refusal.reasons = vec![Reason::OwningPredicatesSatisfied];
+    publish(&host, refusal);
+    assert!(resolve(host)
+        .err()
+        .unwrap()
+        .contains("conflicting decisions over identical inputs"));
+    let mut malformed = first;
+    malformed.observed_authority = "candidate-selected".into();
+    assert!(malformed.canonical().is_err());
+}
+
+#[test]
 fn revocation_preserves_immutable_history_and_changes_present_eligibility() {
     let record = retained();
     let host = fixture().host.fork();

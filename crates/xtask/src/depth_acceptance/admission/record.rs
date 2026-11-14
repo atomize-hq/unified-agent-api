@@ -119,6 +119,8 @@ pub(crate) struct Record {
     pub registry_blob: String,
     /// Path -> Git blob identity for every authoritative input consumed by this decision.
     pub inputs: BTreeMap<String, String>,
+    /// Canonical commitment to independently read host facts, including observed absence.
+    pub observed_authority: String,
     /// FR2/FR3 supply authenticated freeze and producer-context references.
     pub producer_context: Option<String>,
     pub execution_evidence: Vec<String>,
@@ -181,6 +183,7 @@ impl Record {
         oid(&self.registry_blob)?;
         oid(&self.policy.workflow_commit)?;
         sha256(&self.policy.implementation)?;
+        sha256(&self.observed_authority)?;
         if self.policy.workflow_id == 0
             || self.policy.app_id == 0
             || self.policy.job_key.is_empty()

@@ -1,5 +1,80 @@
 # FR1 admission history implementation report
 
+## Observed host authority repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `7624f1ec`, subject to
+four Unix-socket sandbox failures detailed below. Changes are uncommitted for the lead.
+The report was started before implementation.
+
+The lead reproduced `in1_reauthenticates_population_in_admission_and_post_push_observation`.
+The previous evaluated-input identity omitted independently authenticated host observations,
+so a host-disturbed refusal and a host-restored admission collided over identical repository
+inputs. Required `observed_authority` now binds the producer host facts consumed during this IN1
+invocation into the canonical record and evaluated-input identity.
+
+The approved producer API adapter records canonical JSON responses and complete binary response
+digests for population, attempt, witness artifact, producer job/log and adoption/permission reads.
+Empty responses commit observed absence. Transport failures commit a fixed `unavailable` state,
+excluding arbitrary error text. Domain-separated per-read commitments are sorted and deduplicated,
+then hashed under `support-depth-in1-observed-authority-v1` followed by NUL. Only its fixed-size
+lowercase SHA-256 digest enters the record. Existing response/population bounds govern discovery.
+Capture ends before history reconstruction/publication, keeping retries independent of their own
+new artifacts. Record schema version 1, canonical UTF-8 JSON and the 65,536-byte bound apply.
+The admission/input literal vectors and independent observation-domain vectors cover the addition.
+The new capture lives in `crates/xtask/src/depth_acceptance/admission/observations.rs`, with scoped
+wiring in `integration.rs` and emission in `admission/emitter.rs`. Producer authentication wraps
+its existing host API in `depth_evidence/verdict/github/{population,transport}.rs` under the same
+`crates/xtask/src` root.
+
+Regression coverage includes the following cases.
+
+- `depth_acceptance::admission::tests::observed_authority_distinguishes_decisions_but_unchanged_facts_still_conflict`
+  authenticates distinct-fact decisions and refuses contradictory decisions sharing the same facts.
+- `isolated_maintenance::tests::in1_integration::observed_authority::in1_retains_disturbed_and_restored_host_authority_without_a_conflict`
+  drives real producer reads and real IN1 publication/history across two disturbed-attempt states
+  and revoked adoption, restoring and admitting after every refusal through the socket-free
+  assembler fixture already used by view-evaluation tests.
+- `isolated_maintenance::tests::in1_integration::observed_authority::candidate_witness_copy_cannot_select_observed_authority_or_avoid_conflicts`
+  commits candidate-owned altered/genuine copies of the actual hosted witness archive and a forged
+  `admission.json`, checks stable authority digests, then requires conflict refusal for contradictory
+  decisions with that authority and the same repository inputs.
+- Observation tests pin canonical response/digest bytes, deduplication, read-order independence,
+  empty/unavailable distinctions, error-text exclusion and invocation/drop isolation.
+
+The existing socket-dependent reauthentication regression reaches MA4 channel creation and
+receives `Operation not permitted` before its host-disturbance assertions in this sandbox.
+The new producer-backed regressions pass without requiring that channel. The Python archive
+reader returns opaque admission bytes, so this schema addition requires Rust/schema/vector edits.
+The design, evidence contract and Annex A IN1 sentence describe the new observed authority.
+
+### Host authority repair validation
+
+Cargo commands use `env -u TMPDIR` to select the default writable temporary directory.
+The final runs cover the completed source. Test groups ran concurrently, so runtimes include
+contention.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 19.55 s including build-lock wait |
+| `cargo test -p xtask --lib depth_acceptance` | 69 passed, 49.90 s tests |
+| `cargo test -p xtask --lib in1_integration` | 26 passed, 4 Unix-socket sandbox failures, 135.94 s tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed, 357.81 s tests |
+| `make loc-check` | Pass |
+| `git diff --check` | Pass |
+| `make hygiene` | Pass |
+| Focused new producer-backed regressions | 2 passed, 147.75 s tests |
+
+The four IN1 sandbox failures are `connected::{in1_closeout_candidate_admission_and_post_push_observation,
+in1_prepared_closeout_candidate_admission_and_post_push_observation,
+in1_refuses_forged_closeout_entries_in_admission_and_observation,
+in1_reauthenticates_population_in_admission_and_post_push_observation}`. Each receives
+`cannot open the MA4 evidence channel: Operation not permitted (os error 1)` during fixture
+preparation. Full socket-capable validation remains a lead-side check.
+
+
+## Previous round status
+
 Status — round-2 repairs are implemented in `feat/fr1-admission-history` over `8246eb35`.
 Changes are uncommitted. Requested validation completed with the default TMPDIR. Four existing
 IN1 closeout cases are blocked by the sandbox Unix-socket restriction. All other requested checks pass.
@@ -163,12 +238,13 @@ and SHA-256 over `support-depth-in1-admission-v1` + NUL + canonical bytes.
 | `predecessors`, `enrollment_anchor` | Sorted unique successful parent-frontier decisions and independent first-record anchor |
 | `policy` | Approved implementation/workflow/closure and fixed workflow/job/app identities |
 | `protected_tip`, `canonical_tip`, `accepted_origin`, `registry_blob`, `inputs` | Observed roots, accepted repository and authoritative input blobs |
+| `observed_authority` | Required canonical digest of consumed producer host observations, including absence/refusal |
 | `producer_context`, `execution_evidence` | Nullable context and consumed evidence identities; producer absence is representable |
 | `claims` | Run, attempt, emitting job, check and event |
 
 Generation and evaluated-input identities have their own digest domains. Input identity includes
-root snapshots and excludes retry association and outcome, allowing conflict detection without
-conflating distinct observations. Refusals retain bounded reason enums, not arbitrary error text.
+root snapshots and the independently computed `observed_authority`, and excludes retry association
+and outcome, allowing conflict detection across decisions over the same observed facts. Refusals retain bounded reason enums, not arbitrary error text.
 
 ## Runtime policy identity and approval
 

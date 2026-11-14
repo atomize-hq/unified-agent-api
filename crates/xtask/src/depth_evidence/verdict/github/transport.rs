@@ -25,6 +25,23 @@ pub(super) trait Api {
             .map_err(|_| "invalid GitHub response".into())
     }
 }
+/// All producer authority reads pass through this adapter during population authentication.
+pub(super) struct Observed<'a, A>(pub &'a A);
+impl<A: Api> Api for Observed<'_, A> {
+    fn repository(&self) -> &str {
+        self.0.repository()
+    }
+    fn bytes(&self, endpoint: &str, limit: usize) -> Result<Vec<u8>, String> {
+        let result = self.0.bytes(endpoint, limit);
+        crate::depth_acceptance::admission::observations::bytes(endpoint, &result);
+        result
+    }
+    fn json(&self, endpoint: &str) -> Result<Value, String> {
+        let result = self.0.json(endpoint);
+        crate::depth_acceptance::admission::observations::json(endpoint, &result);
+        result
+    }
+}
 pub(super) struct Github {
     repository: &'static str,
 }

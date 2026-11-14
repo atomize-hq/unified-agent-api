@@ -29,8 +29,9 @@ impl crate::isolated_maintenance::Route {
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
         let mut emitter = self.context().admission_emitter()?;
+        let observations = super::admission::observations::Capture::start()?;
         let outcome = self.evaluate_admitted_publication(root, revision, validate, &mut emitter);
-        emitter.finish(root, outcome)
+        emitter.finish(root, outcome, observations.finish())
     }
 
     fn evaluate_admitted_publication<T>(

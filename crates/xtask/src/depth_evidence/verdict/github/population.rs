@@ -8,6 +8,8 @@ pub(super) fn resolve_profile_inputs(
     host: Option<&crate::isolated_maintenance::EvidenceHost>,
     borrowed: Option<&mut GitInputs>,
 ) -> Result<Resolved, String> {
+    let observed = super::transport_impl::Observed(api);
+    let api = &observed;
     let ir_p3 = match (p, host) {
         (Profile::Synthetic | Profile::SyntheticOnboarding, Some(h))
             if api.repository() == h.repository() && h.repository() != depth_ci::REPOSITORY =>
