@@ -49,7 +49,7 @@ pub(super) fn resolve(
         result
             .inputs
             .push(view.reference(super::onboarding::APPROVAL)?);
-    } else {
+    } else if profile != profile::Profile::Synthetic {
         view.required(profile.fixture())?;
         result.inputs.push(view.reference(profile.fixture())?);
     }
@@ -58,9 +58,8 @@ pub(super) fn resolve(
         result.inputs.push(view.reference(&path)?);
     }
     if profile != profile::Profile::Channel {
-        let record = profile.record(
-            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
-        )?;
+        use super::profile::GenerationResolver;
+        let record = profile.current_generation(view)?.record;
         for input in record.obligations.unwrap().acquired_inputs {
             view.required(&input.path)?;
             let current = view.reference(&input.path)?;

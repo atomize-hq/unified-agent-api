@@ -11,6 +11,7 @@ use std::{path::Path, process::Command};
 
 mod collector;
 mod graph;
+mod maintenance;
 pub(crate) mod native;
 pub(crate) mod onboarding;
 pub(crate) mod profile;

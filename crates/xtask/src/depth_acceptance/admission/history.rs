@@ -151,6 +151,48 @@ impl History {
                 .iter()
                 .any(|r| r.identity().as_deref() == Ok(identity) && self.authoritative(r)))
     }
+    /// Complete retained generations associate descendants through rehashed bounded ancestry.
+    pub(crate) fn associates_generation(
+        &self,
+        root: &Path,
+        commit: &str,
+        generation: &Generation,
+    ) -> Result<bool, String> {
+        let mut objects = Objects::new(root);
+        let mut pending = vec![commit.to_owned()];
+        let mut seen = BTreeSet::new();
+        let mut observed: BTreeSet<_> = self.parents.keys().cloned().collect();
+        while let Some(commit) = pending.pop() {
+            if !seen.insert(commit.clone()) {
+                continue;
+            }
+            observed.insert(commit.clone());
+            if observed.len() > super::objects::COMMIT_LIMIT {
+                return Err("IN1 unique commit traversal bound exceeded".into());
+            }
+            let frontier = self.records.iter().find(|record| {
+                record.candidate.commit == commit
+                    && record.generation.is_some()
+                    && self.authoritative(record)
+            });
+            if let Some(record) = frontier {
+                if record.generation.as_ref() == Some(generation) {
+                    return Ok(true);
+                }
+                // A complete newer generation seals this ancestry branch.
+                continue;
+            }
+            if commit != self.anchor {
+                if let Some(parents) = self.parents.get(&commit) {
+                    pending.extend(parents.iter().cloned());
+                } else {
+                    pending.extend(objects.commit(&commit)?.parents.clone());
+                }
+            }
+        }
+        Ok(false)
+    }
+
     /// Structural checkpoint identity supplies no receipt-free authority by itself.
     pub(crate) fn is_request_freeze(&self, commit: &str, generation: &Generation) -> bool {
         self.records.iter().any(|record| {

@@ -9,6 +9,7 @@ use std::{
 };
 
 const OBJECT_LIMIT: usize = 16_777_216;
+pub(super) const COMMIT_LIMIT: usize = 1000;
 #[derive(Clone)]
 pub(crate) struct Commit {
     pub object: Object,
@@ -101,7 +102,7 @@ impl<'a> Objects<'a> {
         if let Some(commit) = self.commits.get(identity) {
             return Ok(commit.clone());
         }
-        if self.commits.len() >= 1000 {
+        if self.commits.len() >= COMMIT_LIMIT {
             return Err("IN1 unique commit traversal bound exceeded".into());
         }
         let bytes = self.read("commit", identity)?;

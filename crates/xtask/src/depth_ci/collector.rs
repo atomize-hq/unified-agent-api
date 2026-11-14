@@ -302,9 +302,8 @@ fn execute(
 fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     let (run_id, run_attempt, workflow_commit) = host_header()?;
     let mut view = GitInputs::new(root)?;
-    let original = profile.record(
-        std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
-    )?;
+    use super::profile::GenerationResolver;
+    let original = profile.current_generation(&mut view)?.record;
     if original.execution.is_some() || !original.acceptance_entries.is_empty() {
         return Err("source fixture must contain only frozen P/O".into());
     }

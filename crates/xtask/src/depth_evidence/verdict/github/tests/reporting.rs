@@ -1,28 +1,18 @@
-//! FR3a consumes a resolved canonical binding supplied by the connected writer fixture.
-//! The production resolver remains unchanged for FR3b.
+//! Connected real-writer reporting populations use the production generation resolver.
 use super::*;
 use crate::{
     depth_acceptance::admission::{fake::MemoryHost, Host as AdmissionHost, Publication},
-    depth_ci::{profile::GenerationResolver, reporting::ContextRecord},
+    depth_ci::reporting::ContextRecord,
     isolated_maintenance::EvidenceHost,
 };
 use std::sync::Arc;
-
-struct CanonicalBinding(Profile);
-impl GenerationResolver for CanonicalBinding {
-    fn profile(&self) -> Profile {
-        self.0
-    }
-    fn path(&self) -> &str {
-        depth_ci::onboarding::RECORD
-    }
-}
 
 pub(crate) fn prove_reporting(
     root: &Path,
     publication: Publication,
     host: Arc<MemoryHost>,
     context: ContextRecord,
+    approve_source: impl FnOnce(&Path, &str, &Arc<MemoryHost>),
 ) {
     let scratch = tempfile::tempdir().unwrap();
     git(
@@ -44,16 +34,50 @@ pub(crate) fn prove_reporting(
         // Fixture insertion is delayed until after genuine MA2 and its real IN1 admission.
         write(root, p.fixture(), &frozen);
     }
+    let before_approval = git(root, &["rev-parse", "HEAD"]);
     let (w, implementation) = build(root, p);
     let mut api = endpoints(root, p, &w, &implementation, 1);
     let host = Arc::new(host.fork());
+    // The execution exists before protected approval. No run-start-time gate is involved.
+    let error = profile::approved(
+        root,
+        ISOLATED,
+        &implementation,
+        &implementation,
+        &before_approval,
+        p,
+    )
+    .unwrap_err();
+    assert!(
+        error.contains("producer closure is not approved on protected staging"),
+        "{error}"
+    );
+    approve_source(root, &before_approval, &host);
     host.root(&implementation);
+    profile::approved(
+        root,
+        ISOLATED,
+        &implementation,
+        &implementation,
+        &implementation,
+        p,
+    )
+    .unwrap();
+    if p == Profile::Synthetic {
+        super::generation::binding_matrix(root, &implementation, &api);
+    }
     let publication = Publication {
         authority: publication.authority,
         host: host.clone(),
     };
     let bound = EvidenceHost::for_admission_test(ISOLATED, &implementation, publication.clone());
-    let resolver = CanonicalBinding(p);
+    let resolver = p;
+    if p == Profile::Synthetic {
+        let source =
+            crate::runtime_advertising::source::Source::tip(root, &context.candidate.commit)
+                .unwrap();
+        assert!(source.optional(p.fixture()).unwrap().is_none());
+    }
     let date = match &context.generation.event {
         Event::Maintenance {
             request_recorded_at,
@@ -103,7 +127,7 @@ pub(crate) fn prove_reporting(
     assert_eq!(proof["result"], "unverified");
     assert_eq!(proof["reporting_attempts"], checkpoint_attempts);
     let mut rows = checkpoint_rows.clone();
-    rows.extend(execution_rows);
+    rows.extend(execution_rows.clone());
     api.page(&query, Some("workflow_runs"), rows.clone());
     for reverse in [false, true] {
         if reverse {
@@ -115,10 +139,39 @@ pub(crate) fn prove_reporting(
                 .unwrap();
         assert_eq!(resolved.reporting.len(), checkpoint_attempts);
         assert_eq!(resolved.runs.len(), p.obligations(&resolved.original).len());
+        assert!(resolved
+            .runs
+            .iter()
+            .all(|r| r.receipt.producer.run_id == w.run_id
+                && r.receipt.build.source_commit == implementation));
         let proof: Value =
             serde_json::from_str(&prove_resolved(root, ISOLATED, &resolved).unwrap()).unwrap();
         assert_eq!(proof["result"], "verified", "{proof}");
     }
+    if p == Profile::Synthetic {
+        associated_descendants(root, &implementation, &api, &bound, &query);
+    }
+    // A later protected source S2 cannot approve this retained S1 execution.
+    let original_source = fs::read(root.join(depth_ci::COLLECTOR)).unwrap();
+    write(root, depth_ci::COLLECTOR, b"changed protected collector S2");
+    git(root, &["add", "."]);
+    git(root, &["commit", "-qm", "protected source S2"]);
+    let changed = git(root, &["rev-parse", "HEAD"]);
+    let mut changed_api = api.clone();
+    changed_api.put("git/ref/heads/staging", json!({"object":{"sha":changed}}));
+    let changed_host = EvidenceHost::for_test(ISOLATED, &changed);
+    let error =
+        population::resolve_profile_inputs(&changed_api, root, p, Some(&changed_host), None)
+            .unwrap_err();
+    assert!(
+        error.contains("producer closure is not approved on protected staging"),
+        "{error}"
+    );
+    git(root, &["reset", "--hard", &implementation]);
+    assert_eq!(
+        fs::read(root.join(depth_ci::COLLECTOR)).unwrap(),
+        original_source
+    );
     let absent = EvidenceHost::for_test(ISOLATED, &implementation);
     let error = population::resolve_generation_inputs(&api, root, Some(&absent), None, &resolver)
         .unwrap_err();
@@ -153,6 +206,55 @@ pub(crate) fn prove_reporting(
         error,
         "reporting context lacks later exact-transition IN1 admission"
     );
+}
+
+fn associated_descendants(root: &Path, base: &str, api: &Fake, bound: &EvidenceHost, query: &str) {
+    let p = Profile::Synthetic;
+    let path = crate::agent_lifecycle::maintenance_request_path(p.agent_id());
+    let report = depth_ci::onboarding::RECORD;
+    for removed in [true, false] {
+        if removed {
+            fs::remove_file(root.join(&path)).unwrap();
+            fs::remove_file(root.join(report)).unwrap();
+        } else {
+            let mut request: toml_edit::DocumentMut = fs::read_to_string(root.join(&path))
+                .unwrap()
+                .parse()
+                .unwrap();
+            request["request_commit"] = toml_edit::value("a".repeat(40));
+            write(root, &path, request.to_string());
+            let mut record = p
+                .record(&fs::read_to_string(root.join(report)).unwrap())
+                .unwrap();
+            if let Event::Maintenance { request_commit, .. } = &mut record.event {
+                *request_commit = "a".repeat(40);
+            }
+            write(root, report, serde_json::to_vec_pretty(&record).unwrap());
+        }
+        git(root, &["add", "."]);
+        git(
+            root,
+            &["commit", "-qm", "removed or replaced generation inputs"],
+        );
+        let candidate = git(root, &["rev-parse", "HEAD"]);
+        git(root, &["reset", "--hard", base]);
+        let mut next = api.clone();
+        let mut rows = next
+            .json(&next.endpoint(&format!("{query}&per_page=100&page=1")))
+            .unwrap()["workflow_runs"]
+            .as_array()
+            .unwrap()
+            .clone();
+        let mut run = rows[0].clone();
+        run["id"] = json!(48);
+        run["head_sha"] = json!(candidate);
+        run["pull_requests"] = json!([]);
+        rows.push(run);
+        next.page(query, Some("workflow_runs"), rows);
+        let error =
+            population::resolve_profile_inputs(&next, root, p, Some(bound), None).unwrap_err();
+        assert_eq!(error, "associated head replaced maintenance generation");
+    }
 }
 
 pub(crate) fn prove_refused_reporting(
@@ -227,14 +329,8 @@ pub(crate) fn prove_refused_reporting(
             rows.reverse();
         }
         api.page(&query, Some("workflow_runs"), rows.clone());
-        let error = population::resolve_generation_inputs(
-            &api,
-            root,
-            Some(&bound),
-            None,
-            &CanonicalBinding(p),
-        )
-        .unwrap_err();
+        let error =
+            population::resolve_generation_inputs(&api, root, Some(&bound), None, &p).unwrap_err();
         assert_eq!(
             error,
             "reporting context lacks later exact-transition IN1 admission"
@@ -341,14 +437,8 @@ fn unexpected_execution(
         host.change(&job_path, |value| {
             value["jobs"][0]["conclusion"] = json!(if failure { "failure" } else { "success" })
         });
-        let resolved = population::resolve_generation_inputs(
-            &api,
-            root,
-            Some(&bound),
-            None,
-            &CanonicalBinding(p),
-        )
-        .unwrap();
+        let resolved =
+            population::resolve_generation_inputs(&api, root, Some(&bound), None, &p).unwrap();
         assert_eq!(resolved.reporting_conflicts, [(claims.run, 1)].into());
         let proof: Value =
             serde_json::from_str(&prove_resolved(root, ISOLATED, &resolved).unwrap()).unwrap();

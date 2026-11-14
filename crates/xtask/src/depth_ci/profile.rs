@@ -433,42 +433,47 @@ mod onboarding_tests {
     }
 }
 
-/// A resolved Event/P/O binding. FR3b replaces the resolver behind this interface.
+/// A resolved Event/P/O projection, shared by collection, discovery and witness authentication.
 pub(crate) struct GenerationBinding {
     pub record: crate::depth_record::DepthRecord,
 }
 pub(crate) trait GenerationResolver {
     fn profile(&self) -> Profile;
-    fn path(&self) -> &str;
+    fn resolve_inputs(
+        &self,
+        inputs: &mut impl crate::support_depth::acquisition_inputs::Inputs,
+        target: Option<&crate::depth_record::DepthRecord>,
+        associated: bool,
+    ) -> Result<Option<GenerationBinding>, String> {
+        let p = self.profile();
+        if p == Profile::Synthetic {
+            return super::maintenance::resolve(inputs, p, target, associated);
+        }
+        let binding = inputs
+            .optional(p.fixture())?
+            .map(|raw| {
+                p.record(std::str::from_utf8(&raw).map_err(|e| e.to_string())?)
+                    .map(|record| GenerationBinding { record })
+            })
+            .transpose()?;
+        Ok(binding)
+    }
     fn resolve_generation(
         &self,
         source: &crate::runtime_advertising::source::Source,
     ) -> Result<Option<GenerationBinding>, String> {
-        source
-            .optional(self.path())?
-            .map(|raw| {
-                self.profile()
-                    .record(&raw)
-                    .map(|record| GenerationBinding { record })
-            })
-            .transpose()
+        self.resolve_inputs(&mut source.clone(), None, false)
     }
     fn current_generation(
         &self,
         view: &mut crate::git_inputs::GitInputs,
     ) -> Result<GenerationBinding, String> {
-        let bytes = view.required(self.path())?;
-        let raw = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
-        Ok(GenerationBinding {
-            record: self.profile().record(raw)?,
-        })
+        self.resolve_inputs(view, None, false)?
+            .ok_or_else(|| "generation unavailable".into())
     }
 }
 impl GenerationResolver for Profile {
     fn profile(&self) -> Profile {
         *self
-    }
-    fn path(&self) -> &str {
-        self.fixture()
     }
 }

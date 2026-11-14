@@ -678,8 +678,11 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     generation with no conflicting authenticated association receive out-of-generation treatment.
     A target binding in either record with the other missing, malformed, stale or contradictory,
     ambiguous report entries, or removed/replaced required records at a head independently
-    associated through admission/enrollment history MUST yield `unverified`. Heads without an
-    independent target-generation association retain ordinary unrelated-head treatment. Records
+    associated through authenticated original packet-PR membership or admission/enrollment history
+    MUST yield `unverified`. Retained complete-admission association follows rehashed bounded
+    ancestry through unadmitted descendants. A complete admission for another generation ends
+    that ancestry branch's association. Incomplete admissions confer no association authority.
+    Heads without an independent target-generation association retain ordinary unrelated-head treatment. Records
     supply authenticated input evidence. Reporting authorization requires the combined proof.
 
 ### Reporting-context control record v1

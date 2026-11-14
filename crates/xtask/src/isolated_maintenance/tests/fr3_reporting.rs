@@ -15,6 +15,7 @@ pub(super) fn before(
     record: &DepthRecord,
     candidate: &str,
 ) -> ContextRecord {
+    publication_closure(f, candidate);
     let policy = reporting::authority(publication).policy;
     let claims = f.api.3.begin(candidate, &policy).unwrap();
     let invocation = Invocation {
@@ -26,20 +27,14 @@ pub(super) fn before(
         substantive_invoked: false,
     };
     install(&f.api.3, candidate, &invocation);
-    let context = if matches!(record.event, crate::depth_record::Event::Onboarding { .. }) {
-        crate::depth_ci::collect_synthetic(f.root.path()).unwrap();
-        reporting::authenticate(
-            f.root.path(),
-            publication,
-            invocation.claims.run,
-            invocation.claims.attempt,
-        )
-        .unwrap()
-    } else {
-        reporting::dispatch(f.root.path(), publication, candidate, record)
-            .unwrap()
-            .unwrap()
-    };
+    crate::depth_ci::collect_synthetic(f.root.path()).unwrap();
+    let context = reporting::authenticate(
+        f.root.path(),
+        publication,
+        invocation.claims.run,
+        invocation.claims.attempt,
+    )
+    .unwrap();
     assert!(context.successful());
     assert!(f
         .api
@@ -77,6 +72,40 @@ pub(super) fn before(
     dirty_checkout_and_pinned_context(f, publication, &context, record);
     checkout_relationships(f, publication, &context, record);
     context
+}
+
+fn publication_closure(f: &Fixture, candidate: &str) {
+    use crate::support_matrix as matrix;
+    let root = f.root.path();
+    let parent = git(root, &["rev-parse", &format!("{candidate}^")]);
+    for path in [
+        "crates",
+        "Cargo.toml",
+        "Cargo.lock",
+        ".github/workflows/ci.yml",
+        crate::depth_ci::ARCHIVE,
+    ] {
+        assert_eq!(
+            git(root, &["rev-parse", &format!("{candidate}:{path}")]),
+            git(root, &["rev-parse", &format!("{parent}:{path}")]),
+            "freeze changed execution closure {path}"
+        );
+    }
+    let rendered = matrix::generate_publication_artifacts(root).unwrap();
+    for (path, bytes) in [
+        (matrix::JSON_OUTPUT_PATH, rendered.json),
+        (matrix::MARKDOWN_OUTPUT_PATH, rendered.markdown),
+        (
+            matrix::AGENT_API_RUNTIME_SUPPORT_DATA_OUTPUT_PATH,
+            rendered.runtime_support_data,
+        ),
+    ] {
+        assert_eq!(
+            fs::read(root.join(path)).unwrap(),
+            bytes.as_bytes(),
+            "publication changed {path}"
+        );
+    }
 }
 fn install(host: &MemoryHost, candidate: &str, invocation: &Invocation) {
     host.put(
@@ -301,6 +330,7 @@ pub(super) fn after(f: &Fixture, publication: &Publication, context: &ContextRec
         publication.clone(),
         f.api.3.clone(),
         context.clone(),
+        |root, parent, host| approve_source(f, root, parent, host),
     );
 }
 
@@ -508,3 +538,51 @@ pub(super) fn freeze_after_readiness(
         context,
     );
 }
+
+/// Real protected IN1 admits the execution source after its modeled execution already exists.
+fn approve_source(f: &Fixture, root: &Path, parent: &str, host: &Arc<MemoryHost>) {
+    let api = Arc::new(super::fixture::Fake(
+        std::sync::Mutex::new(f.api.0.lock().unwrap().clone()),
+        Default::default(),
+        Default::default(),
+        host.clone(),
+        Default::default(),
+    ));
+    let baseline = f.baseline.clone();
+    let subject = f.subject;
+    let candidate = git(root, &["rev-parse", "HEAD"]);
+    git(
+        root,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/fixture/isolated.git",
+        ],
+    );
+    git(root, &["update-ref", "refs/remotes/origin/staging", parent]);
+    for base in [&baseline, parent] {
+        api.put(
+            &format!("repos/fixture/isolated/compare/{base}...{candidate}"),
+            json!({"status":"ahead","merge_base_commit":{"sha":base}}),
+        );
+    }
+    api.put(
+        &format!("repos/fixture/isolated/commits/{candidate}"),
+        json!({"sha":candidate}),
+    );
+    let _installed = super::fixture::install(Box::new(move || {
+        (
+            super::fixture::profile_with(baseline.clone(), subject),
+            api.clone() as Arc<dyn Api>,
+        )
+    }));
+    check_integration(root, parent).unwrap();
+    assert!(host
+        .records()
+        .iter()
+        .any(|r| r.candidate.commit == candidate && r.successful()));
+}
+
+#[path = "fr2_maintenance/reporting.rs"]
+mod maintenance;

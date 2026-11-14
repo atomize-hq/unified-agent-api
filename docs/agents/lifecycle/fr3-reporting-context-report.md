@@ -76,3 +76,153 @@ Initial validation caught a preserved refusal-order regression and test-only unt
 The requested test groups complete with 16 environment-dependent failures across depth evidence and IN1. The additional GitInputs run exposes one further socket-blocked case, for 17 distinct environment-dependent cases. Their dependent assertions remain unverified. The final ON2 and MA2 proving cases pass, including context publication, real IN1, protected-history joins, separately authenticated retries and both substantive outcomes. Full-group durations reflect concurrent validation and repeated source/history authentication. Shared immutable fixtures and independent host forks serve the mutation matrices.
 
 The lead can commit the source, schema text, Annex A and this report together. FR3b's canonical production resolver and approval/currentness proofs, and phase C's deployed host qualification, are pending within their assigned passes.
+
+## FR3b
+
+Status — implemented and validated on `feat/fr3-reporting-context` over `c8ee17b9`, subject to
+the sixteen environment-dependent cases below. Changes remain uncommitted for the lead.
+
+### Binding and discovery
+
+`depth_ci::maintenance` is the sole canonical MA2 resolver behind `GenerationResolver`. Collector
+dispatch, substantive collection, build-graph acquisition inputs, witness authentication and
+population discovery consume it. The fixture-only resolver has been removed. Exact immutable host
+heads supply Git-authenticated standing-request and versioned-report bytes. Current indexed views
+use the same resolver and retain GitInputs freshness checks.
+
+The resolver captures both required reads before parsing, checks supported structures/versions,
+original Event, agent/version/enrollment and request P/O agreement, validates acquired digests, and
+reuses approved policy/acquisition derivation over the same inputs. The original finite machinery
+profile retains its independently compiled P/O expectation. Later E/entries are projected out after
+validation. No execution outcome, session, retry, ordering or failed lookup selects a binding.
+Ignored request metadata and auxiliary fixture bytes contribute no generation identity. Fixture
+bytes continue to belong to the ordinary execution source closure when present.
+
+Either record's target Event associates a head even when the other record is invalid or absent.
+Authenticated original packet-PR membership and complete retained IN1 generation association also
+prevent record removal/replacement from hiding a head. Retained association follows rehashed bounded ancestry through unadmitted descendants, stopping
+at a complete admission for another generation on each branch. Incomplete retained decisions
+confer no association authority and do not stop an older complete association. Coherent other generations and heads without target association retain
+ordinary unrelated treatment. The real MA2 matrix also re-derives a coherent different O under the
+same original Event and checks that independent target association changes its treatment. Ambiguous versioned-report claims refuse. Read unavailability
+propagates as incompleteness. Matching attempts are retained before substantive artifact reads.
+Existing execution-source refusal ordering is preserved. Closing population checks bind normalized
+packet-PR membership. Unrelated PR numbers and ignored PR prose do not salt captured identity,
+while a newly appearing target association refuses the population.
+
+The mutation matrix runs through real discovery with bounded reason assertions. It covers both
+record directions with and without packet-PR association, missing/malformed/contradictory records,
+unsupported versions, wrong agent, ambiguous reports, stale acquired input, removed/replaced
+associated records, coherent unrelated heads and unavailable report transport. Producer and
+historical discovery bindings agree under fixture absence, mismatch and mutation. Those changed
+fixture heads remain discoverable and reach the ordinary execution-closure refusal.
+
+### Source approval and publication
+
+The genuine MA2 test uses `collect_synthetic` before auxiliary insertion. The real MA2 and ON2
+writers precede real IN1, retained context/admission authentication and protected-tip advancement.
+The shared connected proof constructs an execution at S while protected source approval still
+refuses it, then runs real IN1 over that exact implementation source before advancing modeled
+protected history. Evaluation retains the original run/attempt and verifies all eleven obligations.
+A separately changed current collector S2 refuses the retained S1 run. Scoped fake-host installation
+restores the enclosing route after the connected real-IN1 approval callback.
+
+Both real freeze writers preserve the entire execution closure by Git object equality for `crates`,
+Cargo manifest/lock, workflow and archive reader. Existing publication generation reproduces the
+committed support JSON, Markdown and runtime projection byte for byte. FR2's reviewed literal
+packet/report/runtime expectations remain independent of the planners. The genuine MA2 binding
+also compares its complete P/O with the committed FR2 literal. The MA2 reporting test now lives
+under `isolated_maintenance::tests::fr3_reporting::maintenance` so the requested FR3 filter executes
+its connected proof directly.
+
+Real ON3–ON5 publication-writer closure proofs are deferred to slices 6–9, as assigned by the
+design. The credential-free host protocol proves local predicates, binding, classification,
+retention/history joins and the measured real-writer source closure. Its test process remains
+trusted. Real GitHub issuance, exact deployed job/log/artifact association, emitter isolation,
+merge queues, retries/retention and credentials remain phase C.
+
+### Row-by-row design coverage
+
+| Positive or boundary | Executing tests and measured boundary |
+| --- | --- |
+| Reproduced defect | `fr3_reporting_context_real_ma2_and_later_execution_population` and `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` call `prove_reporting`, retaining genuine older freezes with zero credit before later execution/adoption verifies the generation. |
+| Real MA2 discovery | `fr3_reporting_context_real_ma2_and_later_execution_population` runs actual collector dispatch at genuine MA2 with no auxiliary fixture. It also executes `binding_matrix`. `canonical_maintenance_generation_association_refusals_and_fixture_independence` separately exercises fixture absence/mismatch/mutation through producer binding and real discovery. |
+| Real MA2 combined commit | Existing FR2 `fr2_ma2_combined_acquisition_and_freeze_real_in1` covers the real transport's single acquisition/freeze commit, complete byte/mode/kind authority, canonical freeze output, unqualified support, absent E/entries and real IN1 before observation. |
+| ON2 split | `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` authenticates the real reporting freeze, its context and IN1. Its extra-edit candidate is execution-required. `public_on2_connected_freeze_write_admission_and_observation` executes the real implementation writer and IN1. |
+| ON2 acquisition boundary | Existing FR2 `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` preserves the protected parent's OF-P4 statement/acquisition. `public_on2_in1_requires_parent_acquisition_and_intact_binding` refuses same-candidate acquisition/statement substitution. |
+| Freeze retries | Both connected freeze tests execute `fr3_reporting::after`, including attempt 1, independently emitted/admitted retry and the maintenance retry after execution-required admission. `every_retry_is_authenticated_and_wrong_attempt_commitment_refuses` covers retained retry transport. |
+| Other PRs/events | Both connected freeze tests emit contexts on pull_request, merge_group, workflow_dispatch and push, including distinct PR numbers. `prove_reporting` consumes the full population in both listing orders. `onboarding_same_generation_later_runs_wait_for_producer_not_workflow` retains execution attempts across events. |
+| Only checkpoints | Both connected freeze tests use `prove_reporting` to assert no execution receipts, empty support selection, the complete reporting-attempt count and an unverified verdict. |
+| Source-approval timing | Both connected freeze tests execute `approve_source` through real IN1 after execution S exists, then verify the retained original run against identical protected S. `publication_closure` checks complete freeze closure and byte-stable publication. Real ON3–ON5 writer closure is deferred to slices 6–9 because those writers connect there. |
+| Noncircular ordering | Both connected freeze tests run collection before their own admission and assert that no earlier IN1 references the new context. History refuses the context until its later IN1. `onboarding_reuses_canonical_collection_and_has_no_packet_admission_invocation` retains the ordinary collector boundary. |
+
+| Refusal | Executing tests and bounded refusal |
+| --- | --- |
+| Forged authority | `refuses_candidate_json_same_name_wrong_job_attempt_and_missing_publication`, `same_run_wrong_job_artifact_with_valid_digest_and_copied_commitment_refuses` and both connected freeze tests' `refusals` cover candidate copies, wrong job/attempt, substituted context and source/workflow claims. Canonical binding matrix rejects wrong agent/version/Event/P/O. |
+| Implementation hidden in freeze | `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1`, `fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1` and `complete_tree_equality_includes_bytes_modes_kinds_presence_and_preserved_paths` cover source/dependency/build/workflow and other extra bytes. `freeze_after_readiness` checks execution-required classification through real IN1. |
+| Extra change in combined MA2 | Existing FR2 `fr2_ma2_combined_acquisition_and_freeze_real_in1` checks unrelated edits, schema-valid changed authenticated metadata/lockfile bytes, missing authority, inventory, modes and kinds through real acquisition/classification/IN1. |
+| Failure before readiness | `onboarding_same_generation_later_runs_wait_for_producer_not_workflow`, `nonterminal_aborted_or_failed_producer_steps_never_verify`, `missing_attempt_or_wrong_job_or_artifact_digest_refuses` and `native_complete_population_preserves_counterexamples_and_later_missing_attempts` retain adverse/missing earlier executions despite later success. |
+| Backward progression | `public_on2_connected_freeze_write_admission_and_observation` executes `prove_unobserved_admission`, covering a higher-stage admitted ancestor with no producer, both API orders and another PR. `onboarding_producer_refuses_descendant_lifecycle_rollback_in_either_api_order` retains observed-source progression. The genuine MA2 test executes `freeze_after_readiness` and refuses reopened reporting on another PR in both orders. |
+| Changed actual checkout | Both connected freeze tests execute `checkout_relationships` and `dirty_checkout_and_pinned_context`, covering changed checkout/tree/base, reversed parents, genuine identical-tree PR merges and hidden worktree edits. |
+| Changed dispatch/workflow context | Both connected freeze tests' `refusals` and checkout matrix authenticate dispatch/configuration, workflow policy and invocation independently. Changed substantive mode cannot inherit reporting classification. |
+| Unexpected substantive execution | Both connected freeze tests execute `unexpected_execution` through real population discovery and the evaluator for passing and failing checkpoint execution. `reporting_checkpoint_substantive_pass_and_failure_remain_conflicts_and_counterexamples` preserves zero-credit passes, failed counterexamples and conflicts. |
+| Failed reporting producer | Both connected freeze tests mutate authenticated producer job conclusion and require `failed reporting producer or incomplete collection`. Their transport matrix covers cancelled/nonterminal jobs, incomplete outcome and missing publication. |
+| Historical execution closure | Both connected freeze tests retain S1 while independently current collector S2 causes `producer closure is not approved on protected staging`. `onboarding_genuine_freeze_attempt_remains_applicable_and_blocks_later_proof` retains its original execution-source mismatch assertion. |
+| Missing/conflicting authority | Both connected freeze tests remove/revoke later exact-context IN1 and require `reporting context lacks later exact-transition IN1 admission`. `history_deficiency_quarantines_while_object_and_input_mismatches_refuse`, `retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs`, `roots_and_populations_are_rechecked_after_history_and_at_consumption` and the FR1 history suite cover missing/conflicting/incomplete/object/root authority. |
+| Population incompleteness | `missing_attempt_or_wrong_job_or_artifact_digest_refuses`, `pagination_detects_truncation_duplicates_and_saturation`, `onboarding_same_generation_later_runs_wait_for_producer_not_workflow`, `each_host_stream_and_control_bound_overflow_refuses`, `host_pagination_accepts_the_run_bound_and_refuses_gaps_duplicates_and_page_overflow`, and `unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation` cover missing attempts/artifacts, unstable totals, duplicates, gaps, unsupported events and bounds. |
+| Contradictory execution | `all_attempts_drive_verdict_even_when_e_selected_receipt_passes`, `complete_population_prevents_selecting_only_the_green_attempt`, `reporting_checkpoint_substantive_pass_and_failure_remain_conflicts_and_counterexamples` and both connected tests' substantive matrix retain pass/fail conflicts and counterexamples across retries/PRs. |
+| Flow separation and scope | `onboarding_refuses_cross_event_population_and_independent_adoption_mismatch` resolves both real populations and rejects cross-flow use in both directions. `core_authenticated_bridge_evaluates_all_due_and_preserves_production_refusal`, `bootstrap_route_absence_keeps_production_depth_refusal` and `synthetic_requires_the_authenticated_isolated_binding` preserve scope and public refusal. |
+
+Additional FR1–FR3 rows remain covered by the retained FR1/FR2 report inventories. FR3b adds the
+explicit request/report two-direction matrix, malformed/unsupported/stale/ambiguous binding,
+associated removal/replacement, unrelated heads, fixture independence, identity agreement and
+`unavailable_canonical_report_never_becomes_unrelated_absence`. `generation_association_follows_unadmitted_descendants_and_stops_at_a_complete_new_generation`
+checks inherited association and the newer-generation boundary through real history resolution.
+The FR1 `history_deficient_admissions_cannot_grant_frontier_progression_or_transition_history`
+regression also checks that quarantined transitions leave complete predecessor association intact.
+The connected MA2 population's `associated_descendants` removes or coherently replaces both records
+on an unadmitted descendant on another PR and requires the bounded association refusal.
+
+### Validation
+
+Logs are ignored artifacts under `target/fr3b-validation/`. Cargo uses `env -u TMPDIR`.
+Final test groups use two or four test threads to bound temporary storage pressure. The FR3
+filter executes the genuine MA2 chain. The ON2 extension runs in the bootstrap group.
+
+| Command | Final result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_ci` | 7 passed | 0.00 s |
+| `cargo test -p xtask --lib depth_acceptance` | 89 passed | 54.54 s |
+| `cargo test -p xtask --lib depth_evidence` | 94 passed, 12 environment failures, 1 existing ignored | 108.77 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::in1_integration` | 35 passed, 4 socket-blocked | 67.15 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr3_reporting` | 1 connected proof passed | 226.76 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | 3 passed, including combined acquisition/freeze | 169.86 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 62 passed, including extended ON2 proof | 270.57 s |
+| `cargo test -p xtask --lib freeze_transition` | 7 passed | 0.00 s |
+| `make loc-check` | Pass, every Rust file within 700 code lines | — |
+| `make hygiene` | Pass | — |
+| `git diff --check` | Pass | — |
+
+The sixteen environment-dependent cases match FR3a's categories. Ten depth-evidence MA4 channel
+cases require Unix sockets prohibited by this sandbox, including one dependent forged-channel
+assertion that reports `fake never bound`. Two native local-guard cases report `ForeignLoader`
+from managed ancestor loader directories. Four connected IN1 closeout/population cases also fail
+at channel creation with `Operation not permitted`. Their dependent assertions remain unverified
+and need an unrestricted environment. The existing ignored subprocess entry remains ignored.
+
+Initial parallel runs exhausted the temporary filesystem and caused unrelated file-write/Git
+failures. A temporary worktree-local TMPDIR exposed Cargo ancestor-workspace discovery in existing
+standalone producer fixtures. Returning to the normal temporary root with bounded concurrency
+recovered those failures. A test-module relocation exposed repository-copy fixtures that require
+every tracked path to remain readable before the lead commits. Its source path is preserved and
+the test is mounted under the FR3 module. The existing commit-bound test moved into the lineage
+suite to retain the 700-code-line cap, and now checks the shared 1,000-commit bound across retained
+history and newly associated ancestry. Known authenticated parents are reused during association.
+
+All FR3b binding/refusal, real-writer, source-timing and publication-closure proofs pass. The final
+MA2 proof includes retained-admission ancestry association for removed and coherently replaced
+records on another PR. Annex A and the binding rule are updated. Source changes remain confined
+to the worktree and uncommitted for the lead. Real ON3–ON5 writer closure proofs remain in slices
+6–9, and deployed host qualification remains phase C.

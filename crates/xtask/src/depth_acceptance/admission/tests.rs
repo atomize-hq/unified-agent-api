@@ -442,56 +442,6 @@ fn every_retry_is_authenticated_and_wrong_attempt_commitment_refuses() {
 }
 
 #[test]
-fn unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation() {
-    use std::{io::Write, process::Stdio};
-    let root = tempfile::tempdir().unwrap();
-    git(
-        root.path(),
-        &[
-            "clone",
-            "--quiet",
-            "--no-hardlinks",
-            fixture().root.path().to_str().unwrap(),
-            ".",
-        ],
-    );
-    let anchor = &fixture().publication.authority.anchor.commit;
-    let mut stream = Vec::new();
-    for index in 1..=1000 {
-        let parent = if index == 1 {
-            anchor.clone()
-        } else {
-            format!(":{}", index - 1)
-        };
-        let message = format!("bounded history {index}\n");
-        stream.extend_from_slice(format!("commit refs/heads/bound\nmark :{index}\ncommitter Fixture <fixture@example.invalid> {index} +0000\ndata {}\n{message}from {parent}\n\n",message.len()).as_bytes());
-    }
-    let mut import = crate::git_inputs::command(root.path())
-        .args(["fast-import", "--quiet"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .spawn()
-        .unwrap();
-    import.stdin.take().unwrap().write_all(&stream).unwrap();
-    assert!(import.wait().unwrap().success());
-    let tip = git(root.path(), &["rev-parse", "refs/heads/bound"]);
-    let at_limit = git(root.path(), &["rev-parse", "refs/heads/bound^"]);
-    history::resolve(
-        root.path(),
-        &fixture().publication.authority,
-        &[],
-        &[at_limit],
-    )
-    .unwrap();
-    assert!(
-        history::resolve(root.path(), &fixture().publication.authority, &[], &[tip])
-            .err()
-            .unwrap()
-            .contains("unique commit traversal bound")
-    );
-}
-
-#[test]
 fn verifies_raw_object_hashes_and_traverses_second_parent_to_the_anchor() {
     let root = tempfile::tempdir().unwrap();
     git(

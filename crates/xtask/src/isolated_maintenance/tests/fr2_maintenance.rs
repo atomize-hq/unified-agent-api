@@ -345,5 +345,3 @@ fn intervening_handoff_mode_change(
 }
 
 mod pinning;
-
-mod reporting;

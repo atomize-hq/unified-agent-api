@@ -12,6 +12,46 @@ struct Lineage {
     depth: DepthRecord,
     enrolled: Record,
 }
+
+#[test]
+fn generation_association_follows_unadmitted_descendants_and_stops_at_a_complete_new_generation() {
+    let mut f = Lineage::new();
+    let old = Generation::from_record(&f.depth);
+    let removed = f.commit(LifecycleStage::Enrolled, "unadmitted descendant");
+    let history = f
+        .publication
+        .resolve(f.root.path(), &[f.enrolled.candidate.commit.clone()])
+        .unwrap();
+    assert!(history
+        .associates_generation(f.root.path(), &removed, &old)
+        .unwrap());
+    if let crate::depth_record::Event::Maintenance { request_commit, .. } = &mut f.depth.event {
+        *request_commit = "a".repeat(40);
+    }
+    std::fs::write(
+        f.root.path().join(DEPTH),
+        serde_json::to_vec_pretty(&f.depth).unwrap(),
+    )
+    .unwrap();
+    let next = f.commit(
+        LifecycleStage::Enrolled,
+        "independently admitted new generation",
+    );
+    f.admit(&next, &f.enrolled);
+    f.host.root(&next);
+    let descendant = f.commit(LifecycleStage::Enrolled, "new generation descendant");
+    let history = f.publication.resolve(f.root.path(), &[next]).unwrap();
+    assert!(!history
+        .associates_generation(f.root.path(), &descendant, &old)
+        .unwrap());
+    assert!(history
+        .associates_generation(
+            f.root.path(),
+            &descendant,
+            &Generation::from_record(&f.depth)
+        )
+        .unwrap());
+}
 impl Lineage {
     fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
@@ -445,6 +485,14 @@ fn history_deficient_admissions_cannot_grant_frontier_progression_or_transition_
         vec![f.enrolled.identity().unwrap()]
     );
     let generation = Generation::from_record(&f.depth);
+    // The quarantined higher-stage decision supplies no association authority of its own.
+    // Its complete enrolled predecessor still associates this descendant with the generation.
+    assert!(history
+        .associates_generation(f.root.path(), &higher, &generation)
+        .unwrap());
+    assert!(history
+        .associates_generation(f.root.path(), &f.enrolled.candidate.commit, &generation)
+        .unwrap());
     history
         .check_progression(&later, &generation, LifecycleStage::Enrolled)
         .unwrap();
@@ -481,4 +529,68 @@ fn history_deficient_admissions_cannot_grant_frontier_progression_or_transition_
             std::slice::from_ref(&f.enrolled.candidate.commit)
         )
         .is_err());
+}
+
+#[test]
+fn unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation() {
+    use std::{io::Write, process::Stdio};
+    let root = tempfile::tempdir().unwrap();
+    git(
+        root.path(),
+        &[
+            "clone",
+            "--quiet",
+            "--no-hardlinks",
+            fixture().root.path().to_str().unwrap(),
+            ".",
+        ],
+    );
+    let anchor = &fixture().publication.authority.anchor.commit;
+    let mut stream = Vec::new();
+    for index in 1..=1000 {
+        let parent = if index == 1 {
+            anchor.clone()
+        } else {
+            format!(":{}", index - 1)
+        };
+        let message = format!("bounded history {index}\n");
+        stream.extend_from_slice(format!("commit refs/heads/bound\nmark :{index}\ncommitter Fixture <fixture@example.invalid> {index} +0000\ndata {}\n{message}from {parent}\n\n",message.len()).as_bytes());
+    }
+    let mut import = crate::git_inputs::command(root.path())
+        .args(["fast-import", "--quiet"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()
+        .unwrap();
+    import.stdin.take().unwrap().write_all(&stream).unwrap();
+    assert!(import.wait().unwrap().success());
+    let tip = git(root.path(), &["rev-parse", "refs/heads/bound"]);
+    let at_limit = git(root.path(), &["rev-parse", "refs/heads/bound^"]);
+    let bounded = history::resolve(
+        root.path(),
+        &fixture().publication.authority,
+        &[],
+        std::slice::from_ref(&at_limit),
+    )
+    .unwrap();
+    let depth = crate::depth_ci::profile::Profile::Synthetic
+        .record(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/depth-synthetic/record.json"
+        )))
+        .unwrap();
+    let generation = Generation::from_record(&depth);
+    assert!(!bounded
+        .associates_generation(root.path(), &at_limit, &generation)
+        .unwrap());
+    assert!(bounded
+        .associates_generation(root.path(), &tip, &generation)
+        .unwrap_err()
+        .contains("unique commit traversal bound"));
+    assert!(
+        history::resolve(root.path(), &fixture().publication.authority, &[], &[tip])
+            .err()
+            .unwrap()
+            .contains("unique commit traversal bound")
+    );
 }

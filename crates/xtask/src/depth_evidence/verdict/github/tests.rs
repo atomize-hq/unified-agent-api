@@ -1,4 +1,5 @@
 use super::*;
+mod generation;
 use crate::depth_evidence::payload::{DependencyGraph, Environment, Variable};
 use crate::depth_evidence::{CaseIdentity, CaseOutcome, CaseResult, ProvenanceKind};
 use std::{collections::BTreeMap, fs, process::Command};
@@ -48,20 +49,21 @@ impl Fake {
     }
 }
 fn git(root: &Path, args: &[&str]) -> String {
-    String::from_utf8(
-        depth_ci::output(
-            Command::new("git")
-                .arg("--no-replace-objects")
-                .arg("-C")
-                .arg(root)
-                .args(args),
-        )
-        .unwrap(),
-    )
-    .unwrap()
-    .trim()
-    .into()
+    let output = Command::new("git")
+        .arg("--no-replace-objects")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap().trim().into()
 }
+
 fn write(root: &Path, path: &str, bytes: impl AsRef<[u8]>) -> FileRef {
     let file = root.join(path);
     fs::create_dir_all(file.parent().unwrap()).unwrap();

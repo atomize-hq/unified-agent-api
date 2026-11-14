@@ -1,5 +1,12 @@
 //! Genuine MA2 with a complete original request commit for the population proof.
 use super::*;
+use crate::{
+    agent_maintenance::prepare::{apply_prepare_plan, build_prepare_plan},
+    depth_acceptance::admission::{
+        freeze::authority::{Observation, Writer},
+        Checkpoint, Generation,
+    },
+};
 
 #[test]
 fn fr3_reporting_context_real_ma2_and_later_execution_population() {
@@ -26,6 +33,17 @@ fn fr3_reporting_context_real_ma2_and_later_execution_population() {
         "0.2.0",
     )
     .unwrap();
+    let expected: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../tests/fixtures/fr2-canonical/ma2/cli_manifests/depth_fixture/reports/0.2.0/depth-record.json"
+    )).unwrap();
+    assert_eq!(
+        serde_json::to_value(&record.policy).unwrap(),
+        expected["policy"]
+    );
+    assert_eq!(
+        serde_json::to_value(&record.obligations).unwrap(),
+        expected["obligations"]
+    );
     let observation = Observation {
         repository: publication.authority.repository.clone(),
         predecessor: admission::emitter::object(root, &parent).unwrap(),
