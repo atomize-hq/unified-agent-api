@@ -24,7 +24,7 @@ fn borrowed_single_reads_share_objects_and_recheck_working_files() {
             Some(format!("bytes {i}\0\n").into_bytes())
         );
     }
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 2);
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 3);
     fs::write(scratch.path().join("file-0"), "changed").unwrap();
     fs::remove_file(scratch.path().join("file-1")).unwrap();
     fs::remove_file(scratch.path().join("file-2")).unwrap();

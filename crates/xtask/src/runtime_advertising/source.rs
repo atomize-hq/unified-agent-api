@@ -425,7 +425,7 @@ mod captured_tests {
         assert_eq!(source.committed_files("scope").unwrap().len(), 64);
         assert_eq!(
             crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.get()),
-            2
+            3
         );
     }
     #[test]

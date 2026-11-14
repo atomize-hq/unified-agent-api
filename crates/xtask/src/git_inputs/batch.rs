@@ -1,50 +1,120 @@
 use super::*;
 
-/// Stream one path and blob at a time, reusing the entry listing and cat-file child. This
-/// bounds additional payload memory to one working file plus one blob, including files larger
-/// than any fixed chunk budget, without imposing an input size limit. Consumers compare and
-/// record each result before requesting the next, preserving per-path error precedence.
-pub(super) fn read_many(
-    root: &Path,
-    paths: &[&str],
-    borrowed: Option<&(PathBuf, String)>,
-) -> impl Iterator<Item = Result<Input, String>> {
-    let root = root.to_owned();
-    let borrowed = borrowed.cloned();
-    let paths: Vec<_> = paths.iter().map(|path| (*path).to_owned()).collect();
-    let mut entries = None;
-    let object_root = borrowed
-        .as_ref()
-        .map_or(root.as_path(), |(caller, _)| caller.as_path());
-    let mut blobs = immutable::BlobReader::new(object_root);
-    paths.into_iter().map(move |path| {
-        let full = safe_path(&root, &path)?;
-        let entries = entries.get_or_insert_with(|| load_entries(&root, borrowed.as_ref()));
-        let entries = match entries {
-            Ok(entries) => entries,
-            // Recursive listings can fail on unrelated unavailable subtrees. Unsorted and
-            // duplicate tree entries also need Git's original bounded pathspec walk.
-            Err(_) => return read(&root, &path, borrowed.as_ref()),
-        };
-        let mut index = entries.get(path.as_bytes()).cloned().unwrap_or_default();
-        if borrowed.is_none() {
-            // Literal ls-files pathspecs include descendants of a requested directory.
-            let prefix = format!("{path}/").into_bytes();
-            for (_, rows) in entries
-                .range(prefix.clone()..)
-                .take_while(|(p, _)| p.starts_with(&prefix))
-            {
-                index.extend(rows);
-            }
+type Entries = BTreeMap<Vec<u8>, Vec<u8>>;
+
+/// One operation owns one index snapshot and one streaming child, including recursive walks.
+/// Only the current working file and blob are buffered; no payload cache is retained.
+pub(super) struct Session<'a> {
+    root: &'a Path,
+    borrowed: Option<&'a (PathBuf, String)>,
+    entries: std::sync::OnceLock<Result<Entries, String>>,
+    blobs: immutable::BlobReader,
+    objects: BTreeSet<String>,
+    read_objects: Vec<String>,
+}
+
+impl<'a> Session<'a> {
+    pub(super) fn new(root: &'a Path, borrowed: Option<&'a (PathBuf, String)>) -> Self {
+        Self {
+            root,
+            borrowed,
+            entries: std::sync::OnceLock::new(),
+            blobs: immutable::BlobReader::new(borrowed.map_or(root, |(caller, _)| caller)),
+            objects: BTreeSet::new(),
+            read_objects: Vec::new(),
         }
-        let (input, object) = prepare(&full, &path, index, borrowed.is_some())?;
+    }
+
+    fn entries(&self) -> Result<&Entries, &String> {
+        self.entries
+            .get_or_init(|| load_entries(self.root, self.borrowed))
+            .as_ref()
+    }
+
+    pub(super) fn listing(&self) -> listing::Listing {
+        if self.borrowed.is_some() {
+            return listing::Listing::default();
+        }
+        listing::Listing::from_paths(
+            self.entries()
+                .ok()
+                .map(|entries| entries.keys().cloned().collect()),
+        )
+    }
+
+    pub(super) fn read(&mut self, path: &str) -> Result<Input, String> {
+        let full = safe_path(self.root, path)?;
+        let entries = match self.entries() {
+            Ok(entries) => entries,
+            // Unavailable unrelated subtrees and malformed tree ordering require Git's
+            // original bounded pathspec walk, preserving its results and diagnostics.
+            Err(_) => return read(self.root, path, self.borrowed),
+        };
+        let index = entry(entries, path, self.borrowed.is_some());
+        let (input, object) = prepare(&full, path, index, self.borrowed.is_some())?;
         if let Some(object) = object {
-            if input.bytes.as_ref() != Some(&blobs.read(&object)?) {
+            if input.bytes.as_ref() != Some(&self.blobs.read(&object)?) {
                 return Err(format!("working bytes disagree with index: {path}"));
+            }
+            if self.objects.insert(object.clone()) {
+                self.read_objects.push(object);
             }
         }
         Ok(input)
-    })
+    }
+
+    /// Capture the ending stage/mode/object/path snapshot only after all filesystem checks.
+    pub(super) fn finish_index(
+        &self,
+        files: &BTreeMap<String, Input>,
+    ) -> Result<(listing::Listing, bool), String> {
+        if self.borrowed.is_some() {
+            return Ok((listing::Listing::default(), false));
+        }
+        let end = load_entries(self.root, None)?;
+        let start = self.entries().map_err(Clone::clone)?;
+        for path in files.keys() {
+            if entry(start, path, false) != entry(&end, path, false) {
+                return Err(format!("bound input changed during freeze: {path}"));
+            }
+        }
+        let changed = start != &end;
+        Ok((
+            listing::Listing::from_paths(Some(end.into_keys().collect())),
+            changed,
+        ))
+    }
+
+    pub(super) fn check_objects(&self) -> Result<(), String> {
+        let root = self.borrowed.map_or(self.root, |(caller, _)| caller);
+        immutable::check_blobs(root, &self.read_objects)
+    }
+}
+
+fn entry(entries: &Entries, path: &str, borrowed: bool) -> Vec<u8> {
+    let mut index = entries.get(path.as_bytes()).cloned().unwrap_or_default();
+    if !borrowed {
+        // Literal ls-files pathspecs include descendants of a requested directory.
+        let prefix = format!("{path}/").into_bytes();
+        for (_, rows) in entries
+            .range(prefix.clone()..)
+            .take_while(|(p, _)| p.starts_with(&prefix))
+        {
+            index.extend(rows);
+        }
+    }
+    index
+}
+
+#[cfg(test)]
+pub(super) fn read_many<'a>(
+    root: &'a Path,
+    paths: &[&str],
+    borrowed: Option<&'a (PathBuf, String)>,
+) -> impl Iterator<Item = Result<Input, String>> + 'a {
+    let mut session = Session::new(root, borrowed);
+    let paths: Vec<_> = paths.iter().map(|path| (*path).to_owned()).collect();
+    paths.into_iter().map(move |path| session.read(&path))
 }
 
 fn load_entries(

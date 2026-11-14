@@ -328,3 +328,32 @@ fn warm_immutable_reads_observe_removed_and_corrupt_blobs() {
         );
     }
 }
+
+#[test]
+fn warm_immutable_reads_observe_removed_packed_blobs() {
+    let root = fixture();
+    let cached = Source::tip(root.path(), "HEAD").unwrap();
+    let mut single = cached.clone();
+    single.immutable = None;
+    let object = single.git(&["rev-parse", "HEAD:bound"]).unwrap();
+    let mut pack = crate::git_inputs::command(root.path())
+        .args(["pack-objects", ".git/objects/pack/pack"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()
+        .unwrap();
+    pack.stdin
+        .take()
+        .unwrap()
+        .write_all(object.as_bytes())
+        .unwrap();
+    assert!(pack.wait().unwrap().success());
+    single.git(&["prune-packed"]).unwrap();
+    assert_eq!(cached.read("bound").unwrap(), "regular");
+    for entry in fs::read_dir(root.path().join(".git/objects/pack")).unwrap() {
+        fs::remove_file(entry.unwrap().path()).unwrap();
+    }
+    let expected = single.optional_bytes("bound");
+    assert!(expected.is_err());
+    assert_eq!(cached.optional_bytes("bound"), expected);
+}

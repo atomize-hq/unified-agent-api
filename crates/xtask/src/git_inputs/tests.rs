@@ -11,6 +11,21 @@ type DirectoryHook = (String, Box<dyn FnOnce()>);
 thread_local! {
     pub(crate) static GIT_COMMANDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     static DIRECTORY_HOOK: std::cell::RefCell<Option<DirectoryHook>> = const { std::cell::RefCell::new(None) };
+    static FILE_HOOK: std::cell::RefCell<Option<DirectoryHook>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(super) fn file_observed(path: &str) {
+    let hook = FILE_HOOK.with(|hook| {
+        let mut hook = hook.borrow_mut();
+        if hook.as_ref().is_some_and(|(expected, _)| expected == path) {
+            hook.take()
+        } else {
+            None
+        }
+    });
+    if let Some((_, run)) = hook {
+        run();
+    }
 }
 
 pub(super) fn directory_observed(path: &str) {
@@ -129,7 +144,7 @@ fn files_under_preserves_freeze_recording_proposals_and_error_order() {
     let frozen = equivalent_traversal(&view);
     GIT_COMMANDS.with(|count| count.set(0));
     frozen.verify().unwrap();
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 4); // Entry listing, blob child, two directory snapshots.
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 5); // Two stage snapshots, object-directory resolution, blob child, fresh object check.
     let mut proposed = view.clone();
     proposed.proposed = Some(
         crate::runtime_advertising::source::Source::captured(
@@ -171,10 +186,10 @@ fn files_under_batches_direct_files_and_verify_batches_all_files() {
     let mut view = GitInputs::new(root.path()).unwrap();
     GIT_COMMANDS.with(|count| count.set(0));
     assert_eq!(view.files_under("scope").unwrap().len(), 64);
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 4);
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 5);
     GIT_COMMANDS.with(|count| count.set(0));
     view.verify().unwrap();
-    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 4);
+    assert_eq!(GIT_COMMANDS.with(|count| count.get()), 5);
     fs::write(root.path().join("scope/extra"), "untracked").unwrap();
     assert_eq!(
         view.verify(),

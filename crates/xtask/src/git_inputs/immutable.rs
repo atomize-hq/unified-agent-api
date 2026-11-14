@@ -27,6 +27,7 @@ pub(super) struct Index {
 pub(super) struct BlobReader {
     root: PathBuf,
     batch: Option<Batch>,
+    packs: Option<Result<super::packed::Packs, String>>,
 }
 
 struct Batch {
@@ -167,16 +168,43 @@ impl BlobReader {
         Self {
             root: root.to_owned(),
             batch: None,
+            packs: None,
         }
     }
 
     pub(super) fn read(&mut self, object: &str) -> Result<Vec<u8>, String> {
+        let packs = self
+            .packs
+            .get_or_insert_with(|| super::packed::Packs::new(&self.root));
+        match packs
+            .as_mut()
+            .map_err(|e| e.clone())
+            .and_then(|packs| packs.changed())
+        {
+            Ok(true) => self.batch = None,
+            Ok(false) => {}
+            Err(_) => {
+                self.batch = None;
+                return git(&self.root, &["cat-file", "blob", object]);
+            }
+        }
         let result = (|| {
             if self.batch.is_none() {
                 self.batch = Some(Batch::new(&self.root)?);
             }
             self.batch.as_mut().ok_or("missing Git batch")?.read(object)
         })();
+        // Recheck after the response as well: a pack can disappear while the child serves
+        // the request. A fresh command preserves the original availability diagnostics.
+        let changed = self
+            .packs
+            .as_mut()
+            .and_then(|packs| packs.as_mut().ok())
+            .and_then(|packs| packs.changed().ok());
+        if changed != Some(false) {
+            self.batch = None;
+            return git(&self.root, &["cat-file", "blob", object]);
+        }
         match result {
             Ok(bytes) => Ok(bytes),
             Err(_) => {
@@ -189,10 +217,44 @@ impl BlobReader {
     }
 }
 
+/// A fresh process cannot serve objects from a pack mapping retained by the read child.
+/// Stream requests and replies together so neither pipe can fill on large input closures.
+pub(super) fn check_blobs(root: &Path, objects: &[String]) -> Result<(), String> {
+    if objects.is_empty() {
+        return Ok(());
+    }
+    let mut batch = Batch::with_mode(root, "--batch-check")?;
+    for object in objects {
+        let checked = (|| -> Result<bool, String> {
+            writeln!(batch.stdin, "{object}").map_err(|e| e.to_string())?;
+            batch.stdin.flush().map_err(|e| e.to_string())?;
+            let mut header = String::new();
+            batch
+                .stdout
+                .read_line(&mut header)
+                .map_err(|e| e.to_string())?;
+            let fields: Vec<_> = header.trim_end().split(' ').collect();
+            Ok(fields.len() == 3
+                && fields[0] == object
+                && fields[1] == "blob"
+                && fields[2].parse::<usize>().is_ok())
+        })();
+        if !matches!(checked, Ok(true)) {
+            // Use the original conversion/error path for missing and non-blob objects.
+            git(root, &["cat-file", "blob", object])?;
+        }
+    }
+    Ok(())
+}
+
 impl Batch {
     fn new(root: &Path) -> Result<Self, String> {
+        Self::with_mode(root, "--batch")
+    }
+
+    fn with_mode(root: &Path, mode: &str) -> Result<Self, String> {
         let mut child = command(root)
-            .args(["--literal-pathspecs", "cat-file", "--batch"])
+            .args(["--literal-pathspecs", "cat-file", mode])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

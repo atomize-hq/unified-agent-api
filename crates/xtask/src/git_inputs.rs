@@ -11,6 +11,7 @@ use std::{
 mod batch;
 pub(crate) mod immutable;
 mod listing;
+mod packed;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Input {
@@ -194,14 +195,20 @@ impl GitInputs {
     /// Observe every file and directory in a relevant build scope, including untracked additions.
     pub(crate) fn files_under(&mut self, path: &str) -> Result<Vec<String>, String> {
         safe_path(&self.root, path)?;
-        let start = listing::Listing::snapshot(&self.root, self.borrowed.is_some());
+        let root = self.root.clone();
+        let borrowed = self.borrowed.clone();
+        let mut session = batch::Session::new(&root, borrowed.as_ref());
+        let start = session.listing();
         let mut observed = Vec::new();
-        let result = self.files_under_listing(path, &start, &mut observed)?;
+        let result = self.files_under_listing(path, &start, &mut observed, &mut session)?;
         listing::verify(
             &self.root,
             self.borrowed.as_ref(),
+            &self.files,
             &self.directories,
             observed,
+            &session,
+            &start,
         )?;
         Ok(result)
     }
@@ -211,6 +218,7 @@ impl GitInputs {
         path: &str,
         listing: &listing::Listing,
         observed: &mut Vec<(String, Result<Vec<String>, String>)>,
+        session: &mut batch::Session<'_>,
     ) -> Result<Vec<String>, String> {
         let names = list_cached(&self.root, path, self.borrowed.as_ref(), Some(listing))?;
         observed.push((path.to_owned(), Ok(names.clone())));
@@ -224,26 +232,21 @@ impl GitInputs {
                 (child, directory)
             })
             .collect();
-        let paths: Vec<_> = children
-            .iter()
-            .filter(|(child, directory)| {
-                matches!(directory, Ok(false))
-                    && !(self.proposed.is_some() && self.files.contains_key(child))
-            })
-            .map(|(child, _)| child.as_str())
-            .collect();
-        let binding = if self.proposed.is_none() && !paths.is_empty() {
+        let binding = if self.proposed.is_none()
+            && children
+                .iter()
+                .any(|(_, directory)| matches!(directory, Ok(false)))
+        {
             self.recheck_borrowed()
         } else {
             Ok(())
         };
         // Refuse reads through a stale binding, consuming its error at the original optional
         // boundary so an earlier directory or path-validation failure retains precedence.
-        let mut inputs = batch::read_many(&self.root, &paths, self.borrowed.as_ref());
         let mut result = Vec::new();
         for (child, directory) in children {
             if directory? {
-                result.extend(self.files_under_listing(&child, listing, observed)?);
+                result.extend(self.files_under_listing(&child, listing, observed, session)?);
             } else {
                 let bytes = if self.proposed.is_some() && self.files.contains_key(&child) {
                     self.files[&child].bytes.clone()
@@ -252,7 +255,7 @@ impl GitInputs {
                     if self.proposed.is_none() {
                         self.recheck_borrowed()?;
                     }
-                    self.record(&child, inputs.next().ok_or("missing batch input")??)?
+                    self.record(&child, session.read(&child)?)?
                 };
                 bytes.ok_or_else(|| format!("missing bound input: {child}"))?;
                 result.push(child);
@@ -284,17 +287,14 @@ impl GitInputs {
 
     pub(crate) fn verify(&self) -> Result<(), String> {
         self.recheck_borrowed()?;
-        let start = if self.directories.is_empty() {
-            listing::Listing::default()
-        } else {
-            listing::Listing::snapshot(&self.root, self.borrowed.is_some())
-        };
-        let paths: Vec<_> = self.files.keys().map(String::as_str).collect();
-        let inputs = batch::read_many(&self.root, &paths, self.borrowed.as_ref());
-        for ((path, expected), input) in self.files.iter().zip(inputs) {
-            if input? != *expected {
+        let mut session = batch::Session::new(&self.root, self.borrowed.as_ref());
+        let start = session.listing();
+        for (path, expected) in &self.files {
+            if session.read(path)? != *expected {
                 return Err(format!("bound input changed during freeze: {path}"));
             }
+            #[cfg(test)]
+            tests::file_observed(path);
         }
         let observed = self
             .directories
@@ -309,8 +309,11 @@ impl GitInputs {
         listing::verify(
             &self.root,
             self.borrowed.as_ref(),
+            &self.files,
             &self.directories,
             observed,
+            &session,
+            &start,
         )?;
         self.recheck_borrowed()?;
         Ok(())
@@ -464,6 +467,15 @@ fn list_cached(
     borrowed: Option<&(PathBuf, String)>,
     listing: Option<&listing::Listing>,
 ) -> Result<Vec<String>, String> {
+    list_observed(root, path, borrowed, listing).map(|(names, _)| names)
+}
+
+fn list_observed(
+    root: &Path,
+    path: &str,
+    borrowed: Option<&(PathBuf, String)>,
+    listing: Option<&listing::Listing>,
+) -> Result<(Vec<String>, BTreeSet<String>), String> {
     let full = safe_path(root, path)?;
     let mut names = BTreeSet::new();
     match fs::read_dir(full) {
@@ -481,6 +493,7 @@ fn list_cached(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(format!("{path}: {e}")),
     }
+    let working_names = names.clone();
     let prefix = format!("{path}/");
     let tracked = if let Some((caller, commit)) = borrowed {
         git(
@@ -504,14 +517,23 @@ fn list_cached(
             &["--literal-pathspecs", "ls-files", "-z", "--", &prefix],
         )?
     };
-    for file in tracked.split(|b| *b == 0).filter(|b| !b.is_empty()) {
-        let file = std::str::from_utf8(file).map_err(|e| e.to_string())?;
-        let tail = file.strip_prefix(&prefix).ok_or("unexpected Git path")?;
-        names.insert(tail.split('/').next().ok_or("empty Git path")?.to_string());
-    }
+    extend_tracked_names(&mut names, &tracked, &prefix)?;
     #[cfg(test)]
     tests::directory_observed(path);
-    Ok(names.into_iter().collect())
+    Ok((names.into_iter().collect(), working_names))
+}
+
+fn extend_tracked_names(
+    names: &mut BTreeSet<String>,
+    tracked: &[u8],
+    prefix: &str,
+) -> Result<(), String> {
+    for file in tracked.split(|b| *b == 0).filter(|b| !b.is_empty()) {
+        let file = std::str::from_utf8(file).map_err(|e| e.to_string())?;
+        let tail = file.strip_prefix(prefix).ok_or("unexpected Git path")?;
+        names.insert(tail.split('/').next().ok_or("empty Git path")?.to_string());
+    }
+    Ok(())
 }
 
 /// Git state belongs to the explicit root, never an inherited index/object/worktree redirect.

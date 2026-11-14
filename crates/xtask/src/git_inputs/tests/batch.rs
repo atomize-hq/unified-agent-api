@@ -184,7 +184,7 @@ fn batch_uses_constant_git_processes() {
         assert!(read_many(root.path(), &paths, borrowed)
             .iter()
             .all(Result::is_ok));
-        assert_eq!(GIT_COMMANDS.with(|count| count.get()), 2);
+        assert_eq!(GIT_COMMANDS.with(|count| count.get()), 3);
     }
 }
 
