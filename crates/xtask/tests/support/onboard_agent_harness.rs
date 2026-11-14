@@ -23,6 +23,35 @@ pub struct HarnessOutput {
     pub stderr: String,
 }
 
+/// Keeps child-owned recovery copies alive through assertions, then removes them.
+#[derive(Debug)]
+pub struct CandidateOutput {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub temp: tempfile::TempDir,
+}
+
+pub fn run_candidate_xtask<I, S>(workspace_root: &Path, argv: I) -> CandidateOutput
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let temp = tempfile::tempdir().expect("child temporary directory");
+    let output = Command::new(xtask_bin())
+        .current_dir(workspace_root)
+        .env("TMPDIR", temp.path())
+        .args(argv.into_iter().map(|arg| arg.as_ref().to_string()).skip(1))
+        .output()
+        .expect("run candidate xtask binary");
+    CandidateOutput {
+        exit_code: output.status.code().unwrap_or(1),
+        stdout: String::from_utf8(output.stdout).expect("stdout must be utf-8"),
+        stderr: String::from_utf8(output.stderr).expect("stderr must be utf-8"),
+        temp,
+    }
+}
+
 pub fn base_args(agent_id: &str) -> Vec<String> {
     base_args_with_package_name(agent_id, "unified-agent-api-cursor")
 }

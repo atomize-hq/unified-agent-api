@@ -8,6 +8,7 @@ mod declaration;
 mod producer;
 mod public_on1;
 pub(super) mod public_on2;
+mod public_repair;
 mod regressions;
 mod renderer;
 mod sweep;

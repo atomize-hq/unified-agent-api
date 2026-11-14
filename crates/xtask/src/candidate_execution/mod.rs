@@ -4,6 +4,7 @@ mod candidate;
 #[path = "../agent_maintenance/execute/candidate_git.rs"]
 pub(crate) mod candidate_git;
 pub(crate) mod delivery_index;
+mod diagnostics;
 #[path = "../agent_maintenance/execute/index_lock.rs"]
 pub(crate) mod index_lock;
 pub(crate) mod process;
@@ -34,18 +35,24 @@ impl From<crate::workspace_mutation::WorkspaceMutationError> for Error {
 /// Failure starts from the controller's before-tree and admits only host diagnostics.
 /// The caller never reads failed candidate bytes to construct this tree.
 pub(crate) fn finalized_tree(
-    before: &tree::Tree,
+    candidate: &Candidate,
+    caller: &std::path::Path,
     observed: Option<&tree::Tree>,
     passed: bool,
     diagnostics: tree::Tree,
-) -> tree::Tree {
+) -> Result<tree::Tree, Error> {
+    let before = &candidate.before;
     let mut delivery = if passed {
         observed.unwrap_or(before).clone()
     } else {
         before.clone()
     };
+    let diagnostic_paths = diagnostics.keys().cloned().collect::<Vec<_>>();
     delivery.extend(diagnostics);
-    delivery
+    if passed {
+        diagnostics::rebase(candidate, caller, &mut delivery, &diagnostic_paths)?;
+    }
+    Ok(delivery)
 }
 
 const EXECUTION_RUNS_ROOT: &str = "docs/agents/.uaa-temp/agent-maintenance/runs";
@@ -55,4 +62,21 @@ const EXECUTION_RUNS_ROOT: &str = "docs/agents/.uaa-temp/agent-maintenance/runs"
 /// The private index copy is discarded; this never publishes entries.
 pub(crate) fn lock_index(root: &std::path::Path) -> Result<impl Drop, Error> {
     index_lock::IndexLock::acquire(root)
+}
+
+/// Test-only ownership of a recovery copy; production candidates never clean up on drop.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct TestHolder(std::path::PathBuf);
+#[cfg(test)]
+impl TestHolder {
+    pub(crate) fn new(candidate: &std::path::Path) -> Self {
+        Self(candidate.parent().expect("candidate holder").to_path_buf())
+    }
+}
+#[cfg(test)]
+impl Drop for TestHolder {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }

@@ -167,14 +167,24 @@ fn create_candidate_preparation_refuses_caller_absolute_prompt() {
 }
 
 #[test]
-fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_delivery() {
-    for passed in [true, false] {
+fn create_candidate_delivery_cleans_success_and_retains_reported_failure() {
+    for (exit_code, write_recovery, refuse_delivery) in [
+        (0, false, false),
+        (7, false, false),
+        (0, true, false),
+        (0, false, true),
+    ] {
+        let passed = exit_code == 0 && !write_recovery;
         let (root, context) = setup(true);
         let before = fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap();
-        let host = tempfile::tempdir().unwrap();
-        let binary = host.path().join("executor.sh");
+        let binary = root.path().join("executor.sh");
         let handoff = serde_json::json!({"agent_id":"codex", "manifest_root":"cli_manifests/codex", "runtime_lane_complete":true, "publication_refresh_required":true, "required_commands":life::REQUIRED_PUBLICATION_COMMANDS, "blockers":[]});
-        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\nexit {}\n", if passed { 0 } else { 7 })).unwrap();
+        let recovery_write = if write_recovery {
+            "printf '%s\\n' \"$PWD\" > \"$(dirname \"$target\")/recovery-candidate.txt\""
+        } else {
+            ":"
+        };
+        fs::write(&binary, format!("#!/bin/sh\nset -eu\ntarget=$(sed -n 's/^- Update `\\([^`]*\\)` so it passes validation with:/\\1/p')\ntest -n \"$target\"\ncat > \"$target\" <<'JSON'\n{handoff}\nJSON\nprintf '%s\\n' \"$PWD/$target\"\nprintf '%s\\n' \"$PWD/missing\" >&2\n{recovery_write}\nexit {exit_code}\n")).unwrap();
         fs::set_permissions(&binary, fs::Permissions::from_mode(0o755)).unwrap();
         let mut args = args();
         args.codex_binary = Some(binary.to_string_lossy().into_owned());
@@ -184,6 +194,7 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
             vec![],
         )
         .unwrap();
+        let _holder = candidate_execution::TestHolder::new(&candidate.root);
         let (execution, observed) = candidate.execute_observed(|| {
             codex_exec::capture_depth_execution(
                 root.path(),
@@ -193,10 +204,23 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
                 &prepared_prompt(&context),
             )
         });
-        let (evidence, _) = execution.unwrap();
-        assert_eq!(evidence.exit_code, if passed { 0 } else { 7 });
+        let (evidence, output) = execution.unwrap();
+        assert_eq!(evidence.exit_code, exit_code);
         let observed = observed.unwrap();
-        candidate.check(&observed).unwrap();
+        let guard = candidate.check(&observed);
+        let errors = if write_recovery {
+            let error = guard.unwrap_err().to_string();
+            assert!(error.contains("protected request"), "{error}");
+            assert!(error.contains("recovery-candidate.txt"), "{error}");
+            vec![error]
+        } else {
+            guard.unwrap();
+            if passed {
+                vec![]
+            } else {
+                vec!["executor failed".into()]
+            }
+        };
         validate_handoff(
             &candidate
                 .root
@@ -213,21 +237,125 @@ fn create_candidate_prompt_follower_writes_only_candidate_handoff_before_deliver
             tree::capture(root.path(), &Default::default()).unwrap(),
             candidate.before
         );
-        let delivery = candidate_execution::finalized_tree(
-            &candidate.before,
+        let mut report = ValidationReport {
+            workflow_version: WORKFLOW_VERSION.into(),
+            generated_at: now_rfc3339().unwrap(),
+            run_id: context.run_id.clone(),
+            status: if passed { "pass" } else { "fail" }.into(),
+            checks: vec![ValidationCheck {
+                name: "codex_exec".into(),
+                ok: passed,
+                message: format!("codex exec completed via `{}`", evidence.binary),
+            }],
+            errors,
+        };
+        let original_evidence = bytes(&evidence).unwrap();
+        let execution = Ok((evidence, output));
+        let delivery = finalized_diagnostics(
+            root.path(),
+            &context,
+            &candidate,
             Some(&observed),
-            passed,
-            Tree::new(),
-        );
-        candidate
+            &report,
+            &[],
+            execution.as_ref().ok(),
+        )
+        .unwrap();
+        let source_before: Tree = candidate
+            .before
+            .iter()
+            .filter(|(path, _)| !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")))
+            .map(|(p, n)| (p.clone(), n.clone()))
+            .collect();
+        if refuse_delivery {
+            fs::write(root.path().join("concurrent.txt"), "caller change").unwrap();
+        }
+        let outcome = candidate
             .deliver(root.path(), &delivery, passed, None)
-            .unwrap();
-        if passed {
+            .map(|_| ())
+            .map_err(candidate_error);
+        let recovery = candidate.recovery();
+        let result = finalize_delivery(
+            root.path(),
+            candidate,
+            &context,
+            &mut report,
+            &execution,
+            outcome,
+        );
+        let pointer = context.run_dir.join("recovery-candidate.txt");
+        let delivered = passed && !refuse_delivery;
+        assert_eq!(result.is_ok(), delivered);
+        let evidence: CodexExecutionEvidence =
+            load_json(&context.run_dir.join(CODEX_EXECUTION_FILE_NAME)).unwrap();
+        if delivered {
+            assert!(!recovery.parent().unwrap().exists());
+            assert!(!pointer.exists());
+            for path in [
+                &evidence.prompt_path,
+                &evidence.stdout_path,
+                &evidence.stderr_path,
+                &evidence.binary,
+            ] {
+                assert!(Path::new(path).is_file(), "{path}");
+                assert!(Path::new(path).starts_with(root.path()), "{path}");
+            }
+            assert_eq!(evidence.argv.last().unwrap(), root.path().to_str().unwrap());
+            for name in [
+                CODEX_EXECUTION_FILE_NAME,
+                VALIDATION_REPORT_FILE_NAME,
+                RUN_STATUS_FILE_NAME,
+                RUN_SUMMARY_FILE_NAME,
+            ] {
+                let text = fs::read_to_string(context.run_dir.join(name)).unwrap();
+                assert!(
+                    !text.contains(recovery.parent().unwrap().to_str().unwrap()),
+                    "{name}: {text}"
+                );
+            }
+            assert_eq!(
+                fs::read_to_string(&evidence.stdout_path).unwrap().trim(),
+                recovery
+                    .join(format!("{RUNTIME_RUNS_ROOT}/{}", context.run_id))
+                    .join(HANDOFF_FILE_NAME)
+                    .to_str()
+                    .unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(&evidence.stderr_path).unwrap().trim(),
+                recovery.join("missing").to_str().unwrap()
+            );
+        } else {
+            assert_eq!(bytes(&evidence).unwrap(), original_evidence);
+            assert!(recovery.is_dir());
+            let retained: Vec<_> = fs::read_dir(recovery.parent().unwrap())
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            assert_eq!(retained, vec![recovery.clone()]);
+            let source_after: Tree = tree::capture(root.path(), &Default::default())
+                .unwrap()
+                .into_iter()
+                .filter(|(path, _)| {
+                    !path.starts_with(&format!("{RUNTIME_RUNS_ROOT}/")) && path != "concurrent.txt"
+                })
+                .collect();
+            assert_eq!(source_after, source_before);
+            assert_eq!(
+                fs::read_to_string(pointer).unwrap().trim(),
+                recovery.to_str().unwrap()
+            );
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .contains(recovery.to_str().unwrap()));
+        }
+        if delivered {
             validate_handoff(&context.run_dir.join(HANDOFF_FILE_NAME), &context).unwrap();
         } else {
             assert_eq!(
-                tree::capture(root.path(), &Default::default()).unwrap(),
-                candidate.before
+                fs::read(context.run_dir.join(HANDOFF_FILE_NAME)).unwrap(),
+                before
             );
         }
     }
@@ -238,4 +366,147 @@ fn create_candidate_non_depth_prompt_keeps_original_rendering() {
     let (_root, context) = setup(false);
     assert_eq!(prepared_prompt(&context), render_prompt(&context));
     assert!(prepared_prompt(&context).contains(&context.run_dir.to_string_lossy().to_string()));
+}
+
+#[test]
+fn create_candidate_relative_holder_name_preserves_publication_digest() {
+    let (root, context) = setup(true);
+    write(
+        root.path(),
+        &context.input_contract.required_agent_api_test,
+        "// fixture\n",
+    );
+    let candidate = Candidate::prepare(
+        root.path(),
+        &format!("{RUNTIME_RUNS_ROOT}/{RUN_ID}"),
+        vec![STATE.into()],
+    )
+    .unwrap();
+    let _holder = candidate_execution::TestHolder::new(&candidate.root);
+    let holder = candidate.root.parent().unwrap();
+    let relative = format!("crates/codex/src{}/note.txt", holder.display());
+    assert!(is_allowed_write_path(
+        &relative,
+        &context.approval.descriptor
+    ));
+    let source = format!("executor content mentions {}", holder.display());
+    let candidate_context = RuntimeContext {
+        approval: context.approval.clone(),
+        input_contract: context.input_contract.clone(),
+        lifecycle_state: context.lifecycle_state.clone(),
+        lifecycle_state_path: context.lifecycle_state_path.clone(),
+        run_id: context.run_id.clone(),
+        run_dir: candidate.root.join(&candidate.run_dir_rel),
+        wrapper_only: context.wrapper_only,
+    };
+    let (execution, observed) = candidate.execute_observed(|| {
+        write(&candidate.root, &relative, &source);
+        write(
+            &candidate_context.run_dir,
+            HANDOFF_FILE_NAME,
+            bytes(&serde_json::json!({
+                "agent_id": "codex", "manifest_root": "cli_manifests/codex",
+                "runtime_lane_complete": true, "publication_refresh_required": true,
+                "required_commands": life::REQUIRED_PUBLICATION_COMMANDS, "blockers": [],
+            }))
+            .unwrap(),
+        );
+        Ok::<_, Error>(CodexExecutionEvidence {
+            workflow_version: WORKFLOW_VERSION.into(),
+            generated_at: now_rfc3339().unwrap(),
+            run_id: RUN_ID.into(),
+            binary: "codex".into(),
+            argv: vec!["--cd".into(), candidate.root.to_str().unwrap().into()],
+            prompt_path: candidate_context
+                .run_dir
+                .join(PROMPT_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            stdout_path: candidate_context
+                .run_dir
+                .join(CODEX_STDOUT_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            stderr_path: candidate_context
+                .run_dir
+                .join(CODEX_STDERR_FILE_NAME)
+                .to_str()
+                .unwrap()
+                .into(),
+            exit_code: 0,
+        })
+    });
+    let evidence = execution.unwrap();
+    let observed = observed.unwrap();
+    candidate.check(&observed).unwrap();
+    let (mut report, written) = validate_observed_write_mode(
+        &candidate.root,
+        &candidate_context,
+        &context.input_contract,
+        &evidence,
+        vec![relative.clone()],
+    )
+    .unwrap();
+    assert_eq!(report.status, "pass", "{:?}", report.errors);
+    assert_eq!(written, vec![relative.clone()]);
+    let execution = Ok((
+        evidence,
+        std::process::Command::new("true").output().unwrap(),
+    ));
+    let delivery = finalized_diagnostics(
+        root.path(),
+        &context,
+        &candidate,
+        Some(&observed),
+        &report,
+        &written,
+        execution.as_ref().ok(),
+    )
+    .unwrap();
+    let mut state =
+        lifecycle::successful_runtime_state(&context, &context.input_contract, &written).unwrap();
+    state.written_paths_sha256 =
+        Some(life::Preserved::new(hex::encode(Sha256::digest(bytes(&written).unwrap()))).unwrap());
+    let trusted = [PlannedMutation::replace(
+        STATE,
+        fs::read(root.path().join(STATE)).unwrap(),
+        bytes(&state).unwrap(),
+    )];
+    let outcome = candidate
+        .deliver_with(root.path(), &delivery, true, None, &trusted)
+        .map(|_| ())
+        .map_err(candidate_error);
+    let holder = holder.to_owned();
+    finalize_delivery(
+        root.path(),
+        candidate,
+        &context,
+        &mut report,
+        &execution,
+        outcome,
+    )
+    .unwrap();
+    assert!(!holder.exists());
+    assert_eq!(
+        fs::read_to_string(root.path().join(&relative)).unwrap(),
+        source
+    );
+    let recorded: Vec<String> = load_json(&context.run_dir.join(WRITTEN_PATHS_FILE_NAME)).unwrap();
+    assert_eq!(recorded, written);
+    let status: serde_json::Value = load_json(&context.run_dir.join(RUN_STATUS_FILE_NAME)).unwrap();
+    assert_eq!(status["written_paths"], serde_json::json!(written));
+    assert_eq!(
+        hex::encode(Sha256::digest(
+            fs::read(context.run_dir.join(WRITTEN_PATHS_FILE_NAME)).unwrap()
+        )),
+        **state.written_paths_sha256.as_ref().unwrap()
+    );
+    crate::prepare_publication::validate_runtime_evidence_run_for_approval(
+        root.path(),
+        &context.approval,
+        RUN_ID,
+    )
+    .unwrap();
 }
