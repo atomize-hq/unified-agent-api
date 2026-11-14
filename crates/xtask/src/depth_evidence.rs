@@ -269,3 +269,6 @@ impl EvidenceReceipt {
         }
     }
 }
+
+#[cfg(all(test, unix))]
+pub(crate) use verdict::prove_unobserved_admission;

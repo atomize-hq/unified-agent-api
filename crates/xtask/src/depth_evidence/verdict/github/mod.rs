@@ -482,3 +482,6 @@ pub(super) fn view_record_results(
     inputs.verify()?;
     Ok(results)
 }
+
+#[cfg(all(test, unix))]
+pub(crate) use tests::onboarding::admissions::prove_unobserved_admission;

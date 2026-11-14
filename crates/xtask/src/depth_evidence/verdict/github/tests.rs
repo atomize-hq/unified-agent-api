@@ -428,4 +428,4 @@ pub(super) mod host;
 mod synthetic;
 
 #[cfg(unix)]
-mod onboarding;
+pub(super) mod onboarding;

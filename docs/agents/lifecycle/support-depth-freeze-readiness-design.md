@@ -1,8 +1,11 @@
 # Support depth freeze checkpoints and implementation readiness
 
-Status — round-2 documentation decisions and implementation requirements. The four mechanisms
-are specified below. FR1–FR3 and connected writer proofs remain pending. Production/live activation
-requires phase-C emitter-isolation and transport qualification. This packet supplies docs changes.
+Status — round-2 mechanisms specified; FR1 implemented for the credential-free isolated route.
+FR1 supplies canonical protected-IN1 decision publication and independent bounded admission
+history, including progression over admitted ancestors without producer runs. FR2/FR3 and the
+remaining connected writer proofs are pending. Production/live activation requires phase-C
+emitter-isolation and transport qualification. See the [FR1 report](fr1-admission-history-report.md)
+for schema, policy identity, proving-test coverage and measured validation.
 
 The decision follows the maintainer-delegated guidance
 `.codex/guidance/2026-11-13-chatgpt-pro-freeze-checkpoint.md`, including its
@@ -156,7 +159,8 @@ its reporting classification after readiness only with its original authorized c
 
 ## Four mechanism decisions
 
-These decisions adopt the second consult's mechanisms. Their implementations are pending.
+These decisions adopt the second consult's mechanisms. FR1 implements admission publication and
+history under the isolated route; complete freeze planning and reporting-context joins remain pending.
 Missing authority yields `unverified`. FR1–FR3 must deliver positive isolated behavior as well as
 refusals. Production/live activation remains closed until phase C qualifies the real emitters
 and transport.
@@ -173,7 +177,10 @@ actual checkout commit/tree, evaluated source/context and permitted host-head re
 old/proposed lifecycle state, checkpoint kind, decision and bounded reason codes. It also contains predecessor admission
 identities, independently approved IN1 source/workflow and complete relevant policy/dependency
 closure, observed protected roots/tips, accepted origin, registry anchor and other authoritative
-inputs, consumed reporting-context/execution-evidence identities where applicable, and host
+inputs, a canonical digest of normalized independently authenticated producer and isolated-host
+facts (including authorized adoptions and explicit discovery completeness/absence, with canonical
+population ordering), consumed reporting-context/execution-evidence identities
+where applicable, and host
 workflow/run/attempt/job/check/event claims. An admission without a depth producer is representable.
 The first record binds an independently authenticated bootstrap/enrollment anchor. Earlier
 admissions must never be invented to fill a pre-mechanism history gap.
@@ -203,14 +210,54 @@ the full relevant history. The shared progression predicate consumes that histor
 applicable candidate, in either API listing order. Recheck roots and host populations before
 accepting. An advanced fake protected tip alone supplies no admission decision.
 
+History-gap detection covers the protected lineage and all candidate ancestors through every
+parent to the authenticated anchor. A same-generation ancestor with a stage change against any
+same-generation parent, or the first occurrence of that generation, requires its own authenticated
+retained successful admission. The enrolled-or-earlier anchor supplies the bootstrap exception.
+This applies to unmerged ancestors. Without the retained decision, a never-admitted stage edit and
+a genuine admission whose run disappeared are indistinguishable, so verification refuses. Ordinary
+ancestors preserving the generation and stage need no admission, and the pending candidate can receive its first
+admission after this check. This preserves independent history and noncircular candidate evaluation.
+
 Use v1 bounds of 1,000 runs and 100 attempts for each independently enumerated host stream,
 1,000 unique commits per admission-history resolution and 64 KiB per canonical decision/context
 record. Existing object/source/artifact bounds also apply. Exceeding a bound yields `unverified`
 with complete-discovery failure. Required history is never truncated. Keep records immutable by
 decision identity and separately authenticate retries. Conflicting decisions over identical policy
-and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
-commitments, stale roots or changed populations prevent verification. Distinguish decisions over
-different root snapshots. Revocation changes present eligibility while preserving historical
+and authoritative inputs, object mismatches, gaps, ambiguous/duplicate commitments, bound overflow,
+stale roots or changed populations prevent verification. Distinguish decisions over
+different root snapshots and observed host authority. Candidate-authored files cannot select the
+observed-authority digest. Author login and current permission precede fallible adoption-body
+parsing; unauthorized prose and malformed adoption JSON cannot truncate normalized capture.
+After initial input capture succeeds, an unavailable read before a substantive decision produces
+a retained refusal with the sole reason `observation_incomplete`, excluded from identical-input conflict comparisons. At the owning
+boundary, pin the reached decision, owning reason and normalized facts. Closing context/binding
+rechecks still run; failures append `observation_incomplete` without relabeling the reached
+admission/refusal or salting its authority commitment. Such reached decisions remain conflict
+sides. Capture every other evaluated-input field before invoking the owning policy predicates,
+including the authenticated predecessor frontier and its Bootstrap/unclassified classification,
+immutable generation/state/input/evidence projections, root/policy snapshots and independently
+supplied invocation event. Failed reads or malformed present state/depth bytes abort input capture
+before a substantive decision and leave an incomplete, unverified attempt. Successful lookups can
+represent actual absence. Retention reuses the captured fields. A retention-time history failure
+adds incompleteness while preserving the reached decision and its full conflict identity. The
+emitting session event must match the captured event. The substantive conflict key binds
+candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+evaluated blobs, normalized observed authority, checkpoint classification and generation. Replace
+the audit predecessor identities with a sorted set of predecessor commit/transition-digest pairs.
+The transition digest covers canonical `[old_state, new_state]` under the NUL-terminated
+`support-depth-in1-transition-v1` domain. Exclude emitting session claims, decision and reasons.
+Equivalent predecessor retries yield the same key. Retained predecessor identities authenticate
+the audit trail. Every reached decision participates in key-based conflict comparison.
+
+History quarantines every observation-incomplete or history-deficient record, including admissions
+with missing/superseded predecessor references or inconsistent Bootstrap classification. Only
+complete records contribute frontier completeness, readiness, generation-history completion and
+progression. Quarantined records preserve accountability while allowing healthy retries and other
+candidates to reconstruct. Reconstruction fails only for genuine integrity failures, including
+object mismatches, gaps, bounds, duplicate identities and contradictory reached decisions over
+one substantive key. Incomplete-only refusals remain exempt from conflict comparison. Every
+observation-incomplete record requires a failed emitting job. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification
 requires the evidence to remain available.
@@ -416,6 +463,22 @@ Annex A with its measured boundaries. Canonical workflow deployment belongs to p
 
 ### FR1 — Admission record, publication and independent history
 
+Delivered for the isolated route; live activation remains closed. Policy provenance uses runtime
+Git tree/blob identities of the source-installed protected installation commit, checked against
+that independently authenticated anchor. The fixed closure includes `crates`, Cargo manifest/lock,
+`.github`, `scripts` (including the exact workflow and archive reader) and installed profile
+scopes. Candidate records cannot select the protected anchor or substitute their own identities.
+The Python proof transport only decodes one bounded regular `admission.json`; Rust owns canonical
+record parsing, digest and authority checks. No compile-time repository hashing is used.
+ZIP transport validates streamed data descriptors in signed, unsigned and ZIP64 forms against
+actual payload length and CRC. The 64 KiB limit covers the new versioned control records.
+Existing depth and lifecycle inputs retain their existing bounds. Git reads require exact object
+types and bounded stdout. Producer applicability filters candidate roots before history resolution,
+while admission discovery independently enumerates all retained attempts. Connected proofs drive
+the hidden unmerged-ancestor refusal and a same-run late parent retry through real IN1 publication.
+Fixed canonical bytes and domain digests pin retained identities.
+The [report](fr1-admission-history-report.md) maps every FR1 proving item to executable tests.
+
 - Write scope covers private IN1 decision capture/emission in `depth_acceptance/integration*`,
   the shared progression interface in `runtime_follow_on/depth/`, admission-history resolution
   in `depth_evidence/verdict/github/`, and `isolated_maintenance/` host/fixture support. Add the
@@ -535,7 +598,11 @@ semantic facts from consult section 2A. The reporting payload precedes its own a
 ### Proving tests
 
 Parameterize maintenance and onboarding where their rule is shared. The following requirements
-carry forward all of consult section 8. They are pending tests, with no new test result claimed.
+carry forward all of consult section 8 across FR1–FR3 and the later connected writer slices.
+FR1's retained-admission authentication, bounded history and backward-progression tests are
+implemented for the isolated route; the [FR1 report](fr1-admission-history-report.md) records
+results and sandbox limits. Exact reporting-checkpoint classification, complete freeze planning,
+reporting-context joins and the remaining connected writer proofs below are still pending.
 
 | Positive or boundary | Required result |
 | --- | --- |
@@ -651,7 +718,8 @@ All four second-consult recommendations and its four draft tightenings are adopt
 single shared implementation slice is delivered as FR1–FR3 at the maintainer's requested review
 boundaries. The connected ON3 E, owning-predicate and ON4/ON5 writer work stays in slices 6–9,
 consuming those interfaces. Source approval at evaluation time is settled by local inspection.
-Real writer stability still requires the actual ON3–ON5 operations. All proving tests and real-host
+Real writer stability still requires the actual ON3–ON5 operations. FR1's modeled-host admission
+and unobserved-ancestor rollback proofs are delivered; FR2/FR3, later writer proofs and real-host
 qualification above remain pending. Production/live activation requires phase-C emitter isolation
 and exact transport. Existing execution-source approval, complete population and adverse-history
 requirements continue to apply.

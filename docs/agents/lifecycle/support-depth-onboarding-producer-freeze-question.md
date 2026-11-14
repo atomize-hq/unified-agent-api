@@ -24,8 +24,9 @@ After existing slices 0–3 and 5, land
 [FR1–FR3](support-depth-freeze-readiness-design.md#ordered-implementation-sub-slices) deliver the
 shared isolated mechanisms and genuine freeze positives. Slices 6–9 then connect ON3 E, owning
 predicates and actual ON4/ON5 writers with closure-stability proofs. FR1 owns the deferred
-rollback-over-unobserved-history fix below. All these additions remain pending. This docs packet
-implements no reporting exception or admission-history authentication. The original investigation,
+rollback-over-unobserved-history fix below, now implemented under the isolated route with real
+IN1 emission and independently modeled host history (see the [FR1 report](fr1-admission-history-report.md)).
+FR2/FR3 and later writer proofs remain pending; no reporting exception is activated. The original investigation,
 measured validation and current genuine-freeze source refusal below remain historical evidence.
 
 ## Original investigation
@@ -173,7 +174,8 @@ explicitly create their fixtures under `/tmp`. Neither restriction is changed or
 worked around here. The lead must run those tests unrestricted.
 
 At the original validation boundary, P1 remained unimplemented pending the policy decision.
-The round-2 docs decision now specifies its mechanisms, with FR1–FR3 implementation pending.
+The round-2 docs decision specified its mechanisms; FR1 is now implemented for the isolated route,
+while FR2/FR3 remain pending.
 Phase C still must prove real protected CI/needs ordering (including the recursive workspace
 test leg), independent adoption, terminal producers before failure-preserving
 consumers/same-run IN1, and the terminal workflow/gate before conditional MERGE.
@@ -187,18 +189,19 @@ higher-stage ancestor itself had no run. A round-3 attempt walked local Git hist
 freeze to each source; round-4 review found that walk reads unauthenticated local objects (no OID
 verification), caches incompletely and is unbounded. That walk was reverted.
 
-This gap is now specified by the shared
+This gap is closed for the isolated route by FR1, under the shared
 [freeze/readiness amendment](../../specs/support-depth-evidence-v1.md#authenticated-request-freeze-checkpoints-and-implementation-readiness),
-with implementation assigned to FR1. The maintainer-delegated consult
+with retained records emitted by actual IN1 and independently authenticated host history. The maintainer-delegated consult
 (option 3 adjusted and its second consult) roots lifecycle authority in protected IN1 admission
 history. The freeze checkpoint and the readiness transition are independently authenticated IN1 admissions, and
 readiness is irreversible within the generation. IN1 already refuses backward progression at
-admission. FR1 must authenticate retained records against separate host observations, independently
-discover bounded history beyond producer heads, verify Git object identities and apply the shared
-progression predicate to every applicable candidate. The pending cases include
-
-- a descendant restoring an earlier stage with no CI run on the higher-stage ancestor;
-- a new freeze-labelled head after readiness, including on another PR.
-
-Until then, round 2's check over authenticated observed sources remains in force and
-`onboarding_producer_refuses_descendant_lifecycle_rollback_in_either_api_order` pins it.
+admission. FR1 authenticates retained records against separate host observations, independently
+discovers bounded history beyond producer heads, verifies Git object identities and applies the
+shared progression predicate to every applicable candidate. The connected
+`public_on2_connected_freeze_write_admission_and_observation` proof calls
+`prove_unobserved_admission`: an actual higher-stage admission with no producer blocks lower-stage
+descendants in both producer listing orders and on another PR. Removing those retained decisions
+leaves a history gap, even when the fake protected tip already names the descendant. Round 2's
+observed-source regression remains unchanged. FR2/FR3 still own exact freeze labels/readiness
+classification; phase C still owns deployed host authority. See the
+[FR1 report](fr1-admission-history-report.md) for coverage and validation.

@@ -1,4 +1,5 @@
 use super::{transport::*, *};
+use crate::depth_acceptance::admission::observations;
 use crate::depth_ci::{self, Witness};
 use std::{
     io::Write,
@@ -23,6 +24,24 @@ pub(super) fn witness(
         .iter()
         .filter(|a| a["name"] == name)
         .collect::<Vec<_>>();
+    observations::population(
+        &api.endpoint(&format!("actions/runs/{id}/artifacts")),
+        "witness_artifacts",
+        matches
+            .iter()
+            .map(|a| {
+                serde_json::json!([
+                    a["id"],
+                    a["name"],
+                    a["expired"],
+                    a["size_in_bytes"],
+                    a["digest"],
+                    a["workflow_run"]["id"],
+                    a["workflow_run"]["head_sha"]
+                ])
+            })
+            .collect(),
+    );
     if matches.len() != 1 {
         return Err("missing/ambiguous attempt witness artifact".into());
     }
@@ -50,6 +69,57 @@ pub(super) fn witness(
         .iter()
         .filter(|j| j["name"] == "Rust tests (workspace)")
         .collect::<Vec<_>>();
+    let label = profile.step_label();
+    let names = [
+        format!("Collect {label} witness"),
+        format!("Upload {label} witness"),
+        format!("Bind {label} artifact"),
+    ];
+    observations::population(
+        &api.endpoint(&format!("actions/runs/{id}/attempts/{attempt}/jobs")),
+        "producer_jobs",
+        jobs.iter()
+            .map(|j| {
+                let mut steps: Vec<_> = j["steps"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|s| {
+                        s["name"]
+                            .as_str()
+                            .is_some_and(|name| names.iter().any(|n| n == name))
+                    })
+                    .map(|s| {
+                        serde_json::json!([
+                            s["name"],
+                            s["status"],
+                            s["conclusion"],
+                            if s["name"] == names[2] {
+                                &s["started_at"]
+                            } else {
+                                &Value::Null
+                            },
+                            if s["name"] == names[2] {
+                                &s["completed_at"]
+                            } else {
+                                &Value::Null
+                            }
+                        ])
+                    })
+                    .collect();
+                steps.sort_by_cached_key(Value::to_string);
+                serde_json::json!([
+                    j["id"],
+                    j["name"],
+                    j["run_id"],
+                    j["run_attempt"],
+                    j["status"],
+                    j["conclusion"],
+                    steps
+                ])
+            })
+            .collect(),
+    );
     if jobs.len() != 1 {
         return Err("missing/ambiguous producer job".into());
     }
@@ -62,12 +132,6 @@ pub(super) fn witness(
         return Err("aborted or unconcluded producer job".into());
     }
     let steps = job["steps"].as_array().ok_or("missing job steps")?;
-    let label = profile.step_label();
-    let names = [
-        format!("Collect {label} witness"),
-        format!("Upload {label} witness"),
-        format!("Bind {label} artifact"),
-    ];
     for name in &names {
         if steps
             .iter()
@@ -110,6 +174,14 @@ pub(super) fn witness(
         }
         bindings.push(binding);
     }
+    observations::population(
+        &api.endpoint(&format!("actions/jobs/{job_id}/logs")),
+        "artifact_bindings",
+        bindings
+            .iter()
+            .map(|b| serde_json::json!([b["id"], b["name"], b["digest"]]))
+            .collect(),
+    );
     if bindings.len() != 1
         || bindings[0]["id"] != artifact_id
         || bindings[0]["name"] != name
@@ -121,6 +193,11 @@ pub(super) fn witness(
         &api.endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
         2_097_152,
     )?;
+    observations::fact(
+        &api.endpoint(&format!("actions/artifacts/{artifact_id}/zip")),
+        "witness_bytes",
+        &depth_ci::reference("", &zip).sha256,
+    );
     if zip.len() as u64 != artifact["size_in_bytes"].as_u64().unwrap()
         || depth_ci::reference("", &zip).sha256 != digest
     {

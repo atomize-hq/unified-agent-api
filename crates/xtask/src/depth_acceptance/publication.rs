@@ -344,9 +344,10 @@ impl crate::depth_evidence::EvidenceVerdicts {
         }
         view.verify_current(root)?;
         let outcome = Self::with_publication_results(root, values, validate);
-        view.verify_current(root)?;
-        captured.recheck(root)?;
-        outcome
+        super::admission::observations::after_decision(outcome, || {
+            view.verify_current(root)?;
+            captured.recheck(root)
+        })
     }
 
     /// Freshly evaluate the exact proposed records before invoking file-based renderers.

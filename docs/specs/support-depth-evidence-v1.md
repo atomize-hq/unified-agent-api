@@ -636,8 +636,18 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     no authority. Missing, duplicate, ambiguous or conflicting commitments, wrong-job or
     cross-attempt replay and substituted bytes MUST prevent verification. Retries MUST have
     separately authenticated observations. Decision identities MUST be immutable. Conflicting
-    decisions over identical policy/authoritative inputs MUST prevent verification. Different root
-    snapshots MUST remain distinguishable. Revocation MUST affect present eligibility while
+    decisions over one substantive `inputs_identity` MUST prevent verification. The key MUST bind
+    candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+    evaluated blobs, normalized observed authority, checkpoint classification and generation.
+    Predecessors MUST contribute a sorted set of commit/transition-digest pairs. Equivalent
+    predecessor retries MUST yield the same key. Emitting session claims and predecessor record
+    identities MUST be excluded. Every reached decision MUST participate, including quarantined
+    decisions. Only complete records contribute frontier, readiness or progression authority.
+    Observation-incomplete and history-deficient records MUST be quarantined and MUST permit
+    healthy retries and other candidates to reconstruct. Reconstruction MUST fail only for genuine
+    integrity failures, including object mismatches, history gaps, bound overflow, duplicate
+    identities and contradictory reached decisions over one key. Different root snapshots and
+    independently observed host authority MUST remain distinguishable. Revocation MUST affect present eligibility while
     preserving historical readiness and execution accountability.
 12. Trusted emitters MUST be isolated from candidate-controlled processes that could alter their
     runtime, inputs, observations or publication. Protected IN1 MUST use a clean separate
@@ -670,6 +680,198 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     associated through admission/enrollment history MUST yield `unverified`. Heads without an
     independent target-generation association retain ordinary unrelated-head treatment. Records
     supply authenticated input evidence. Reporting authorization requires the combined proof.
+
+### IN1 admission control record v1
+
+The isolated FR1 route uses an independently versioned `in1_admission` JSON object. Canonical
+bytes are compact UTF-8 JSON with lexicographically ordered object members, decimal integers,
+ordered arrays and no trailing newline. Parsing MUST reproduce those exact bytes. Unknown
+members, duplicate members, alternate encodings, unsupported versions and payloads exceeding
+65,536 bytes MUST refuse. The identity is SHA-256 over the literal UTF-8 domain
+`support-depth-in1-admission-v1` followed by one NUL byte and the canonical payload. Generation
+identity uses the separate `support-depth-in1-generation-v1` NUL-terminated domain over canonical
+generation bytes.
+
+The record contains the following fields.
+
+- `schema_version` is `1` and `kind` is `in1_admission`.
+- `repository` records the host name, numeric repository id and owner id.
+- `generation` contains the original Event, complete selection/enrollment, P identity and
+  optional O identity. `generation_sha256` binds its canonical identity. Both are null for
+  record-free bootstrap/preparation.
+- `candidate`, `parent`, `checkout`, `enrollment_anchor` and `protected_tip` each contain full
+  commit and tree identities. FR1 emits `head_relationship` as `exact_head`.
+- `old_state` and `new_state` contain lifecycle path, authenticated blob identity and stage when
+  present. The blob preserves the complete evaluated lifecycle state.
+- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR1 emits `bootstrap`
+  for the first anchored decision and `unclassified` thereafter. `request_freeze` and
+  `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
+  or `refused`. Reasons are the bounded enums `owning_predicates_satisfied`,
+  `owning_predicate_refused` and `observation_incomplete`, with at most sixteen entries.
+  After initial input capture succeeds, an unavailable producer or isolated-host read before a
+  substantive decision yields a refused decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
+  successful reads, including source object acquisition and retained history reads during
+  predicate evaluation. Only these incomplete-only refusals are excluded from both sides of
+  identical-input conflict comparisons.
+  Once the owning predicates reach admission or refusal, the emitter MUST preserve that decision,
+  its corresponding owning reason and the normalized authority facts consumed up to that boundary.
+  Closing captured-context and binding rechecks MUST still run. Any failed closing recheck adds
+  `observation_incomplete` after the owning reason, without replacing the decision or changing
+  its substantive authority commitment. The only combined forms are admitted with
+  `[owning_predicates_satisfied, observation_incomplete]` and refused with
+  `[owning_predicate_refused, observation_incomplete]`. These reached decisions MUST participate
+  in identical-input conflict comparisons. Any record containing `observation_incomplete` MUST
+  NOT authorize readiness, predecessor frontiers, generation-history completion or progression,
+  and its emitting job MUST conclude failure. A closing failure prevents invocation success.
+  Reached contradictory decisions over identical normalized authority MUST refuse.
+- `predecessors` is a sorted unique list of retained successful decision identities at every
+  applicable parent frontier. Before invoking the owning policy predicates, IN1 MUST resolve
+  that frontier from authenticated history and pin both the predecessor identities and checkpoint
+  classification. An empty authenticated frontier selects `bootstrap`, and an existing frontier
+  selects `unclassified`. Retention-time reconstruction MUST preserve those pinned values on
+  both admission and refusal. A failed reconstruction adds `observation_incomplete` to the reached
+  decision, retains its original evaluated-input identity and prevents invocation success.
+  History MUST check parent-frontier coverage and Bootstrap classification. Any record with
+  deficient, unavailable or superseded predecessor references or inconsistent classification MUST
+  be quarantined in reconstructed history, for both reached admissions and refusals. Quarantined
+  records MUST contribute no authority to frontier completeness, readiness, generation-history
+  completion or progression. Their presence MUST permit reconstruction and healthy complete
+  retries. Every reached decision retains its substantive-key conflict participation. The sole-reason
+  incomplete-only refusal is exempt because no decision was reached. Late retries remain
+  independently discoverable, and earlier retained predecessor references remain immutable.
+- `policy` names independently supplied implementation/workflow provenance, workflow id, job key,
+  app id and the approved closure. The isolated FR1 route resolves `workflow_commit` from the
+  source-installed authenticated protected installation commit, independently of candidate JSON.
+  `closure` records Git tree/blob ids for `crates`, `Cargo.toml`, `Cargo.lock`, `.github`,
+  `.github/workflows/ci.yml`, `scripts`, `scripts/depth_ci_archive.py` and installed profile scopes.
+  The evaluator rehashes bounded Git objects and requires each evaluated source object to equal
+  the independently protected anchor's object, as producer closure approval does. Root Cargo and
+  toolchain overrides remain unsupported. `implementation` is SHA-256 of canonical closure JSON
+  prefixed by `support-depth-in1-git-policy-v1` and a NUL byte; it summarizes those Git identities,
+  never uncommitted files or a compile-time directory inventory. Candidate-provided hashes cannot
+  approve policy. Phase C must bind the deployed evaluator to that approved source and runtime.
+  `canonical_tip`, `accepted_origin`, `registry_blob` and `inputs` bind observed authority and
+  evaluated input blob identities.
+- `observed_authority` is a lowercase SHA-256 commitment to normalized authoritative host
+  facts consumed during this IN1 evaluation. Approved predicate code derives these facts from
+  authenticated producer and isolated-host reads. Candidate files cannot supply facts.
+  The normalized fact set contains the following data.
+
+  - Applicable Event/P/O producer run/attempt identities, head commit, workflow path/id,
+    repository and event, sorted canonically. Ignored out-of-scope runs contribute no content
+    facts. The closing population comparison contributes an explicit discovery-stability boolean.
+    The canonical profile includes the required enclosing terminal status. IR-P3
+    uses producer job terminal state while the enclosing workflow may progress independently.
+  - The unique packet PR identity and governing base, matching witness artifact identities,
+    names, exact run/head bindings, expiry, size and digest, and downloaded witness-byte digests.
+    Producer job identities, run/attempt, status/conclusion and the exact required collection,
+    upload and binding step statuses/conclusions are included. Only the binding step's time
+    interval is consumed. Log facts contain matching artifact-binding id/name/digest tuples.
+  - Every accepted authorized adoption's endorsement kind, repository, PR/id, author login/id,
+    accepted permission, source commit, mapping digest and digest of the exact referenced body
+    bytes. Exhausted authorized-adoption populations explicitly encode an empty array for absence.
+    Author login and current permission MUST be authenticated before any fallible adoption-body
+    parsing or referenced-source/mapping processing. Unauthorized comments, including malformed
+    adoption JSON, and ignored records contribute no content facts and MUST NOT truncate capture
+    or alter discovery completeness. Ordinary authorized comments contribute no adoption facts.
+  - Isolated and canonical repository ids/owners/names, protected staging identities and protection,
+    baseline/candidate ancestry status and merge base, candidate host presence, governing registry
+    path/type/blob, and canonical approved-scope path/blob/mode/type inventory with tree truncation
+    and completeness. Source rows outside installed scopes contribute no content facts.
+  - Each discovered producer, PR, artifact, job, comment and review stream records a start fact
+    (`discovery`, `false`) and, only after bounded exhaustive pagination, a completion fact
+    (`discovery`, `true`). Relevant population facts include empty arrays for observed absence.
+    Comment/review stream completion is independent of ignored record counts and page boundaries.
+    Before a substantive decision, transport-unavailable reads contribute only the fixed
+    `["unavailable"]` availability fact and set `observation_incomplete`. After that boundary,
+    failed closing reads set the separate incompleteness reason without salting the pinned fact
+    set. Error text contributes no facts.
+
+  Each fact hashes canonical `[endpoint, kind, SHA256(canonical(normalized_value))]` under the
+  NUL-terminated `support-depth-in1-host-read-v1` domain. Population facts use the stream endpoint
+  before pagination parameters, retaining its semantic query, and arrays sorted by canonical
+  JSON bytes, preserving multiplicity. Unrelated workflow metadata, ignored log/comment text and
+  population ordering preserve identity. Fact digests use lowercase hexadecimal. The sorted
+  unique set of fact digests is encoded canonically and hashed under
+  `support-depth-in1-observed-authority-v1` followed by NUL. The empty set represents an evaluation
+  consuming no host facts. Facts are pinned when the owning predicates reach their substantive
+  decision; closing observations track completeness separately. If no substantive decision is
+  reached, capture ends before retention-time admission-history reconstruction and publication. Repeated reads
+  and independent read order preserve identity. Existing host response, pagination,
+  attempt, population and canonical encoding bounds apply, and the record retains its 65,536-byte
+  bound. This required fixed-size digest participates in evaluated-input identity. Reached
+  contradictions over the same repository inputs and normalized authority refuse, even when a
+  reached decision also records failed closing observations. An incomplete-only observation
+  retains a refusal that permits a later complete retry to recover.
+- `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
+  FR3 supplies the reporting-context association. An admission without a producer is supported.
+- `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
+  The invocation event MUST be obtained independently before policy evaluation and matched against
+  the emitting session event before publication. The entire `claims` object is excluded from
+  evaluated-input identity.
+
+`inputs_identity` uses the NUL-terminated `support-depth-in1-inputs-v1` domain over canonical
+record JSON after removing `claims`, `decision` and `reasons` and replacing `predecessors` with
+its sorted unique array of `[commit, transition_digest]` pairs from independently authenticated
+referenced records. A transition digest uses the NUL-terminated
+`support-depth-in1-transition-v1` domain over canonical `[old_state, new_state]`, including null
+states. Unresolved audit references mark history deficiency and contribute no authenticated pair.
+Checkpoint classification and every other substantive field remain in the key. Complete and
+incomplete reached decisions with an identical key MUST conflict when their decisions differ.
+
+All other identity-bearing record fields MUST also be captured before the owning policy predicates
+run. This includes authenticated root/policy snapshots, content-addressed candidate/parent/checkout
+objects, lifecycle states, generation and its digest, authoritative input blob maps and execution
+references. Explicit absence is permitted only after a successful authenticated source lookup.
+Malformed present state/depth bytes and failed source reads MUST abort input capture. Such an
+invocation cannot reach a substantive owning decision or publish a record with substituted nulls,
+empty maps or default classifications. Its independently started attempt remains incomplete and
+unverified. `producer_context` remains the explicit FR1 reserved absence. Normalized host facts
+continue accumulating during evaluation and are pinned at the reached decision boundary.
+
+After input capture, closing or emission failures MUST preserve every pinned identity field and
+the reached decision. A retained reached-incomplete decision participates in conflict detection
+against a contradictory complete retry over those same inputs, while supplying no successful
+historical authority. Later parent-frontier changes can quarantine either decision in reconstructed
+history while preserving its pinned inputs and substantive-key conflict participation.
+
+The fixed commitment line has exactly this form, with a lowercase 64-character payload digest
+and a positive decimal returned artifact id.
+
+```text
+IN1_ADMISSION_V1 kind=in1_admission sha256=<digest> artifact=<id>
+```
+
+It MUST appear exactly once in the approved job's retained log within its binding step interval.
+Attempt-specific job enumeration MUST authenticate the workflow job key, app, check and attempt.
+The downloaded proof artifact MUST contain exactly one regular `admission.json` entry. Its host
+archive digest/size, canonical payload digest, provenance and association claims MUST agree.
+The transport MUST independently stream-decompress the complete entry with a 65,536-byte expanded
+limit, require completed decompression with no excess compressed data, and verify the actual
+expanded length and CRC against the ZIP declarations. Local and central declarations MUST agree
+when present. A declared size or CRC matching only a prefix MUST refuse.
+When flag bit 3 is set, the required data descriptor, with or without its signature and including
+ZIP64 sizes, MUST match those declarations and actual payload values. Missing, truncated or
+inconsistent descriptors MUST refuse.
+Required publication precedes successful completion. Upload/log failure leaves an incomplete
+attempt. The fake host models these facts independently of producer artifacts.
+
+Independent discovery permits at most 1,000 runs and 100 attempts per run in each host stream,
+1,000 unique commits per resolution and 64 KiB per control record. Every relevant parent is
+traversed to the authenticated enrollment anchor, with commit/tree/blob content hashes checked.
+Complete populations and protected roots are checked again after resolution and at consumption.
+Generation-history completeness MUST cover both protected lineage and every candidate ancestor
+through all parents back to the authenticated anchor. Within that generation, an ancestor whose
+lifecycle stage differs from any same-generation parent's stage, or first introduces the generation,
+MUST have an authenticated retained `admitted` decision for that commit and generation. The
+enrollment anchor at or below `enrolled` remains the bootstrap exception. Absence of that decision
+is missing authority and MUST yield `unverified`, including for an unmerged ancestor whose run
+disappeared from an otherwise complete listing. Ordinary ancestors preserving the generation and stage require no
+admission. A pending candidate's own transition requires no future admission in this history check.
+Overflow, gaps, missing predecessors, conflicts over identical evaluated inputs or unavailable
+required publication yield unverified authority. Revocation removes present eligibility and
+preserves historical progression. These are credential-free modeled-host predicates. Deployed
+GitHub policy provenance, emitter isolation, retention and transport qualification remain phase C.
 
 ## Synthetic wrapper machinery-proof profile
 

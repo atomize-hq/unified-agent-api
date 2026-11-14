@@ -527,3 +527,6 @@ pub(super) fn prepare_native_finish(
 #[allow(dead_code)]
 #[path = "view_eval.rs"]
 mod view_eval;
+
+#[cfg(all(test, unix))]
+pub(crate) use github::prove_unobserved_admission;

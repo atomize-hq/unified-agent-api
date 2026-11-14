@@ -2,6 +2,7 @@
 use super::*;
 use crate::{depth_ci::onboarding as inputs, isolated_maintenance::EvidenceHost};
 
+pub(crate) mod admissions;
 mod checkpoints;
 mod history;
 
