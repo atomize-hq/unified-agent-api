@@ -1,5 +1,6 @@
 //! Retained protected-IN1 decisions. Candidate data has no constructor for host authority.
 pub(crate) mod emitter;
+pub(crate) mod freeze;
 pub(crate) mod history;
 mod objects;
 pub(crate) mod policy;

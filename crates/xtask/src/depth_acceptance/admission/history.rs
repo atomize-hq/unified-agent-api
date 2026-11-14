@@ -291,6 +291,7 @@ pub(super) fn resolve(
                 if record.decision == Decision::Admitted
                     && expected.is_empty()
                     && record.checkpoint != Checkpoint::Bootstrap
+                    && !record.bootstrap
                 {
                     return Err("IN1 first record lacks bootstrap anchoring".into());
                 }

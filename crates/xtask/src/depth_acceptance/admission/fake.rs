@@ -142,6 +142,17 @@ impl Host for MemoryHost {
         }
         Ok(bytes)
     }
+    fn freeze_inputs(
+        &self,
+        candidate: &str,
+    ) -> Result<Option<freeze::authority::Observation>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get(&format!("freeze-inputs/{candidate}"))
+            .map(|bytes| serde_json::from_slice(bytes).map_err(|e| e.to_string()))
+            .transpose()
+    }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String> {
         if let Some(prior) = self.next_retry.lock().unwrap().take() {
             if prior.candidate.commit != candidate || prior.policy != *policy {

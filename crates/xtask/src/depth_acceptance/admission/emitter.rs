@@ -127,6 +127,24 @@ impl Emitter {
                 )?;
             }
         }
+        let observation = self.publication.host.freeze_inputs(&self.candidate)?;
+        let classification = if admitted {
+            depth.as_ref().map(|record| {
+                super::freeze::classify(
+                    root,
+                    &self.publication,
+                    &parent,
+                    &candidate,
+                    record,
+                    observation.as_ref(),
+                )
+            })
+        } else {
+            None
+        };
+        if self.publication.host.freeze_inputs(&self.candidate)? != observation {
+            return Err("IN1 freeze input authority changed during planning".into());
+        }
         session.publish(&Record {
             schema_version: 1,
             kind: "in1_admission".into(),
@@ -139,21 +157,30 @@ impl Emitter {
             head_relationship: "exact_head".into(),
             old_state: old_state.unwrap_or(None),
             new_state: new_state.unwrap_or(None),
-            checkpoint: if predecessors.is_empty() && history.is_ok() {
-                Checkpoint::Bootstrap
-            } else {
-                Checkpoint::Unclassified
-            },
+            checkpoint: classification.as_ref().map_or_else(
+                || {
+                    if predecessors.is_empty() && history.is_ok() {
+                        Checkpoint::Bootstrap
+                    } else {
+                        Checkpoint::Unclassified
+                    }
+                },
+                |c| c.checkpoint,
+            ),
+            bootstrap: classification.is_some() && predecessors.is_empty() && history.is_ok(),
+            transition: classification.as_ref().and_then(|c| c.transition.clone()),
             decision: if admitted {
                 Decision::Admitted
             } else {
                 Decision::Refused
             },
-            reasons: vec![if admitted {
+            reasons: std::iter::once(if admitted {
                 Reason::OwningPredicatesSatisfied
             } else {
                 Reason::OwningPredicateRefused
-            }],
+            })
+            .chain(classification.as_ref().map(|c| c.reason))
+            .collect(),
             predecessors,
             enrollment_anchor: self.publication.authority.anchor.clone(),
             policy: self.publication.authority.policy.clone(),
@@ -169,6 +196,9 @@ impl Emitter {
             execution_evidence,
             claims: session.claims.clone(),
         })?;
+        if self.publication.host.freeze_inputs(&self.candidate)? != observation {
+            return Err("IN1 freeze input authority changed around publication".into());
+        }
         if let Ok(history) = history {
             history.recheck_publication(&session.claims)?;
         }

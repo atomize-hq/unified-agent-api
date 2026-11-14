@@ -5,6 +5,7 @@ use crate::{agent_lifecycle as life, depth_acceptance::check_integration};
 use sha2::{Digest, Sha256};
 
 mod declaration;
+mod fr2;
 mod producer;
 mod public_on1;
 pub(super) mod public_on2;

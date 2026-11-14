@@ -1,5 +1,8 @@
 #![allow(dead_code, unused_imports)]
 
+#[path = "../src/freeze_transition.rs"]
+mod freeze_transition;
+
 mod support_matrix {
     pub use xtask::support_matrix::*;
 }

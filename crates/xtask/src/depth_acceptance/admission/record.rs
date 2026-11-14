@@ -85,6 +85,12 @@ pub(crate) enum Checkpoint {
 pub(crate) enum Reason {
     OwningPredicatesSatisfied,
     OwningPredicateRefused,
+    ExactFreezeTree,
+    FreezeTreeMismatch,
+    FreezeAuthorityUnavailable,
+    FreezeAuthorityMismatch,
+    AcquisitionAuthorityUnavailable,
+    FreezePlanningRefused,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -92,6 +98,12 @@ pub(crate) struct State {
     pub path: String,
     pub blob: String,
     pub stage: LifecycleStage,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Transition {
+    pub planner: String,
+    pub writer_inputs: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -108,6 +120,12 @@ pub(crate) struct Record {
     pub old_state: Option<State>,
     pub new_state: Option<State>,
     pub checkpoint: Checkpoint,
+    /// First-decision anchoring is independent of transition classification. Older v1 records
+    /// express this with checkpoint=bootstrap and omit this member.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub bootstrap: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transition: Option<Transition>,
     pub decision: Decision,
     pub reasons: Vec<Reason>,
     pub predecessors: Vec<String>,
@@ -234,6 +252,20 @@ impl Record {
                 sha256(o)?;
             }
         }
+        if self.bootstrap && !self.predecessors.is_empty() {
+            return Err("IN1 bootstrap decision has predecessor admissions".into());
+        }
+        if let Some(transition) = &self.transition {
+            sha256(&transition.planner)?;
+            sha256(&transition.writer_inputs)?;
+        }
+        if self.checkpoint == Checkpoint::RequestFreeze
+            && (self.transition.is_none()
+                || self.decision != Decision::Admitted
+                || !self.reasons.contains(&Reason::ExactFreezeTree))
+        {
+            return Err("IN1 request freeze lacks an admitted exact transition".into());
+        }
         for state in self.old_state.iter().chain(&self.new_state) {
             oid(&state.blob)?;
         }
@@ -267,4 +299,8 @@ fn identity(value: &str, size: usize) -> Result<(), String> {
         return Err("invalid IN1 object/digest identity".into());
     }
     Ok(())
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }

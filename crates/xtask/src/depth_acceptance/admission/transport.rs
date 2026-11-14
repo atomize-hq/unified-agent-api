@@ -15,6 +15,13 @@ pub(crate) struct Authority {
 pub(crate) trait Host: Send + Sync {
     fn json(&self, path: &str) -> Result<Value, String>;
     fn bytes(&self, path: &str, limit: usize) -> Result<Vec<u8>, String>;
+    /// Independent invocation observation. Production has no activated implementation.
+    fn freeze_inputs(
+        &self,
+        _candidate: &str,
+    ) -> Result<Option<freeze::authority::Observation>, String> {
+        Ok(None)
+    }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String>;
     fn upload(&self, claims: &Claims, bytes: &[u8]) -> Result<u64, String>;
     fn commit(&self, claims: &Claims, line: &str) -> Result<(), String>;

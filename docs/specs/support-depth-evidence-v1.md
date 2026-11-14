@@ -693,11 +693,19 @@ The record contains the following fields.
   commit and tree identities. FR1 emits `head_relationship` as `exact_head`.
 - `old_state` and `new_state` contain lifecycle path, authenticated blob identity and stage when
   present. The blob preserves the complete evaluated lifecycle state.
-- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR1 emits `bootstrap`
-  for the first anchored decision and `unclassified` thereafter. `request_freeze` and
-  `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
-  or `refused`. Reasons are the bounded enums `owning_predicates_satisfied` and
-  `owning_predicate_refused`, with at most sixteen entries.
+- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR2a emits
+  `request_freeze` only after exact writer-derived complete-tree equality and independent
+  writer-input authentication. Other depth candidates remain `execution_required`. Record-free
+  decisions retain FR1's `bootstrap` / `unclassified` representation. Optional `bootstrap=true`
+  independently records first-decision anchoring when a depth transition has its own checkpoint
+  kind. Omitted `bootstrap` means false, preserving earlier v1 canonical records. Optional
+  `transition` contains domain-separated `planner` and `writer_inputs` identities for an exact
+  freeze. Decisions are `admitted` or `refused`. The bounded reasons include
+  `owning_predicates_satisfied`, `owning_predicate_refused`, `exact_freeze_tree`,
+  `freeze_tree_mismatch`, `freeze_authority_unavailable`, `freeze_authority_mismatch`,
+  `acquisition_authority_unavailable` and `freeze_planning_refused`, with at most sixteen entries.
+  MA2 acquisition authority remains an empty-only FR2a seam. The combined acquisition admission
+  belongs to FR2b. FR3 supplies the reporting-context join required for an execution exception.
 - `predecessors` is a sorted unique list of retained successful decision identities at every
   applicable parent frontier. Late retries remain independently discoverable and cannot rewrite
   an earlier child's predecessor references. No earlier decision is synthesized.

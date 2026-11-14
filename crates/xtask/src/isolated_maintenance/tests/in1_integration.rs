@@ -42,7 +42,7 @@ fn local(f: &Fixture, tip: &str) {
 }
 /// Commit a candidate without pushing the fake protected tip. Host comparisons deliberately
 /// claim ancestry even in negative tests: IN1 must independently check the local Git objects.
-fn candidate(f: &Fixture, tip: &str) -> String {
+pub(super) fn candidate(f: &Fixture, tip: &str) -> String {
     git(f.root.path(), &["add", "."]);
     git(
         f.root.path(),
