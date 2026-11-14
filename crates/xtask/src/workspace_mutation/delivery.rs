@@ -20,3 +20,20 @@ pub fn apply_mutations(
     }
     apply_admitted_mutations(workspace_root, mutations)
 }
+
+#[cfg(test)]
+pub(crate) fn apply_admitted_mutations_with_test_failure(
+    root: &Path,
+    mutations: &[PlannedMutation],
+    fail_before: usize,
+) -> Result<ApplySummary, WorkspaceMutationError> {
+    apply_with_hook(root, mutations, |index| {
+        if index == fail_before {
+            Err(WorkspaceMutationError::Internal(
+                "injected repair delivery failure".into(),
+            ))
+        } else {
+            Ok(())
+        }
+    })
+}
