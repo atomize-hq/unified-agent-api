@@ -270,8 +270,8 @@ the design baseline. Changes remain uncommitted for the lead.
 | `crates/xtask/tests/c0_spec_validate/depth_records/acceptance/relay_boundary.rs:37` | P | done |
 | `crates/xtask/tests/c8_capability_matrix_unit.rs:49` | P | done |
 | `crates/xtask/tests/c8_spec_capability_matrix_parity.rs:34` | P | done |
-| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:38` | C/P | done |
-| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:90` | C | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:38` | P (minimal registry-named input fixture) | done |
+| `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:90` | P (minimal-input reproduction); separate C (authenticated actual candidate) | done |
 | `crates/xtask/tests/c8_spec_capability_matrix_registry_driven.rs:112` | P | done |
 | `crates/xtask/tests/c8_spec_capability_matrix_staleness.rs:48` | P | done |
 | `crates/xtask/tests/depth_synthetic_governing.rs:83` | P | done |
@@ -381,12 +381,15 @@ It uses the onboarding declaration by default. `--lifecycle-path maintenance` se
 reviewed maintenance declaration. Each checkout carries one lifecycle path as the existing
 isolated scope requires. The production profile stays absent.
 
-The runner uses offline Cargo and a dedicated build cache under `target/s10-declared-build`.
-It independently builds the private test reader and supplies that reader only to test helpers.
-It rebuilds workspace packages before testing because Cargo dep-info can otherwise reuse an
-executable naming a previous fixture checkout. Cached external dependencies remain available
-between fixture runs in that dedicated cache. Successful completion also checks that the
-committed fixture checkout stayed clean.
+The runner uses offline Cargo with a private HOME, Cargo home and build directory beneath each
+destination's `target/s10-runner/`. Only PATH and Rust toolchain selection come from the caller;
+Git overrides, credential variables and compiler wrappers are excluded from every subprocess.
+It snapshots registry indexes and crate archives from the read-only `--dependency-cache` input
+(defaulting to the caller's Cargo home), without copying home config or credentials. Each run
+builds its own workspace packages and independently builds the private test reader, supplying
+that reader only to test helpers. Successful completion checks that the committed fixture
+checkout stayed clean. All copied source inputs are validated as regular files before creating
+the destination; symlink inputs, including dangling links and symlinked parents, are refused.
 
 Run each full-workspace leg with a fresh destination.
 
@@ -395,7 +398,7 @@ python3 scripts/s10_declared_test_leg.py --destination target/s10-declared-works
 python3 scripts/s10_declared_test_leg.py --destination target/s10-declared-workspace-maintenance --lifecycle-path maintenance
 ```
 
-Each default invocation executes `cargo test --offline --workspace` in its depth-declared,
+Each default invocation executes `cargo test --offline --workspace --all-targets --all-features` in its depth-declared,
 committed fixture checkout. Full-workspace execution is reserved for the lead as requested.
 Focused validation passed in both declared and ordinary checkouts.
 
@@ -403,9 +406,13 @@ Focused validation passed in both declared and ordinary checkouts.
 ### Validation discoveries
 
 The wider declared maintenance run found five affected integration targets beyond the direct
-parser calls. The explicit-plan/CLI control now uses an ordinary seeded workspace. Its positive uses the real
-Clap parser, argument conversion and public workspace command entry to compare the exact preview.
-The binary command fixes its root at compile time, so changing cwd cannot provide that control.
+parser calls. The explicit-plan/CLI control uses an ordinary seeded workspace. Its positive uses
+the real Clap parser, argument conversion and public workspace command entry to compare the exact
+preview. Review round 1b restores executable coverage according to the build workspace's registry
+state, detected through the production parser. An undeclared build workspace must succeed on
+ordinary inputs, matching stdout and the build workspace plan's delivery-report hashes; a
+depth-declared build workspace must refuse with the specific production parser message.
+Preparation and `--from-request` retain their original compile-time workspace resolution.
 The mixed-argument and missing-mode refusals continue through the actual CLI executable. Four refresh
 controls and two capability runtime-inventory controls resolve production inputs through cwd.
 They now execute every original assertion in a test-owned child with a shared immutable ordinary
@@ -503,3 +510,86 @@ filter paths matched zero tests and were corrected to the nonempty module paths 
 - `runtime_follow_on_policy`
 - `release_doc::tests`
 - `support_matrix::depth::tests::generator`
+
+## Slice 10b review round 1 fixes
+
+All seven findings are addressed. Changes remain uncommitted for the lead; no push was performed.
+No `readonly_gates` implementation or test file was edited.
+
+- The declared-leg runner validates its complete source and dependency copy plans before creating
+  the destination. It refuses all symlinks, including escaping, dangling and parent-directory
+  links, and copies regular content into new files so declaration installation cannot write
+  through a copied link.
+- Every subprocess, starting with source enumeration, receives an explicit allowlisted
+  environment. HOME and Cargo home are destination-local; caller Git overrides, credentials,
+  SSH agents, linker injection and compiler wrapper/flag variables are absent. Fixture Git
+  initialization uses an empty template and disabled hooks/signing/automatic maintenance.
+- Each destination owns its Cargo target directory and writable dependency-cache snapshot.
+  The optional `--dependency-cache` input is only read: registry indexes and crate archives are
+  copied, while home configuration, credentials and executable wrappers are excluded. No shared
+  build output or package-cleaning step remains.
+- Default Cargo testing adds only offline resolution to the exact Makefile test command:
+  `cargo test --offline --workspace --all-targets --all-features`. Focused argument overrides
+  remain available.
+- `scripts/test_s10_declared_test_leg.py` supplies eight subprocess-mocked regressions for
+  source/cache symlink refusal before mutation, caller-environment isolation, private build
+  outputs, dependency-cache selection, authoritative command flags and both lifecycle declarations.
+  The initial runner failed the new boundary assertions; all eight now pass.
+- The maintenance preparation test retains its library assertions against the explicitly
+  undeclared fixture and exercises `CARGO_BIN_EXE_xtask` in both build-workspace registry states.
+  The production parser outcome on that workspace's registry selects the assertion, without an
+  environment flag: undeclared builds must succeed on ordinary inputs and match stdout plus every
+  emitted delivery path/hash against the build workspace's plan; depth-declared builds must fail
+  with the specific `support_depth` production refusal and emit no delivery report. Round 1b
+  restores both production preparation files byte-for-byte to `082df1fb`, preserving compile-time
+  `CARGO_MANIFEST_DIR` resolution for explicit preparation and `--from-request`. With that resolution
+  restored, the previous fixture-hash assertion failed before correcting the test's expectation.
+- The capability-matrix test again runs its executable in a temporary workspace containing only
+  registry-named inputs, and separately retains authenticated actual-candidate reproduction.
+  Both check the exact committed matrix and enrolled backend set. Baseline progress sites `:38`
+  and `:90` above now distinguish the ordinary minimal-input control from candidate coverage.
+
+### Review round 1 validation
+
+All Cargo checks used offline dependencies with `TMPDIR` unset. System Python 3.14 was used for
+the full Python suite; the shell's Python 3.10 lacks the existing recommendation tests' required
+TOML module.
+
+| Validation | Result |
+| --- | --- |
+| `python3 -I -m unittest discover -s scripts -p test_s10_declared_test_leg.py` | Passed, 8 tests |
+| `python3 -I -m unittest discover -s scripts -p 'test_*.py'` | Passed, 127 tests with system Python 3.14 |
+| `make fmt-check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test -p xtask --test agent_maintenance_prepare --test c8_spec_capability_matrix_registry_driven` | Passed, 54 + 3 tests |
+| Same two Rust targets through the real onboarding-declared runner | Passed, 54 + 3 tests; clean fixture checkout |
+| Same two Rust targets through the real maintenance-declared runner | Passed, 54 + 3 tests; clean fixture checkout |
+| `make loc-check` | Passed, 700-code-line cap |
+| `make hygiene` | Passed |
+| `git diff --check` | Passed |
+
+The requested filename form `python3 -I -m unittest scripts/test_s10_declared_test_leg.py` cannot
+import `scripts` because isolated mode removes the working directory from Python's import path.
+It fails at module discovery on both available Python versions. The focused discovery command
+above executes that exact test file while preserving isolated mode, and full discovery includes it.
+
+The two real runner checks used separate destinations `target/s10fixb-declared-onboarding` and
+`target/s10fixb-declared-maintenance`, each with its own Cargo home and target directory. Both
+exercised the then-current executable positive and the independent authenticated candidate reader.
+The full workspace test leg remains assigned to the lead; its default flags now match preflight.
+
+### Review round 1b validation
+
+After restoring compile-time production workspace resolution and correcting the executable test:
+
+| Validation | Result |
+| --- | --- |
+| `make fmt-check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test -p xtask --test agent_maintenance_prepare` | Passed, 54 tests; executable success on the undeclared build registry |
+| `python3 scripts/s10_declared_test_leg.py --destination target/s10-declared-prepare -- -p xtask --test agent_maintenance_prepare` | Passed, 54 tests; executable production refusal on the declared build registry; clean fixture checkout |
+| `git diff 082df1fb -- crates/xtask/src/agent_maintenance` | Empty; both restored files also compared byte-for-byte with the commit |
+| `git diff --check` | Passed |
+
+Other round-1 fixes remain in place. No `readonly_gates` file was edited; changes remain
+uncommitted and no push was performed.

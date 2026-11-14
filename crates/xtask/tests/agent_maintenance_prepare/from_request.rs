@@ -210,6 +210,64 @@ fn explicit_cli_matches_the_existing_plan_and_invalid_modes_are_rejected() {
     prepare::run_in_workspace(root, parsed, &mut output).expect("run explicit CLI plan");
     assert_eq!(String::from_utf8(output).expect("utf8 stdout"), expected);
 
+    // The executable resolves its workspace at build time, independently of this fixture's cwd.
+    // Use the production parser to distinguish the ordinary and depth-declared build legs.
+    let build_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("xtask crate should live under crates/xtask");
+    let build_registry = agent_registry::AgentRegistry::load(build_root);
+    let reports = tempfile::tempdir().expect("external CLI report directory");
+    let report = reports.path().join("preview.json");
+    let executable = Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .args(explicit_cli_args())
+        .arg("--emit-json")
+        .arg(&report)
+        .current_dir(root.join("crates/xtask"))
+        .env_remove("XTASK_AGENT_MAINTENANCE_RUN_ID")
+        .output()
+        .expect("run explicit CLI plan");
+    match build_registry {
+        Ok(_) => {
+            assert!(executable.status.success(), "{executable:?}");
+            assert_eq!(
+                String::from_utf8(executable.stdout).expect("utf8 stdout"),
+                expected
+            );
+            let build_plan =
+                build_prepare_plan(build_root, &explicit).expect("build workspace plan");
+            let reported: serde_json::Value =
+                serde_json::from_slice(&fs::read(report).expect("CLI report"))
+                    .expect("report JSON");
+            let files: Vec<_> = build_plan
+                .files
+                .iter()
+                .map(|file| {
+                    json!({
+                        "path": file.relative_path,
+                        "sha256": hex::encode(Sha256::digest(&file.contents)),
+                    })
+                })
+                .collect();
+            assert_eq!(reported, json!({"applied": false, "files": files}));
+        }
+        Err(agent_registry::AgentRegistryError::Validation(message))
+            if message.ends_with(" carries `support_depth`, which no command enforces yet") =>
+        {
+            assert!(!executable.status.success(), "{executable:?}");
+            let stderr = String::from_utf8(executable.stderr).expect("utf8 stderr");
+            assert!(
+                stderr.contains(&format!("load agent registry: {message}")),
+                "{stderr}"
+            );
+            assert!(
+                !report.exists(),
+                "refused preparation must not emit a report"
+            );
+        }
+        Err(error) => panic!("unexpected build workspace registry error: {error}"),
+    }
+
     let mixed = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args([
             "prepare-agent-maintenance",

@@ -85,6 +85,30 @@ fn header_backends(markdown: &str) -> Vec<String> {
 
 #[test]
 fn registry_inputs_alone_reproduce_the_checked_in_matrix() {
+    let registry_text = registry_fixture::undeclared_registry();
+    let parsed = AgentRegistry::parse(registry_text).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    seed(temp.path(), registry_text, &parsed);
+    let generated = generate(temp.path());
+    assert_eq!(
+        generated,
+        read(&repo_root().join(DEFAULT_OUT_PATH)),
+        "only registry-named inputs in a minimal ordinary workspace must reproduce the matrix"
+    );
+    let mut enrolled: Vec<String> = parsed
+        .capability_matrix_entries()
+        .map(|entry| entry.agent_id.clone())
+        .collect();
+    enrolled.sort();
+    assert_eq!(header_backends(&generated), enrolled);
+    assert_eq!(
+        read(&temp.path().join(REGISTRY_RELATIVE_PATH)),
+        registry_text
+    );
+}
+
+#[test]
+fn authenticated_actual_candidate_reproduces_the_checked_in_matrix() {
     let parsed = candidate_registry::registry(&repo_root());
     let generated = candidate_registry::capability_markdown(&repo_root());
     assert_eq!(
