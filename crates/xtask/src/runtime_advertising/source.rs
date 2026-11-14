@@ -423,9 +423,11 @@ mod captured_tests {
         }
         assert_eq!(source.paths("scope").unwrap().len(), 65);
         assert_eq!(source.committed_files("scope").unwrap().len(), 64);
+        // Unix reuses one cat-file child; other platforms read each blob fresh (no stable store identity).
+        let expected = if cfg!(unix) { 3 } else { 3 + 63 };
         assert_eq!(
             crate::git_inputs::tests::GIT_COMMANDS.with(|count| count.get()),
-            3
+            expected
         );
     }
     #[test]

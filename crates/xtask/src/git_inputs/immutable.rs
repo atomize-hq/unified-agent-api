@@ -289,7 +289,7 @@ impl Batch {
         self.stdout
             .read_exact(&mut end)
             .map_err(|e| e.to_string())?;
-        if end != [b'\n'] {
+        if end != *b"\n" {
             return Err("invalid Git batch terminator".into());
         }
         Ok(bytes)
