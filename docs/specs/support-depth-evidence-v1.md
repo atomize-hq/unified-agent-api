@@ -729,6 +729,10 @@ It MUST appear exactly once in the approved job's retained log within its bindin
 Attempt-specific job enumeration MUST authenticate the workflow job key, app, check and attempt.
 The downloaded proof artifact MUST contain exactly one regular `admission.json` entry. Its host
 archive digest/size, canonical payload digest, provenance and association claims MUST agree.
+The transport MUST independently stream-decompress the complete entry with a 65,536-byte expanded
+limit, require completed decompression with no excess compressed data, and verify the actual
+expanded length and CRC against the ZIP declarations. Local and central declarations MUST agree
+when present. A declared size or CRC matching only a prefix MUST refuse.
 Required publication precedes successful completion. Upload/log failure leaves an incomplete
 attempt. The fake host models these facts independently of producer artifacts.
 
@@ -736,6 +740,14 @@ Independent discovery permits at most 1,000 runs and 100 attempts per run in eac
 1,000 unique commits per resolution and 64 KiB per control record. Every relevant parent is
 traversed to the authenticated enrollment anchor, with commit/tree/blob content hashes checked.
 Complete populations and protected roots are checked again after resolution and at consumption.
+Generation-history completeness MUST cover both protected lineage and every candidate ancestor
+through all parents back to the authenticated anchor. Within that generation, an ancestor whose
+lifecycle stage differs from any same-generation parent's stage, or first introduces the generation,
+MUST have an authenticated retained `admitted` decision for that commit and generation. The
+enrollment anchor at or below `enrolled` remains the bootstrap exception. Absence of that decision
+is missing authority and MUST yield `unverified`, including for an unmerged ancestor whose run
+disappeared from an otherwise complete listing. Ordinary ancestors preserving the generation and stage require no
+admission. A pending candidate's own transition requires no future admission in this history check.
 Overflow, gaps, missing predecessors, conflicts over identical evaluated inputs or unavailable
 required publication yield unverified authority. Revocation removes present eligibility and
 preserves historical progression. These are credential-free modeled-host predicates. Deployed

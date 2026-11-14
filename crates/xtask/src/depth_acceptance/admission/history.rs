@@ -43,24 +43,36 @@ impl History {
             .ok_or("IN1 missing candidate lifecycle state")?;
         let generation = Generation::from_record(record);
         self.check_progression(commit, &generation, state.stage)?;
-        self.require_generation_history(root, record, state_path)
+        self.require_generation_history(root, commit, record, state_path)
     }
     fn require_generation_history(
         &self,
         root: &Path,
+        candidate: &str,
         expected: &DepthRecord,
         state_path: &str,
     ) -> Result<(), String> {
         let generation = Generation::from_record(expected);
         let mut objects = Objects::new(root);
-        let protected = self
+        let mut lineage = self
             .ancestors
             .get(&self.protected)
-            .ok_or("IN1 missing protected lineage")?;
+            .ok_or("IN1 missing protected lineage")?
+            .clone();
+        lineage.insert(self.protected.clone());
+        // Progression also relies on unmerged ancestors through every candidate parent.
+        // A pending candidate's own transition does not require its future admission.
+        lineage.extend(
+            self.ancestors
+                .get(candidate)
+                .ok_or("IN1 missing candidate lineage")?
+                .iter()
+                .cloned(),
+        );
         let tip = objects.commit(&self.protected)?.object;
         let path = generation_path(&mut objects, &tip, &generation)?;
         let mut stages = BTreeMap::new();
-        for commit in protected.iter().chain(std::iter::once(&self.protected)) {
+        for commit in &lineage {
             let object = objects.commit(commit)?.object;
             let Some((_, bytes)) = objects.blob(&object, &path)? else {
                 continue;
@@ -97,7 +109,10 @@ impl History {
                         && r.decision == Decision::Admitted
                 })
             {
-                return Err("IN1 protected generation history gap: lifecycle transition has no retained admission".into());
+                return Err(
+                    "IN1 generation history gap: lifecycle transition has no retained admission"
+                        .into(),
+                );
             }
         }
         Ok(())

@@ -7,6 +7,55 @@ or push was introduced. Compilation uses the default TMPDIR without an override.
 
 Original scope: the FR1 sub-slice in `support-depth-freeze-readiness-design.md`.
 
+## Adversarial repair at a11f3712
+
+P1 now checks the union of protected lineage and all candidate ancestors for missing admission
+authority at same-generation lifecycle transitions. An unmerged transition without retained
+authority refuses even when its descendant restores the enrolled protected tree. Ordinary
+unchanged-stage ancestors and the pending candidate's own transition remain admissible. This
+implements the independent-history and noncircular-evaluation requirements. A stage change alone
+cannot distinguish an unadmitted edit from a genuine admission whose host run disappeared.
+
+P2 keeps the Python transport reader and independently streams native ZIP decompressors with a
+65,536-byte output bound, completion, excess-input, actual-length and CRC checks. Stored, DEFLATE,
+BZIP2 and LZMA entries retain support. Local/central declarations are checked before decoding.
+The exact 243-byte archive with 100,002 expanded bytes and a two-byte declared prefix now refuses.
+
+Focused regressions reproduced both defects before repair. Three admission-lineage tests pass
+in 2.34 s, including second-parent coverage and the ordinary-ancestor positive control. All twelve
+Python archive tests pass, including exact-boundary positives for every supported compression
+method and descriptor-based ZIP streams. The real ON2 chain now additionally checks the genuine
+unmerged higher-stage admission, restored complete tree, hidden run, ordinary-ancestor positive
+and the existing producer-discovery refusal after hiding the protected admission population.
+The new unmerged case directly exercises the shared history checker. An added discovery call at
+the enrolled protected source instead reached the independent producer-inventory guard, since
+the current checkout included implementation/collector files absent at that source. That
+misplaced assertion was removed. The first connected run took 295.75 s and reached all new
+history assertions successfully before that fixture mismatch.
+
+Repair files are `admission/{history.rs,tests.rs,tests/lineage.rs}`,
+`depth_evidence/verdict/github/tests/onboarding/admissions.rs`, both Python archive files, this
+report, the freeze/readiness design and the evidence contract/Annex A.
+
+### Repair validation
+
+Compilation uses the default TMPDIR. Changes remain uncommitted in this worktree.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass |
+| `cargo test -p xtask --lib depth_acceptance::admission` | 23 passed, 7.58 s tests |
+| `cargo test -p xtask --lib isolated_maintenance::tests::in1_integration::admission` | 3 passed, 1.40 s tests |
+| `python3 -m unittest discover -s scripts -p test_depth_ci_archive.py` | 12 passed, 0.025 s |
+| Connected ON2 test | Pass, 236.53 s tests, 7.49 s compilation |
+| `make loc-check` | Pass, all Rust files at or below 700 code lines |
+| `make hygiene` | Pass |
+| `git diff --check` | Pass |
+
+All requested repair validation passed. A separate in-memory matrix also passed 36 random-content
+size/compression combinations across empty, chunk-boundary, exact-limit and overflow inputs.
+
 ## Files changed
 
 - New `crates/xtask/src/depth_acceptance/admission/`: `record.rs`, `policy.rs`, `objects.rs`,
@@ -81,9 +130,10 @@ Kept Python `in1` as the existing proof transport's ZIP reader. It returns bytes
 regular, unencrypted `admission.json`; input archive bound is 2 MiB, declared and streamed expanded
 payload bounds are 64 KiB. No extraction or Git lookup occurs. Rust owns canonical JSON, typed
 schema, record digest, host association and policy/history authentication. This preserves the
-existing transport boundary without adding a Rust ZIP dependency. Eight Python tests include
-both existing witness/registry cases and new IN1 boundary, duplicate, traversal, extra-entry,
-nonregular and encrypted-entry refusals.
+existing transport boundary without adding a Rust ZIP dependency. Twelve Python tests include
+existing witness/registry cases, IN1 boundary, duplicate, traversal, extra-entry, nonregular and
+encrypted-entry refusals, independent expanded-length/CRC/completion checks, the exact size-lie
+reproduction, descriptor-based streams, ZIP64 sizes and all four supported compression methods.
 
 ## Proving-test audit
 

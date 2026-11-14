@@ -207,6 +207,15 @@ the full relevant history. The shared progression predicate consumes that histor
 applicable candidate, in either API listing order. Recheck roots and host populations before
 accepting. An advanced fake protected tip alone supplies no admission decision.
 
+History-gap detection covers the protected lineage and all candidate ancestors through every
+parent to the authenticated anchor. A same-generation ancestor with a stage change against any
+same-generation parent, or the first occurrence of that generation, requires its own authenticated
+retained successful admission. The enrolled-or-earlier anchor supplies the bootstrap exception.
+This applies to unmerged ancestors. Without the retained decision, a never-admitted stage edit and
+a genuine admission whose run disappeared are indistinguishable, so verification refuses. Ordinary
+ancestors preserving the generation and stage need no admission, and the pending candidate can receive its first
+admission after this check. This preserves independent history and noncircular candidate evaluation.
+
 Use v1 bounds of 1,000 runs and 100 attempts for each independently enumerated host stream,
 1,000 unique commits per admission-history resolution and 64 KiB per canonical decision/context
 record. Existing object/source/artifact bounds also apply. Exceeding a bound yields `unverified`

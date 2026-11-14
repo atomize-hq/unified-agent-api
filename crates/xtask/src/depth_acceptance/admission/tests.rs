@@ -688,4 +688,5 @@ fn policy_identity_covers_git_policy_and_dependency_closure() {
     }
 }
 
+mod lineage;
 mod policy;

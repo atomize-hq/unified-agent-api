@@ -168,6 +168,76 @@ pub(crate) fn prove_unobserved_admission(
         )
         .unwrap_err()
         .contains("lifecycle progression"));
+    // Keep protected T at the genuine enrolled freeze while H remains unmerged. L restores
+    // T's entire tree. Removing every H admission from discovery leaves no surviving reference.
+    let unmerged_host = Arc::new(host.fork());
+    let protected = &freeze.candidate.commit;
+    unmerged_host.root(protected);
+    let higher_records: Vec<_> = records
+        .iter()
+        .filter(|r| r.candidate.commit == implementation.candidate.commit)
+        .collect();
+    unmerged_host.change("actions/workflows/ci.yml/runs?per_page=100&page=1", |v| {
+        v["workflow_runs"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|run| !higher_records.iter().any(|r| run["id"] == r.claims.run));
+        v["total_count"] = json!(v["workflow_runs"].as_array().unwrap().len());
+    });
+    assert!(records.iter().all(|r| r
+        .predecessors
+        .iter()
+        .all(|id| { !higher_records.iter().any(|h| h.identity().unwrap() == *id) })));
+    let unmerged = Publication {
+        authority: publication.authority.clone(),
+        host: unmerged_host,
+    };
+    let restored = git(
+        f.root.path(),
+        &[
+            "commit-tree",
+            &freeze.candidate.tree,
+            "-p",
+            &implementation.candidate.commit,
+            "-m",
+            "L restores T after unmerged H",
+        ],
+    );
+    assert!(unmerged
+        .resolve(f.root.path(), &[protected.clone(), restored.clone()])
+        .unwrap()
+        .check_candidate(f.root.path(), &restored, &original, inputs::STATE)
+        .unwrap_err()
+        .contains("history gap"));
+    // An ordinary unadmitted ancestor at T's stage remains admissible, as does the pending
+    // candidate's own higher-stage transition before it has an admission record.
+    let ordinary = git(
+        f.root.path(),
+        &[
+            "commit-tree",
+            &freeze.candidate.tree,
+            "-p",
+            protected,
+            "-m",
+            "ordinary unchanged-stage ancestor",
+        ],
+    );
+    let pending = git(
+        f.root.path(),
+        &[
+            "commit-tree",
+            &implementation.candidate.tree,
+            "-p",
+            &ordinary,
+            "-m",
+            "pending candidate transition",
+        ],
+    );
+    unmerged
+        .resolve(f.root.path(), &[protected.clone(), pending.clone()])
+        .unwrap()
+        .check_candidate(f.root.path(), &pending, &original, inputs::STATE)
+        .unwrap();
     // Hiding the admission population leaves a protected generation gap, even though retained
     // payload bytes, the fake protected branch and valid candidate files are still present.
     host.page("actions/workflows/ci.yml/runs", "workflow_runs", vec![]);
