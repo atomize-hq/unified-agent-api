@@ -450,74 +450,6 @@ fn unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation() {
 }
 
 #[test]
-fn late_parent_retry_does_not_rewrite_existing_child_predecessors() {
-    let root = tempfile::tempdir().unwrap();
-    git(
-        root.path(),
-        &[
-            "clone",
-            "--quiet",
-            "--no-hardlinks",
-            fixture().root.path().to_str().unwrap(),
-            ".",
-        ],
-    );
-    git(root.path(), &["config", "user.name", "History"]);
-    git(
-        root.path(),
-        &["config", "user.email", "history@example.invalid"],
-    );
-    git(root.path(), &["commit", "--allow-empty", "-qm", "child"]);
-    let first = retained();
-    let mut child = first.clone();
-    child.parent = first.candidate.clone();
-    child.protected_tip = child.parent.clone();
-    child.candidate =
-        emitter::object(root.path(), &git(root.path(), &["rev-parse", "HEAD"])).unwrap();
-    child.checkout = child.candidate.clone();
-    child.predecessors = vec![first.identity().unwrap()];
-    child.checkpoint = Checkpoint::Unclassified;
-    child.claims.run += 1;
-    let mut late = first.clone();
-    late.claims.run += 2;
-    let mut earlier_refusal = child.clone();
-    earlier_refusal.decision = Decision::Refused;
-    earlier_refusal.reasons = vec![Reason::OwningPredicateRefused];
-    earlier_refusal.parent = first.parent.clone();
-    earlier_refusal.protected_tip = first.parent.clone();
-    earlier_refusal.predecessors.clear();
-    earlier_refusal.checkpoint = Checkpoint::Bootstrap;
-    history::resolve(
-        root.path(),
-        &fixture().publication.authority,
-        &[earlier_refusal, first.clone()],
-        std::slice::from_ref(&child.candidate.commit),
-    )
-    .unwrap();
-    for records in [
-        [child.clone(), late.clone(), first.clone()],
-        [first.clone(), late.clone(), child.clone()],
-    ] {
-        history::resolve(
-            root.path(),
-            &fixture().publication.authority,
-            &records,
-            &[child.candidate.commit.clone()],
-        )
-        .unwrap();
-    }
-    assert!(history::resolve(
-        root.path(),
-        &fixture().publication.authority,
-        &[child.clone(), late],
-        &[child.candidate.commit.clone()]
-    )
-    .err()
-    .unwrap()
-    .contains("missing predecessor"));
-}
-
-#[test]
 fn verifies_raw_object_hashes_and_traverses_second_parent_to_the_anchor() {
     let root = tempfile::tempdir().unwrap();
     git(
@@ -645,6 +577,55 @@ fn oversized_archives_logs_and_objects_refuse_without_truncation() {
         .read("blob", &blob)
         .unwrap_err()
         .contains("object bound"));
+    git(root.path(), &["config", "user.name", "Object fixture"]);
+    git(
+        root.path(),
+        &["config", "user.email", "object@example.invalid"],
+    );
+    git(
+        root.path(),
+        &[
+            "tag",
+            "-a",
+            "large-tag",
+            &blob,
+            "-m",
+            "small tag to huge blob",
+        ],
+    );
+    let tag = git(root.path(), &["rev-parse", "large-tag"]);
+    assert!(
+        git(root.path(), &["cat-file", "-s", &tag])
+            .parse::<usize>()
+            .unwrap()
+            < 1024
+    );
+    // A malformed regular-file tree entry points at the small tag. cat-file blob would
+    // dereference it and buffer the huge target despite measuring only the tag's size.
+    let mut tree = b"100644 admission.json\0".to_vec();
+    tree.extend(hex::decode(&tag).unwrap());
+    let tree_file = root.path().join("malformed-tree");
+    std::fs::write(&tree_file, tree).unwrap();
+    let tree = git(
+        root.path(),
+        &[
+            "hash-object",
+            "--literally",
+            "-t",
+            "tree",
+            "-w",
+            tree_file.to_str().unwrap(),
+        ],
+    );
+    let commit = git(
+        root.path(),
+        &["commit-tree", &tree, "-m", "malformed tag entry"],
+    );
+    let object = objects.commit(&commit).unwrap().object;
+    assert!(objects
+        .blob(&object, "admission.json")
+        .unwrap_err()
+        .contains("object type mismatch"));
 }
 
 #[test]
@@ -690,3 +671,4 @@ fn policy_identity_covers_git_policy_and_dependency_closure() {
 
 mod lineage;
 mod policy;
+mod vectors;

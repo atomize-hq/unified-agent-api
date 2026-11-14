@@ -733,6 +733,9 @@ The transport MUST independently stream-decompress the complete entry with a 65,
 limit, require completed decompression with no excess compressed data, and verify the actual
 expanded length and CRC against the ZIP declarations. Local and central declarations MUST agree
 when present. A declared size or CRC matching only a prefix MUST refuse.
+When flag bit 3 is set, the required data descriptor, with or without its signature and including
+ZIP64 sizes, MUST match those declarations and actual payload values. Missing, truncated or
+inconsistent descriptors MUST refuse.
 Required publication precedes successful completion. Upload/log failure leaves an incomplete
 attempt. The fake host models these facts independently of producer artifacts.
 

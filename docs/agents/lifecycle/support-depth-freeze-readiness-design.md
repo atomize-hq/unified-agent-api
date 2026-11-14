@@ -436,6 +436,13 @@ that independently authenticated anchor. The fixed closure includes `crates`, Ca
 scopes. Candidate records cannot select the protected anchor or substitute their own identities.
 The Python proof transport only decodes one bounded regular `admission.json`; Rust owns canonical
 record parsing, digest and authority checks. No compile-time repository hashing is used.
+ZIP transport validates streamed data descriptors in signed, unsigned and ZIP64 forms against
+actual payload length and CRC. The 64 KiB limit covers the new versioned control records.
+Existing depth and lifecycle inputs retain their existing bounds. Git reads require exact object
+types and bounded stdout. Producer applicability filters candidate roots before history resolution,
+while admission discovery independently enumerates all retained attempts. Connected proofs drive
+the hidden unmerged-ancestor refusal and a same-run late parent retry through real IN1 publication.
+Fixed canonical bytes and domain digests pin retained identities.
 The [report](fr1-admission-history-report.md) maps every FR1 proving item to executable tests.
 
 - Write scope covers private IN1 decision capture/emission in `depth_acceptance/integration*`,

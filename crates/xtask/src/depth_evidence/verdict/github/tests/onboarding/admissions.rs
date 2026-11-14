@@ -49,7 +49,8 @@ pub(crate) fn prove_unobserved_admission(
             &format!("{}:{}", freeze.candidate.commit, inputs::STATE),
         ],
     );
-    let (mut w, _) = build(root, P);
+    let (mut w, built) = build(root, P);
+    unrelated_pre_anchor_dispatch_is_inapplicable(root, &publication, &host, &w, &built);
     write(root, inputs::STATE, enrolled);
     git(root, &["add", "."]);
     git(
@@ -168,76 +169,6 @@ pub(crate) fn prove_unobserved_admission(
         )
         .unwrap_err()
         .contains("lifecycle progression"));
-    // Keep protected T at the genuine enrolled freeze while H remains unmerged. L restores
-    // T's entire tree. Removing every H admission from discovery leaves no surviving reference.
-    let unmerged_host = Arc::new(host.fork());
-    let protected = &freeze.candidate.commit;
-    unmerged_host.root(protected);
-    let higher_records: Vec<_> = records
-        .iter()
-        .filter(|r| r.candidate.commit == implementation.candidate.commit)
-        .collect();
-    unmerged_host.change("actions/workflows/ci.yml/runs?per_page=100&page=1", |v| {
-        v["workflow_runs"]
-            .as_array_mut()
-            .unwrap()
-            .retain(|run| !higher_records.iter().any(|r| run["id"] == r.claims.run));
-        v["total_count"] = json!(v["workflow_runs"].as_array().unwrap().len());
-    });
-    assert!(records.iter().all(|r| r
-        .predecessors
-        .iter()
-        .all(|id| { !higher_records.iter().any(|h| h.identity().unwrap() == *id) })));
-    let unmerged = Publication {
-        authority: publication.authority.clone(),
-        host: unmerged_host,
-    };
-    let restored = git(
-        f.root.path(),
-        &[
-            "commit-tree",
-            &freeze.candidate.tree,
-            "-p",
-            &implementation.candidate.commit,
-            "-m",
-            "L restores T after unmerged H",
-        ],
-    );
-    assert!(unmerged
-        .resolve(f.root.path(), &[protected.clone(), restored.clone()])
-        .unwrap()
-        .check_candidate(f.root.path(), &restored, &original, inputs::STATE)
-        .unwrap_err()
-        .contains("history gap"));
-    // An ordinary unadmitted ancestor at T's stage remains admissible, as does the pending
-    // candidate's own higher-stage transition before it has an admission record.
-    let ordinary = git(
-        f.root.path(),
-        &[
-            "commit-tree",
-            &freeze.candidate.tree,
-            "-p",
-            protected,
-            "-m",
-            "ordinary unchanged-stage ancestor",
-        ],
-    );
-    let pending = git(
-        f.root.path(),
-        &[
-            "commit-tree",
-            &implementation.candidate.tree,
-            "-p",
-            &ordinary,
-            "-m",
-            "pending candidate transition",
-        ],
-    );
-    unmerged
-        .resolve(f.root.path(), &[protected.clone(), pending.clone()])
-        .unwrap()
-        .check_candidate(f.root.path(), &pending, &original, inputs::STATE)
-        .unwrap();
     // Hiding the admission population leaves a protected generation gap, even though retained
     // payload bytes, the fake protected branch and valid candidate files are still present.
     host.page("actions/workflows/ci.yml/runs", "workflow_runs", vec![]);
@@ -256,4 +187,47 @@ pub(crate) fn prove_unobserved_admission(
         retained_payloads,
         "discovery must not issue admissions"
     );
+}
+
+fn unrelated_pre_anchor_dispatch_is_inapplicable(
+    root: &Path,
+    publication: &Publication,
+    host: &MemoryHost,
+    witness: &Witness,
+    tip: &str,
+) {
+    // An older branch with no depth record has no enrollment lineage. It still belongs in
+    // the producer inventory, and must be skipped by Event/P/O applicability before history.
+    let empty = git(root, &["mktree"]);
+    let output = crate::git_inputs::command(root)
+        .env("GIT_AUTHOR_DATE", "2000-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2000-01-01T00:00:00Z")
+        .args(["commit-tree", &empty, "-m", "pre-enrollment branch"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let old = String::from_utf8(output.stdout).unwrap().trim().to_owned();
+    let mut api = endpoints(root, P, witness, tip, 1);
+    api.change(RUNS, |value| {
+        value["workflow_runs"].as_array_mut().unwrap().push(json!({
+            "id":999,"head_sha":old,"path":profile::WORKFLOW,
+            "head_repository":{"full_name":ISOLATED},"event":"workflow_dispatch","run_attempt":1
+        }));
+        value["total_count"] = json!(value["workflow_runs"].as_array().unwrap().len());
+    });
+    let host = Arc::new(host.fork());
+    host.root(tip);
+    let publication = Publication {
+        authority: publication.authority.clone(),
+        host,
+    };
+    // Confirm that supplying the unrelated root to the history resolver reproduces the gap.
+    assert!(publication
+        .resolve(root, &[tip.into(), old])
+        .err()
+        .unwrap()
+        .contains("history gap"));
+    let bound = EvidenceHost::for_admission_test(ISOLATED, tip, publication);
+    let resolved = resolve_profile_in(&api, root, P, Some(&bound)).unwrap();
+    assert_eq!(resolved.runs.len(), 11);
 }

@@ -23,9 +23,9 @@ impl History {
         }
         Ok(())
     }
-    pub(crate) fn recheck_publication(&self, run: u64) -> Result<(), String> {
+    pub(crate) fn recheck_publication(&self, claims: &Claims) -> Result<(), String> {
         if let Some((publication, snapshot)) = &self.observation {
-            snapshot.recheck_publication(publication, run)?;
+            snapshot.recheck_publication(publication, claims)?;
         }
         Ok(())
     }
@@ -77,9 +77,6 @@ impl History {
             let Some((_, bytes)) = objects.blob(&object, &path)? else {
                 continue;
             };
-            if bytes.len() > RECORD_LIMIT {
-                return Err("IN1 generation control record exceeds 64 KiB".into());
-            }
             let depth = DepthRecord::parse(
                 std::str::from_utf8(&bytes).map_err(|e| e.to_string())?,
                 &generation.selection.agent_id,
@@ -390,9 +387,6 @@ fn verify_record(objects: &mut Objects<'_>, record: &Record) -> Result<(), Strin
         let (_, bytes) = objects
             .blob(&record.candidate, &path)?
             .ok_or("IN1 generation record missing")?;
-        if bytes.len() > super::RECORD_LIMIT {
-            return Err("IN1 generation control record exceeds 64 KiB".into());
-        }
         let depth = DepthRecord::parse(
             std::str::from_utf8(&bytes).map_err(|e| e.to_string())?,
             &generation.selection.agent_id,

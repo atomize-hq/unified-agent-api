@@ -1,7 +1,12 @@
 //! Bounded content-addressed reads. No ref walk, fetch, candidate execution or global cache.
 use super::{oid, Object, State};
 use crate::agent_lifecycle::LifecycleState;
-use std::{collections::BTreeMap, io::Write, path::Path, process::Stdio};
+use std::{
+    collections::BTreeMap,
+    io::{Read, Write},
+    path::Path,
+    process::Stdio,
+};
 
 const OBJECT_LIMIT: usize = 16_777_216;
 #[derive(Clone)]
@@ -28,6 +33,15 @@ impl<'a> Objects<'a> {
         if let Some(bytes) = self.bytes.get(&key) {
             return Ok(bytes.clone());
         }
+        let object_type = crate::git_inputs::command(self.root)
+            .args(["cat-file", "-t", identity])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !object_type.status.success()
+            || String::from_utf8_lossy(&object_type.stdout).trim() != kind
+        {
+            return Err("IN1 object type mismatch".into());
+        }
         let size = crate::git_inputs::command(self.root)
             .args(["cat-file", "-s", identity])
             .output()
@@ -42,11 +56,25 @@ impl<'a> Objects<'a> {
         {
             return Err("IN1 missing object or object bound exceeded".into());
         }
-        let out = crate::git_inputs::command(self.root)
+        let mut reader = crate::git_inputs::command(self.root)
             .args(["cat-file", kind, identity])
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
             .map_err(|e| e.to_string())?;
-        if !out.status.success() || out.stdout.len() > OBJECT_LIMIT {
+        let mut bytes = Vec::new();
+        let read = reader
+            .stdout
+            .take()
+            .ok_or("missing object output")?
+            .take(OBJECT_LIMIT as u64 + 1)
+            .read_to_end(&mut bytes);
+        if read.is_err() || bytes.len() > OBJECT_LIMIT {
+            let _ = reader.kill();
+            let _ = reader.wait();
+            return Err("IN1 unreadable bounded object".into());
+        }
+        if !reader.wait().map_err(|e| e.to_string())?.success() {
             return Err("IN1 unreadable bounded object".into());
         }
         let mut child = crate::git_inputs::command(self.root)
@@ -60,14 +88,14 @@ impl<'a> Objects<'a> {
             .stdin
             .take()
             .ok_or("missing object hash input")?
-            .write_all(&out.stdout)
+            .write_all(&bytes)
             .map_err(|e| e.to_string())?;
         let hash = child.wait_with_output().map_err(|e| e.to_string())?;
         if !hash.status.success() || String::from_utf8_lossy(&hash.stdout).trim() != identity {
             return Err("IN1 Git object hash mismatch".into());
         }
-        self.bytes.insert(key, out.stdout.clone());
-        Ok(out.stdout)
+        self.bytes.insert(key, bytes.clone());
+        Ok(bytes)
     }
     pub fn commit(&mut self, identity: &str) -> Result<Commit, String> {
         if let Some(commit) = self.commits.get(identity) {
@@ -193,9 +221,6 @@ impl<'a> Objects<'a> {
     pub fn state(&mut self, object: &Object, path: &str) -> Result<Option<State>, String> {
         self.blob(object, path)?
             .map(|(blob, bytes)| {
-                if bytes.len() > super::RECORD_LIMIT {
-                    return Err("IN1 lifecycle control record exceeds 64 KiB".into());
-                }
                 let state: LifecycleState =
                     serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
                 Ok(State {

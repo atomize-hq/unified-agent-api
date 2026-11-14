@@ -1,11 +1,79 @@
 # FR1 admission history implementation report
 
-Status: FR1 code and docs delivered in `feat/fr1-admission-history`; changes intentionally
-uncommitted. All required groups and the final other-PR-only proof have completed. Existing
-sandbox restrictions prevent a fully green validation gate. No live profile, production declaration, network/credentials, commit
-or push was introduced. Compilation uses the default TMPDIR without an override.
+Status — round-2 repairs are implemented in `feat/fr1-admission-history` over `8246eb35`.
+Changes are uncommitted. Requested validation completed with the default TMPDIR. Four existing
+IN1 closeout cases are blocked by the sandbox Unix-socket restriction. All other requested checks pass.
 
-Original scope: the FR1 sub-slice in `support-depth-freeze-readiness-design.md`.
+Original scope follows the FR1 sub-slice in `support-depth-freeze-readiness-design.md`.
+
+## Round-2 repairs
+
+- ZIP descriptors are required when flag bit 3 is set. Signed and unsigned 32-bit and ZIP64
+  forms must match the central/local declarations and independently decoded length and CRC.
+  Missing, truncated, garbage and inconsistent descriptors refuse. The reviewer's zero CRC,
+  compressed-size maximum and million-byte expanded-size mutations are covered in all forms.
+- The connected public ON2 chain now drives L through real IN1 with protected enrolled T,
+  unmerged admitted H, H's runs hidden and L restoring T's complete tree. It requires a retained
+  refusal containing `history gap`. The earlier direct-check-only connected assertion was
+  replaced. Small lineage tests still cover unchanged-stage ancestors and second parents.
+- The late-parent-retry test publishes parent, child and same-run parent attempts two and three through
+  `Route::with_admitted_publication`. It authenticates the retained child in both listing orders
+  and compares its original payload bytes and predecessor identities. Publication rechecks now
+  permit that precise retry inventory/artifact addition while checking earlier facts unchanged.
+- Fixed canonical UTF-8 bytes and independently computed SHA-256 vectors pin the admission,
+  generation and evaluated-input domains, including their terminating NUL. Fixtures cover ordered
+  maps, escaped text and Unicode. They are independent of runtime-generated fixture identities.
+- Git object reads check the exact object type, then read at most the object bound plus one byte,
+  killing and reaping the reader on overflow. A malformed regular-file tree entry pointing at a
+  small tag to a blob larger than 16 MiB refuses at the type check.
+- Producer discovery applies the existing Event/P/O filter before passing candidate roots to
+  admission history. Independent admission discovery still enumerates every admission attempt.
+  The connected positive includes a same-repository dispatch on a pre-enrollment branch without
+  an applicable depth record. Supplying that branch directly to history reproduces the gap.
+- The 64 KiB bound applies to versioned admission control records. Existing depth and lifecycle
+  input reads retain their prior object bound. The connected chain publishes and authenticates
+  depth/lifecycle files exceeding 64 KiB through valid formatting, with a small admission record.
+  `lineage::legacy_inputs_over_64k_remain_readable_in_ancestor_history` also covers these files
+  on an admitted ancestor of a pending candidate.
+
+New test support lives in `admission/tests/vectors.rs`, `admission/tests/vectors/*.json` and
+`isolated_maintenance/tests/bootstrap/public_on2/admissions.rs`. Paths starting with `admission/`
+are relative to `crates/xtask/src/depth_acceptance/`. Other round-2 edits affect the owning object,
+emitter, history, transport, fake-host and population modules and their existing tests, the Python
+archive reader/tests, this report, the design status and Annex A.
+
+### Round-2 validation
+
+| Command | Result and runtime |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass, 2.71 s wall |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass, 13.30 s wall |
+| `cargo test -p xtask --lib depth_acceptance` | 66 passed, 42.73 s tests, 59.41 s wall including compilation |
+| `cargo test -p xtask --lib isolated_maintenance::tests::in1_integration` | 24 passed, 4 sandbox channel failures, 94.04 s tests, 97.00 s wall |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on2` | 5 passed, 252.95 s tests, 258.23 s wall |
+| `cargo test -p xtask --lib depth_evidence::verdict::github` | 33 passed, 147.93 s tests, 149.74 s wall |
+| Python archive tests | 13 passed, 0.023 s tests, 0.110 s wall |
+| `make loc-check` | Pass, 0.146 s wall |
+| `make hygiene` | Pass, 0.198 s wall |
+| Focused admission tests | 23 passed, 27.85 s tests, 38.50 s wall including compile |
+| Focused IN1 publication/retry tests | 4 passed, 10.82 s tests, 46.96 s wall including 36.11 s compilation |
+
+The four IN1 failures are the existing connected closeout tests. Each reaches the MA4 evidence
+channel and receives `Operation not permitted` when opening its Unix socket. The focused FR1
+publication tests pass, including the genuine same-run retries. The full groups ran concurrently, so timings include contention. The connected
+`public_on2_connected_freeze_write_admission_and_observation` proof passed within the five-test
+public ON2 group. Its containing group runtime is recorded above. The final runs cover the
+timestamped unrelated branch, attempt-three/artifact-page recheck and padded ancestor inputs.
+
+The original reader at `8246eb35` accepts all 24 malformed descriptor cases in the new regression
+(the six mutations across signed/unsigned and 32-bit/ZIP64 forms). The fixed reader rejects them.
+An additional in-memory matrix passed 48 combinations of four compression methods, both descriptor
+widths, both signature forms and empty/two-byte/exact-boundary payloads. `git diff --check` passes.
+
+## Earlier implementation and first repair
+
+The remaining sections record the original implementation and first repair, including their
+historical runtimes and sandbox restrictions. The round-2 table above is the current gate.
 
 ## Adversarial repair at a11f3712
 
@@ -27,7 +95,8 @@ Python archive tests pass, including exact-boundary positives for every supporte
 method and descriptor-based ZIP streams. The real ON2 chain now additionally checks the genuine
 unmerged higher-stage admission, restored complete tree, hidden run, ordinary-ancestor positive
 and the existing producer-discovery refusal after hiding the protected admission population.
-The new unmerged case directly exercises the shared history checker. An added discovery call at
+The first-repair unmerged case directly exercised the shared history checker. Round 2 replaces
+that connected assertion with actual IN1 publication and retained-refusal checks. An added discovery call at
 the enrolled protected source instead reached the independent producer-inventory guard, since
 the current checkout included implementation/collector files absent at that source. That
 misplaced assertion was removed. The first connected run took 295.75 s and reached all new
@@ -162,7 +231,7 @@ Names without a prefix below are under `depth_acceptance::admission::tests::`.
 | 1,000 unique commits accepted, 1,001 refused without truncation | `unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation` | A |
 | Archive/log/object bounds | `oversized_archives_logs_and_objects_refuse_without_truncation`; Python IN1 tests additionally exercise 64 KiB exact boundary | A; Python 0.018 s |
 | Conflicting decisions; distinct roots and retries | `retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs` | A |
-| Late retry cannot rewrite a child's predecessor | `late_parent_retry_does_not_rewrite_existing_child_predecessors` (both admission orders) | A |
+| Late retry cannot rewrite a child's predecessor | `isolated_maintenance::tests::in1_integration::admission::late_parent_retry_does_not_rewrite_existing_child_predecessors` (real emitter, same-run attempts two and three, both listing orders) | Round-2 IN1 publication group above |
 | Revocation preserves historical authority | `revocation_preserves_immutable_history_and_changes_present_eligibility`; connected proof also revokes higher-stage authority and still refuses rollback | A, C |
 | Changing roots/populations, including consumption recheck | `roots_and_populations_are_rechecked_after_history_and_at_consumption`; `concurrent_host_attempt_registration_preserves_the_complete_population` | A |
 | Complete runtime Git policy identity; forged source/map/digest; overrides | `policy_identity_covers_git_policy_and_dependency_closure`, `policy::runtime_git_policy_authentication_rejects_self_selected_closure_and_source`, `policy::runtime_policy_refuses_root_toolchain_configuration_even_with_matching_claims` | A |
@@ -223,8 +292,8 @@ Times use default TMPDIR; no sandbox restrictions were bypassed.
 
 The evidence failures reproduce documented sandbox restrictions: ten staged-channel tests cannot
 bind Unix sockets (`Operation not permitted`, including the forged-channel child that never binds);
-two native local-guard tests fail `ForeignLoader` because explicitly `/tmp`-rooted fixtures see
-injected `/tmp/.codex` and `/tmp/.agents` ancestor loaders. Those tests and guards remain unchanged.
+two native local-guard tests fail `ForeignLoader` because temporary-directory fixtures see
+injected `.codex` and `.agents` ancestor loaders. Those tests and guards remain unchanged.
 The lead must rerun the full affected groups unrestricted; these results are not a fully green gate.
 
 The four IN1 failures are the unchanged connected closeout cases

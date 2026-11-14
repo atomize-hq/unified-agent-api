@@ -108,6 +108,41 @@ class ArchiveTests(unittest.TestCase):
                 struct.pack_into('<I',raw,descriptor+4,zlib.crc32(b'{}'))
                 struct.pack_into('<I',raw,descriptor+12,2)
                 with self.assertRaises(ValueError):archive.in1(bytes(raw))
+    def descriptor_archive(self,value,zip64,signature):
+        class Unseekable(io.BytesIO):
+            def seek(self,*args):raise OSError('stream has no seek')
+        output=Unseekable()
+        with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as zipped:
+            with zipped.open('admission.json','w',force_zip64=zip64) as entry:
+                entry.write(value)
+        raw=bytearray(output.getvalue())
+        descriptor=raw.index(b'PK\x07\x08')
+        if not signature:
+            del raw[descriptor:descriptor+4]
+            central=raw.index(b'PK\x01\x02')
+            struct.pack_into('<I',raw,raw.index(b'PK\x05\x06')+16,central)
+        return raw,descriptor
+    def test_in1_required_descriptors_match_crc_and_sizes(self):
+        for zip64 in [False,True]:
+            for signature in [False,True]:
+                for value in [b'{}',b'x'*65536]:
+                    raw,_=self.descriptor_archive(value,zip64,signature)
+                    self.assertEqual(archive.in1(bytes(raw)),value)
+                for mutation in ['crc','compressed','expanded','garbage','missing','truncated']:
+                    with self.subTest(zip64=zip64,signature=signature,mutation=mutation):
+                        raw,start=self.descriptor_archive(b'{}',zip64,signature)
+                        central=raw.index(b'PK\x01\x02')
+                        fields=start+(4 if signature else 0)
+                        width=8 if zip64 else 4
+                        if mutation=='crc':struct.pack_into('<I',raw,fields,0)
+                        elif mutation=='compressed':struct.pack_into('<Q' if zip64 else '<I',raw,fields+4,0xffffffff)
+                        elif mutation=='expanded':struct.pack_into('<Q' if zip64 else '<I',raw,fields+4+width,1000000)
+                        elif mutation=='garbage':raw[start:central]=b'x'*(central-start)
+                        else:
+                            del raw[start:central if mutation=='missing' else central-1]
+                            central=raw.index(b'PK\x01\x02')
+                            struct.pack_into('<I',raw,raw.index(b'PK\x05\x06')+16,central)
+                        with self.assertRaises(ValueError):archive.in1(bytes(raw))
     def test_in1_zip64_local_sizes_and_excess_compressed_data(self):
         output=io.BytesIO()
         with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as zipped:

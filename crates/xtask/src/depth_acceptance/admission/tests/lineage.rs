@@ -146,6 +146,23 @@ fn ordinary_unadmitted_ancestors_and_pending_candidate_transition_pass() {
 }
 
 #[test]
+fn legacy_inputs_over_64k_remain_readable_in_ancestor_history() {
+    let f = Lineage::new();
+    for path in [DEPTH, STATE] {
+        let mut bytes = std::fs::read(f.root.path().join(path)).unwrap();
+        bytes.extend(vec![b' '; 65_537]);
+        std::fs::write(f.root.path().join(path), bytes).unwrap();
+    }
+    git(f.root.path(), &["add", "."]);
+    git(f.root.path(), &["commit", "-qm", "legacy input formatting"]);
+    let formatted = git(f.root.path(), &["rev-parse", "HEAD"]);
+    let admitted = f.admit(&formatted, &f.enrolled);
+    assert!(admitted.canonical().unwrap().len() < RECORD_LIMIT);
+    let candidate = f.commit(LifecycleStage::RuntimeIntegrated, "pending transition");
+    f.check(&candidate).unwrap();
+}
+
+#[test]
 fn missing_admission_on_second_parent_refuses() {
     let f = Lineage::new();
     let higher = f.commit(

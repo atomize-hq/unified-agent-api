@@ -75,16 +75,11 @@ impl Emitter {
         }
         let depth = objects
             .blob(&candidate, &self.record_path)?
-            .map(|(_, bytes)| {
-                if bytes.len() > RECORD_LIMIT {
-                    return Err("IN1 generation control record exceeds 64 KiB".to_owned());
-                }
-                Ok(std::str::from_utf8(&bytes)
+            .and_then(|(_, bytes)| {
+                std::str::from_utf8(&bytes)
                     .ok()
-                    .and_then(|raw| DepthRecord::parse(raw, &self.agent, &self.version).ok()))
-            })
-            .transpose()?
-            .flatten();
+                    .and_then(|raw| DepthRecord::parse(raw, &self.agent, &self.version).ok())
+            });
         let generation = depth.as_ref().map(Generation::from_record);
         let mut execution_evidence = Vec::new();
         if let Some(depth) = &depth {
@@ -175,7 +170,7 @@ impl Emitter {
             claims: session.claims.clone(),
         })?;
         if let Ok(history) = history {
-            history.recheck_publication(session.claims.run)?;
+            history.recheck_publication(&session.claims)?;
         }
         Ok(())
     }

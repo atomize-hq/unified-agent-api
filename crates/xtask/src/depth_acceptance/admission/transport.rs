@@ -174,19 +174,53 @@ impl Snapshot {
     pub(super) fn recheck_publication(
         &self,
         publication: &Publication,
-        run: u64,
+        claims: &Claims,
     ) -> Result<(), String> {
         let rows = list(publication.host.as_ref(), RUNS, "workflow_runs")?.0;
-        let others: Vec<_> = rows
-            .iter()
-            .filter(|row| row["id"] != run)
-            .cloned()
-            .collect();
-        if others != self.inventory || rows.len() != self.inventory.len() + 1 {
+        let mut expected = self.inventory.clone();
+        let retry = expected.iter_mut().find(|row| row["id"] == claims.run);
+        if let Some(prior) = retry {
+            if prior["run_attempt"].as_u64().and_then(|n| n.checked_add(1)) != Some(claims.attempt)
+            {
+                return Err("IN1 retry skipped an attempt".into());
+            }
+            prior["run_attempt"] = claims.attempt.into();
+        } else {
+            if claims.attempt != 1 || rows.len() != expected.len() + 1 {
+                return Err("IN1 first publication attempt or population changed".into());
+            }
+            let index = rows
+                .iter()
+                .position(|row| row["id"] == claims.run)
+                .ok_or("IN1 publication missing from inventory")?;
+            expected.insert(index, rows[index].clone());
+        }
+        if rows != expected {
             return Err("IN1 admission population changed around publication".into());
         }
+        let artifact_path = format!("actions/runs/{}/artifacts", claims.run);
+        let artifact_query = format!("{artifact_path}?");
+        let mut pages = BTreeSet::new();
+        let prior_artifacts: Vec<_> = self
+            .observations
+            .iter()
+            .filter(|(path, _)| path.starts_with(&artifact_query) && pages.insert(path))
+            .flat_map(|(_, value)| value["artifacts"].as_array().into_iter().flatten().cloned())
+            .collect();
+        if !prior_artifacts.is_empty() {
+            let mut artifacts = list(publication.host.as_ref(), &artifact_path, "artifacts")?.0;
+            let name = format!("in1-admission-{}-{}", claims.run, claims.attempt);
+            let count = artifacts.len();
+            artifacts.retain(|row| row["name"] != name);
+            if count != prior_artifacts.len() + 1 || artifacts != prior_artifacts {
+                return Err("IN1 earlier artifacts changed around retry publication".into());
+            }
+        }
         for (path, before) in &self.observations {
-            if !path.starts_with(RUNS) && publication.host.json(path)? != *before {
+            if !path.starts_with(RUNS)
+                && !path.starts_with(&artifact_query)
+                && publication.host.json(path)? != *before
+            {
                 return Err("IN1 roots or earlier attempts changed around publication".into());
             }
         }

@@ -14,6 +14,7 @@ use std::{
 pub(crate) struct MemoryHost {
     pub facts: Mutex<BTreeMap<String, Vec<u8>>>,
     next: AtomicU64,
+    next_retry: Mutex<Option<Record>>,
     pub fail_upload: std::sync::atomic::AtomicBool,
     pub fail_commit: std::sync::atomic::AtomicBool,
 }
@@ -22,6 +23,7 @@ impl Default for MemoryHost {
         let host = Self {
             facts: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(1000),
+            next_retry: Mutex::new(None),
             fail_upload: false.into(),
             fail_commit: false.into(),
         };
@@ -101,10 +103,14 @@ impl MemoryHost {
         );
         claims
     }
+    pub(crate) fn retry_on_next_begin(&self, prior: &Record) {
+        *self.next_retry.lock().unwrap() = Some(prior.clone());
+    }
     pub(crate) fn fork(&self) -> Self {
         Self {
             facts: Mutex::new(self.facts.lock().unwrap().clone()),
             next: AtomicU64::new(self.next.load(Ordering::SeqCst)),
+            next_retry: Mutex::new(None),
             fail_upload: false.into(),
             fail_commit: false.into(),
         }
@@ -137,6 +143,12 @@ impl Host for MemoryHost {
         Ok(bytes)
     }
     fn begin(&self, candidate: &str, policy: &Policy) -> Result<Claims, String> {
+        if let Some(prior) = self.next_retry.lock().unwrap().take() {
+            if prior.candidate.commit != candidate || prior.policy != *policy {
+                return Err("fake retry candidate/policy mismatch".into());
+            }
+            return Ok(self.retry(&prior));
+        }
         let run = self.next.fetch_add(1, Ordering::SeqCst);
         let claims = Claims {
             run,

@@ -113,7 +113,27 @@ def in1(raw):
             raise ValueError('control payload exceeds bounds or declared size')
         if zlib.crc32(value)!=entry.CRC:
             raise ValueError('control CRC mismatch')
+        if entry.flag_bits&8:
+            end=start+entry.compress_size
+            zip64=0xffffffff in header[7:9]
+            control_descriptor(raw[end:archive.start_dir],entry,zip64)
         return value
+
+def control_descriptor(raw,entry,zip64):
+    """A streamed entry must declare the same CRC and sizes after its compressed span."""
+    # Descriptor length disambiguates a signature from a CRC equal to the signature.
+    if len(raw) in (16,24):
+        if raw[:4]!=b'PK\x07\x08':
+            raise ValueError('invalid control data descriptor signature')
+        raw=raw[4:]
+    if len(raw)==20:
+        declared=struct.unpack('<IQQ',raw)
+    elif len(raw)==12 and not zip64:
+        declared=struct.unpack('<III',raw)
+    else:
+        raise ValueError('missing or invalid control data descriptor')
+    if declared!=(entry.CRC,entry.compress_size,entry.file_size):
+        raise ValueError('control data descriptor CRC or sizes disagree')
 
 def control_payload(compressed,method):
     """Bound native streaming decompressors independently of ZIP's expanded-size fields."""
