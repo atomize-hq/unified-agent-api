@@ -276,7 +276,7 @@ impl WorkspacePathJail {
 }
 
 #[path = "workspace_mutation/delivery.rs"]
-mod delivery;
+pub(crate) mod delivery;
 pub use delivery::apply_mutations;
 
 /// Only owning routes which independently admit their whole proposal may use this boundary.

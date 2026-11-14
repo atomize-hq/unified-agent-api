@@ -30,7 +30,7 @@ pub(super) fn read(
 }
 
 /// An internal execution view after strict finite validation, never a production loader.
-pub(super) fn execution(
+pub(crate) fn execution(
     workspace: &Path,
     raw: &[u8],
     path: &str,
