@@ -371,6 +371,7 @@ fn ordinary_later_request_preserves_retained_evaluation_and_target_refusals() {
     ordinary.remove("support_depth");
     ordinary["detected_release"]["target_version"] = toml_edit::value("0.3.0");
     ordinary["request_commit"] = toml_edit::value("a".repeat(40));
+    ordinary["trigger_kind"] = toml_edit::value("upstream_release_detected");
     write(root, &path, ordinary.to_string());
     let later = commit(root);
     let at = source(root, ISOLATED, &later).unwrap();
@@ -454,6 +455,125 @@ fn ordinary_later_request_preserves_retained_evaluation_and_target_refusals() {
         }
         let error = P.resolve_generation(&at).err().unwrap();
         assert!(error.contains(expected), "{error}");
+    }
+}
+
+#[test]
+fn ordinary_later_request_validates_retained_generation_before_evaluation() {
+    struct Reauthenticated<'a> {
+        fixture: &'a Fixture,
+        host: &'a EvidenceHost,
+        refusal: std::cell::RefCell<Option<String>>,
+    }
+    impl Host for Reauthenticated<'_> {
+        fn population(&self, current: &Evaluation) -> Result<Option<Population>, String> {
+            match resolve_profile_in(
+                &self.fixture.api,
+                self.fixture.root.path(),
+                P,
+                Some(self.host),
+            ) {
+                Ok(resolved) => resolved.population(current),
+                Err(reason) => {
+                    // Match the production adapter's refusal and retain its diagnostic.
+                    *self.refusal.borrow_mut() = Some(reason);
+                    Ok(None)
+                }
+            }
+        }
+    }
+    let f = Fixture::new_for(P);
+    let root = f.root.path();
+    let host = EvidenceHost::for_test(ISOLATED, &f.commit);
+    let resolved = resolve_profile_in(&f.api, root, P, Some(&host)).unwrap();
+    let assembled = assembly::assemble(&resolved).unwrap();
+    for (file, bytes) in assembled.files {
+        write(root, &file.path, bytes);
+    }
+    let mut record = resolved.original.clone();
+    record.execution = Some(assembled.execution);
+    write(root, REPORT, serde_json::to_vec_pretty(&record).unwrap());
+    let path = crate::agent_lifecycle::maintenance_request_path(P.agent_id());
+    let mut ordinary: toml_edit::DocumentMut = fs::read_to_string(root.join(&path))
+        .unwrap()
+        .parse()
+        .unwrap();
+    ordinary.remove("support_depth");
+    ordinary["detected_release"]["target_version"] = toml_edit::value("0.3.0");
+    ordinary["request_commit"] = toml_edit::value("a".repeat(40));
+    write(root, &path, ordinary.to_string());
+    let clean = commit(root);
+    let run = &resolved.runs[0];
+    let obligation = P.obligations(&record).remove(0);
+    let current = Evaluation {
+        current: profile::scope_for(&record, P, obligation.clone()),
+        definition_sha256: resolved.definition.clone(),
+        record: record.clone(),
+        environment: run.witness.environment.clone(),
+        toolchain: run.witness.build.toolchain.clone(),
+    };
+    let reauthenticated = Reauthenticated {
+        fixture: &f,
+        host: &host,
+        refusal: Default::default(),
+    };
+    for mutation in 0..3 {
+        git(root, &["reset", "--hard", &clean]);
+        let expected = match mutation {
+            0 => None,
+            1 => {
+                let mut duplicate = resolved.original.clone();
+                duplicate.policy.selection.enrollment.version = "0.3.0".into();
+                duplicate.policy.identity =
+                    crate::depth_record::part_identity(&duplicate.policy).unwrap();
+                let o = duplicate.obligations.as_mut().unwrap();
+                o.policy_identity = duplicate.policy.identity.clone();
+                o.identity = crate::depth_record::part_identity(o).unwrap();
+                write(
+                    root,
+                    "cli_manifests/depth_fixture/reports/0.3.0/depth-record.json",
+                    serde_json::to_vec_pretty(&duplicate).unwrap(),
+                );
+                Some("ambiguous maintenance generation reports")
+            }
+            _ => {
+                write(
+                    root,
+                    &record.obligations.as_ref().unwrap().acquired_inputs[0].path,
+                    b"stale retained generation input",
+                );
+                Some("maintenance generation has stale acquired input")
+            }
+        };
+        let head = commit(root);
+        *reauthenticated.refusal.borrow_mut() = None;
+        let verdict = evaluate(
+            root,
+            &assembled.selected[&obligation],
+            &current,
+            &reauthenticated,
+        )
+        .unwrap();
+        assert_eq!(
+            verdict.result,
+            if expected.is_some() {
+                DepthResult::Unverified
+            } else {
+                DepthResult::Verified
+            },
+            "mutation {mutation}: {verdict:?}"
+        );
+        assert_eq!(reauthenticated.refusal.borrow().as_deref(), expected);
+        if let Some(expected) = expected {
+            let at = source(root, ISOLATED, &head).unwrap();
+            for target in [None, Some(&resolved.original)] {
+                let error = P
+                    .resolve_inputs(&mut at.clone(), target, false)
+                    .err()
+                    .unwrap();
+                assert_eq!(error, expected);
+            }
+        }
     }
 }
 

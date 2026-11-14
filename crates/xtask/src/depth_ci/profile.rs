@@ -437,6 +437,24 @@ mod onboarding_tests {
 pub(crate) struct GenerationBinding {
     pub record: crate::depth_record::DepthRecord,
 }
+/// An ordinary later request retains evaluation authority without an active producer binding.
+pub(crate) enum GenerationResolution {
+    Active(GenerationBinding),
+    Retained(GenerationBinding),
+}
+impl GenerationResolution {
+    fn active(self) -> Option<GenerationBinding> {
+        match self {
+            Self::Active(binding) => Some(binding),
+            Self::Retained(_) => None,
+        }
+    }
+    pub(crate) fn binding(self) -> GenerationBinding {
+        match self {
+            Self::Active(binding) | Self::Retained(binding) => binding,
+        }
+    }
+}
 pub(crate) trait GenerationResolver {
     fn profile(&self) -> Profile;
     fn resolve_inputs(
@@ -445,6 +463,16 @@ pub(crate) trait GenerationResolver {
         target: Option<&crate::depth_record::DepthRecord>,
         associated: bool,
     ) -> Result<Option<GenerationBinding>, String> {
+        Ok(self
+            .resolve_binding(inputs, target, associated)?
+            .and_then(GenerationResolution::active))
+    }
+    fn resolve_binding(
+        &self,
+        inputs: &mut impl crate::support_depth::acquisition_inputs::Inputs,
+        target: Option<&crate::depth_record::DepthRecord>,
+        associated: bool,
+    ) -> Result<Option<GenerationResolution>, String> {
         let p = self.profile();
         if p == Profile::Synthetic {
             return super::maintenance::resolve(inputs, p, target, associated);
@@ -453,7 +481,7 @@ pub(crate) trait GenerationResolver {
             .optional(p.fixture())?
             .map(|raw| {
                 p.record(std::str::from_utf8(&raw).map_err(|e| e.to_string())?)
-                    .map(|record| GenerationBinding { record })
+                    .map(|record| GenerationResolution::Active(GenerationBinding { record }))
             })
             .transpose()?;
         Ok(binding)

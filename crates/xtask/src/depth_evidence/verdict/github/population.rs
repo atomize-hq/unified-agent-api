@@ -73,17 +73,11 @@ pub(super) fn resolve_generation_inputs(
         // stays at the caller's immutable checkout, including when the view lives in scratch.
         // Proposed build/acquired inputs below retain all GitInputs freshness checks.
         let committed = view.provenance("HEAD")?;
-        match resolver.resolve_generation(&committed)? {
-            Some(binding) => binding.record,
-            None => {
-                // An ordinary later packet has no active depth generation. Evaluation still
-                // selects the retained versioned statement at this immutable checkout.
-                let mut retained = p.record(&committed.read(depth_ci::onboarding::RECORD)?)?;
-                retained.execution = None;
-                retained.acceptance_entries.clear();
-                retained
-            }
-        }
+        resolver
+            .resolve_binding(&mut committed.clone(), None, false)?
+            .ok_or("generation unavailable")?
+            .binding()
+            .record
     } else {
         resolver.current_generation(view)?.record
     };

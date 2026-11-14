@@ -1,5 +1,5 @@
 //! Canonical MA2 input evidence. Checkpoint authority belongs to protected IN1 and its join.
-use super::profile::{GenerationBinding, Profile};
+use super::profile::{GenerationBinding, GenerationResolution, Profile};
 use crate::{
     agent_maintenance::{request::SupportDepthBinding, support_audit::SurfaceIdentity},
     depth_record::{DepthRecord, Event, RequestBinding},
@@ -13,7 +13,7 @@ pub(crate) fn resolve(
     p: Profile,
     target: Option<&DepthRecord>,
     associated: bool,
-) -> Result<Option<GenerationBinding>, String> {
+) -> Result<Option<GenerationResolution>, String> {
     let request_path = crate::agent_lifecycle::maintenance_request_path(p.agent_id());
     // Capture both reads before parsing. An unavailable read never means absent association.
     let request = inputs.optional(&request_path)?;
@@ -70,36 +70,40 @@ pub(crate) fn resolve(
     if request.artifact_version != "2" || request.agent_id != p.agent_id() {
         return Err("maintenance generation version, agent or enrollment mismatch".into());
     }
-    let Some(support_depth) = &request.support_depth else {
+    let ordinary = if request.support_depth.is_none() {
         // A later ordinary packet can coexist with this version's retained report. A target
         // request stripped of its binding, or an independently associated replacement, refuses.
         if request.detected_release.target_version != p.version()
             && target.map_or(true, |t| t.event != request.event())
             && report.as_ref().map_or(true, |r| r.event != request.event())
         {
-            return if associated {
-                Err("associated head replaced maintenance generation".into())
-            } else {
-                Ok(None)
-            };
+            if associated {
+                return Err("associated head replaced maintenance generation".into());
+            }
+            true
+        } else {
+            return Err("maintenance generation request missing support_depth".into());
         }
-        return Err("maintenance generation request missing support_depth".into());
+    } else {
+        false
     };
     let mut record = report.ok_or("maintenance generation report missing")?;
-    if request.detected_release.target_version != p.version()
+    if (!ordinary && request.detected_release.target_version != p.version())
         || record.policy.selection.enrollment.lifecycle_path
             != crate::agent_registry::support_depth::LifecyclePath::Maintenance
     {
         return Err("maintenance generation version, agent or enrollment mismatch".into());
     }
-    if let Some(reason) = record.request_mismatch(&RequestBinding {
-        event: request.event(),
-        policy_identity: Some(support_depth.policy_identity.clone()),
-        obligations_identity: support_depth.obligations_identity.clone(),
-    }) {
-        return Err(format!(
-            "maintenance generation request/report mismatch: {reason}"
-        ));
+    if let Some(support_depth) = &request.support_depth {
+        if let Some(reason) = record.request_mismatch(&RequestBinding {
+            event: request.event(),
+            policy_identity: Some(support_depth.policy_identity.clone()),
+            obligations_identity: support_depth.obligations_identity.clone(),
+        }) {
+            return Err(format!(
+                "maintenance generation request/report mismatch: {reason}"
+            ));
+        }
     }
     let different_generation = target.is_some_and(|t| {
         t.event != record.event || t.policy != record.policy || t.obligations != record.obligations
@@ -131,7 +135,9 @@ pub(crate) fn resolve(
             return Err("maintenance generation has stale acquired input".into());
         }
     }
-    if request.trigger_kind == "isolated_synthetic_wrapper" {
+    if matches!(&record.event, Event::Maintenance { trigger_kind, .. }
+        if trigger_kind == "isolated_synthetic_wrapper")
+    {
         // The original finite machinery profile has a compiled P/O, with no CLI acquisition.
         let expected = p.record(include_str!(
             "../../tests/fixtures/depth-synthetic/record.json"
@@ -144,6 +150,9 @@ pub(crate) fn resolve(
             .support_surface_audit
             .required_uplifts_this_run
             .into_iter()
+            // Retained O already carries the original generation's acceptance work. The
+            // later ordinary packet's audit cannot add work to that frozen generation.
+            .filter(|_| !ordinary)
             .map(|r| SurfaceIdentity::new(r.surface_kind, r.command_path, r.surface_id))
             .collect::<BTreeSet<_>>();
         crate::support_depth::generation::check(inputs, &record, &required)?;
@@ -153,7 +162,12 @@ pub(crate) fn resolve(
     }
     record.execution = None;
     record.acceptance_entries.clear();
-    Ok(Some(GenerationBinding { record }))
+    let binding = GenerationBinding { record };
+    Ok(Some(if ordinary {
+        GenerationResolution::Retained(binding)
+    } else {
+        GenerationResolution::Active(binding)
+    }))
 }
 fn text(bytes: &[u8]) -> Result<&str, String> {
     std::str::from_utf8(bytes).map_err(|e| e.to_string())

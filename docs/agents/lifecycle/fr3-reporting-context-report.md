@@ -391,3 +391,32 @@ The additional verdict run's seven onboarding fixtures fail in their existing pr
 before resolver execution. Cargo discovers the enclosing repository workspace from the required
 `target/tmp` location and reports that the standalone fixture package believes it belongs to that
 workspace. Details are in the ignored `target/fr3-round3-verdict-tests.log`.
+
+## Round 4 fix
+
+The shared maintenance resolver now validates the retained report before returning ordinary-request
+treatment. Report structure, duplicate Event claims across versioned reports, acquired-input freshness
+and policy/obligation re-derivation all run before that return. An explicit retained binding supplies
+population evaluation with the validated Event/P/O projection. Producer discovery continues to receive
+no active generation for a clean ordinary later request. Retained validation uses the report's Event
+and carried acceptance work, so the later request's trigger and audit cannot redefine its generation.
+
+The socket-free generation regression reproduced a duplicate retained-Event claim yielding `verified`
+before the fix. Its clean, duplicate-claim and stale-input cases now exercise population authentication
+and the real evaluator. The clean case remains `verified`; both refusals yield `unverified` and retain
+the exact ambiguity or stale-input resolver diagnostic. Direct resolution checks both target discovery
+and initial evaluation. The existing ordinary-request regression also uses a different later trigger.
+
+The requested temporary directory is read-only in this sandbox. Every Cargo/test command uses the
+default temporary directory through `env -u TMPDIR`. The lead runs the socket-dependent MA6 replay.
+
+| Check | Round 4 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass |
+| `cargo test -p xtask --lib depth_ci` | 8 passed |
+| `cargo test -p xtask --lib depth_evidence::verdict::github::tests::generation -- --test-threads=1` | 5 passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr3_reporting -- --test-threads=1` | 1 passed |
+| `make loc-check`, `git diff --check` | Pass |
+
+Changes remain uncommitted on `feat/fr3-reporting-context` for the lead.
