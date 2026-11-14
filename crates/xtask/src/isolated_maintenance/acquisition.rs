@@ -2,11 +2,12 @@
 //! producer artifacts: an approved union job commits to the checked bundle's complete inventory.
 //! Production Host defaults to no policy/reference and cannot issue acquisition authority.
 use crate::depth_acceptance::admission::{
-    canonical, digest, policy, transport, Generation, Host, Object, Policy, Publication, Repository,
+    canonical, digest, transport, Generation, Host, Object, Policy, Publication, Repository,
 };
 use crate::freeze_transition::acquisition::Inventory;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(test)]
 use std::path::Path;
 
 const LIMIT: usize = 536_870_912;
@@ -207,6 +208,7 @@ pub(crate) fn commitment(identity: &str, artifact: u64) -> String {
 }
 impl Retained {
     #[allow(clippy::too_many_arguments)]
+    #[cfg(test)]
     pub(crate) fn require_binding(
         &self,
         root: &Path,
@@ -217,7 +219,24 @@ impl Retained {
         plan: &crate::manifest_acquisition::AcquisitionPlan,
         branch: &str,
     ) -> Result<(), String> {
-        policy::authenticate(root, &self.approved, &publication.authority.policy)?;
+        crate::depth_acceptance::admission::policy::authenticate(
+            root,
+            &self.approved,
+            &publication.authority.policy,
+        )?;
+        self.require_association(publication, parent, candidate, generation, plan, branch)
+    }
+
+    /// Pure association check after the caller has authenticated the protected policy source.
+    pub(crate) fn require_association(
+        &self,
+        publication: &Publication,
+        parent: &Object,
+        candidate: &Object,
+        generation: &Generation,
+        plan: &crate::manifest_acquisition::AcquisitionPlan,
+        branch: &str,
+    ) -> Result<(), String> {
         let o = &self.observation;
         let inputs = serde_json::json!({"agent_id":plan.agent_id,"target_version":plan.version,"ref":branch,"commit":true});
         if o.repository != publication.authority.repository

@@ -66,7 +66,7 @@ impl Emitter {
     pub(crate) fn prepare(&mut self, root: &Path) -> Result<(), String> {
         let prepared = self.read_inputs(root);
         observations::unavailable("in1/evaluated-inputs", &prepared);
-        self.prepared = Some(prepared?);
+        prepared?;
         let stable = self.recheck_freeze();
         observations::unavailable("in1/freeze-stability", &stable);
         stable
@@ -77,7 +77,7 @@ impl Emitter {
         }
         Ok(())
     }
-    fn read_inputs(&self, root: &Path) -> Result<(Record, Option<freeze::Captured>), String> {
+    fn read_inputs(&mut self, root: &Path) -> Result<(), String> {
         let mut objects = Objects::new(root);
         let candidate = objects.commit(&self.candidate)?.object;
         let parent = objects
@@ -146,26 +146,34 @@ impl Emitter {
         let captured = depth
             .as_ref()
             .map(|_| freeze::Captured::read(self.publication.host.as_ref(), &self.candidate))
-            .transpose()?;
-        if let Some(captured) = &captured {
+            .transpose();
+        if let Ok(Some(captured)) = &captured {
             captured.pin();
         }
-        let classification = depth
+        let classification = captured
             .as_ref()
-            .zip(captured.as_ref())
-            .map(|(depth, captured)| {
-                freeze::classify_authenticated(
-                    root,
-                    &self.publication,
-                    &parent,
-                    &candidate,
-                    depth,
-                    captured.observation.as_ref(),
-                    &Ok(captured.acquired.clone()),
-                )
+            .map_err(Clone::clone)
+            .and_then(|captured| {
+                depth
+                    .as_ref()
+                    .zip(captured.as_ref())
+                    .map(|(depth, captured)| {
+                        freeze::classify_authenticated(
+                            root,
+                            &self.publication,
+                            &parent,
+                            &candidate,
+                            depth,
+                            captured.observation.as_ref(),
+                            &Ok(captured.acquired.clone()),
+                        )
+                    })
+                    .transpose()
             });
+        observations::unavailable("in1/freeze-planning", &classification);
+        let established = classification.as_ref().ok().and_then(Option::as_ref);
         let bootstrap = predecessors.is_empty();
-        Ok((
+        self.prepared = Some((
             Record {
                 schema_version: 1,
                 kind: "in1_admission".into(),
@@ -178,20 +186,19 @@ impl Emitter {
                 head_relationship: "exact_head".into(),
                 old_state,
                 new_state,
-                checkpoint: classification.as_ref().map_or(
-                    if bootstrap {
+                checkpoint: established.map_or(
+                    if classification.is_ok() && bootstrap {
                         Checkpoint::Bootstrap
                     } else {
                         Checkpoint::Unclassified
                     },
                     |classification| classification.checkpoint,
                 ),
-                bootstrap: classification.is_some() && bootstrap,
-                transition: classification
-                    .as_ref()
+                bootstrap: established.is_some() && bootstrap,
+                transition: established
                     .and_then(|classification| classification.transition.clone()),
                 decision: Decision::Refused,
-                reasons: classification
+                reasons: established
                     .iter()
                     .map(|classification| classification.reason)
                     .collect(),
@@ -217,8 +224,9 @@ impl Emitter {
                     event: self.publication.host.event()?,
                 },
             },
-            captured,
-        ))
+            captured.ok().flatten(),
+        ));
+        classification.map(|_| ())
     }
     fn retain(&self, root: &Path, authority: observations::Authority) -> Result<(), String> {
         let Some(mut record) = self.prepared.as_ref().map(|(record, _)| record.clone()) else {

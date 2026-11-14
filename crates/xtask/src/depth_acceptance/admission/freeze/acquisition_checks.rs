@@ -1,4 +1,5 @@
 //! Producer invariants in addition to complete independently authenticated acquisition bytes.
+use super::PlanningFailure;
 use crate::{freeze_transition::Tree, manifest_acquisition::AcquisitionPlan};
 use serde_json::Value;
 use std::path::Path;
@@ -7,17 +8,17 @@ pub(super) fn validate(
     root: &Path,
     predecessor: &Tree,
     plan: &AcquisitionPlan,
-) -> Result<(), String> {
+) -> Result<(), PlanningFailure> {
     let base = root.join(&plan.manifest_root);
     crate::manifest_validate::check_acquisition(base.clone())?;
     let metadata_path = format!("{}/versions/{}.json", plan.manifest_root, plan.version);
     let metadata = std::fs::read(root.join(&metadata_path)).map_err(|e| e.to_string())?;
-    let value: Value = serde_json::from_slice(&metadata).map_err(|e| e.to_string())?;
+    let value: Value = serde_json::from_slice(&metadata).map_err(PlanningFailure::acquisition)?;
     let stamp = value["updated_at"]
         .as_str()
-        .ok_or("missing acquisition metadata clock")?;
+        .ok_or_else(|| PlanningFailure::acquisition("missing acquisition metadata clock"))?;
     time::OffsetDateTime::parse(stamp, &time::format_description::well_known::Rfc3339)
-        .map_err(|e| e.to_string())?;
+        .map_err(PlanningFailure::acquisition)?;
     let (_, expected) = crate::manifest_version_metadata::plan_at(
         crate::manifest_version_metadata::Args {
             root: Some(base),
@@ -33,21 +34,23 @@ pub(super) fn validate(
     )
     .map_err(|e| e.to_string())?;
     if metadata != expected {
-        return Err("acquisition reported metadata differs from producer".into());
+        return Err(PlanningFailure::acquisition(
+            "acquisition reported metadata differs from producer",
+        ));
     }
     let lock_path = format!("{}/artifacts.lock.json", plan.manifest_root);
     let before: Value = serde_json::from_slice(
         &predecessor
             .get(&lock_path)
             .filter(|entry| entry.regular())
-            .ok_or("missing predecessor lockfile")?
+            .ok_or_else(|| PlanningFailure::acquisition("missing predecessor lockfile"))?
             .bytes,
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(PlanningFailure::acquisition)?;
     let after: Value =
         serde_json::from_slice(&std::fs::read(root.join(lock_path)).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
-    validate_lockfile(&before, &after, plan)
+            .map_err(PlanningFailure::acquisition)?;
+    validate_lockfile(&before, &after, plan).map_err(PlanningFailure::acquisition)
 }
 
 fn validate_lockfile(before: &Value, after: &Value, plan: &AcquisitionPlan) -> Result<(), String> {

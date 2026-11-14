@@ -56,10 +56,39 @@ fn fr2_classification_is_pinned_for_refusal_and_late_freeze_flake() {
             Ok(())
         })
         .unwrap_err();
-    assert!(error.contains("evaluated inputs unavailable"), "{error}");
+    assert!(error.contains("observation incomplete"), "{error}");
     assert!(!evaluated.get());
-    assert!(f.api.3.records().is_empty());
+    let unavailable = f.api.3.records().pop().unwrap();
+    assert_eq!(unavailable.checkpoint, Checkpoint::Unclassified);
+    assert!(unavailable.transition.is_none());
+    assert_eq!(unavailable.reasons, vec![Reason::ObservationIncomplete]);
     *f.api.3.facts.lock().unwrap() = healthy_facts;
+    // Authenticated host reads succeed, then real temporary-directory I/O fails in planning.
+    // The owning refusal is never reached and cannot acquire a fallback classification.
+    freeze::DATA_VIEW_TEMP_ROOT.with(|slot| {
+        *slot.borrow_mut() = Some(root.join("Cargo.toml"));
+    });
+    let error = Route(f.resolve().unwrap())
+        .with_admitted_publication(root, &parent, || {
+            evaluated.set(true);
+            Err::<(), _>("deliberate owning refusal".into())
+        })
+        .unwrap_err();
+    assert!(
+        !evaluated.get(),
+        "planner failure reached owning policy: {error}"
+    );
+    let incomplete = f.api.3.records().pop().unwrap();
+    assert_eq!(incomplete.decision, Decision::Refused);
+    assert_eq!(incomplete.checkpoint, Checkpoint::Unclassified);
+    assert!(incomplete.transition.is_none());
+    assert!(!incomplete.bootstrap);
+    assert_eq!(incomplete.reasons, vec![Reason::ObservationIncomplete]);
+    let history = publication
+        .resolve(root, &[parent.clone(), candidate.clone()])
+        .unwrap();
+    assert!(history.incomplete.contains(&incomplete.identity().unwrap()));
+    assert!(!history.eligible(&incomplete.identity().unwrap()).unwrap());
     // Both reached refusals must carry the same exact-freeze classification as an admission.
     for disturbance in 0..4 {
         f.api
@@ -97,7 +126,13 @@ fn fr2_classification_is_pinned_for_refusal_and_late_freeze_flake() {
     f.api
         .3
         .put(&path, serde_json::to_value(&observation).unwrap());
-    let refusals = f.api.3.records();
+    let refusals: Vec<_> = f
+        .api
+        .3
+        .records()
+        .into_iter()
+        .filter(|record| record.reasons != [Reason::ObservationIncomplete])
+        .collect();
     Route(f.resolve().unwrap())
         .with_admitted_publication(root, &parent, || Ok(()))
         .unwrap();

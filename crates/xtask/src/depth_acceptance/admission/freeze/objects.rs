@@ -1,13 +1,14 @@
 //! Authenticate complete raw trees before deriving any writer inputs.
 use super::super::{objects::Objects, Object};
+use super::PlanningFailure;
 use crate::freeze_transition::{tree::validate_inventory, tree::validate_path, Entry, Tree};
 use std::{fs, path::Path};
 
-pub(super) fn read(objects: &mut Objects<'_>, object: &Object) -> Result<Tree, String> {
+pub(super) fn read(objects: &mut Objects<'_>, object: &Object) -> Result<Tree, PlanningFailure> {
     objects.require(object)?;
     let mut tree = Tree::new();
     walk(objects, &object.tree, "", &mut tree, &mut 0)?;
-    validate_inventory(&tree)?;
+    validate_inventory(&tree).map_err(PlanningFailure::planning)?;
     Ok(tree)
 }
 fn walk(
@@ -16,19 +17,25 @@ fn walk(
     prefix: &str,
     tree: &mut Tree,
     size: &mut usize,
-) -> Result<(), String> {
+) -> Result<(), PlanningFailure> {
     if prefix.split('/').count() > 64 {
-        return Err("freeze tree depth bound exceeded".into());
+        return Err(PlanningFailure::Incomplete(
+            "freeze tree depth bound exceeded".into(),
+        ));
     }
     let bytes = objects.read("tree", identity)?;
     if !prefix.is_empty() && bytes.is_empty() {
-        return Err("freeze tree contains an empty directory object".into());
+        return Err(PlanningFailure::planning(
+            "freeze tree contains an empty directory object",
+        ));
     }
     *size = size
         .checked_add(bytes.len())
-        .ok_or("freeze tree byte overflow")?;
+        .ok_or_else(|| PlanningFailure::Incomplete("freeze tree byte overflow".into()))?;
     if *size > 536_870_912 {
-        return Err("freeze tree inventory bound exceeded".into());
+        return Err(PlanningFailure::Incomplete(
+            "freeze tree inventory bound exceeded".into(),
+        ));
     }
     let mut previous_name = None;
     let mut remaining = bytes.as_slice();
@@ -37,16 +44,18 @@ fn walk(
         let end = remaining
             .iter()
             .position(|b| *b == 0)
-            .ok_or("malformed freeze tree")?;
-        let header = std::str::from_utf8(&remaining[..end]).map_err(|e| e.to_string())?;
-        let (mode, name) = header.split_once(' ').ok_or("malformed freeze tree mode")?;
+            .ok_or_else(|| PlanningFailure::planning("malformed freeze tree"))?;
+        let header = std::str::from_utf8(&remaining[..end]).map_err(PlanningFailure::planning)?;
+        let (mode, name) = header
+            .split_once(' ')
+            .ok_or_else(|| PlanningFailure::planning("malformed freeze tree mode"))?;
         if name.contains('/') || !names.insert(name) {
-            return Err("ambiguous freeze tree entry".into());
+            return Err(PlanningFailure::planning("ambiguous freeze tree entry"));
         }
         let hash = hex::encode(
             remaining
                 .get(end + 1..end + 21)
-                .ok_or("malformed freeze tree hash")?,
+                .ok_or_else(|| PlanningFailure::planning("malformed freeze tree hash"))?,
         );
         remaining = &remaining[end + 21..];
         let ordering_name = if mode == "40000" {
@@ -58,11 +67,13 @@ fn walk(
             .as_ref()
             .is_some_and(|previous| previous >= &ordering_name)
         {
-            return Err("freeze tree entries are not canonically ordered".into());
+            return Err(PlanningFailure::planning(
+                "freeze tree entries are not canonically ordered",
+            ));
         }
         previous_name = Some(ordering_name);
         let path = format!("{prefix}{name}");
-        validate_path(&path)?;
+        validate_path(&path).map_err(PlanningFailure::planning)?;
         if mode == "40000" {
             walk(objects, &hash, &format!("{path}/"), tree, size)?;
             continue;
@@ -74,13 +85,19 @@ fn walk(
                 kind: "commit".into(),
                 bytes: hash.into_bytes(),
             },
-            _ => return Err("unsupported freeze tree object kind".into()),
+            _ => {
+                return Err(PlanningFailure::planning(
+                    "unsupported freeze tree object kind",
+                ))
+            }
         };
         *size = size
             .checked_add(entry.bytes.len())
-            .ok_or("freeze tree byte overflow")?;
+            .ok_or_else(|| PlanningFailure::Incomplete("freeze tree byte overflow".into()))?;
         if *size > 536_870_912 || tree.len() >= 50_000 {
-            return Err("freeze tree inventory bound exceeded".into());
+            return Err(PlanningFailure::Incomplete(
+                "freeze tree inventory bound exceeded".into(),
+            ));
         }
         tree.insert(path, entry);
     }
@@ -92,7 +109,14 @@ fn walk(
 pub(super) struct DataView(tempfile::TempDir);
 impl DataView {
     pub(super) fn new(root: &Path, parent: &Object, tree: &Tree) -> Result<Self, String> {
-        let directory = tempfile::tempdir().map_err(|e| e.to_string())?;
+        #[cfg(test)]
+        let directory = match super::DATA_VIEW_TEMP_ROOT.with(|slot| slot.borrow_mut().take()) {
+            Some(path) => tempfile::tempdir_in(path),
+            None => tempfile::tempdir(),
+        };
+        #[cfg(not(test))]
+        let directory = tempfile::tempdir();
+        let directory = directory.map_err(|e| e.to_string())?;
         let destination = directory
             .path()
             .to_str()

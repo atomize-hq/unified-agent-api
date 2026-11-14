@@ -93,7 +93,33 @@ fn authenticated_tree_reader_refuses_hidden_empty_tree_object() {
     );
     let mut reader = Objects::new(root.path());
     let object = reader.commit(&commit).unwrap().object;
-    assert!(objects::read(&mut reader, &object)
-        .unwrap_err()
-        .contains("empty directory"));
+    let failure = objects::read(&mut reader, &object).unwrap_err();
+    assert!(matches!(
+        &failure,
+        PlanningFailure::Ineligible(Reason::FreezePlanningRefused, _)
+    ));
+    assert!(failure.message().contains("empty directory"));
+}
+
+#[test]
+fn transient_authenticated_blob_read_failure_is_incomplete_and_recovers() {
+    let root = repository();
+    let commit = git(root.path(), &["rev-parse", "HEAD"]);
+    let expected = read(root.path(), &commit);
+    let blob = git(root.path(), &["rev-parse", "HEAD:Cargo.toml"]);
+    let blob_path = root
+        .path()
+        .join(".git/objects")
+        .join(&blob[..2])
+        .join(&blob[2..]);
+    let saved = fs::read(&blob_path).unwrap();
+    fs::remove_file(&blob_path).unwrap();
+    let mut reader = Objects::new(root.path());
+    let object = reader.commit(&commit).unwrap().object;
+    assert!(matches!(
+        objects::read(&mut reader, &object),
+        Err(PlanningFailure::Incomplete(_))
+    ));
+    fs::write(blob_path, saved).unwrap();
+    assert_eq!(objects::read(&mut reader, &object).unwrap(), expected);
 }

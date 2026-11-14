@@ -4,7 +4,8 @@
 
 Resolved the merge of `origin/integration/support-depth` (`40c08723`, including final FR1 PR #360)
 into `feat/fr2-freeze-planner` at `0b8a39e1`. This section was created before resolution.
-The merge result is staged and uncommitted for the lead.
+The follow-up repair starts from committed HEAD `31bf6c38` on `feat/fr2-freeze-planner`.
+Repair changes remain uncommitted for the lead.
 
 `Emitter::prepare()` computes FR2 checkpoint/transition classification from authenticated Git
 objects and independently read freeze/acquisition inputs before owning-predicate evaluation.
@@ -16,8 +17,8 @@ after artifact upload and before the exact job-log commitment. On a late failure
 uploads the pinned decision with incompleteness and commits that final artifact identity.
 The fake host allocates a separate artifact identity for each upload. Closing read failures or changed
 observations add `observation_incomplete` while preserving captured classification and inputs.
-Unavailable initial observations abort capture before owning predicates and leave an incomplete
-host attempt. Successful observations of absent authority retain their execution-required meaning.
+Unavailable initial freeze/acquisition observations abort capture before owning predicates.
+Once the base record inputs are available, the attempt retains an unclassified incomplete record. Successful observations of absent authority retain their execution-required meaning.
 
 Classification, transition and bootstrap anchoring remain substantive conflict-key inputs.
 Freeze reasons follow FR1's exclusion for all reasons. Predecessor commit/transition-digest pair
@@ -45,7 +46,102 @@ Existing canonical admission, generation and input vectors pass. Python `json`/`
 independently rechecked their exact sorted compact JSON bytes and NUL-domain digests.
 Optional FR2 fields retain their existing omission rules, and these literal bytes remain valid.
 
-### Merge validation
+### Planner I/O repair and error-path audit
+
+The adversarial P1 finding reproduced with an exact-freeze candidate and a real temporary-directory
+creation failure after successful freeze/acquisition observation reads. Before the repair, IN1 reached
+the deliberately refusing owning predicate and retained a fallback classification. The regression
+failed at that boundary. `classify_authenticated` now returns `Result<Classification, String>`.
+Internal `PlanningFailure` distinguishes established content ineligibility from incomplete reads.
+The former produces a bounded execution-required reason. The latter propagates through initial
+capture and cannot establish a checkpoint or transition.
+
+`Emitter::read_inputs` retains the already authenticated base record before returning a planning or
+freeze/acquisition observation error. The record has `unclassified`, no transition, a false bootstrap
+flag, a refused decision and only `observation_incomplete`. Observation unavailability stays sticky,
+so the outer decision boundary cannot turn the failed capture into a reached owning decision.
+FR1 reconstruction quarantines this record, excludes it from substantive decision conflicts and
+withholds frontier/progression authority. Healthy reached refusals and admissions continue to use
+the existing classification, transition, normalized authority and predecessor conflict key.
+
+Every fallible boundary in the requested files and planner call was audited below. Successfully
+read absence and pure content failures establish substantive ineligibility. Readers whose string
+errors combine I/O with validation conservatively produce incomplete capture for every error.
+This includes some content refusals in those legacy readers. Their errors cannot safely establish
+ineligibility without a typed distinction at their own boundary.
+
+| Boundary and error paths | Outcome |
+| --- | --- |
+| `freeze.rs` acquisition observation supplied as `Err` | Propagated failure, checked before absent freeze authority can classify. |
+| Absent freeze authority, repository/predecessor/policy/generation mismatch | Substantive `freeze_authority_unavailable` or `freeze_authority_mismatch`. |
+| `authority.rs` writer run ID, either RFC3339 timestamp, justification path validation | Pure content refusal, substantive `freeze_planning_refused`. |
+| `authority.rs` canonical observation identity and typed transition serialization | Typed string/enum structures serialize without fallible external reads. Existing checked/expected serialization boundaries remain. |
+| `objects.rs` commit/tree authentication and every underlying object type, size, read, hash, process, pipe or wait error | Incomplete capture. Underlying object reader errors are propagated, including ambiguous source-integrity errors. |
+| Raw-tree depth, aggregate byte/count bounds and checked-add overflow | Incomplete capture. Bounded or interrupted inventories cannot establish a different classification. |
+| Authenticated tree empty-directory, malformed header/mode/hash/UTF-8, duplicate/slash name, ordering, path, unsupported kind and final inventory checks | Pure content refusal, substantive `freeze_planning_refused`. |
+| `objects.rs` data-view temp creation, destination UTF-8, clone/read-tree/update-ref, parent-path checks, directory/file/permission writes | Incomplete capture for every error. |
+| Data-view overlay path/parent checks, create/write/chmod/remove, hash-object spawn/status/UTF-8, update-index and nonregular-entry error | Incomplete capture for every error. The authenticated delta already requires regular acquisition entries. |
+| Captured `Source` construction/root canonicalization | Incomplete capture. |
+| Captured-source registry/RULES reads, registry parsing/validation, missing agent, RULES JSON and target parsing | Pure content refusal, substantive `freeze_planning_refused`. These reads use the authenticated in-memory inventory. |
+| Acquisition attempted with an ON2 writer/event | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| `plan_with_registry` I/O, registry and routed-registry errors | Incomplete capture, including ambiguous registry failures. |
+| Acquisition plan JSON, unknown-agent, unenrolled, absent-descriptor, descriptor and version errors | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| Both MA2 request-argument reader calls, MA2 `derive_inputs`, ON2 `from_predecessor` | Incomplete capture for every error. These constructors combine filesystem/Git reads and validation in string errors. |
+| Protected acquisition publication missing, `policy::authenticate_inputs` object/closure reads and identity serialization errors | Incomplete capture. Ambiguous closure-read failures propagate. |
+| Completed acquisition policy identity/implementation/closure comparison mismatch | Pure content refusal, substantive `acquisition_authority_unavailable`. The existing string-returning `authenticate` entry point preserves its callers through the typed authentication implementation. |
+| Acquisition repository/parent/candidate/generation/invocation/plan association and plan serialization | Pure content refusal, substantive `acquisition_authority_unavailable`. `require_binding` tests retain both policy authentication and association. |
+| Authenticated acquisition inventory, byte/presence/mode/kind/path checks, delta application and absent-authority preservation comparison | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| Missing O, missing/nonregular authenticated O input and O digest mismatch | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| `acquisition_checks.rs` `check_acquisition`, filesystem metadata/lock reads and `plan_at` | Incomplete capture for every error. The reused validator and metadata planner include filesystem-backed reads. |
+| Acquisition metadata JSON, missing/invalid clock, producer-byte comparison, predecessor lock presence/JSON and acquired lock JSON | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| Lockfile object/artifact-list shape, top-level preservation, retained rows, target population, missing/duplicate targets and provenance checks | Pure content refusal, substantive `acquisition_authority_unavailable`. |
+| Event/writer lifecycle mismatch and the pure MA2 `freeze_transition::plan` or ON2 `committed_plan` render/operation/inventory errors | Substantive `freeze_planning_refused`. Rendering consumes the completed owning-writer inputs without external reads. |
+| Complete expected/proposed tree inequality | Substantive `freeze_tree_mismatch`. Exact equality yields `request_freeze` with transition identities. |
+| `captured.rs` initial freeze/acquisition host, decoding or authentication error | Incomplete capture, retained once base record inputs are available. Successfully observed absent authority remains a substantive input. |
+| `captured.rs` closing read error or changed observation after capture, including after upload | Incompleteness preserves every already established classification and reached decision. Pinning uses typed observation serialization and cannot replace captured facts. |
+
+The connected regression retains and reconstructs the planning-failure attempt, checks its
+quarantine and absence of authority, then runs healthy owning refusals and a contradictory admission
+on the identical candidate, predecessor and host facts. Reached records retain identical substantive
+keys and reconstruction refuses their contradiction. The fixture also retains the initial-observation
+and late/post-upload failure checks. A separate raw-Git regression temporarily removes an authenticated
+blob, requires an incomplete read, restores the same object bytes and obtains the identical tree.
+The empty-directory object regression requires a substantive content failure. The combined MA2
+policy-mutation matrix exposed an over-conservative policy-mismatch error during validation.
+Typed policy source-read and completed-comparison outcomes restore that substantive refusal while
+propagating Git-source failures. Existing MA2 and ON2 complete-tree mismatch matrices continue to require `execution_required` and `freeze_tree_mismatch`.
+The temp-root injection is one-shot, thread-local and test-only, and exercises a real OS I/O failure.
+
+### Planner I/O repair validation
+
+Validation commands use `env -u TMPDIR`. Detailed output is under ignored
+`target/fr2-planner-io-validation/`. The table records final runs after the typed policy correction.
+
+| Command | Result | Test duration |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | — |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | — |
+| `cargo test -p xtask --lib depth_acceptance` | 88 passed, including transient object-read recovery | 32.78 s |
+| `cargo test -p xtask --lib freeze_transition` | 7 passed | 0.00 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | 3 passed, including the connected planning-failure/conflict regression and combined acquisition | 157.75 s |
+| `cargo test -p xtask --lib in1_integration` | 35 passed, 4 socket-blocked failures | 77.18 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 62 passed, including ON2 content-mismatch classifications | 152.93 s |
+| `make loc-check` | Pass | — |
+| `make hygiene` and `git diff --check` | Pass | — |
+
+The four IN1 failures occur while opening the existing MA4 evidence channel with
+`Operation not permitted (os error 1)`. They are
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`.
+Their socket-dependent behavior requires an unrestricted rerun. Existing assertions remain in
+place. The new failed-capture assertions verify record retention, quarantine and skipped owning
+policy. The connected contradiction assertions continue to cover every reached decision.
+
+Changes remain uncommitted on `feat/fr2-freeze-planner` at HEAD `31bf6c38`. No push was performed.
+
+### Previous merge validation
 
 Cargo commands used `env -u TMPDIR`. Logs are under ignored `target/fr2-merge-validation/`.
 The table records final runs after the resolution and regression updates.

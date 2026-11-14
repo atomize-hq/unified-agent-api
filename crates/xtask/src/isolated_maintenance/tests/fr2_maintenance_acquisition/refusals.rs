@@ -328,7 +328,8 @@ pub(super) fn host(
             record,
             Some(observation),
             &Ok(Some(observed)),
-        );
+        )
+        .unwrap();
         assert_eq!(
             classification.checkpoint,
             Checkpoint::ExecutionRequired,

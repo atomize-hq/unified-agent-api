@@ -53,6 +53,27 @@ pub(crate) fn identity(closure: &BTreeMap<String, String>) -> Result<String, Str
 /// Like producer approval, compare each source tree/blob with independently protected objects.
 /// The source-installed authority supplies `approved`; neither candidate nor retained JSON can.
 pub(crate) fn authenticate(root: &Path, claimed: &Policy, approved: &Policy) -> Result<(), String> {
+    authenticate_inputs(root, claimed, approved).map_err(|failure| match failure {
+        AuthenticationFailure::SourceRead(error) | AuthenticationFailure::Mismatch(error) => error,
+    })
+}
+
+#[derive(Debug)]
+pub(crate) enum AuthenticationFailure {
+    SourceRead(String),
+    Mismatch(String),
+}
+impl From<String> for AuthenticationFailure {
+    fn from(error: String) -> Self {
+        Self::SourceRead(error)
+    }
+}
+
+pub(crate) fn authenticate_inputs(
+    root: &Path,
+    claimed: &Policy,
+    approved: &Policy,
+) -> Result<(), AuthenticationFailure> {
     let mut objects = Objects::new(root);
     let source = objects.commit(&claimed.workflow_commit)?.object;
     let anchor = objects.commit(&approved.workflow_commit)?.object;
@@ -62,7 +83,9 @@ pub(crate) fn authenticate(root: &Path, claimed: &Policy, approved: &Policy) -> 
         || claimed.implementation != identity(&expected)?
         || approved.implementation != claimed.implementation
     {
-        return Err("IN1 policy identity differs from protected anchor".into());
+        return Err(AuthenticationFailure::Mismatch(
+            "IN1 policy identity differs from protected anchor".into(),
+        ));
     }
     let evaluated = if source == anchor {
         expected.clone()
@@ -71,9 +94,9 @@ pub(crate) fn authenticate(root: &Path, claimed: &Policy, approved: &Policy) -> 
     };
     for (path, id) in expected {
         if evaluated.get(&path) != Some(&id) {
-            return Err(format!(
+            return Err(AuthenticationFailure::Mismatch(format!(
                 "IN1 policy closure is not approved on protected staging: {path}"
-            ));
+            )));
         }
     }
     Ok(())
