@@ -13,6 +13,7 @@ pub(crate) fn prove_reporting(
     host: Arc<MemoryHost>,
     context: ContextRecord,
     approve_source: impl FnOnce(&Path, &str, &Arc<MemoryHost>),
+    collect: impl Fn(&Path, &Arc<MemoryHost>) -> Result<(), String>,
 ) {
     let scratch = tempfile::tempdir().unwrap();
     git(
@@ -90,6 +91,42 @@ pub(crate) fn prove_reporting(
     };
     let query = format!("actions/workflows/ci.yml/runs?created=%3E%3D{date}");
     let page = format!("{query}&per_page=100&page=1");
+    let record = p
+        .record(&fs::read_to_string(root.join(depth_ci::onboarding::RECORD)).unwrap())
+        .unwrap();
+    depth_ci::reporting::publication_failures(
+        root,
+        &publication,
+        &host,
+        &record,
+        |failed, failed_host, context, refusal| {
+            let mut next = api.clone();
+            for (path, bytes) in failed_host
+                .facts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(path, _)| path.starts_with("actions/"))
+            {
+                next.0.insert(next.endpoint(path), bytes.clone());
+            }
+            let run = failed
+                .host
+                .json(&format!(
+                    "actions/runs/{}/attempts/1",
+                    context.invocation.claims.run
+                ))
+                .unwrap();
+            next.page(&query, Some("workflow_runs"), vec![run]);
+            let bound = EvidenceHost::for_admission_test(ISOLATED, &implementation, failed.clone());
+            assert_eq!(
+                population::resolve_generation_inputs(&next, root, Some(&bound), None, &resolver)
+                    .unwrap_err(),
+                refusal
+            );
+        },
+    );
+    observed_execution_without_witness(root, &publication, &host, &api, p, &query, collect);
     let execution_rows = api.json(&api.endpoint(&page)).unwrap()["workflow_runs"]
         .as_array()
         .unwrap()
@@ -313,7 +350,7 @@ pub(crate) fn prove_refused_reporting(
             context.invocation.claims.run
         ))
         .unwrap();
-    checkpoint["pull_requests"] = json!([{"number":4567}]);
+    checkpoint["pull_requests"] = json!([{"number":9}]);
     rows.push(checkpoint);
     for (path, bytes) in host
         .facts
@@ -324,16 +361,119 @@ pub(crate) fn prove_refused_reporting(
     {
         api.0.insert(api.endpoint(path), bytes.clone());
     }
-    for reverse in [false, true] {
-        if reverse {
-            rows.reverse();
+    for other_pr in [false, true] {
+        rows.iter_mut()
+            .find(|row| row["id"] == context.invocation.claims.run)
+            .unwrap()["pull_requests"] = json!([{"number":if other_pr { 4567 } else { 9 }}]);
+        for reverse in [false, true] {
+            if reverse {
+                rows.reverse();
+            }
+            api.page(&query, Some("workflow_runs"), rows.clone());
+            let error = population::resolve_generation_inputs(&api, root, Some(&bound), None, &p)
+                .unwrap_err();
+            assert_eq!(
+                error,
+                "reporting checkpoint cannot reopen irreversible readiness"
+            );
         }
-        api.page(&query, Some("workflow_runs"), rows.clone());
-        let error =
-            population::resolve_generation_inputs(&api, root, Some(&bound), None, &p).unwrap_err();
+    }
+}
+
+fn observed_execution_without_witness(
+    root: &Path,
+    publication: &Publication,
+    host: &Arc<MemoryHost>,
+    api: &Fake,
+    p: Profile,
+    query: &str,
+    collect: impl Fn(&Path, &Arc<MemoryHost>) -> Result<(), String>,
+) {
+    use crate::depth_ci::reporting::{self, Invocation};
+    let candidate = git(root, &["rev-parse", "HEAD"]);
+    for failure in [false, true] {
+        let host = Arc::new(host.fork());
+        let publication = Publication {
+            authority: publication.authority.clone(),
+            host: host.clone(),
+        };
+        let claims = host
+            .begin(&candidate, &reporting::authority(&publication).policy)
+            .unwrap();
+        let invocation = Invocation {
+            claims: claims.clone(),
+            checkout: crate::depth_acceptance::admission::emitter::object(root, &candidate)
+                .unwrap(),
+            checkout_parents: vec![git(root, &["rev-parse", "HEAD^"])],
+            dispatch_inputs: [("depth_mode".into(), "reporting_only".into())].into(),
+            configuration: [("profile".into(), "synthetic-wrapper-v1".into())].into(),
+            substantive_invoked: false,
+        };
+        host.put("reporting/current", json!(candidate));
+        host.put(
+            &format!("reporting/candidates/{candidate}"),
+            serde_json::to_value(&invocation).unwrap(),
+        );
+        host.put(
+            &format!("reporting/invocations/{}/1", claims.run),
+            serde_json::to_value(&invocation).unwrap(),
+        );
+        let execution_path = format!("reporting/execution/{}/1", claims.run);
+        if failure {
+            let path = execution_path.clone();
+            *host.after_reporting_upload.lock().unwrap() =
+                Some(Box::new(move |host| host.put(&path, json!(true))));
+            assert_eq!(
+                collect(root, &host).unwrap_err(),
+                "reporting collection/publication incomplete"
+            );
+        } else {
+            collect(root, &host).unwrap();
+            host.put(&execution_path, json!(true));
+        }
+        let context = reporting::authenticate(root, &publication, claims.run, 1).unwrap();
+        assert_eq!(context.successful(), !failure);
         assert_eq!(
-            error,
-            "reporting context lacks later exact-transition IN1 admission"
+            reporting::capture(
+                root,
+                &publication,
+                &context.candidate,
+                &context.predecessor,
+                &context.generation,
+                &context.predecessor_admissions
+            )
+            .unwrap_err(),
+            "reporting context has substantive execution observation"
+        );
+        let mut next = api.clone();
+        for (path, bytes) in host
+            .facts
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(path, _)| path.starts_with("actions/"))
+        {
+            next.0.insert(next.endpoint(path), bytes.clone());
+        }
+        let run = host
+            .json(&format!("actions/runs/{}/attempts/1", claims.run))
+            .unwrap();
+        next.page(query, Some("workflow_runs"), vec![run]);
+        let inventory = host
+            .json(&format!(
+                "actions/runs/{}/artifacts?per_page=100&page=1",
+                claims.run
+            ))
+            .unwrap();
+        assert!(inventory["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|a| a["name"] != format!("{}-{}-1", p.artifact(), claims.run)));
+        let bound = EvidenceHost::for_admission_test(ISOLATED, &candidate, publication);
+        assert_eq!(
+            population::resolve_generation_inputs(&next, root, Some(&bound), None, &p).unwrap_err(),
+            "missing/ambiguous attempt witness artifact"
         );
     }
 }
@@ -347,6 +487,7 @@ fn unexpected_execution(
 ) {
     use crate::depth_ci::reporting::{self, Invocation};
     let candidate = &w.build.source_commit;
+    host.put("reporting/current", json!(candidate));
     let claims = host
         .begin(candidate, &reporting::authority(publication).policy)
         .unwrap();

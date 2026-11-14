@@ -11,10 +11,14 @@ use std::{
     },
 };
 
+type ReportingUploadHook = Box<dyn FnOnce(&MemoryHost) + Send>;
+
 pub(crate) struct MemoryHost {
     pub facts: Mutex<BTreeMap<String, Vec<u8>>>,
     next: AtomicU64,
     next_retry: Mutex<Option<Record>>,
+    pub after_reporting_upload: Mutex<Option<ReportingUploadHook>>,
+    pub fail_reporting_execution_once: std::sync::atomic::AtomicBool,
     pub fail_freeze_after_upload: std::sync::atomic::AtomicBool,
     pub fail_freeze_after_capture: std::sync::atomic::AtomicBool,
     pub fail_history_after_capture: std::sync::atomic::AtomicBool,
@@ -27,6 +31,8 @@ impl Default for MemoryHost {
             facts: Mutex::new(BTreeMap::new()),
             next: AtomicU64::new(1000),
             next_retry: Mutex::new(None),
+            after_reporting_upload: Mutex::new(None),
+            fail_reporting_execution_once: false.into(),
             fail_freeze_after_upload: false.into(),
             fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
@@ -118,6 +124,8 @@ impl MemoryHost {
             facts: Mutex::new(self.facts.lock().unwrap().clone()),
             next: AtomicU64::new(self.next.load(Ordering::SeqCst)),
             next_retry: Mutex::new(None),
+            after_reporting_upload: Mutex::new(None),
+            fail_reporting_execution_once: false.into(),
             fail_freeze_after_upload: false.into(),
             fail_freeze_after_capture: false.into(),
             fail_history_after_capture: false.into(),
@@ -203,6 +211,14 @@ impl Host for MemoryHost {
             .map(|b| serde_json::from_slice(b).map_err(|e| e.to_string()))
             .transpose()
     }
+    fn reporting_candidate(&self) -> Result<Option<String>, String> {
+        self.facts
+            .lock()
+            .unwrap()
+            .get("reporting/current")
+            .map(|bytes| serde_json::from_slice(bytes).map_err(|e| e.to_string()))
+            .transpose()
+    }
     fn reporting_invocation(
         &self,
         candidate: &str,
@@ -227,6 +243,12 @@ impl Host for MemoryHost {
             .transpose()
     }
     fn reporting_execution(&self, run: u64, attempt: u64) -> Result<bool, String> {
+        if self
+            .fail_reporting_execution_once
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err("fake reporting execution observation unavailable".into());
+        }
         self.facts
             .lock()
             .unwrap()
@@ -308,6 +330,12 @@ impl Host for MemoryHost {
             .insert(format!("actions/artifacts/{artifact}/zip"), zip.clone());
         rows.push(json!({"id":artifact,"name":format!("in1-admission-{}-{}",claims.run,claims.attempt),"expired":false,"size_in_bytes":zip.len(),"digest":format!("sha256:{}",digest(b"",&zip)),"workflow_run":{"id":claims.run,"head_sha":value["candidate"]["commit"]}}));
         self.page(&path, "artifacts", rows);
+        if reporting {
+            let after = self.after_reporting_upload.lock().unwrap().take();
+            if let Some(after) = after {
+                after(self);
+            }
+        }
         if self.fail_freeze_after_upload.swap(false, Ordering::SeqCst) {
             self.fail_freeze_after_capture.store(true, Ordering::SeqCst);
         }

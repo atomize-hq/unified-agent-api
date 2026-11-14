@@ -2,6 +2,74 @@
 
 Status — implemented and validated on `feat/fr3-reporting-context`, subject to the environment restrictions below. Changes are uncommitted for the lead.
 
+## Review round 1 fixes
+
+The review fixes add collector-to-IN1-to-population regressions for authenticated PR test-merge
+selection, closing index inventory, structurally admitted freezes after readiness, independent
+execution without a witness, and publication-time observation changes.
+Identity fields are pinned before evaluation. Transient observation failures retain incomplete
+results with captured identities. Tests assert specific bounded refusals through the real paths
+and retain the committed canonical literals as independent expectations.
+
+The original PR merge case called `dispatch` directly. The reopened-freeze case reached structural
+refusal before the readiness guard. Failed outcome checks mutated a literal without exercising
+dispatcher publication. Independent execution
+was covered by substantive witness artifacts, leaving the observation-only path unproved.
+
+Both real-writer proofs now collect at an identical-tree PR merge whose second parent is the
+freeze candidate. The host supplies the current candidate independently, and the context retains
+the separate checkout object and both parents. Dispatch and closing publication recheck the pinned
+current candidate association. Real IN1 admits the candidate and population resolution joins that
+same merge context.
+
+Closing publication compares the complete captured stage-0 index listing, including modes and
+blob identities, after the existing raw-worktree verification.
+`reporting_dispatcher_retains_captured_inputs_on_upload_changes` and the connected
+`publication_failures` matrix inject staged additions, deletions, modes and bytes, a same-tree
+checkout change, changed invocation and current candidate association, independent execution and
+an unavailable execution observation during actual upload. The matrix compares the entire
+retained context with the captured context after changing only outcome/completeness, authenticates
+the retained failure, and asserts exact IN1-capture and population refusals.
+
+`freeze_after_readiness` preserves the implementation tree and proposes a new identical-tree
+freeze transition. Real IN1 must admit `RequestFreeze` with `ExactFreezeTree` and the exact context
+reference. Authenticated history and population resolution must then return
+`reporting checkpoint cannot reopen irreversible readiness`. The proof reverses admission and
+producer listings and includes the original packet PR and another PR.
+
+`observed_execution_without_witness` runs the collector for successful and failed collection,
+sets independent execution to true, and proves that no substantive witness exists. Real IN1
+capture requires `reporting context has substantive execution observation`. Population resolution
+continues to the substantive path and requires `missing/ambiguous attempt witness artifact`.
+
+All requested review-round checks pass with `TMPDIR` unset. Logs live under the ignored
+`target/fr3-round1-validation/` directory.
+
+| Command or observation | Review round 1 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass |
+| `cargo test -p xtask --lib depth_ci` | 8 passed |
+| `cargo test -p xtask --lib depth_evidence::verdict -- --test-threads=2` | 81 passed |
+| `cargo test -p xtask --lib depth_acceptance -- --test-threads=2` | 89 passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr3_reporting` | 1 connected proof passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance -- --test-threads=1` | 3 passed |
+| `cargo test -p xtask --lib fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` | 1 connected proof passed |
+| `make loc-check`, `make hygiene`, `git diff --check` | Pass |
+| Sandbox-prevented requested checks | 0 |
+
+The old HEAD-based collector selection failed the PR-merge proof. Removing the closing inventory
+check failed the staged-addition regression. Removing the readiness loop failed after exact
+structural IN1 admission. Removing population's independent execution check changed the expected
+missing-witness refusal to a failed-reporting refusal. Removing the closing checkout check allowed
+the same-tree checkout mutation to succeed and failed the publication regression. Each temporary
+guard removal was restored before final validation.
+
+An intermediate native interruption test returned `NotFound` while spawning its subprocess during
+concurrent rebuilds. The stable-source verdict-group rerun passed all
+81 tests. A temporary-root placement inside the workspace also caused Cargo workspace-discovery
+errors during an initial run. Validation with `TMPDIR` unset completed successfully.
+
 ## Delivered mechanism
 
 The existing collector selects its trusted reporting dispatcher before witness construction or candidate build/execution. Context v1 uses deterministic canonical JSON, the 65,536-byte limit and the independent NUL-terminated `support-depth-reporting-context-v1` digest domain. The committed literal `depth_ci/reporting/context-v1.json` has independently computed SHA-256 `63e791e20e3d0828b64e1e258fe565868afa6d39fe673379da12207c5e4e4c6a`.
@@ -46,7 +114,7 @@ The credential-free fixture assumes a trusted test process and independent model
 - Shared transport refusals cover wrong job, cross-attempt replay, checkout/tree/parent substitutions, changed dispatch/workflow provenance, failed/cancelled/nonterminal producers, missing independent context and substituted artifact bytes.
 - Real IN1 preparation rejects changed or unavailable context. A reached admission with a late context change retains the prepared reference with incompleteness. Ignored invocation prose preserves canonical identity.
 - Complete actual-checkout checks cover hidden worktree edits, genuine identical-tree PR merges, changed merge trees and reversed parents.
-- The maintenance fixture restores a freeze-labelled tree after an execution-required admission. Real IN1 classifies it execution-required. The evaluator refuses its reporting claim on another PR in both population orders.
+- After an execution-required admission, the maintenance fixture preserves the implementation tree and creates a new exact freeze transition. Real IN1 admits `RequestFreeze`. Authenticated history and population resolution then refuse reopening irreversible readiness, in both listing orders and on the original packet PR and another PR.
 - Passing and failing substantive checkpoint execution is covered at the evaluator and connected population boundaries, preserving zero-credit passes and qualifying counterexamples. Existing execution-failure, progression, completeness and cross-flow suites also run.
 
 ## Validation
@@ -159,14 +227,14 @@ merge queues, retries/retention and credentials remain phase C.
 | Refusal | Executing tests and bounded refusal |
 | --- | --- |
 | Forged authority | `refuses_candidate_json_same_name_wrong_job_attempt_and_missing_publication`, `same_run_wrong_job_artifact_with_valid_digest_and_copied_commitment_refuses` and both connected freeze tests' `refusals` cover candidate copies, wrong job/attempt, substituted context and source/workflow claims. Canonical binding matrix rejects wrong agent/version/Event/P/O. |
-| Implementation hidden in freeze | `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1`, `fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1` and `complete_tree_equality_includes_bytes_modes_kinds_presence_and_preserved_paths` cover source/dependency/build/workflow and other extra bytes. `freeze_after_readiness` checks execution-required classification through real IN1. |
+| Implementation hidden in freeze | `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1`, `fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1` and `complete_tree_equality_includes_bytes_modes_kinds_presence_and_preserved_paths` cover source/dependency/build/workflow and other extra bytes through complete-tree structural classification. |
 | Extra change in combined MA2 | Existing FR2 `fr2_ma2_combined_acquisition_and_freeze_real_in1` checks unrelated edits, schema-valid changed authenticated metadata/lockfile bytes, missing authority, inventory, modes and kinds through real acquisition/classification/IN1. |
 | Failure before readiness | `onboarding_same_generation_later_runs_wait_for_producer_not_workflow`, `nonterminal_aborted_or_failed_producer_steps_never_verify`, `missing_attempt_or_wrong_job_or_artifact_digest_refuses` and `native_complete_population_preserves_counterexamples_and_later_missing_attempts` retain adverse/missing earlier executions despite later success. |
-| Backward progression | `public_on2_connected_freeze_write_admission_and_observation` executes `prove_unobserved_admission`, covering a higher-stage admitted ancestor with no producer, both API orders and another PR. `onboarding_producer_refuses_descendant_lifecycle_rollback_in_either_api_order` retains observed-source progression. The genuine MA2 test executes `freeze_after_readiness` and refuses reopened reporting on another PR in both orders. |
-| Changed actual checkout | Both connected freeze tests execute `checkout_relationships` and `dirty_checkout_and_pinned_context`, covering changed checkout/tree/base, reversed parents, genuine identical-tree PR merges and hidden worktree edits. |
+| Backward progression | `public_on2_connected_freeze_write_admission_and_observation` executes `prove_unobserved_admission`, covering a higher-stage admitted ancestor with no producer, both API orders and another PR. `onboarding_producer_refuses_descendant_lifecycle_rollback_in_either_api_order` retains observed-source progression. The review-round `freeze_after_readiness` requires real structural admission before asserting the irreversible-readiness refusal through history and population, both listing orders and both PR associations. |
+| Changed actual checkout | Both real-writer proofs collect at a genuine identical-tree PR merge through `collect_synthetic`, then run real IN1 and population resolution. `checkout_relationships` retains direct-dispatch negative relationship coverage. `dirty_checkout_and_pinned_context` covers hidden worktree edits and late IN1 context changes. `publication_failures` covers closing index additions, deletions, modes, bytes and checkout changes. |
 | Changed dispatch/workflow context | Both connected freeze tests' `refusals` and checkout matrix authenticate dispatch/configuration, workflow policy and invocation independently. Changed substantive mode cannot inherit reporting classification. |
-| Unexpected substantive execution | Both connected freeze tests execute `unexpected_execution` through real population discovery and the evaluator for passing and failing checkpoint execution. `reporting_checkpoint_substantive_pass_and_failure_remain_conflicts_and_counterexamples` preserves zero-credit passes, failed counterexamples and conflicts. |
-| Failed reporting producer | Both connected freeze tests mutate authenticated producer job conclusion and require `failed reporting producer or incomplete collection`. Their transport matrix covers cancelled/nonterminal jobs, incomplete outcome and missing publication. |
+| Unexpected substantive execution | Both connected freeze tests execute `unexpected_execution` with witness artifacts through population discovery and the evaluator for passing and failing execution. `observed_execution_without_witness` exercises independent execution with no substantive artifact through collection, IN1 capture and population resolution for successful and failed producers. `reporting_checkpoint_substantive_pass_and_failure_remain_conflicts_and_counterexamples` preserves zero-credit passes, failed counterexamples and conflicts. |
+| Failed reporting producer | Both connected freeze tests mutate authenticated producer job conclusion and require `failed reporting producer or incomplete collection`. Their transport matrix covers cancelled/nonterminal jobs and missing publication. `publication_failures` exercises actual upload-time changes, retained captured identities, failed/incomplete outcomes and exact downstream IN1/population refusals. The committed literal separately pins canonical bytes and digest. |
 | Historical execution closure | Both connected freeze tests retain S1 while independently current collector S2 causes `producer closure is not approved on protected staging`. `onboarding_genuine_freeze_attempt_remains_applicable_and_blocks_later_proof` retains its original execution-source mismatch assertion. |
 | Missing/conflicting authority | Both connected freeze tests remove/revoke later exact-context IN1 and require `reporting context lacks later exact-transition IN1 admission`. `history_deficiency_quarantines_while_object_and_input_mismatches_refuse`, `retries_are_distinct_conflicts_refuse_and_roots_distinguish_inputs`, `roots_and_populations_are_rechecked_after_history_and_at_consumption` and the FR1 history suite cover missing/conflicting/incomplete/object/root authority. |
 | Population incompleteness | `missing_attempt_or_wrong_job_or_artifact_digest_refuses`, `pagination_detects_truncation_duplicates_and_saturation`, `onboarding_same_generation_later_runs_wait_for_producer_not_workflow`, `each_host_stream_and_control_bound_overflow_refuses`, `host_pagination_accepts_the_run_bound_and_refuses_gaps_duplicates_and_page_overflow`, and `unique_commit_traversal_accepts_1000_and_refuses_1001_without_truncation` cover missing attempts/artifacts, unstable totals, duplicates, gaps, unsupported events and bounds. |

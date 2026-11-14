@@ -298,6 +298,8 @@ pub(crate) fn resolve_attempt(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+pub(crate) use tests::publication_failures;
 
 /// Called by the existing collector before its witness/build/execution branch.
 pub(super) fn dispatch_installed(
@@ -314,17 +316,18 @@ pub(super) fn dispatch_installed(
     let publication = host
         .reporting_publication()
         .ok_or("reporting publication unavailable")?;
-    let head = super::output(crate::git_inputs::command(root).args(["rev-parse", "HEAD"]))?;
-    let candidate = std::str::from_utf8(&head)
-        .map_err(|e| e.to_string())?
-        .trim();
-    if publication.host.reporting_invocation(candidate)?.is_none() {
+    let Some(candidate) = publication.host.reporting_candidate()? else {
         return Ok(false);
+    };
+    oid(&candidate)?;
+    if publication.host.reporting_invocation(&candidate)?.is_none() {
+        return Err("reporting current invocation unavailable".into());
     }
-    let source = crate::runtime_advertising::source::Source::tip(root, candidate)?;
+    let source = crate::runtime_advertising::source::Source::tip(root, &candidate)?;
     let binding = profile
         .resolve_generation(&source)?
         .ok_or("reporting generation unavailable")?;
-    dispatch(root, publication, candidate, &binding.record)?;
+    dispatch(root, publication, &candidate, &binding.record)?
+        .ok_or("reporting current invocation unavailable")?;
     Ok(true)
 }

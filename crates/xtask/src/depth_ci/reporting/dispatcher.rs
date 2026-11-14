@@ -11,6 +11,9 @@ pub(crate) fn dispatch(
     let Some(invocation) = publication.host.reporting_invocation(candidate)? else {
         return Ok(None);
     };
+    if publication.host.reporting_candidate()?.as_deref() != Some(candidate) {
+        return Err("reporting current candidate differs from dispatch".into());
+    }
     let invocation = invocation.normalized();
     if invocation.substantive_invoked {
         return Err("reporting dispatcher observed substantive execution".into());
@@ -126,7 +129,9 @@ pub(crate) fn dispatch(
     // All identity-bearing inputs above stay pinned even if publication's closing read fails.
     if publication
         .host
-        .reporting_invocation(candidate)?
+        .reporting_invocation(candidate)
+        .ok()
+        .flatten()
         .map(Invocation::normalized)
         .as_ref()
         != Some(&context.invocation)
@@ -141,6 +146,15 @@ pub(crate) fn dispatch(
     }
     let closing = view
         .verify()
+        .and_then(|()| {
+            let closing_index = crate::depth_ci::output(
+                crate::git_inputs::command(root).args(["ls-files", "--stage", "-z"]),
+            )?;
+            if closing_index != indexed {
+                return Err("reporting index inventory changed during publication".into());
+            }
+            Ok(())
+        })
         .and_then(|()| history.recheck())
         .and_then(|()| {
             let head = crate::depth_ci::output(
@@ -160,6 +174,7 @@ pub(crate) fn dispatch(
                     .map(Invocation::normalized)
                     .as_ref()
                     != Some(&context.invocation)
+                || publication.host.reporting_candidate()?.as_deref() != Some(candidate)
             {
                 return Err("reporting closing checkout/dispatch changed".into());
             }

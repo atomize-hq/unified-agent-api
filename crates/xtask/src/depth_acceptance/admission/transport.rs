@@ -31,7 +31,11 @@ pub(crate) trait Host: Send + Sync {
     fn acquisition_policy(&self) -> Result<Option<Policy>, String> {
         Ok(None)
     }
-    /// Independent reporting dispatcher facts. Production has no activated implementation.
+    /// Candidate named by the installed current invocation, including at a PR test merge.
+    /// Production has no activated reporting implementation.
+    fn reporting_candidate(&self) -> Result<Option<String>, String> {
+        Ok(None)
+    }
     fn reporting_invocation(
         &self,
         _candidate: &str,

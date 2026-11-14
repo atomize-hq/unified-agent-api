@@ -18,16 +18,43 @@ pub(super) fn before(
     publication_closure(f, candidate);
     let policy = reporting::authority(publication).policy;
     let claims = f.api.3.begin(candidate, &policy).unwrap();
+    let parent = git(f.root.path(), &["rev-parse", "HEAD^"]);
+    let tree = git(f.root.path(), &["rev-parse", "HEAD^{tree}"]);
+    let merge = git(
+        f.root.path(),
+        &[
+            "commit-tree",
+            &tree,
+            "-p",
+            &parent,
+            "-p",
+            candidate,
+            "-m",
+            "collector PR test merge",
+        ],
+    );
     let invocation = Invocation {
         claims,
-        checkout: admission::emitter::object(f.root.path(), candidate).unwrap(),
-        checkout_parents: vec![git(f.root.path(), &["rev-parse", "HEAD^"])],
+        checkout: admission::emitter::object(f.root.path(), &merge).unwrap(),
+        checkout_parents: vec![parent, candidate.into()],
         dispatch_inputs: [("depth_mode".into(), "reporting_only".into())].into(),
         configuration: [("profile".into(), "synthetic-wrapper-v1".into())].into(),
         substantive_invoked: false,
     };
     install(&f.api.3, candidate, &invocation);
+    for base in [&f.baseline, &invocation.checkout_parents[0]] {
+        f.api.put(
+            &format!("repos/fixture/isolated/compare/{base}...{merge}"),
+            json!({"status":"ahead","merge_base_commit":{"sha":base}}),
+        );
+    }
+    f.api.put(
+        &format!("repos/fixture/isolated/commits/{merge}"),
+        json!({"sha":merge}),
+    );
+    git(f.root.path(), &["reset", "--hard", &merge]);
     crate::depth_ci::collect_synthetic(f.root.path()).unwrap();
+    git(f.root.path(), &["reset", "--hard", candidate]);
     let context = reporting::authenticate(
         f.root.path(),
         publication,
@@ -36,6 +63,9 @@ pub(super) fn before(
     )
     .unwrap();
     assert!(context.successful());
+    assert_eq!(context.candidate.commit, candidate);
+    assert_eq!(context.invocation.checkout.commit, merge);
+    assert_eq!(context.head_relationship, "pr_test_merge");
     assert!(f
         .api
         .3
@@ -108,6 +138,7 @@ fn publication_closure(f: &Fixture, candidate: &str) {
     }
 }
 fn install(host: &MemoryHost, candidate: &str, invocation: &Invocation) {
+    host.put("reporting/current", json!(candidate));
     host.put(
         &format!("reporting/candidates/{candidate}"),
         serde_json::to_value(invocation).unwrap(),
@@ -229,6 +260,8 @@ pub(super) fn after(f: &Fixture, publication: &Publication, context: &ContextRec
     assert_eq!(admitted.checkpoint, admission::Checkpoint::RequestFreeze);
     // Every retry has its own immutable context, and receives its own later real IN1 decision.
     let mut invocation = context.invocation.clone();
+    invocation.checkout = context.candidate.clone();
+    invocation.checkout_parents = vec![context.predecessor.commit.clone()];
     invocation.claims.attempt += 1;
     invocation.claims.job += 100_000;
     invocation.claims.check += 100_000;
@@ -295,6 +328,8 @@ pub(super) fn after(f: &Fixture, publication: &Publication, context: &ContextRec
     for event in ["merge_group", "workflow_dispatch", "push"] {
         let policy = reporting::authority(publication).policy;
         let mut invocation = context.invocation.clone();
+        invocation.checkout = context.candidate.clone();
+        invocation.checkout_parents = vec![context.predecessor.commit.clone()];
         invocation.claims = f.api.3.begin(&context.candidate.commit, &policy).unwrap();
         invocation.claims.event = event.into();
         let claims = &invocation.claims;
@@ -331,7 +366,50 @@ pub(super) fn after(f: &Fixture, publication: &Publication, context: &ContextRec
         f.api.3.clone(),
         context.clone(),
         |root, parent, host| approve_source(f, root, parent, host),
+        |root, host| collect_with_host(f, root, host),
     );
+}
+
+fn collect_with_host(f: &Fixture, root: &Path, host: &Arc<MemoryHost>) -> Result<(), String> {
+    let api = Arc::new(super::fixture::Fake(
+        std::sync::Mutex::new(f.api.0.lock().unwrap().clone()),
+        Default::default(),
+        Default::default(),
+        host.clone(),
+        Default::default(),
+    ));
+    let candidate = git(root, &["rev-parse", "HEAD"]);
+    let tip = host.json("git/ref/heads/staging").unwrap()["object"]["sha"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    api.put(
+        "repos/fixture/isolated/branches/staging",
+        json!({"name":"staging","protected":true,"commit":{"sha":tip}}),
+    );
+    let registry = crate::agent_registry::REGISTRY_RELATIVE_PATH;
+    let blob = git(root, &["rev-parse", &format!("{tip}:{registry}")]);
+    api.put(
+        &format!("repos/fixture/isolated/contents/{registry}?ref={tip}"),
+        json!({"path":registry,"type":"file","sha":blob}),
+    );
+    for base in [&f.baseline, &tip] {
+        api.put(&format!("repos/fixture/isolated/compare/{base}...{candidate}"),
+            json!({"status":if base == &candidate { "identical" } else { "ahead" },"merge_base_commit":{"sha":base}}));
+    }
+    api.put(
+        &format!("repos/fixture/isolated/commits/{candidate}"),
+        json!({"sha":candidate}),
+    );
+    let baseline = f.baseline.clone();
+    let subject = f.subject;
+    let _installed = super::fixture::install(Box::new(move || {
+        (
+            super::fixture::profile_with(baseline.clone(), subject),
+            api.clone() as Arc<dyn Api>,
+        )
+    }));
+    crate::depth_ci::collect_synthetic(root)
 }
 
 fn dirty_checkout_and_pinned_context(
@@ -348,6 +426,10 @@ fn dirty_checkout_and_pinned_context(
     };
     let path = "docs/input.txt";
     let bytes = fs::read(root.join(path)).unwrap();
+    git(
+        root,
+        &["reset", "--hard", &context.invocation.checkout.commit],
+    );
     git(root, &["update-index", "--assume-unchanged", path]);
     write(root, path, b"hidden changed actual checkout");
     let error =
@@ -358,6 +440,7 @@ fn dirty_checkout_and_pinned_context(
     );
     write(root, path, &bytes);
     git(root, &["update-index", "--no-assume-unchanged", path]);
+    git(root, &["reset", "--hard", &context.candidate.commit]);
     let mut emitter = f.resolve().unwrap().admission_emitter().unwrap();
     emitter.parent = Some(context.predecessor.commit.clone());
     emitter.publication = publication;
@@ -477,10 +560,16 @@ pub(super) fn freeze_after_readiness(
     depth: &DepthRecord,
 ) {
     let root = f.root.path();
+    assert_ne!(
+        git(root, &["rev-parse", &format!("{freeze}^{{tree}}")]),
+        git(root, &["rev-parse", &format!("{ready}^{{tree}}")]),
+        "readiness must preserve a distinct implementation tree"
+    );
     git(root, &["reset", "--hard", ready]);
     f.host();
     git(root, &["update-ref", "refs/remotes/origin/staging", ready]);
-    git(root, &["read-tree", "--reset", "-u", freeze]);
+    // Preserve the implementation file. Re-rendering the same freeze from this predecessor
+    // is an exact freeze transition, independently of its irreversible readiness history.
     let candidate = super::in1_integration::candidate(f, ready);
     let claims = f
         .api
@@ -518,19 +607,33 @@ pub(super) fn freeze_after_readiness(
         .into_iter()
         .find(|record| record.candidate.commit == candidate)
         .unwrap();
-    assert_eq!(
-        admitted.checkpoint,
-        admission::Checkpoint::ExecutionRequired
-    );
-    assert!(admitted.reasons.iter().any(|reason| matches!(
-        reason,
-        admission::Reason::FreezeTreeMismatch | admission::Reason::FreezePlanningRefused
-    )));
+    assert!(admitted.successful());
+    assert_eq!(admitted.checkpoint, admission::Checkpoint::RequestFreeze);
+    assert!(admitted
+        .reasons
+        .contains(&admission::Reason::ExactFreezeTree));
+    assert_eq!(admitted.producer_context, Some(context.identity().unwrap()));
     f.host();
     git(
         root,
         &["update-ref", "refs/remotes/origin/staging", &candidate],
     );
+    let inventory = "actions/workflows/ci.yml/runs?per_page=100&page=1";
+    for reverse in [false, true] {
+        if reverse {
+            f.api.3.change(inventory, |value| {
+                value["workflow_runs"].as_array_mut().unwrap().reverse()
+            });
+        }
+        let history = publication
+            .resolve(root, std::slice::from_ref(&candidate))
+            .unwrap();
+        assert!(history.is_request_freeze(&candidate, &context.generation));
+        assert_eq!(
+            history.require_reporting(&context).unwrap_err(),
+            "reporting checkpoint cannot reopen irreversible readiness"
+        );
+    }
     crate::depth_evidence::prove_refused_reporting(
         root,
         publication.clone(),
