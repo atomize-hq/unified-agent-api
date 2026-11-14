@@ -15,6 +15,18 @@ pub(super) fn before(
     record: &DepthRecord,
     candidate: &str,
 ) -> ContextRecord {
+    let context = collect_checkpoint(f, publication, candidate);
+    refusals(f, publication, &f.api.3, &context);
+    dirty_checkout_and_pinned_context(f, publication, &context, record);
+    checkout_relationships(f, publication, &context, record);
+    context
+}
+
+pub(super) fn collect_checkpoint(
+    f: &Fixture,
+    publication: &Publication,
+    candidate: &str,
+) -> ContextRecord {
     publication_closure(f, candidate);
     let policy = reporting::authority(publication).policy;
     let claims = f.api.3.begin(candidate, &policy).unwrap();
@@ -98,9 +110,6 @@ pub(super) fn before(
         reporting::authenticate(f.root.path(), publication, claims.run, claims.attempt).unwrap(),
         context
     );
-    refusals(f, publication, &f.api.3, &context);
-    dirty_checkout_and_pinned_context(f, publication, &context, record);
-    checkout_relationships(f, publication, &context, record);
     context
 }
 

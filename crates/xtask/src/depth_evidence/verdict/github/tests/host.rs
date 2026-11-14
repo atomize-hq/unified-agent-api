@@ -14,6 +14,82 @@ pub(crate) fn synthetic_host(root: &Path) -> SyntheticHost {
     SyntheticHost(Arc::new(Mutex::new(endpoints(root, p, &w, &commit, 1))))
 }
 impl SyntheticHost {
+    /// Model one onboarding producer over the actual connected ON2 implementation.
+    pub(crate) fn onboarding(root: &Path) -> Self {
+        let p = Profile::SyntheticOnboarding;
+        let (witness, commit) = build(root, p);
+        Self(Arc::new(Mutex::new(endpoints(
+            root, p, &witness, &commit, 1,
+        ))))
+    }
+
+    /// Retain genuine collector reporting contexts alongside substantive execution attempts.
+    pub(crate) fn include_reporting(
+        &self,
+        host: &crate::depth_acceptance::admission::fake::MemoryHost,
+    ) {
+        use crate::depth_acceptance::admission::Host;
+        let mut fake = self.0.lock().unwrap();
+        let query = "actions/workflows/ci.yml/runs?created=%3E%3D2026-11-05";
+        let mut rows = fake
+            .json(&fake.endpoint(&format!("{query}&per_page=100&page=1")))
+            .unwrap()["workflow_runs"]
+            .as_array()
+            .unwrap()
+            .clone();
+        rows.extend(
+            host.json("reporting/runs?per_page=100&page=1").unwrap()["workflow_runs"]
+                .as_array()
+                .unwrap()
+                .clone(),
+        );
+        for (key, bytes) in host
+            .facts
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(key, _)| key.starts_with("actions/"))
+        {
+            let endpoint = fake.endpoint(key);
+            fake.0.insert(endpoint, bytes.clone());
+        }
+        fake.page(query, Some("workflow_runs"), rows);
+    }
+
+    pub(crate) fn onboarding_population(
+        &self,
+        root: &Path,
+        host: &crate::isolated_maintenance::EvidenceHost,
+    ) -> (usize, usize) {
+        let fake = self.0.lock().unwrap().clone();
+        let resolved =
+            resolve_profile_in(&fake, root, Profile::SyntheticOnboarding, Some(host)).unwrap();
+        (resolved.reporting.len(), resolved.runs.len())
+    }
+
+    /// Real assembly from the separate maintenance population, retained as a cross-flow control.
+    pub(crate) fn maintenance_receipt() -> Vec<u8> {
+        static RECEIPT: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+        RECEIPT
+            .get_or_init(|| {
+                let f = Fixture::new_for(Profile::Synthetic);
+                let host = crate::isolated_maintenance::EvidenceHost::for_test(ISOLATED, &f.commit);
+                let resolved =
+                    resolve_profile_in(&f.api, f.root.path(), Profile::Synthetic, Some(&host))
+                        .unwrap();
+                let assembled = assembly::assemble(&resolved).unwrap();
+                let reference = &assembled.execution.results[0].evidence[0];
+                assembled
+                    .files
+                    .iter()
+                    .find(|(file, _)| file == reference)
+                    .unwrap()
+                    .1
+                    .clone()
+            })
+            .clone()
+    }
+
     /// Serve this host to the calling thread's isolated readers until the guard drops.
     pub(crate) fn install(&self) -> transport::test_reader::Installed {
         let fake = self.0.clone();

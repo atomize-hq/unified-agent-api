@@ -70,6 +70,21 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
             }),
             Event::Onboarding { .. } => {
                 if onboarding {
+                    if old.records.get(version).is_some_and(|prior| {
+                        prior.event == record.event
+                            && prior.policy == record.policy
+                            && prior.obligations == record.obligations
+                    }) {
+                        // E-only reporting retains the generation. Independently authenticate
+                        // its runtime handoff and packet before the fresh publication evaluation.
+                        crate::prepare_publication::check_reporting_transition(
+                            root,
+                            &old.source,
+                            record,
+                            &new.entry,
+                        )?;
+                        continue;
+                    }
                     crate::runtime_follow_on::depth::check_freeze(
                         root,
                         &old.source,

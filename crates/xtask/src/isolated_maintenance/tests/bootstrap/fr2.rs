@@ -10,7 +10,7 @@ use crate::depth_acceptance::admission::{
 };
 use clap::Parser;
 
-fn variables() -> Writer {
+pub(super) fn variables() -> Writer {
     Writer::Onboarding {
         run_id: "fr2-freeze".into(),
         contract_generated_at: "2026-11-14T00:00:00Z".into(),
@@ -20,7 +20,7 @@ fn variables() -> Writer {
         allow_rich_surface: vec![],
     }
 }
-fn run(f: &Fixture) {
+pub(super) fn run(f: &Fixture) {
     let args = crate::runtime_follow_on::Args::parse_from([
         "runtime-follow-on",
         "--dry-run",
