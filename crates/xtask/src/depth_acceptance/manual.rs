@@ -8,9 +8,7 @@ use crate::{
     agent_maintenance::{stand_down, support_audit::NON_TUI_SUPPORT_DEBT_PATH},
     agent_registry::{support_depth::LifecyclePath, AgentRegistry, REGISTRY_RELATIVE_PATH},
     depth_evidence::EvidenceVerdicts,
-    depth_record::{
-        due, AcceptanceEntry, DepthRecord, DepthResult, Event, ObligationsPart, PolicyPart,
-    },
+    depth_record::{AcceptanceEntry, DepthRecord, Event, ObligationsPart, PolicyPart},
     runtime_advertising::source::Source,
 };
 use std::{
@@ -245,33 +243,7 @@ pub(super) fn admitted(
     record: &DepthRecord,
     host: &impl Host,
 ) -> Result<(), String> {
-    let o = record
-        .obligations
-        .as_ref()
-        .ok_or("closeout requires frozen O")?;
-    let e = record
-        .execution
-        .as_ref()
-        .ok_or("closeout requires current E")?;
-    if o.policy_identity != record.policy.identity
-        || e.policy_identity != record.policy.identity
-        || e.obligations_identity != o.identity
-    {
-        return Err("closeout P/O/E binding is stale".into());
-    }
-    let (policy, obligations) = host.bindings(root, record)?;
-    crate::support_depth::check_current_policy(&record.policy, &policy)?;
-    if obligations != *o {
-        return Err("closeout frozen O is no longer current".into());
-    }
-    if !o.classification_required.is_empty() {
-        return Err("closeout has classification_required units".into());
-    }
-    // Current reports can describe names, not independently establish semantic satisfaction or
-    // upstream removal. No corroborating producer is installed for these required work items.
-    if !o.acceptance_work.is_empty() {
-        return Err("closeout due name-level work lacks independent semantic corroboration".into());
-    }
+    super::adequacy::current(record, "closeout", || host.bindings(root, record))?;
     let mut reports = BTreeMap::new();
     for path in view
         .source
@@ -290,51 +262,7 @@ pub(super) fn admitted(
         return Err("closeout debt transitions lack independent semantic corroboration".into());
     }
     let verdicts = host.evidence(root, record)?;
-    for reference in due(record)? {
-        let stated = e
-            .results
-            .iter()
-            .find(|r| r.obligation == reference)
-            .ok_or("closeout is missing a due depth obligation")?;
-        let operation = record
-            .policy
-            .selection
-            .enrollment
-            .operations
-            .iter()
-            .find(|op| op.id == reference.operation)
-            .ok_or("unknown due operation")?;
-        let valid = match stated.result {
-            DepthResult::Verified => {
-                if stated.evidence.is_empty()
-                    || verdicts.result(record, &reference) != DepthResult::Verified
-                {
-                    false
-                } else {
-                    let mut bound = true;
-                    for file in &stated.evidence {
-                        bound &= view
-                            .source
-                            .optional_bytes(&file.path)?
-                            .is_some_and(|bytes| {
-                                crate::depth_ci::reference(&file.path, &bytes) == *file
-                            });
-                    }
-                    bound
-                }
-            }
-            DepthResult::NotApplicable => reference
-                .id
-                .is_some_and(|id| operation.not_applicable_permitted.contains(&id)),
-            _ => false,
-        };
-        if !valid {
-            return Err(format!(
-                "closeout obligation is not independently satisfied: {reference:?}"
-            ));
-        }
-    }
-    Ok(())
+    super::adequacy::evidence(view, record, &verdicts, "closeout")
 }
 
 fn output_paths(entry: &crate::agent_registry::AgentRegistryEntry) -> BTreeSet<String> {
@@ -347,5 +275,7 @@ fn output_paths(entry: &crate::agent_registry::AgentRegistryEntry) -> BTreeSet<S
     ])
 }
 
+#[cfg(test)]
+use crate::depth_record::DepthResult;
 #[cfg(test)]
 mod tests;
