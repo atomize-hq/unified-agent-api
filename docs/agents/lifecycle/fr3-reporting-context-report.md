@@ -294,3 +294,55 @@ MA2 proof includes retained-admission ancestry association for removed and coher
 records on another PR. Annex A and the binding rule are updated. Source changes remain confined
 to the worktree and uncommitted for the lead. Real ON3–ON5 writer closure proofs remain in slices
 6–9, and deployed host qualification remains phase C.
+
+## Round 2 fix
+
+FR3b made producer generation resolution read the canonical versioned report through a mutable
+`GitInputs` view. MA5/MA6 writers legitimately rewrite that report's execution and acceptance
+entries before staging it, so generation resolution rejected the proposal with
+`working bytes disagree with index: cli_manifests/depth_fixture/reports/0.2.0/depth-record.json`.
+The existing socket-free `publication_closeout_writer_socket_free_qualified_batch` reproduced this
+failure before the fix. Inspection also found population discovery's current-generation lookup
+on the same writer-time path, in addition to the graph and witness callers identified by the lead.
+
+The authority choice follows design §4, “Canonical MA2 generation binding”: generation identity
+comes from the immutable checkout commit. Witness collection captures the commit first and uses
+its `Source` for the canonical resolver and both pre-build and post-build graph resolutions.
+Maintenance population discovery resolves its target generation from `GitInputs::provenance`
+at the caller's HEAD; a bound scratch view uses the original caller's object store. Historical
+host heads continue through the same canonical resolver. Proposed build/acquired-input bytes and
+inventories still pass their existing `GitInputs` checks and evidence evaluation. No freshness
+check is weakened and no path exemption is introduced. Other profiles retain their existing
+population target lookup.
+
+`GenerationResolver::committed_generation` only requires a result from the existing resolver;
+it adds no alternative derivation or fixture fallback. The standing request and canonical report
+remain the generation inputs, the auxiliary fixture retains no generation authority, and read
+failures still propagate. The resolver validates the full committed report before clearing
+execution/acceptance entries, so an MA5-extended immutable report yields precisely the original
+Event/P/O without accepting malformed execution data.
+
+The new socket-free regression,
+`writer_edits_do_not_change_the_committed_maintenance_generation`, failed with the exact reported
+index mismatch before the fix and passes after it. It writes valid execution and closeout entries
+without staging, confirms that an ordinary `GitInputs` read still rejects those bytes, and reruns
+production population resolution. It checks unchanged Event/P/O and population size, preserves
+the writer bytes and index, commits the extended report and checks the frozen projection again,
+then commits an invalid execution identity and requires canonical-report refusal.
+
+Validation logs are ignored artifacts in `target/fr3-round2-validation/` and
+`target/fr3-round2-*.log`. Tests use `env -u TMPDIR` and `--test-threads=1` to bound temporary
+storage use. Changes remain uncommitted on `feat/fr3-reporting-context`; nothing is pushed.
+
+| Command | Round 2 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass |
+| `cargo test -p xtask --lib depth_ci` | 8 passed |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 82 passed, including the new regression |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr3_reporting` | 1 connected proof passed |
+| `cargo test -p xtask --lib isolated_maintenance::tests::fr2_maintenance` | 3 passed |
+| `make loc-check`, `make hygiene`, `git diff --check` | Pass |
+
+The affected publication, MA5, MA6, view-evaluation and connected IN1 results will be recorded
+when their validation run completes.

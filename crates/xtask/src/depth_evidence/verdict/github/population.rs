@@ -68,7 +68,16 @@ pub(super) fn resolve_generation_inputs(
             &mut owned
         }
     };
-    let original = resolver.current_generation(view)?.record;
+    let original = if p == Profile::Synthetic {
+        // MA5/MA6 evaluate post-entry proposals with unstaged report bytes. Generation authority
+        // stays at the caller's immutable checkout, including when the view lives in scratch.
+        // Proposed build/acquired inputs below retain all GitInputs freshness checks.
+        resolver
+            .committed_generation(&view.provenance("HEAD")?)?
+            .record
+    } else {
+        resolver.current_generation(view)?.record
+    };
     depth_ci::onboarding::check_inputs(p, &original, |path| {
         String::from_utf8(view.required(path)?).map_err(|e| e.to_string())
     })?;

@@ -380,3 +380,70 @@ fn unavailable_canonical_report_never_becomes_unrelated_absence() {
         .unwrap();
     assert_eq!(error, "authenticated report transport unavailable");
 }
+
+#[test]
+fn writer_edits_do_not_change_the_committed_maintenance_generation() {
+    use crate::{depth_record::AcceptanceEntry, git_inputs::GitInputs};
+    let f = Fixture::new_for(P);
+    let root = f.root.path();
+    let host = EvidenceHost::for_test(ISOLATED, &f.commit);
+    let before = resolve_profile_in(&f.api, root, P, Some(&host)).unwrap();
+    let frozen = before.original.clone();
+    let mut report = frozen.clone();
+    report.execution = Some(assembly::assemble(&before).unwrap().execution);
+    report
+        .acceptance_entries
+        .push(AcceptanceEntry::MaintenanceCloseout {
+        closeout: depth_ci::reference(
+            "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-closeout.json",
+            b"closeout",
+        ),
+        record_sha256: "a".repeat(64),
+    });
+    let bytes = serde_json::to_vec_pretty(&report).unwrap();
+    DepthRecord::parse(
+        std::str::from_utf8(&bytes).unwrap(),
+        P.agent_id(),
+        P.version(),
+    )
+    .unwrap();
+    let index = fs::read(root.join(".git/index")).unwrap();
+    // The writer has updated E/entries but has not staged or committed its proposed report.
+    write(root, REPORT, &bytes);
+    let mut working = GitInputs::new(root).unwrap();
+    assert_eq!(
+        working.required(REPORT).unwrap_err(),
+        format!("working bytes disagree with index: {REPORT}")
+    );
+    let after = resolve_profile_in(&f.api, root, P, Some(&host)).unwrap();
+    assert_eq!(after.original, frozen);
+    assert_eq!(after.runs.len(), before.runs.len());
+    assert_eq!(fs::read(root.join(REPORT)).unwrap(), bytes);
+    assert_eq!(fs::read(root.join(".git/index")).unwrap(), index);
+
+    // Once MA5's report is committed, the shared resolver still projects exactly Event/P/O.
+    let head = commit(root);
+    let at = source(root, ISOLATED, &head).unwrap();
+    let projected = P.resolve_generation(&at).unwrap().unwrap().record;
+    assert_eq!(projected, frozen);
+    assert!(projected.execution.is_none());
+    assert!(projected.acceptance_entries.is_empty());
+    assert_eq!(
+        resolve_profile_in(&f.api, root, P, Some(&host))
+            .unwrap()
+            .original,
+        frozen
+    );
+    // Projection must follow validation: invalid committed E cannot disappear behind it.
+    report.execution.as_mut().unwrap().identity = "b".repeat(64);
+    write(root, REPORT, serde_json::to_vec_pretty(&report).unwrap());
+    let head = commit(root);
+    let error = P
+        .resolve_generation(&source(root, ISOLATED, &head).unwrap())
+        .err()
+        .unwrap();
+    assert!(
+        error.contains("invalid maintenance generation report"),
+        "{error}"
+    );
+}

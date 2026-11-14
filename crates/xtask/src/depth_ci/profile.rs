@@ -464,6 +464,14 @@ pub(crate) trait GenerationResolver {
     ) -> Result<Option<GenerationBinding>, String> {
         self.resolve_inputs(&mut source.clone(), None, false)
     }
+    /// Producer identity belongs to one pinned head, including when later writers edit E/entries.
+    fn committed_generation(
+        &self,
+        source: &crate::runtime_advertising::source::Source,
+    ) -> Result<GenerationBinding, String> {
+        self.resolve_generation(source)?
+            .ok_or_else(|| "generation unavailable".into())
+    }
     fn current_generation(
         &self,
         view: &mut crate::git_inputs::GitInputs,

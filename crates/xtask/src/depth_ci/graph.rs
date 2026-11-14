@@ -2,6 +2,7 @@ use super::*;
 use crate::{
     depth_evidence::payload::{Package, PackageOrigin},
     git_inputs::GitInputs,
+    runtime_advertising::source::Source,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,6 +34,7 @@ pub(super) fn normalize(id: &str) -> String {
 pub(super) fn resolve(
     root: &Path,
     view: &mut GitInputs,
+    source: &Source,
     metadata: &Value,
     compiled: &BTreeSet<String>,
     profile: profile::Profile,
@@ -59,7 +61,7 @@ pub(super) fn resolve(
     }
     if profile != profile::Profile::Channel {
         use super::profile::GenerationResolver;
-        let record = profile.current_generation(view)?.record;
+        let record = profile.committed_generation(source)?.record;
         for input in record.obligations.unwrap().acquired_inputs {
             view.required(&input.path)?;
             let current = view.reference(&input.path)?;

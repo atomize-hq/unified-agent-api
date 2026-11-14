@@ -303,10 +303,6 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     let (run_id, run_attempt, workflow_commit) = host_header()?;
     let mut view = GitInputs::new(root)?;
     use super::profile::GenerationResolver;
-    let original = profile.current_generation(&mut view)?.record;
-    if original.execution.is_some() || !original.acceptance_entries.is_empty() {
-        return Err("source fixture must contain only frozen P/O".into());
-    }
     let commit = String::from_utf8(output(
         Command::new("git")
             .arg("--no-replace-objects")
@@ -318,6 +314,10 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     .trim()
     .to_owned();
     let source = Source::tip(root, &commit)?;
+    let original = profile.committed_generation(&source)?.record;
+    if original.execution.is_some() || !original.acceptance_entries.is_empty() {
+        return Err("source fixture must contain only frozen P/O".into());
+    }
     super::onboarding::check(&source, profile, &original)?;
     let mut absent = [
         ".cargo/config",
@@ -406,6 +406,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
     super::graph::resolve(
         root,
         &mut view,
+        &source,
         &metadata,
         &super::graph::expected(&metadata, profile)?,
         profile,
@@ -491,7 +492,7 @@ fn witness(root: &Path, profile: profile::Profile) -> Result<Witness, String> {
         );
         return Err("compiled features/build scripts are outside the reviewed profile".into());
     }
-    let graph = super::graph::resolve(root, &mut view, &metadata, &compiled, profile)?;
+    let graph = super::graph::resolve(root, &mut view, &source, &metadata, &compiled, profile)?;
     for file in &graph.inputs {
         if source.optional_bytes(&file.path)?.as_deref()
             != Some(view.required(&file.path)?.as_slice())
