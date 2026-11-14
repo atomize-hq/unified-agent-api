@@ -1,6 +1,7 @@
 //! Independently discover every matching Event/P/O run and attempt before inspecting outcomes.
 use super::*;
 use crate::depth_acceptance::admission::observations;
+use crate::depth_ci::profile::GenerationResolver;
 
 pub(super) fn resolve_profile_inputs(
     api: &impl Api,
@@ -9,6 +10,18 @@ pub(super) fn resolve_profile_inputs(
     host: Option<&crate::isolated_maintenance::EvidenceHost>,
     borrowed: Option<&mut GitInputs>,
 ) -> Result<Resolved, String> {
+    resolve_generation_inputs(api, root, host, borrowed, &p)
+}
+
+/// Discovery and the checkpoint join consume resolved bindings from this single interface.
+pub(super) fn resolve_generation_inputs(
+    api: &impl Api,
+    root: &Path,
+    host: Option<&crate::isolated_maintenance::EvidenceHost>,
+    borrowed: Option<&mut GitInputs>,
+    resolver: &impl GenerationResolver,
+) -> Result<Resolved, String> {
+    let p = resolver.profile();
     let observed = super::transport_impl::Observed(api);
     let api = &observed;
     let ir_p3 = match (p, host) {
@@ -55,8 +68,7 @@ pub(super) fn resolve_profile_inputs(
             &mut owned
         }
     };
-    let original =
-        p.record(std::str::from_utf8(&view.required(p.fixture())?).map_err(|e| e.to_string())?)?;
+    let original = resolver.current_generation(view)?.record;
     depth_ci::onboarding::check_inputs(p, &original, |path| {
         String::from_utf8(view.required(path)?).map_err(|e| e.to_string())
     })?;
@@ -166,10 +178,10 @@ pub(super) fn resolve_profile_inputs(
         let head = source(root, repository, sha(required_string(run, "head_sha")?)?)?;
         // Applicability precedes looking for artifacts or outcomes. Missing witnesses cannot
         // erase an otherwise applicable attempt. Other generations are genuinely out of scope.
-        let Some(raw) = head.optional(p.fixture())? else {
+        let Some(binding) = resolver.resolve_generation(&head)? else {
             continue;
         };
-        let candidate = p.record(&raw)?;
+        let candidate = binding.record;
         if candidate.event != original.event
             || candidate.policy != original.policy
             || candidate.obligations != original.obligations
@@ -202,6 +214,8 @@ pub(super) fn resolve_profile_inputs(
         .transpose()?
         .flatten();
     let mut runs = vec![];
+    let mut reporting = vec![];
+    let mut reporting_conflicts = BTreeSet::new();
     let mut progression = progression::Onboarding::default();
     for (run, head, candidate) in applicable {
         // Approve the API-derived execution head before trusting any witness source claims.
@@ -212,8 +226,16 @@ pub(super) fn resolve_profile_inputs(
             }
         }
         progression.observe(root, head_sha, &head, p, &candidate)?;
-        profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
         let id = run["id"].as_u64().ok_or("missing run id")?;
+        let has_reporting = host
+            .and_then(|host| host.reporting_publication())
+            .map(|publication| publication.host.reporting_attempt(id, 1))
+            .transpose()?
+            .flatten()
+            .is_some();
+        if !has_reporting {
+            profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
+        }
         let count = run["run_attempt"]
             .as_u64()
             .filter(|n| *n > 0 && *n <= 100)
@@ -230,12 +252,88 @@ pub(super) fn resolve_profile_inputs(
                 || attempt_run["run_attempt"] != attempt
                 || attempt_run["head_sha"] != run["head_sha"]
                 || attempt_run["path"] != profile::WORKFLOW
+                || attempt_run["event"] != run["event"]
+                || attempt_run["workflow_id"] != run["workflow_id"]
+                || attempt_run["head_repository"]["full_name"] != run["head_repository"]["full_name"]
                 // IR-P3: the enclosing workflow may still run; the producer job must be terminal,
                 // which the artifact binding checks for every profile.
                 || (!ir_p3 && attempt_run["status"] != "completed")
             {
                 return Err("missing/unstable/nonterminal applicable attempt".into());
             }
+            if let Some((publication, history)) = host
+                .and_then(|host| host.reporting_publication())
+                .zip(admissions.as_ref())
+            {
+                let candidate_object =
+                    crate::depth_acceptance::admission::emitter::object(root, head_sha)?;
+                let resolved_context = depth_ci::reporting::resolve_attempt(
+                    root,
+                    publication,
+                    id,
+                    attempt,
+                    &candidate_object,
+                    &crate::depth_ci::profile::GenerationBinding {
+                        record: candidate.clone(),
+                    },
+                )?;
+                let context_fact = resolved_context
+                    .as_ref()
+                    .map(|(context, success)| {
+                        context.identity().map(|identity| (identity, *success))
+                    })
+                    .transpose()?;
+                observations::fact(
+                    &format!("reporting/{id}/{attempt}"),
+                    "context",
+                    &context_fact,
+                );
+                if let Some((context, producer_success)) = resolved_context {
+                    if attempt_run["event"] != context.invocation.claims.event
+                        || attempt_run["workflow_id"] != context.policy.workflow_id
+                        || attempt_run["head_repository"]["full_name"] != context.repository.name
+                    {
+                        return Err("reporting population event mismatch".into());
+                    }
+                    let artifacts = list(
+                        api,
+                        &format!("actions/runs/{id}/artifacts"),
+                        Some("artifacts"),
+                    )?;
+                    let witness_name = format!("{}-{id}-{attempt}", p.artifact());
+                    let execution = publication.host.reporting_execution(id, attempt);
+                    observations::unavailable("reporting/execution", &execution);
+                    let execution = execution?;
+                    observations::fact(
+                        &format!("reporting/{id}/{attempt}"),
+                        "execution",
+                        &execution,
+                    );
+                    let unexpected = artifacts.iter().any(|a| a["name"] == witness_name)
+                        || execution
+                        || context.invocation.substantive_invoked
+                        || !context.enrolled_substantive_path_not_invoked;
+                    if !unexpected {
+                        if !context.successful() || !producer_success {
+                            return Err("failed reporting producer or incomplete collection".into());
+                        }
+                        history.require_reporting(&context)?;
+                        reporting.push(context);
+                        continue;
+                    }
+                    reporting.push(context);
+                    reporting_conflicts.insert((id, attempt));
+                }
+            }
+            if admissions.as_ref().is_some_and(|history| {
+                history.is_request_freeze(
+                    head_sha,
+                    &crate::depth_acceptance::admission::Generation::from_record(&candidate),
+                )
+            }) {
+                reporting_conflicts.insert((id, attempt));
+            }
+            profile::approved(root, repository, head_sha, head_sha, anchor, p)?;
             let w = artifact::witness(api, &decoder, &attempt_run, attempt, p)?;
             let built_original =
                 profile::validate_witness(root, repository, &w, &attempt_run, attempt, anchor, p)?;
@@ -313,7 +411,7 @@ pub(super) fn resolve_profile_inputs(
             }
         }
     }
-    if runs.is_empty() {
+    if runs.is_empty() && reporting.is_empty() {
         return Err("no applicable producer attempts".into());
     }
     check_stable(api, &query, &inventory, &anchor_value, ir_p3)?;
@@ -327,6 +425,8 @@ pub(super) fn resolve_profile_inputs(
         original,
         definition,
         runs,
+        reporting,
+        reporting_conflicts,
     })
 }
 

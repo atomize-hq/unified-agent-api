@@ -40,7 +40,6 @@ impl PlanningFailure {
     fn acquisition(error: impl ToString) -> Self {
         Self::Ineligible(Reason::AcquisitionAuthorityUnavailable, error.to_string())
     }
-    #[cfg(test)]
     fn message(self) -> String {
         match self {
             Self::Incomplete(message) | Self::Ineligible(_, message) => message,
@@ -352,3 +351,8 @@ fn plan_authenticated(
 
 #[cfg(test)]
 mod tests;
+
+/// Reuse the bounded complete-tree reader for the reporting collector's data-only checkout.
+pub(crate) fn read_tree(root: &Path, object: &Object) -> Result<freeze_transition::Tree, String> {
+    objects::read(&mut Objects::new(root), object).map_err(PlanningFailure::message)
+}

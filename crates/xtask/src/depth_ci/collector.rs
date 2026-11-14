@@ -634,6 +634,9 @@ pub(super) fn collect(workspace: &Path) -> Result<(), String> {
     collect_profile(&root, profile::Profile::Channel)
 }
 pub(super) fn collect_profile(root: &Path, profile: profile::Profile) -> Result<(), String> {
+    if super::reporting::dispatch_installed(root, profile)? {
+        return Ok(());
+    }
     let result = witness(root, profile);
     let value = match &result {
         Ok(w) => serde_json::to_value(w).map_err(|e| e.to_string())?,

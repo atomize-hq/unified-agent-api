@@ -30,6 +30,8 @@ pub(super) struct Resolved {
     pub original: DepthRecord,
     pub definition: String,
     pub runs: Vec<AuthenticatedRun>,
+    pub reporting: Vec<crate::depth_ci::reporting::ContextRecord>,
+    pub reporting_conflicts: BTreeSet<(u64, u64)>,
 }
 
 #[cfg(test)]
@@ -119,6 +121,8 @@ impl Resolved {
             return Ok(None);
         }
         Ok(Some(Population {
+            reporting: self.reporting.clone(),
+            reporting_conflicts: self.reporting_conflicts.clone(),
             current: profile::scope_for(
                 &self.original,
                 self.profile,
@@ -219,7 +223,13 @@ fn prove_resolved(root: &Path, repository: &str, resolved: &Resolved) -> Result<
         _ => return Err("isolated proof requires exactly one frozen target".into()),
     };
     let scratch = tempfile::tempdir().map_err(|e| e.to_string())?;
-    let commit = resolved.runs[0].witness.build.source_commit.clone();
+    let Some(first) = resolved.runs.first() else {
+        return serde_json::to_string_pretty(&json!({"origin":"isolated", "result":"unverified",
+            "reason":"only reporting checkpoints; zero support credit",
+            "reporting_attempts":resolved.reporting.len(), "production_enrollment":false}))
+        .map_err(|e| e.to_string());
+    };
+    let commit = first.witness.build.source_commit.clone();
     crate::depth_ci::output(
         std::process::Command::new("git")
             .args(["clone", "--quiet", "--no-hardlinks", "--no-checkout"])
@@ -352,7 +362,18 @@ impl Resolved {
         ),
         String,
     > {
-        let first = self.runs.first().ok_or("empty authenticated population")?;
+        let Some(first) = self.runs.first() else {
+            let results = self
+                .profile
+                .obligations(&self.original)
+                .into_iter()
+                .map(|obligation| (obligation, DepthResult::Unverified))
+                .collect();
+            return Ok((
+                super::super::results::evaluated_many(record, results)?,
+                Default::default(),
+            ));
+        };
         let mut results = std::collections::BTreeMap::new();
         let mut decisions = std::collections::BTreeMap::new();
         for obligation in self.profile.obligations(&self.original) {
@@ -485,3 +506,9 @@ pub(super) fn view_record_results(
 
 #[cfg(all(test, unix))]
 pub(crate) use tests::onboarding::admissions::prove_unobserved_admission;
+
+#[cfg(test)]
+pub(crate) use tests::reporting::prove_reporting;
+
+#[cfg(test)]
+pub(crate) use tests::reporting::prove_refused_reporting;

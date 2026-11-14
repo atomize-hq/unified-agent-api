@@ -17,6 +17,7 @@ pub(crate) struct Emitter {
     pub version: String,
     pub input_paths: Vec<String>,
     pub prepared: Option<(Record, Option<freeze::Captured>)>,
+    pub prepared_context: Option<crate::depth_ci::reporting::ContextRecord>,
 }
 pub(crate) fn object(root: &Path, commit: &str) -> Result<Object, String> {
     Ok(Objects::new(root).commit(commit)?.object)
@@ -67,11 +68,35 @@ impl Emitter {
         let prepared = self.read_inputs(root);
         observations::unavailable("in1/evaluated-inputs", &prepared);
         prepared?;
-        let stable = self.recheck_freeze();
+        let stable = self.recheck_freeze(root);
         observations::unavailable("in1/freeze-stability", &stable);
         stable
     }
-    fn recheck_freeze(&self) -> Result<(), String> {
+    fn recheck_freeze(&self, root: &Path) -> Result<(), String> {
+        if let Some(context) = &self.prepared_context {
+            let claims = &context.invocation.claims;
+            let retained = crate::depth_ci::reporting::authenticate(
+                root,
+                &self.publication,
+                claims.run,
+                claims.attempt,
+            )?;
+            if retained != *context
+                || self
+                    .publication
+                    .host
+                    .reporting_execution(claims.run, claims.attempt)?
+                || self
+                    .publication
+                    .host
+                    .reporting_invocation(&self.candidate)?
+                    .map(crate::depth_ci::reporting::Invocation::normalized)
+                    .as_ref()
+                    != Some(&context.invocation)
+            {
+                return Err("IN1 reporting context changed after input capture".into());
+            }
+        }
         if let Some((_, Some(captured))) = &self.prepared {
             captured.recheck(self.publication.host.as_ref(), &self.candidate)?;
         }
@@ -172,6 +197,22 @@ impl Emitter {
             });
         observations::unavailable("in1/freeze-planning", &classification);
         let established = classification.as_ref().ok().and_then(Option::as_ref);
+        let prepared_context = match generation.as_ref() {
+            Some(generation) => crate::depth_ci::reporting::capture(
+                root,
+                &self.publication,
+                &candidate,
+                &parent,
+                generation,
+                &predecessors,
+            )?,
+            None => None,
+        };
+        let producer_context = prepared_context
+            .as_ref()
+            .map(|context| context.identity())
+            .transpose()?;
+        self.prepared_context = prepared_context;
         let bootstrap = predecessors.is_empty();
         self.prepared = Some((
             Record {
@@ -214,7 +255,7 @@ impl Emitter {
                 registry_blob: self.registry_blob.clone(),
                 inputs,
                 observed_authority: String::new(),
-                producer_context: None,
+                producer_context,
                 execution_evidence,
                 claims: Claims {
                     run: 0,
@@ -250,7 +291,7 @@ impl Emitter {
             .publication
             .resolve(root, &[self.protected_tip.clone(), self.candidate.clone()]);
         let closing = self
-            .recheck_freeze()
+            .recheck_freeze(root)
             .and_then(|()| history.as_ref().map_err(Clone::clone))
             .and_then(|history| {
                 if history.candidate_predecessors(&record.candidate.commit)? != record.predecessors
@@ -278,11 +319,11 @@ impl Emitter {
             return Err("IN1 emitting event differs from evaluated event".into());
         }
         record.claims = session.claims.clone();
-        let publishing = self.recheck_freeze();
+        let publishing = self.recheck_freeze(root);
         if publishing.is_err() && !record.reasons.contains(&Reason::ObservationIncomplete) {
             record.reasons.push(Reason::ObservationIncomplete);
         }
-        session.publish(&mut record, || self.recheck_freeze())?;
+        session.publish(&mut record, || self.recheck_freeze(root))?;
         closing?;
         publishing?;
         history?.recheck_publication(&session.claims)

@@ -445,6 +445,7 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
         .reason,
         Reason::FreezeTreeMismatch
     );
+    let reporting = super::super::fr3_reporting::before(&f, &publication, &record, &freeze_commit);
     check_integration(f.root.path(), &parent).unwrap();
     let retained = f
         .api
@@ -480,4 +481,5 @@ fn fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1() {
     f.host();
     local(&f, &freeze_commit);
     check_integration(f.root.path(), &parent).unwrap();
+    super::super::fr3_reporting::after(&f, &publication, &reporting);
 }

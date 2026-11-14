@@ -682,6 +682,42 @@ An evaluator MUST refuse the exception whenever required authority cannot be est
     independent target-generation association retain ordinary unrelated-head treatment. Records
     supply authenticated input evidence. Reporting authorization requires the combined proof.
 
+### Reporting-context control record v1
+
+`depth_ci/reporting.rs` defines independently versioned `ContextRecord` with
+`schema_version = 1` and `kind = reporting_only`. It uses the IN1 canonical JSON encoding and
+64 KiB bound. Its SHA-256 domain is `support-depth-reporting-context-v1` followed by NUL.
+The fixed log line is `DEPTH_REPORTING_CONTEXT_V1 kind=reporting_only sha256=<digest> artifact=<id>`.
+The existing bounded control ZIP envelope contains one `admission.json` payload for either kind.
+Kind-specific parsers and digest domains authenticate the payload after shared envelope checks.
+
+The record has the following members.
+
+- `repository`, `generation` and `enrollment_anchor` use the IN1 repository, original Event/P/O/
+  selection and commit/tree representations.
+- `candidate`, `predecessor`, `predecessor_admissions` and `candidate_record` bind commit/tree
+  objects, the authenticated sorted predecessor frontier and the canonical depth-record Git blob.
+- `policy` separately identifies the approved collector implementation, workflow source, complete
+  build/workflow closure, workflow/job/app identities. The isolated job key is `rust-tests`.
+- `invocation` contains exact `claims`, actual `checkout`, ordered `checkout_parents`,
+  `dispatch_inputs`, `configuration` and `substantive_invoked`. The installed isolated dispatcher
+  consumes `depth_mode` and `profile`. Other input/configuration text is ignored before capture.
+- `head_relationship` is `exact_head` or `pr_test_merge`. A PR test merge has exactly two parents,
+  with the candidate second, and its tree equals the exact freeze tree. `source_observations`
+  binds complete candidate, checkout and predecessor trees. `indexed_tree` and `worktree_tree`
+  bind the clean actual checkout observed before dispatch.
+- `selected_mode` is `reporting_only`. `enrolled_substantive_path_not_invoked` records the trusted
+  branch's bounded observation. `reporting_outcome` is `success`, `failure` or `aborted` and
+  `collection_complete` records successful collection. Only complete successful contexts with
+  affirmative non-invocation observation and no substantive invocation can classify reporting.
+
+IN1 captures the authenticated context identity in `producer_context` before owning predicates.
+Closing reads retain the captured identity on incompleteness. A context supplies reporting
+classification only through a successful, eligible, exact-transition IN1 admission referencing
+that context and protected lineage. Each retry has a separate context and admission association.
+Reporting attempts remain in the complete population and contribute zero support credit.
+Unexpected substantive witnesses remain execution observations and invalidate reporting treatment.
+
 ### IN1 admission control record v1
 
 The isolated FR1 route uses an independently versioned `in1_admission` JSON object. Canonical
@@ -855,7 +891,7 @@ references. Explicit absence is permitted only after a successful authenticated 
 Malformed present state/depth bytes and failed source reads MUST abort input capture. Such an
 invocation cannot reach a substantive owning decision or publish a record with substituted nulls,
 empty maps or default classifications. Its independently started attempt remains incomplete and
-unverified. `producer_context` remains the explicit FR1 reserved absence. Normalized host facts
+unverified. `producer_context` is captured from authenticated reporting-context reads during prepare when present. Normalized host facts
 continue accumulating during evaluation and are pinned at the reached decision boundary.
 
 After input capture, closing or emission failures MUST preserve every pinned identity field and

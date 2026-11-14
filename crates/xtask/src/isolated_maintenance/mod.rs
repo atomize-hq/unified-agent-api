@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 pub(crate) mod acquisition;
 mod admission;
+pub(crate) use admission::reporting_host;
 mod host;
 pub(crate) mod onboarding;
 mod scope;

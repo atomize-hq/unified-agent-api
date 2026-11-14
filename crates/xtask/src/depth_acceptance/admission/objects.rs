@@ -10,11 +10,11 @@ use std::{
 
 const OBJECT_LIMIT: usize = 16_777_216;
 #[derive(Clone)]
-pub(super) struct Commit {
+pub(crate) struct Commit {
     pub object: Object,
     pub parents: Vec<String>,
 }
-pub(super) struct Objects<'a> {
+pub(crate) struct Objects<'a> {
     root: &'a Path,
     bytes: BTreeMap<(String, String), Vec<u8>>,
     pub commits: BTreeMap<String, Commit>,

@@ -173,6 +173,23 @@ impl GitInputs {
             .ok_or_else(|| format!("missing bound input: {path}"))
     }
 
+    /// Capture a known bounded file inventory through one stage-0 snapshot and blob reader.
+    pub(crate) fn capture_files<'a>(
+        &mut self,
+        paths: impl IntoIterator<Item = &'a str>,
+    ) -> Result<(), String> {
+        self.recheck_borrowed()?;
+        let root = self.root.clone();
+        let borrowed = self.borrowed.clone();
+        let mut session = batch::Session::new(&root, borrowed.as_ref());
+        for path in paths {
+            self.record(path, session.read(path)?)?
+                .ok_or_else(|| format!("missing bound input: {path}"))?;
+        }
+        session.finish_index(&self.files)?;
+        self.recheck_borrowed()
+    }
+
     pub(crate) fn list(&mut self, path: &str) -> Result<Vec<String>, String> {
         let names = list(&self.root, path, self.borrowed.as_ref())?;
         self.record_directory(path, names)

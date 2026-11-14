@@ -429,3 +429,5 @@ mod synthetic;
 
 #[cfg(unix)]
 pub(super) mod onboarding;
+
+pub(crate) mod reporting;

@@ -432,3 +432,43 @@ mod onboarding_tests {
             .contains("None => Err(\"no fake isolated host is installed for this test\".into())"));
     }
 }
+
+/// A resolved Event/P/O binding. FR3b replaces the resolver behind this interface.
+pub(crate) struct GenerationBinding {
+    pub record: crate::depth_record::DepthRecord,
+}
+pub(crate) trait GenerationResolver {
+    fn profile(&self) -> Profile;
+    fn path(&self) -> &str;
+    fn resolve_generation(
+        &self,
+        source: &crate::runtime_advertising::source::Source,
+    ) -> Result<Option<GenerationBinding>, String> {
+        source
+            .optional(self.path())?
+            .map(|raw| {
+                self.profile()
+                    .record(&raw)
+                    .map(|record| GenerationBinding { record })
+            })
+            .transpose()
+    }
+    fn current_generation(
+        &self,
+        view: &mut crate::git_inputs::GitInputs,
+    ) -> Result<GenerationBinding, String> {
+        let bytes = view.required(self.path())?;
+        let raw = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+        Ok(GenerationBinding {
+            record: self.profile().record(raw)?,
+        })
+    }
+}
+impl GenerationResolver for Profile {
+    fn profile(&self) -> Profile {
+        *self
+    }
+    fn path(&self) -> &str {
+        self.fixture()
+    }
+}

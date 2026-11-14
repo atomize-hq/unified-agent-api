@@ -151,6 +151,54 @@ impl History {
                 .iter()
                 .any(|r| r.identity().as_deref() == Ok(identity) && self.authoritative(r)))
     }
+    /// Structural checkpoint identity supplies no receipt-free authority by itself.
+    pub(crate) fn is_request_freeze(&self, commit: &str, generation: &Generation) -> bool {
+        self.records.iter().any(|record| {
+            self.authoritative(record)
+                && record.candidate.commit == commit
+                && record.generation.as_ref() == Some(generation)
+                && record.checkpoint == Checkpoint::RequestFreeze
+                && record.reasons.contains(&Reason::ExactFreezeTree)
+        })
+    }
+    pub(crate) fn require_reporting(
+        &self,
+        context: &crate::depth_ci::reporting::ContextRecord,
+    ) -> Result<(), String> {
+        let identity = context.identity()?;
+        let protected = &self.ancestors[&self.protected];
+        if context.candidate.commit != self.protected
+            && !protected.contains(&context.candidate.commit)
+        {
+            return Err("reporting checkpoint absent from protected lineage".into());
+        }
+        let admitted = self.records.iter().any(|record| {
+            self.authoritative(record)
+                && !self
+                    .revoked
+                    .contains(&record.identity().unwrap_or_default())
+                && record.candidate == context.candidate
+                && record.parent == context.predecessor
+                && record.generation.as_ref() == Some(&context.generation)
+                && record.checkpoint == Checkpoint::RequestFreeze
+                && record.reasons.contains(&Reason::ExactFreezeTree)
+                && record.producer_context.as_ref() == Some(&identity)
+                && record.execution_evidence.is_empty()
+        });
+        if !admitted {
+            return Err("reporting context lacks later exact-transition IN1 admission".into());
+        }
+        for ready in self.records.iter().filter(|record| {
+            self.authoritative(record)
+                && record.generation.as_ref() == Some(&context.generation)
+                && record.checkpoint == Checkpoint::ExecutionRequired
+        }) {
+            if !self.ancestors[&ready.candidate.commit].contains(&context.candidate.commit) {
+                return Err("reporting checkpoint cannot reopen irreversible readiness".into());
+            }
+        }
+        Ok(())
+    }
     pub(crate) fn check_progression(
         &self,
         commit: &str,
