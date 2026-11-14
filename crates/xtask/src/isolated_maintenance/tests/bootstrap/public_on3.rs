@@ -136,7 +136,9 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     host: &Arc<MemoryHost>,
     evidence: SyntheticHost,
     repaired: bool,
+    owning_only: bool,
 ) {
+    let review_refusals = !repaired && !owning_only;
     eprintln!("ON3 connected proof enters reporting and IN1 siblings");
     let implemented = git(root, &["rev-parse", "HEAD"]);
     let frozen = fs::read(root.join(RECORD)).unwrap();
@@ -150,11 +152,11 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     let parent = git(root, &["rev-parse", "HEAD"]);
     let state = life::load_lifecycle_state(root, STATE).unwrap();
     assert_eq!(fs::read(root.join(RECORD)).unwrap(), frozen);
-    if !repaired {
+    if review_refusals {
         refusals(f, root, &api, &evidence);
     }
     let _evidence = evidence.install();
-    if !repaired {
+    if review_refusals {
         review::runtime_selection(f, root, &api);
     }
     run(root, false).unwrap();
@@ -219,10 +221,10 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     let head = commit(root, &api, &f.baseline, &parent);
     closure(root, &parent, &head);
     run(root, false).unwrap();
-    if !repaired {
+    if review_refusals {
         in1_refusals(f, root, &api, &parent, &head, &record);
     }
-    if !repaired {
+    if review_refusals {
         review::reporting_candidate(f, root, &api, &parent, &head);
     }
     check_integration(root, &parent).unwrap();
@@ -237,7 +239,11 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     check_integration(root, &parent).unwrap();
     run(root, false).unwrap();
     reporting_facts(root);
-    review::publication_checkpoint(f, root, &_api, &head);
+    if owning_only {
+        crate::depth_acceptance::onboarding::tests::connected_publication(root);
+    } else {
+        review::publication_checkpoint(f, root, &_api, &head);
+    }
 }
 
 fn repair(f: &Fixture, root: &Path, host: &Arc<MemoryHost>, evidence: &SyntheticHost) {
@@ -609,7 +615,7 @@ fn template() -> &'static (Fixture, SyntheticHost) {
     })
 }
 
-fn connected(repaired: bool) {
+fn connected(repaired: bool, owning_only: bool) {
     let (template, evidence) = template();
     let root = tempfile::tempdir().unwrap();
     git(
@@ -635,15 +641,29 @@ fn connected(repaired: bool) {
         baseline: template.baseline.clone(),
         subject: template.subject,
     };
-    prove(&f, f.root.path(), &f.api.3, evidence.fork(), repaired);
+    prove(
+        &f,
+        f.root.path(),
+        &f.api.3,
+        evidence.fork(),
+        repaired,
+        owning_only,
+    );
 }
 
 #[test]
 fn public_on3_connected_active_reporting_e_and_real_in1() {
-    connected(false);
+    connected(false, false);
 }
 
 #[test]
 fn public_on3_connected_repaired_runtime_selection_and_real_in1() {
-    connected(true);
+    connected(true, false);
+}
+
+/// Slice 7 consumes the same actual ON3 checkpoint and independent admission/observation,
+/// then exercises private owning predicates. The ON3 refusal matrices retain their own tests.
+#[test]
+fn private_onboarding_predicates_from_connected_on3() {
+    connected(false, true);
 }

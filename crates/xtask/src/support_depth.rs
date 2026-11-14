@@ -15,7 +15,9 @@ pub(crate) use acquisition_basis::{supported_shard, supported_union, supported_w
 pub mod codex_pilot;
 pub use acquisition_basis::ClassificationBasis;
 mod closeout;
+mod onboarding;
 pub(crate) use closeout::{current_closeout_bindings, current_promotion_bindings};
+pub(crate) use onboarding::current_onboarding_bindings;
 pub mod debt;
 mod freeze;
 use crate::git_inputs;
