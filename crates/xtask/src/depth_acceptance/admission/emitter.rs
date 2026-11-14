@@ -36,7 +36,9 @@ impl Emitter {
             .as_ref()
             .err()
             .is_some_and(|e| e.contains("isolated IN1 binding"))
-            && !observed_authority.as_ref().is_ok_and(|a| a.incomplete)
+            && !observed_authority
+                .as_ref()
+                .is_ok_and(|a| a.incomplete || a.decision.is_some())
         {
             return outcome;
         }
@@ -47,7 +49,7 @@ impl Emitter {
             (false, outcome) => outcome,
         };
         let retained = observed_authority
-            .and_then(|authority| self.retain(root, outcome.is_ok(), authority))
+            .and_then(|authority| self.retain(root, authority))
             .and_then(|()| self.context.recheck(root));
         match (outcome, retained) {
             (Ok(value), Ok(())) => Ok(value),
@@ -61,9 +63,18 @@ impl Emitter {
     fn retain(
         &self,
         root: &Path,
-        admitted: bool,
         observed_authority: observations::Authority,
     ) -> Result<(), String> {
+        let decision = observed_authority.decision.unwrap_or(Decision::Refused);
+        let admitted = decision == Decision::Admitted && !observed_authority.incomplete;
+        let mut reasons = match observed_authority.decision {
+            Some(Decision::Admitted) => vec![Reason::OwningPredicatesSatisfied],
+            Some(Decision::Refused) => vec![Reason::OwningPredicateRefused],
+            None => Vec::new(),
+        };
+        if observed_authority.incomplete {
+            reasons.push(Reason::ObservationIncomplete);
+        }
         let parent = self
             .parent
             .as_deref()
@@ -161,18 +172,8 @@ impl Emitter {
             } else {
                 Checkpoint::Unclassified
             },
-            decision: if admitted {
-                Decision::Admitted
-            } else {
-                Decision::Refused
-            },
-            reasons: vec![if admitted {
-                Reason::OwningPredicatesSatisfied
-            } else if observed_authority.incomplete {
-                Reason::ObservationIncomplete
-            } else {
-                Reason::OwningPredicateRefused
-            }],
+            decision,
+            reasons,
             predecessors,
             enrollment_anchor: self.publication.authority.anchor.clone(),
             policy: self.publication.authority.policy.clone(),

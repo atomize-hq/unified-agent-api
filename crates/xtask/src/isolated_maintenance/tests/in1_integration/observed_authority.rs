@@ -142,13 +142,22 @@ fn candidate_witness_copy_cannot_select_observed_authority_or_avoid_conflicts() 
 
 #[test]
 fn ordinary_comment_edit_cannot_salt_a_reached_conflict() {
+    comment_edit_cannot_salt_a_reached_conflict("ordinary original comment");
+}
+
+#[test]
+fn unauthorized_malformed_adoption_cannot_salt_a_reached_conflict() {
+    comment_edit_cannot_salt_a_reached_conflict("```depth-adequacy-v1\n{broken JSON\n```");
+}
+
+fn comment_edit_cannot_salt_a_reached_conflict(original: &str) {
     let (f, host) = connected::frozen(false);
     let _installed = f.install();
     let _reader = host.install();
     let parent = head(&f);
     local(&f, &parent);
     let next = candidate(&f, &parent);
-    host.ordinary_comment("ordinary original comment");
+    host.ordinary_comment(original);
     authenticate(&f, &parent).unwrap();
     let first = f.api.3.records().pop().unwrap();
     host.ordinary_comment("candidate edited this ordinary comment");
@@ -210,7 +219,7 @@ fn reordered_populations_and_unrelated_workflow_progress_preserve_identity() {
 }
 
 #[test]
-fn late_isolated_host_flake_is_retained_incomplete_and_retry_recovers() {
+fn late_isolated_host_flake_preserves_reached_admission_and_retry_recovers() {
     let (f, host) = connected::frozen(false);
     let root = f.root.path();
     let _installed = f.install();
@@ -234,9 +243,15 @@ fn late_isolated_host_flake_is_retained_incomplete_and_retry_recovers() {
     assert!(error.contains("observation incomplete"), "{error}");
     assert!(!f.api.4.load(std::sync::atomic::Ordering::SeqCst));
     let refusal = f.api.3.records().pop().unwrap();
-    assert_eq!(refusal.decision, Decision::Refused);
-    assert_eq!(refusal.reasons, [Reason::ObservationIncomplete]);
-    assert_ne!(refusal.observed_authority, first.observed_authority);
+    assert_eq!(refusal.decision, Decision::Admitted);
+    assert_eq!(
+        refusal.reasons,
+        [
+            Reason::OwningPredicatesSatisfied,
+            Reason::ObservationIncomplete
+        ]
+    );
+    assert_eq!(refusal.observed_authority, first.observed_authority);
     let history = f
         .resolve()
         .unwrap()
@@ -258,4 +273,59 @@ fn late_isolated_host_flake_is_retained_incomplete_and_retry_recovers() {
         .unwrap()
         .resolve(root, &[parent, next])
         .unwrap();
+}
+
+#[test]
+fn late_flake_preserves_reached_policy_refusal_and_conflicts_with_later_admission() {
+    let (f, host) = connected::frozen(false);
+    let root = f.root.path();
+    let _installed = f.install();
+    let _reader = host.install();
+    let parent = head(&f);
+    local(&f, &parent);
+    let next = candidate(&f, &parent);
+    let route = Route(f.resolve().unwrap());
+    let evidence = route.context().evidence_host(root).unwrap();
+    let error = route
+        .with_admitted_publication(root, &parent, || {
+            crate::depth_evidence::EvidenceVerdicts::assemble_view_fixture(root, &evidence)?;
+            f.api.4.store(true, std::sync::atomic::Ordering::SeqCst);
+            Err::<(), _>("deliberate reached policy refusal".into())
+        })
+        .unwrap_err();
+    assert!(!f.api.4.load(std::sync::atomic::Ordering::SeqCst));
+    let refusal = f.api.3.records().pop().unwrap();
+    assert_eq!(refusal.decision, Decision::Refused);
+    assert_eq!(
+        refusal.reasons,
+        [
+            Reason::OwningPredicateRefused,
+            Reason::ObservationIncomplete
+        ]
+    );
+    assert!(
+        error.contains("deliberate reached policy refusal"),
+        "{error}"
+    );
+    assert!(error.contains("observation incomplete"), "{error}");
+    authenticate(&f, &parent).unwrap();
+    let admitted = f.api.3.records().pop().unwrap();
+    assert_eq!(admitted.decision, Decision::Admitted);
+    assert_eq!(admitted.observed_authority, refusal.observed_authority);
+    assert_eq!(
+        admitted.inputs_identity().unwrap(),
+        refusal.inputs_identity().unwrap()
+    );
+    let error = f
+        .resolve()
+        .unwrap()
+        .admission_publication()
+        .unwrap()
+        .resolve(root, &[parent, next])
+        .err()
+        .unwrap();
+    assert!(
+        error.contains("conflicting decisions over identical inputs"),
+        "{error}"
+    );
 }

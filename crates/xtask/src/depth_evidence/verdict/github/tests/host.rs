@@ -66,6 +66,10 @@ impl SyntheticHost {
     /// Candidate-controlled ordinary comments are present in both evaluations.
     pub(crate) fn ordinary_comment(&self, body: &str) {
         let mut fake = self.0.lock().unwrap();
+        fake.put(
+            "collaborators/candidate/permission",
+            json!({"permission":"read"}),
+        );
         fake.change("issues/9/comments?per_page=100&page=1", |v| {
             let rows = v.as_array_mut().unwrap();
             rows.retain(|row| row["id"] != 999);

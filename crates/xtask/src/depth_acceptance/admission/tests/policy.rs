@@ -132,7 +132,10 @@ fn incomplete_observation_is_never_eligible_or_a_conflict_side() {
     assert!(history.eligible(&first.identity().unwrap()).unwrap());
     assert!(!history.eligible(&refused.identity().unwrap()).unwrap());
     // An incomplete refusal must also preserve detection of a later reached contradiction.
-    incomplete.reasons = vec![Reason::OwningPredicateRefused];
+    incomplete.reasons = vec![
+        Reason::OwningPredicateRefused,
+        Reason::ObservationIncomplete,
+    ];
     publish(&host, incomplete);
     assert!(resolve(host)
         .err()
@@ -142,7 +145,10 @@ fn incomplete_observation_is_never_eligible_or_a_conflict_side() {
     malformed.reasons = vec![Reason::ObservationIncomplete];
     assert!(malformed.canonical().is_err());
     malformed.decision = Decision::Refused;
-    malformed.reasons.push(Reason::OwningPredicateRefused);
+    malformed.reasons = vec![
+        Reason::OwningPredicatesSatisfied,
+        Reason::ObservationIncomplete,
+    ];
     assert!(malformed.canonical().is_err());
 }
 
@@ -169,4 +175,32 @@ fn history_transport_unavailability_is_sticky_while_reached_refusal_is_complete(
         .unwrap()
         .contains("repository identity mismatch"));
     assert!(!capture.finish().unwrap().incomplete);
+}
+
+#[test]
+fn reached_admission_with_incomplete_closing_is_not_successful_authority() {
+    let first = retained();
+    let host = fixture().host.fork();
+    host.page(transport::RUNS, "workflow_runs", vec![]);
+    let mut incomplete = first.clone();
+    incomplete.reasons.push(Reason::ObservationIncomplete);
+    let incomplete = publish(&host, incomplete);
+    let history = resolve(host.fork()).unwrap();
+    assert!(!history.eligible(&incomplete.identity().unwrap()).unwrap());
+    assert!(history
+        .predecessors(&incomplete.candidate.commit)
+        .unwrap()
+        .is_empty());
+    let conflicting = host.fork();
+    let mut refusal = first.clone();
+    refusal.decision = Decision::Refused;
+    refusal.reasons = vec![Reason::OwningPredicateRefused];
+    publish(&conflicting, refusal);
+    assert!(resolve(conflicting)
+        .err()
+        .unwrap()
+        .contains("conflicting decisions over identical inputs"));
+    let complete = publish(&host, first);
+    let history = resolve(host).unwrap();
+    assert!(history.eligible(&complete.identity().unwrap()).unwrap());
 }

@@ -1,5 +1,94 @@
 # FR1 admission history implementation report
 
+## Review round 5 repair
+
+Status — implemented and validated on `feat/fr1-admission-history` over `c5b4c99f`, subject to
+four Unix-socket sandbox failures detailed below.
+This section was started before code changes. Changes remain uncommitted; nothing was pushed.
+
+P1 preserves the owning decision before closing checks. `observations::after_decision` pins the
+admitted/refused result and normalized substantive facts before the captured-context and binding
+rechecks, including the finite bootstrap registry path. Nested closing boundaries cannot overwrite
+that result. Failed closing rechecks record sticky incompleteness separately and preserve the
+original refusal diagnostic alongside a closing error. Late availability facts cannot salt the
+pinned identity. Before any substantive decision, unavailable reads retain their fixed availability
+fact and the incomplete-only refusal behavior.
+
+The emitter retains the reached decision and owning reason, appending `observation_incomplete`
+when closing fails. Record validation permits exactly the matching ordered combinations
+`[owning_predicates_satisfied, observation_incomplete]` on admitted and
+`[owning_predicate_refused, observation_incomplete]` on refused, plus the existing incomplete-only
+refused form. Only that sole-reason form is excluded from conflict comparisons. Every incomplete
+record is excluded from readiness, successful predecessor frontiers, generation-history completion
+and progression. The independent job association and fake publisher require failure for every
+incomplete record, even a reached admission. Invocation success still requires closing checks and
+publication to succeed.
+
+P2 authenticates author login and current permission before fallible adoption parsing and source
+or mapping processing. Unauthorized malformed adoption JSON and prose take the same ignored path;
+neither truncates the authorized population or subsequent stability facts.
+
+Both new regressions failed against inherited code: unauthorized malformed JSON returned
+`invalid exact adequacy adoption`, and the policy refusal plus one-shot late flake retained only
+`observation_incomplete`. Regression coverage now includes:
+
+- `late_flake_preserves_reached_policy_refusal_and_conflicts_with_later_admission`: real producer
+  reads, deliberate refusal and one-shot late isolated read failure, followed by an admission with
+  the same authority/input identities. Independent history rejects their contradictory decisions.
+- `unauthorized_malformed_adoption_cannot_salt_a_reached_conflict`: malformed unauthorized JSON
+  admits, then an edit to prose accompanies a reached contradictory refusal. Authority and inputs
+  remain identical, and history rejects the conflict. The ordinary-prose edit test remains.
+- `late_isolated_host_flake_preserves_reached_admission_and_retry_recovers`: a reached admission
+  retains both reasons, remains ineligible, and a complete retry preserves authority and recovers.
+- Unit coverage pins decision-boundary facts, sticky incomplete-only failures, reached decisions
+  with closing failures, reason combinations, failed job association, conflict participation and
+  exclusion of incomplete admissions from successful predecessor authority.
+
+The evidence contract, freeze/readiness design and Annex A IN1 row describe these rules. Schema
+fields, canonical JSON and digest domains are unchanged. Python `json`/`hashlib` independently
+recomputed the existing literal vectors and two newly permitted reason combinations, using sorted
+keys, compact UTF-8 and NUL-terminated domains. The new vectors modify only decision/reasons of
+`tests/vectors/admission.json`; their evaluated-input identity remains the existing literal.
+
+| Vector | SHA-256 |
+| --- | --- |
+| Normalized observed authority (unchanged) | `a740cc927410b5d84653e5d424e74b60ad767838b47dc9c6659762f118ed442d` |
+| Admission (unchanged) | `ab204698473c5cb9cba16156b4eafc8e9effca90a996d6478103f0c865b3d358` |
+| Evaluated inputs (unchanged) | `79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec` |
+| Generation (unchanged) | `141491450471d7ce945131a830e01fff76967b19d8034d7765d0088b946804f4` |
+| Reached admission with incomplete closing | `320064f43916c987960b73578ececb81e17fe5922905ba728fa71d58174c154d` |
+| Reached refusal with incomplete closing | `34e074e7ce7a02d2981ab2fc08b5e6404d3c723be041e2605031d00d0c517fea` |
+
+### Round 5 validation
+
+Cargo commands use `env -u TMPDIR`; logs and elapsed wall times are under ignored
+`target/fr1-round5-validation/`. Groups ran concurrently, so wall times include contention and
+build-lock waits. No sandbox restrictions were bypassed.
+
+| Command | Result | Wall time |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | 1.89 s |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass | 24.07 s |
+| `cargo test -p xtask --lib depth_acceptance` | 76 passed | 101.55 s |
+| `cargo test -p xtask --lib in1_integration` | 31 passed, 4 sandbox failures | 198.68 s |
+| `cargo test -p xtask --lib depth_evidence::verdict` | 78 passed | 144.48 s |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap` | 61 passed | 290.35 s |
+| `make loc-check` | Pass | 0.10 s |
+| `make hygiene` | Pass | Under 1 s |
+| `git diff --check` | Pass | Under 1 s |
+
+The four IN1 failures are the existing connected cases
+`in1_closeout_candidate_admission_and_post_push_observation`,
+`in1_prepared_closeout_candidate_admission_and_post_push_observation`,
+`in1_reauthenticates_population_in_admission_and_post_push_observation` and
+`in1_refuses_forged_closeout_entries_in_admission_and_observation`. Each fails during fixture
+preparation with `cannot open the MA4 evidence channel: Operation not permitted (os error 1)`.
+Their socket-dependent assertions remain unverified in this sandbox. All seven socket-free
+producer-backed authority regressions pass in the final IN1 group, including both required
+round-5 reproductions and the reached-admission late-flake recovery case. Across the requested
+four test groups, 246 tests passed and four failed during socket-dependent fixture preparation.
+The final diff and repository hygiene checks pass; HEAD remains `c5b4c99f`.
+
 ## Review round 4 repair
 
 Status — implemented and validated on `feat/fr1-admission-history` over `7fb60ec8`, subject to

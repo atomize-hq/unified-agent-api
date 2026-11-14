@@ -103,7 +103,7 @@ impl History {
                 && !self.records.iter().any(|r| {
                     r.candidate.commit == *commit
                         && r.generation.as_ref() == Some(&generation)
-                        && r.decision == Decision::Admitted
+                        && r.successful()
                 })
             {
                 return Err(
@@ -138,9 +138,10 @@ impl History {
     #[allow(dead_code)] // FR2/FR3 consume current eligibility independently of historical stage.
     pub(crate) fn eligible(&self, identity: &str) -> Result<bool, String> {
         Ok(!self.revoked.contains(identity)
-            && self.records.iter().any(|r| {
-                r.identity().as_deref() == Ok(identity) && r.decision == Decision::Admitted
-            }))
+            && self
+                .records
+                .iter()
+                .any(|r| r.identity().as_deref() == Ok(identity) && r.successful()))
     }
     pub(crate) fn check_progression(
         &self,
@@ -153,9 +154,7 @@ impl History {
             .get(commit)
             .ok_or("IN1 candidate absent from authenticated history")?;
         for record in &self.records {
-            if record.decision != Decision::Admitted
-                || record.generation.as_ref() != Some(generation)
-            {
+            if !record.successful() || record.generation.as_ref() != Some(generation) {
                 continue;
             }
             if let Some(prior) = &record.new_state {
@@ -224,7 +223,7 @@ pub(super) fn resolve(
             return Err("IN1 authority mismatch".into());
         }
         let key = record.inputs_identity()?;
-        if !record.reasons.contains(&Reason::ObservationIncomplete)
+        if record.reasons != [Reason::ObservationIncomplete]
             && decisions
                 .insert(key, record.decision)
                 .is_some_and(|prior| prior != record.decision)
@@ -274,7 +273,7 @@ pub(super) fn resolve(
                         let prior = by_identity
                             .get(id)
                             .ok_or("IN1 missing predecessor admission")?;
-                        if prior.decision != Decision::Admitted {
+                        if !prior.successful() {
                             return Err("IN1 refused predecessor admission".to_owned());
                         }
                         Ok(prior.candidate.commit.as_str())
@@ -282,14 +281,14 @@ pub(super) fn resolve(
                     .collect::<Result<BTreeSet<_>, String>>()?;
                 if !lineage.contains(&record.parent.commit)
                     || referenced.iter().any(|commit| !lineage.contains(*commit))
-                    || (record.decision == Decision::Admitted && referenced != expected)
+                    || (record.successful() && referenced != expected)
                 {
                     return Err("IN1 missing or inconsistent predecessor admissions".into());
                 }
                 // A refusal grants no transition. An ancestor may receive its first successful
                 // admission after a refused stacked candidate was evaluated against an older
                 // protected parent. That later decision cannot rewrite the refusal's inputs.
-                if record.decision == Decision::Admitted
+                if record.successful()
                     && expected.is_empty()
                     && record.checkpoint != Checkpoint::Bootstrap
                 {
@@ -301,7 +300,7 @@ pub(super) fn resolve(
             // predecessor references. Keep one deterministic representative for new emissions.
             if let Some(admitted) = attempts
                 .iter()
-                .filter(|r| r.decision == Decision::Admitted)
+                .filter(|r| r.successful())
                 .min_by_key(|r| (r.claims.run, r.claims.attempt, r.claims.job))
             {
                 frontier.clear();
@@ -329,7 +328,7 @@ pub(super) fn resolve(
         observation: None,
     };
     for record in records {
-        if record.decision == Decision::Admitted {
+        if record.successful() {
             if let (Some(generation), Some(state)) = (&record.generation, &record.new_state) {
                 history.check_progression(&record.candidate.commit, generation, state.stage)?;
             }

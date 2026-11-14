@@ -210,7 +210,7 @@ impl Host for MemoryHost {
             ),
             |v| {
                 v["jobs"][0]["status"] = json!("completed");
-                v["jobs"][0]["conclusion"] = json!(if record.decision == Decision::Admitted {
+                v["jobs"][0]["conclusion"] = json!(if record.successful() {
                     "success"
                 } else {
                     "failure"

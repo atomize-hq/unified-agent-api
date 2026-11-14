@@ -47,6 +47,22 @@ pub(super) fn resolve(
             let Some(raw) = value["body"].as_str() else {
                 continue;
             };
+            // Authority is established before parsing any candidate-controlled adoption text.
+            let author = required_string(&value["user"], "login")?;
+            if !author
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+            {
+                return Err("invalid GitHub author".into());
+            }
+            let permission =
+                api.json(&api.endpoint(&format!("collaborators/{author}/permission")))?;
+            if !matches!(
+                permission["permission"].as_str(),
+                Some("admin" | "write" | "maintain")
+            ) {
+                continue;
+            }
             let Some(body) = body(raw)? else { continue };
             if body.schema_version != 1 || body.mappings.is_empty() {
                 continue;
@@ -75,21 +91,6 @@ pub(super) fn resolve(
                 None => true,
             };
             if !same_inputs || !same_requirement_population {
-                continue;
-            }
-            let author = required_string(&value["user"], "login")?;
-            if !author
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-            {
-                return Err("invalid GitHub author".into());
-            }
-            let permission =
-                api.json(&api.endpoint(&format!("collaborators/{author}/permission")))?;
-            if !matches!(
-                permission["permission"].as_str(),
-                Some("admin" | "write" | "maintain")
-            ) {
                 continue;
             }
             for entry in body.mappings {

@@ -79,3 +79,51 @@ fn population_order_preserves_authority_but_multiplicity_and_absence_change_it()
     population("jobs", "producer_jobs", vec![]);
     assert_ne!(capture.finish().unwrap(), first);
 }
+
+#[test]
+fn reached_decisions_pin_facts_and_survive_failed_closing_rechecks() {
+    for admitted in [false, true] {
+        let capture = Capture::start().unwrap();
+        fact("repository", "identity", &123);
+        after_decision(Ok(()), || Ok(())).unwrap();
+        let complete = capture.finish().unwrap();
+        let capture = Capture::start().unwrap();
+        fact("repository", "identity", &123);
+        let outcome = if admitted {
+            Ok(())
+        } else {
+            Err("policy refusal".into())
+        };
+        let error = after_decision(outcome, || {
+            unavailable::<()>("repository", &Err("late flake".into()));
+            fact("repository", "identity", &999);
+            Err("closing refused".into())
+        })
+        .unwrap_err();
+        assert!(error.contains("closing refused"));
+        assert!(admitted || error.contains("policy refusal"));
+        // A successful later recheck cannot overwrite the reached result or completeness.
+        after_decision(Ok(()), || Ok(())).unwrap();
+        let observed = capture.finish().unwrap();
+        assert_eq!(observed.identity, complete.identity);
+        assert!(observed.incomplete);
+        assert_eq!(
+            observed.decision,
+            Some(if admitted {
+                Decision::Admitted
+            } else {
+                Decision::Refused
+            })
+        );
+    }
+}
+
+#[test]
+fn unavailable_owning_read_never_claims_a_substantive_decision() {
+    let capture = Capture::start().unwrap();
+    unavailable::<()>("repository", &Err("early flake".into()));
+    assert!(after_decision::<()>(Err("read failed".into()), || Ok(())).is_err());
+    let authority = capture.finish().unwrap();
+    assert!(authority.incomplete);
+    assert_eq!(authority.decision, None);
+}

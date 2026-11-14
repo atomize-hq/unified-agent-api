@@ -227,9 +227,16 @@ decision identity and separately authenticate retries. Conflicting decisions ove
 and authoritative inputs, missing predecessors, object mismatches, gaps, ambiguous/duplicate
 commitments, stale roots or changed populations prevent verification. Distinguish decisions over
 different root snapshots and observed host authority. Candidate-authored files cannot select the
-observed-authority digest. Any unavailable evaluation read produces a retained
-`observation_incomplete` refusal, excluded from identical-input conflict comparisons and readiness.
-Reached contradictory decisions over identical normalized facts still refuse. Revocation changes present eligibility while preserving historical
+observed-authority digest. Author login and current permission precede fallible adoption-body
+parsing; unauthorized prose and malformed adoption JSON cannot truncate normalized capture.
+An unavailable read before a substantive decision produces a retained refusal with the sole reason
+`observation_incomplete`, excluded from identical-input conflict comparisons. At the owning
+boundary, pin the reached decision, owning reason and normalized facts. Closing context/binding
+rechecks still run; failures append `observation_incomplete` without relabeling the reached
+admission/refusal or salting its authority commitment. Such reached decisions remain conflict
+sides. Every incomplete record is ineligible for readiness, predecessor frontiers, generation-history
+completion and progression, and requires a failed emitting job. Reached contradictory decisions
+over identical normalized facts still refuse. Revocation changes present eligibility while preserving historical
 readiness and execution accountability. Explicitly configure retention for records, logs and
 provenance. Expiration or deletion of any required authority yields `unverified`. Verification
 requires the evidence to remain available.

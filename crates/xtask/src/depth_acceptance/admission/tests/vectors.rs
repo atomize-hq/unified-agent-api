@@ -29,3 +29,31 @@ fn fixed_canonical_bytes_and_domain_digests() {
         "79493c986ea198827b223508785188dc8b9a36204f911acc35086ff0ff73b5ec"
     );
 }
+
+#[test]
+fn fixed_reached_decisions_with_incomplete_closing_digests() {
+    let first: Record = serde_json::from_slice(include_bytes!("vectors/admission.json")).unwrap();
+    for (decision, reason, identity) in [
+        (
+            Decision::Admitted,
+            Reason::OwningPredicatesSatisfied,
+            "320064f43916c987960b73578ececb81e17fe5922905ba728fa71d58174c154d",
+        ),
+        (
+            Decision::Refused,
+            Reason::OwningPredicateRefused,
+            "34e074e7ce7a02d2981ab2fc08b5e6404d3c723be041e2605031d00d0c517fea",
+        ),
+    ] {
+        let mut record = first.clone();
+        record.decision = decision;
+        record.reasons = vec![reason, Reason::ObservationIncomplete];
+        assert_eq!(record.identity().unwrap(), identity);
+        assert_eq!(Record::parse(&record.canonical().unwrap()).unwrap(), record);
+        assert_eq!(
+            record.inputs_identity().unwrap(),
+            first.inputs_identity().unwrap()
+        );
+        assert!(!record.successful());
+    }
+}

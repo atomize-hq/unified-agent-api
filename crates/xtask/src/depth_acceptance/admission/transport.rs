@@ -355,7 +355,7 @@ pub(super) fn authenticate(
         || record.repository != authority.repository
         || record.enrollment_anchor != authority.anchor
         || job["conclusion"]
-            != if record.decision == Decision::Admitted {
+            != if record.successful() {
                 "success"
             } else {
                 "failure"

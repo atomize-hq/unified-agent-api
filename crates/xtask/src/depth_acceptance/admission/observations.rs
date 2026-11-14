@@ -1,5 +1,5 @@
 //! Invocation-local normalized authority commitments, computed by approved readers.
-use super::record::{canonical, digest};
+use super::record::{canonical, digest, Decision};
 use serde::Serialize;
 use std::{cell::RefCell, collections::BTreeSet, marker::PhantomData};
 
@@ -8,6 +8,7 @@ const DOMAIN: &[u8] = b"support-depth-in1-observed-authority-v1\0";
 struct State {
     facts: BTreeSet<String>,
     incomplete: bool,
+    decision: Option<Decision>,
     error: Option<String>,
 }
 thread_local! {
@@ -17,6 +18,7 @@ thread_local! {
 pub(crate) struct Authority {
     pub identity: String,
     pub incomplete: bool,
+    pub decision: Option<Decision>,
 }
 
 /// Ends before admission-history reconstruction/publication. Independent read order and
@@ -42,6 +44,7 @@ impl Capture {
             Ok(Authority {
                 identity: digest(DOMAIN, &canonical(&state.facts)?),
                 incomplete: state.incomplete,
+                decision: state.decision,
             })
         })
     }
@@ -52,11 +55,49 @@ impl Drop for Capture {
     }
 }
 
+/// Pin the substantive result and its facts before closing rechecks. A failure before this
+/// boundary remains incomplete-only. Nested closing boundaries preserve the first decision.
+pub(crate) fn after_decision<T>(
+    outcome: Result<T, String>,
+    recheck: impl FnOnce() -> Result<(), String>,
+) -> Result<T, String> {
+    ACTIVE.with(|slot| {
+        if let Some(state) = slot.borrow_mut().as_mut() {
+            if state.decision.is_none() && !state.incomplete {
+                state.decision = Some(if outcome.is_ok() {
+                    Decision::Admitted
+                } else {
+                    Decision::Refused
+                });
+            }
+        }
+    });
+    let closing = recheck();
+    if closing.is_err() {
+        ACTIVE.with(|slot| {
+            if let Some(state) = slot.borrow_mut().as_mut() {
+                if state.decision.is_some() {
+                    state.incomplete = true;
+                }
+            }
+        });
+    }
+    match (outcome, closing) {
+        (Err(error), Err(closing)) => Err(format!("{error}; {closing}")),
+        (Err(error), Ok(())) | (Ok(_), Err(error)) => Err(error),
+        (Ok(value), Ok(())) => Ok(value),
+    }
+}
+
 /// Call only with the fields used by the predicate, after authority filtering.
 pub(crate) fn fact(endpoint: &str, kind: &str, value: &impl Serialize) {
     ACTIVE.with(|slot| {
         let mut slot = slot.borrow_mut();
         let Some(state) = slot.as_mut() else { return };
+        // Closing rechecks cannot salt the substantive authority of an already reached decision.
+        if state.decision.is_some() {
+            return;
+        }
         let observed = canonical(value).and_then(|bytes| {
             canonical(&(endpoint, kind, digest(b"", &bytes)))
                 .map(|bytes| digest(b"support-depth-in1-host-read-v1\0", &bytes))

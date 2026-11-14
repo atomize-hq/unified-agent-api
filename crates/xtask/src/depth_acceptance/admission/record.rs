@@ -166,16 +166,37 @@ impl Record {
             &canonical(&inputs)?,
         ))
     }
+    /// A reached admission with failed closing observations cannot grant historical authority.
+    pub(crate) fn successful(&self) -> bool {
+        self.decision == Decision::Admitted
+            && !self.reasons.contains(&Reason::ObservationIncomplete)
+    }
     fn validate(&self) -> Result<(), String> {
         if self.schema_version != 1 || self.kind != "in1_admission" {
             return Err("unsupported IN1 control record version/kind".into());
         }
         if self.reasons.contains(&Reason::ObservationIncomplete)
-            && (self.decision != Decision::Refused
-                || self.reasons != [Reason::ObservationIncomplete])
+            && !matches!(
+                (self.decision, self.reasons.as_slice()),
+                (Decision::Refused, [Reason::ObservationIncomplete])
+                    | (
+                        Decision::Refused,
+                        [
+                            Reason::OwningPredicateRefused,
+                            Reason::ObservationIncomplete
+                        ]
+                    )
+                    | (
+                        Decision::Admitted,
+                        [
+                            Reason::OwningPredicatesSatisfied,
+                            Reason::ObservationIncomplete
+                        ]
+                    )
+            )
         {
             return Err(
-                "IN1 incomplete observation must be a refusal with its sole bounded reason".into(),
+                "IN1 incomplete observation has inconsistent reached decision/reasons".into(),
             );
         }
         for object in [

@@ -698,12 +698,22 @@ The record contains the following fields.
   `execution_required` are reserved for subsequent owning predicates. Decisions are `admitted`
   or `refused`. Reasons are the bounded enums `owning_predicates_satisfied`,
   `owning_predicate_refused` and `observation_incomplete`, with at most sixteen entries.
-  `observation_incomplete` MUST be the sole reason on a refused decision. Any transport-unavailable
-  producer or isolated-host read during evaluation makes this state sticky for that invocation,
-  including final captured-context and binding rechecks, source object acquisition and retained
-  history reads performed during predicate evaluation. Such refusals MUST be retained, MUST
-  never authorize readiness and MUST be excluded from both sides of identical-input conflict
-  comparisons. Reached contradictory decisions over identical normalized authority MUST refuse.
+  An unavailable producer or isolated-host read before a substantive decision yields a refused
+  decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
+  successful reads, including source object acquisition and retained history reads during
+  predicate evaluation. Only these incomplete-only refusals are excluded from both sides of
+  identical-input conflict comparisons.
+  Once the owning predicates reach admission or refusal, the emitter MUST preserve that decision,
+  its corresponding owning reason and the normalized authority facts consumed up to that boundary.
+  Closing captured-context and binding rechecks MUST still run. Any failed closing recheck adds
+  `observation_incomplete` after the owning reason, without replacing the decision or changing
+  its substantive authority commitment. The only combined forms are admitted with
+  `[owning_predicates_satisfied, observation_incomplete]` and refused with
+  `[owning_predicate_refused, observation_incomplete]`. These reached decisions MUST participate
+  in identical-input conflict comparisons. Any record containing `observation_incomplete` MUST
+  NOT authorize readiness, predecessor frontiers, generation-history completion or progression,
+  and its emitting job MUST conclude failure. A closing failure prevents invocation success.
+  Reached contradictory decisions over identical normalized authority MUST refuse.
 - `predecessors` is a sorted unique list of retained successful decision identities at every
   applicable parent frontier. Late retries remain independently discoverable and cannot rewrite
   an earlier child's predecessor references. No earlier decision is synthesized.
@@ -738,7 +748,10 @@ The record contains the following fields.
   - Every accepted authorized adoption's endorsement kind, repository, PR/id, author login/id,
     accepted permission, source commit, mapping digest and digest of the exact referenced body
     bytes. Exhausted authorized-adoption populations explicitly encode an empty array for absence.
-    Ordinary comments and ignored or unauthorized records contribute no content facts.
+    Author login and current permission MUST be authenticated before any fallible adoption-body
+    parsing or referenced-source/mapping processing. Unauthorized comments, including malformed
+    adoption JSON, and ignored records contribute no content facts and MUST NOT truncate capture
+    or alter discovery completeness. Ordinary authorized comments contribute no adoption facts.
   - Isolated and canonical repository ids/owners/names, protected staging identities and protection,
     baseline/candidate ancestry status and merge base, candidate host presence, governing registry
     path/type/blob, and canonical approved-scope path/blob/mode/type inventory with tree truncation
@@ -747,8 +760,10 @@ The record contains the following fields.
     (`discovery`, `false`) and, only after bounded exhaustive pagination, a completion fact
     (`discovery`, `true`). Relevant population facts include empty arrays for observed absence.
     Comment/review stream completion is independent of ignored record counts and page boundaries.
-    Transport-unavailable reads contribute only the fixed `["unavailable"]` availability fact
-    and set `observation_incomplete`. Error text contributes no facts.
+    Before a substantive decision, transport-unavailable reads contribute only the fixed
+    `["unavailable"]` availability fact and set `observation_incomplete`. After that boundary,
+    failed closing reads set the separate incompleteness reason without salting the pinned fact
+    set. Error text contributes no facts.
 
   Each fact hashes canonical `[endpoint, kind, SHA256(canonical(normalized_value))]` under the
   NUL-terminated `support-depth-in1-host-read-v1` domain. Population facts use the stream endpoint
@@ -757,12 +772,15 @@ The record contains the following fields.
   population ordering preserve identity. Fact digests use lowercase hexadecimal. The sorted
   unique set of fact digests is encoded canonically and hashed under
   `support-depth-in1-observed-authority-v1` followed by NUL. The empty set represents an evaluation
-  consuming no host facts. Capture ends before admission-history reconstruction and publication.
-  Repeated reads and independent read order preserve identity. Existing host response, pagination,
+  consuming no host facts. Facts are pinned when the owning predicates reach their substantive
+  decision; closing observations track completeness separately. If no substantive decision is
+  reached, capture ends before admission-history reconstruction and publication. Repeated reads
+  and independent read order preserve identity. Existing host response, pagination,
   attempt, population and canonical encoding bounds apply, and the record retains its 65,536-byte
   bound. This required fixed-size digest participates in evaluated-input identity. Reached
-  contradictions over the same repository inputs and normalized authority refuse. An incomplete
-  observation retains a refusal that permits a later complete retry to recover.
+  contradictions over the same repository inputs and normalized authority refuse, even when a
+  reached decision also records failed closing observations. An incomplete-only observation
+  retains a refusal that permits a later complete retry to recover.
 - `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
   FR3 supplies the reporting-context association. An admission without a producer is supported.
 - `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
