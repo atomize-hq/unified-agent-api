@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 mod declaration;
 mod producer;
 mod public_on1;
+pub(super) mod public_on2;
 mod regressions;
 mod renderer;
 mod sweep;

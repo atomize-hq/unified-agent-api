@@ -17,6 +17,7 @@ pub(super) fn render_depth_prompt(context: &RuntimeContext) -> String {
     // The executor runs in the independent candidate; every run-file destination must
     // resolve there, including prompts prepared in the caller before the copy exists.
     let relative_context = RuntimeContext {
+        wrapper_only: context.wrapper_only,
         approval: context.approval.clone(),
         input_contract: context.input_contract.clone(),
         lifecycle_state: context.lifecycle_state.clone(),
@@ -24,7 +25,11 @@ pub(super) fn render_depth_prompt(context: &RuntimeContext) -> String {
         run_id: context.run_id.clone(),
         run_dir: Path::new(RUNTIME_RUNS_ROOT).join(&context.run_id),
     };
-    let mut prompt = render_prompt(&relative_context);
+    let mut prompt = if context.wrapper_only {
+        depth::wrapper_prompt(&relative_context)
+    } else {
+        render_prompt(&relative_context)
+    };
     prompt.push_str("\nDepth candidate boundary: handoff.json is the only run file you may write. The input contract, prompt, lifecycle state, depth record, approval and depth-acquisition statement are immutable. The controller writes all streams, execution evidence, validation, status, written paths and summary after observation. Do not write snapshots.\n");
     prompt
 }
@@ -118,6 +123,7 @@ pub(super) fn execute<W: Write>(
         .bind_candidate(&candidate.root)
         .map_err(Error::Validation)?;
     let candidate_context = RuntimeContext {
+        wrapper_only: context.wrapper_only,
         approval: context.approval.clone(),
         input_contract: context.input_contract.clone(),
         lifecycle_state: attempt,

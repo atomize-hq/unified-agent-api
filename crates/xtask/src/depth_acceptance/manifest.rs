@@ -25,6 +25,12 @@ pub(super) fn pointer(view: &View, path: &str) -> Result<Option<String>, String>
         .map(Option::flatten)
 }
 pub(super) fn targets(view: &View, root: &str) -> Result<Vec<String>, String> {
+    let raw = view.source.read(&format!("{root}/current.json"))?;
+    if let Some(targets) =
+        crate::isolated_maintenance::onboarding::reporting_targets(&view.entry, &raw)?
+    {
+        return Ok(targets);
+    }
     let current = view.json(&format!("{root}/current.json"))?;
     if current["snapshot_schema_version"] != 2 || current["mode"] != "union" {
         return Err(format!(
