@@ -83,6 +83,12 @@ fn ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace() {
         &["capability-matrix", "--out", "new/../nested/matrix.md"],
         "capability-matrix: unsupported depth write (declared enrollment)",
     );
+    // The effective destination is ordinary, but the caller's spelling would create
+    // `nested/new` inside the enrolled workspace before traversing back out.
+    ws.assert_refuses(
+        &["capability-matrix", "--out", "nested/new/../../matrix.md"],
+        "capability-matrix: unsupported depth write (declared enrollment)",
+    );
 }
 
 #[test]
@@ -100,6 +106,7 @@ fn ne2_ordinary_explicit_output_keeps_caller_path_resolution() {
     let expected = xtask::capability_matrix::generate_markdown_for_workspace(ws.root()).unwrap();
     for destination in [
         "relative-output/../ordinary-output/matrix.md",
+        "absent-prefix/../absent-output/matrix.md",
         "linked-output/nested/matrix.md",
         "ordinary-alias.md",
         absolute.to_str().unwrap(),

@@ -247,3 +247,21 @@ bytes after every focused command completed. The final ordinary binary suite and
 mutation failed its regression as expected. The additional directory-syntax and
 foreign-route regressions have their own red logs in the same directory.
 The full connected matrix and full gate remain assigned to the lead.
+
+## Review round 2 fix
+
+All four round-2 lanes found that checked NE2 delivery created only the normalized parent. For an
+ordinary `--out new/../matrix.md` with `new` absent, the command succeeded but the caller's own
+spelling stayed unusable, because `new` was never created; the previous `create_dir_all` on the
+caller's parent had created it. `depth_routes/destination.rs::create_caller_directories` now
+recreates every missing directory named by the caller's parent spelling after validation. Before
+creating each one, it refuses at that directory's own enclosing depth scope, so traversal cannot
+create a directory inside an enrolled workspace and then leave it.
+
+Regressions, each failing with its part of the repair reverted:
+
+- `ne2_ordinary_explicit_output_keeps_caller_path_resolution` gains
+  `absent-prefix/../absent-output/matrix.md` and reads exact bytes back through that spelling.
+- `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace` gains
+  `nested/new/../../matrix.md`. The effective destination is ordinary, but `nested/new` would be
+  created inside the enrolled workspace. The test asserts the refusal and an unchanged tree.

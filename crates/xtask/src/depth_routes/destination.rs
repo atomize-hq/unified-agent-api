@@ -77,6 +77,30 @@ fn resolved_output(path: &Path) -> Result<PathBuf, String> {
     ))
 }
 
+/// Ordinary delivery created every missing directory the caller's own parent spelling names,
+/// including a component later traversed by `..`, so that spelling stays usable after the write.
+/// Each missing directory is checked against its own enclosing depth scope before creation.
+fn create_caller_directories(path: &Path, route: &str) -> Result<(), String> {
+    let Some(original) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
+        return Ok(());
+    };
+    let mut prefix = PathBuf::new();
+    for component in original.components() {
+        prefix.push(component);
+        if !matches!(component, Component::Normal(_)) {
+            continue;
+        }
+        match fs::symlink_metadata(&prefix) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                refuse_workspace(&existing_parent(&resolved_output(&prefix)?)?, route)?;
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    fs::create_dir_all(original).map_err(|e| e.to_string())
+}
+
 // Components omit trailing separators and `/.`, which must retain directory-only semantics.
 fn directory_syntax(path: &Path) -> bool {
     let bytes = path.as_os_str().as_encoded_bytes();
@@ -132,6 +156,7 @@ pub fn write_file_destination(path: &Path, bytes: &[u8], route: &str) -> Result<
         Ok(())
     };
     unchanged()?;
+    create_caller_directories(path, route)?;
     let parent = resolved.parent().ok_or("output has no parent")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     if parent.canonicalize().map_err(|e| e.to_string())? != parent {
