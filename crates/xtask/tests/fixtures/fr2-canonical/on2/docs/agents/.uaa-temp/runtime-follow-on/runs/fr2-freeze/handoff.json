@@ -1,0 +1,15 @@
+{
+  "agent_id": "depth_fixture",
+  "manifest_root": "cli_manifests/depth_fixture",
+  "runtime_lane_complete": false,
+  "publication_refresh_required": true,
+  "required_commands": [
+    "cargo run -p xtask -- support-matrix --check",
+    "cargo run -p xtask -- capability-matrix --check",
+    "cargo run -p xtask -- capability-matrix-audit",
+    "make preflight"
+  ],
+  "blockers": [
+    "Pending runtime follow-on implementation."
+  ]
+}

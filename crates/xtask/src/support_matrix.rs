@@ -17,6 +17,7 @@ mod preparation;
 #[path = "support_matrix/publication.rs"]
 mod publication;
 pub use preparation::preview_preparation;
+pub use preparation::{load_preparation, PreparationInputs};
 #[path = "support_matrix/runtime_support.rs"]
 mod runtime_support;
 
@@ -59,13 +60,24 @@ pub struct Args {
 
 pub fn run(args: Args) -> Result<(), String> {
     let workspace_root = resolve_workspace_root()?;
-    let bundle = generate_publication_bundle(&workspace_root)?;
     if args.check {
-        validate_publication_artifacts(&workspace_root, &bundle)?;
+        check_in_workspace(&workspace_root)?;
     } else {
+        let bundle = generate_publication_bundle(&workspace_root)?;
         write_publication_artifacts(&workspace_root, &bundle)?;
     }
     Ok(())
+}
+
+/// Independently authenticate committed inputs for the standalone read-only gate.
+pub fn check_in_workspace(root: &Path) -> Result<(), String> {
+    crate::readonly_gates::with_committed_evaluation(root, || check_publication(root))
+}
+
+/// The same checker also runs inside the controller's borrowed proposal evaluation.
+pub(crate) fn check_publication(root: &Path) -> Result<(), String> {
+    let bundle = generate_publication_bundle(root)?;
+    validate_publication_artifacts(root, &bundle)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

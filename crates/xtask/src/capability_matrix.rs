@@ -27,18 +27,31 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<(), String> {
-    if !args.check {
-        xtask::depth_routes::refuse_workspace(&resolve_workspace_root()?, "capability-matrix")?;
-    }
-    let markdown = generate_markdown()?;
     if args.check {
-        let checked_in = resolve_output_path(None)?;
-        validate_checked_in_file(&checked_in, &markdown)?;
-    } else {
-        let out = resolve_output_path(args.out.as_deref())?;
-        write_file(&out, &markdown)?;
+        return check_in_workspace(&resolve_workspace_root()?);
     }
+    xtask::depth_routes::refuse_workspace(&resolve_workspace_root()?, "capability-matrix")?;
+    let markdown = generate_markdown()?;
+    let out = resolve_output_path(args.out.as_deref())?;
+    xtask::depth_routes::write_file_destination(&out, markdown.as_bytes(), "capability-matrix")?;
     Ok(())
+}
+
+/// Standalone check with its own authenticated route and closing observations.
+pub fn check_in_workspace(root: &Path) -> Result<(), String> {
+    // This module is also embedded by the parity harness, so use the library's public route.
+    let route = xtask::isolated_maintenance::route(root)?;
+    let result = check_publication(root);
+    if let Some(route) = route {
+        route.recheck(root)?;
+    }
+    result
+}
+
+/// Shared checker for standalone and borrowed proposal scopes.
+pub(crate) fn check_publication(root: &Path) -> Result<(), String> {
+    let markdown = generate_markdown_for_workspace(root)?;
+    validate_checked_in_file(&root.join(DEFAULT_OUT_PATH), &markdown)
 }
 
 pub fn collect_builtin_backend_capabilities(
@@ -63,14 +76,6 @@ pub fn generate_markdown_for_workspace(root: &Path) -> Result<String, String> {
         &inventory.backends,
         &inventory.canonical_target_header,
     ))
-}
-
-fn write_file(path: &Path, contents: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| format!("create_dir_all({path:?}): {err}"))?;
-    }
-    fs::write(path, contents).map_err(|err| format!("write({path:?}): {err}"))?;
-    Ok(())
 }
 
 fn validate_checked_in_file(path: &Path, contents: &str) -> Result<(), String> {

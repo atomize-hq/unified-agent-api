@@ -56,6 +56,8 @@ struct Population {
     environment: Environment,
     toolchain: FileRef,
     runs: Vec<Run>,
+    reporting: Vec<crate::depth_ci::reporting::ContextRecord>,
+    reporting_conflicts: BTreeSet<(u64, u64)>,
 }
 struct Run {
     evidence: FileRef,
@@ -92,6 +94,29 @@ fn read(view: &mut GitInputs, reference: &FileRef) -> Result<Option<Vec<u8>>, St
     Ok(Some(bytes))
 }
 
+// Proposed receipts/payloads are reporting artifacts held by the attested read-only source.
+// Build, approval and acquisition currentness continues through the strict GitInputs view.
+fn artifact_read(
+    view: &mut GitInputs,
+    proposed: Option<&crate::runtime_advertising::source::Source>,
+    reference: &FileRef,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(proposed) = proposed else {
+        return read(view, reference);
+    };
+    super::validate::file(reference)?;
+    if view
+        .provenance("HEAD")?
+        .optional_bytes(&reference.path)?
+        .is_some()
+    {
+        return read(view, reference);
+    }
+    Ok(proposed
+        .optional_bytes(&reference.path)?
+        .filter(|bytes| crate::depth_ci::reference(&reference.path, bytes) == *reference))
+}
+
 fn evaluate(
     workspace: &Path,
     selected: &FileRef,
@@ -99,7 +124,7 @@ fn evaluate(
     host: &impl Host,
 ) -> Result<Verdict, String> {
     let mut view = GitInputs::new(workspace)?;
-    evaluate_inputs(workspace, &mut view, selected, current, host)
+    evaluate_inputs(workspace, &mut view, selected, current, host, None)
 }
 
 fn evaluate_inputs(
@@ -108,8 +133,9 @@ fn evaluate_inputs(
     selected: &FileRef,
     current: &Evaluation,
     host: &impl Host,
+    proposed: Option<&crate::runtime_advertising::source::Source>,
 ) -> Result<Verdict, String> {
-    let Some(raw) = read(view, selected)? else {
+    let Some(raw) = artifact_read(view, proposed, selected)? else {
         view.verify()?;
         return Ok(Verdict::unverified("missing or changed selected receipt"));
     };
@@ -128,7 +154,7 @@ fn evaluate_inputs(
     }
     let receipt = EvidenceReceipt::parse(text(&raw)?)?;
     // Malformed referenced payloads are form errors even when no producer is installed.
-    let payloads = load_payloads(view, &receipt)?;
+    let payloads = load_payloads(view, proposed, &receipt)?;
     let record = DepthRecord::parse(
         &serde_json::to_string(&current.record).map_err(|e| e.to_string())?,
         &current.current.agent_id,
@@ -146,7 +172,7 @@ fn evaluate_inputs(
     }) {
         Verdict::unverified("selected evidence is not bound by current E")
     } else if let Some(population) = host.population(current)? {
-        reconcile(workspace, view, selected, current, population)?
+        reconcile(workspace, view, selected, current, population, proposed)?
     } else {
         // Reading and hashing the graph cannot authenticate its completeness or producer.
         let _ = payloads;
@@ -190,10 +216,11 @@ fn generation(record: &DepthRecord, scope: &Scope) -> bool {
 
 fn load_payloads(
     view: &mut GitInputs,
+    proposed: Option<&crate::runtime_advertising::source::Source>,
     receipt: &EvidenceReceipt,
 ) -> Result<Option<(DependencyGraph, Environment)>, String> {
-    let graph = read(view, &receipt.build.dependency_graph)?;
-    let environment = read(view, &receipt.build.environment)?;
+    let graph = artifact_read(view, proposed, &receipt.build.dependency_graph)?;
+    let environment = artifact_read(view, proposed, &receipt.build.environment)?;
     // Parse every available matching payload, including when its partner is absent.
     let graph = graph
         .as_deref()
@@ -212,6 +239,7 @@ fn reconcile(
     selected: &FileRef,
     current: &Evaluation,
     population: Population,
+    proposed: Option<&crate::runtime_advertising::source::Source>,
 ) -> Result<Verdict, String> {
     if population.current != current.current
         || population.definition_sha256 != current.definition_sha256
@@ -228,6 +256,18 @@ fn reconcile(
         ));
     }
     let mut seen = BTreeSet::new();
+    for context in &population.reporting {
+        if !seen.insert((
+            context.repository.name.clone(),
+            context.invocation.claims.run,
+            context.invocation.claims.attempt,
+            "rust-tests".into(),
+        )) {
+            return Ok(Verdict::unverified("duplicate reporting run/attempt/job"));
+        }
+    }
+    // Unexpected execution shares the checkpoint's attempt identity and remains a conflict.
+    seen.retain(|(_, run, attempt, _)| !population.reporting_conflicts.contains(&(*run, *attempt)));
     let mut passed = false;
     let mut failed = false;
     let mut incomplete = false;
@@ -249,28 +289,28 @@ fn reconcile(
             // The selected receipt/payloads remain coherent workspace evidence. Other attempts
             // come directly from authenticated immutable host payloads, not an E-selected list.
             if run.evidence == *selected
-                && read(view, selected)?.as_deref() != Some(bytes.as_slice())
+                && artifact_read(view, proposed, selected)?.as_deref() != Some(bytes.as_slice())
             {
                 incomplete = true;
                 continue;
             }
             if run.evidence == *selected
-                && (load_payloads(view, receipt)?
+                && (load_payloads(view, proposed, receipt)?
                     != Some((run.graph.clone(), run.environment.clone()))
-                    || read(view, &receipt.build.toolchain)?.is_none()
-                    || read(view, &receipt.cases.raw_output)?.is_none())
+                    || artifact_read(view, proposed, &receipt.build.toolchain)?.is_none()
+                    || artifact_read(view, proposed, &receipt.cases.raw_output)?.is_none())
             {
                 incomplete = true;
                 continue;
             }
             (receipt.clone(), run.graph.clone(), run.environment.clone())
         } else {
-            let Some(bytes) = read(view, &run.evidence)? else {
+            let Some(bytes) = artifact_read(view, proposed, &run.evidence)? else {
                 incomplete = true;
                 continue;
             };
             let receipt = EvidenceReceipt::parse(text(&bytes)?)?;
-            let Some((graph, environment)) = load_payloads(view, &receipt)? else {
+            let Some((graph, environment)) = load_payloads(view, proposed, &receipt)? else {
                 incomplete = true;
                 continue;
             };
@@ -288,6 +328,9 @@ fn reconcile(
             incomplete = true;
             continue;
         }
+        incomplete |= population
+            .reporting_conflicts
+            .contains(&(run.producer.run_id, run.producer.run_attempt));
         let (complete, counterexample) = case_outcomes(&receipt.cases);
         failed |= counterexample;
         passed |= complete;
@@ -527,3 +570,12 @@ pub(super) fn prepare_native_finish(
 #[allow(dead_code)]
 #[path = "view_eval.rs"]
 mod view_eval;
+
+#[cfg(all(test, unix))]
+pub(crate) use github::prove_unobserved_admission;
+
+#[cfg(test)]
+pub(crate) use github::prove_reporting;
+
+#[cfg(test)]
+pub(crate) use github::prove_refused_reporting;

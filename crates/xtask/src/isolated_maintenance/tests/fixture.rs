@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use serde_json::json;
@@ -8,10 +12,18 @@ pub(super) struct Fake(
     pub(super) Mutex<BTreeMap<String, Value>>,
     pub(super) Mutex<BTreeMap<String, std::collections::VecDeque<Value>>>,
     pub(super) std::sync::atomic::AtomicUsize,
+    pub(super) Arc<crate::depth_acceptance::admission::fake::MemoryHost>,
+    pub(super) std::sync::atomic::AtomicBool,
 );
 impl Api for Fake {
+    fn admissions(&self) -> Result<Arc<dyn crate::depth_acceptance::admission::Host>, String> {
+        Ok(self.3.clone())
+    }
     fn json(&self, endpoint: &str) -> Result<Value, String> {
         self.2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if self.4.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            return Err("one-shot isolated host transport unavailable".into());
+        }
         if let Some(value) = self
             .1
             .lock()
@@ -108,7 +120,7 @@ impl Fixture {
         let table: crate::agent_registry::support_depth::SupportDepth =
             serde_json::from_value(declaration).unwrap();
         // The production registry remains unchanged; serialize the fixture with its existing TOML.
-        let mut raw = include_str!("../../../data/agent_registry.toml").to_owned();
+        let mut raw = registry_fixture::undeclared_registry().to_owned();
         if *subject == scope::SYNTHETIC {
             raw = format!("{raw}\n{SYNTHETIC_AGENT}")
                 .replace("{{ISOLATED_OWNER}}", "fixture")
@@ -128,6 +140,16 @@ impl Fixture {
         AgentRegistry::parse_isolated(&document.to_string(), &DepthTables { subject }).unwrap();
         write(root.path(), REGISTRY_RELATIVE_PATH, document.to_string());
         write(root.path(), "producer/source.rs", "approved producer\n");
+        // Independently installed fake policy source, separate from candidate writer outputs.
+        write(root.path(), "crates/policy.rs", "modeled IN1 policy\n");
+        write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n");
+        write(root.path(), "Cargo.lock", "version = 3\n");
+        write(
+            root.path(),
+            "scripts/depth_ci_archive.py",
+            include_bytes!("../../../../../scripts/depth_ci_archive.py"),
+        );
+        write(root.path(), ".github/workflows/ci.yml", "name: Modeled protected IN1\non: pull_request\njobs:\n  protected-in1:\n    runs-on: ubuntu-latest\n    steps:\n      - run: protected-in1-predicate\n");
         write(root.path(), "docs/input.txt", "initial\n");
         git(root.path(), &["add", "."]);
         git(root.path(), &["commit", "-m", "fixture original baseline"]);
@@ -156,6 +178,7 @@ impl Fixture {
     }
     pub(super) fn host(&self) {
         let head = git(self.root.path(), &["rev-parse", "HEAD"]);
+        self.api.3.root(&head);
         for (name, id, owner) in [("fixture/isolated", 10, 20), ("fixture/canonical", 30, 40)] {
             self.api.put(
                 &format!("repos/{name}"),
@@ -279,15 +302,14 @@ pub(in crate::isolated_maintenance) fn installed() -> Option<(Profile, Arc<dyn A
     INSTALLED.with(|i| i.borrow().as_ref().map(|make| make()))
 }
 /// Uninstalls on drop, so a failing test never leaks its profile into another test.
-pub(super) struct Installed;
+pub(super) struct Installed(Option<Installer>);
 impl Drop for Installed {
     fn drop(&mut self) {
-        INSTALLED.with(|i| *i.borrow_mut() = None);
+        INSTALLED.with(|i| *i.borrow_mut() = self.0.take());
     }
 }
 pub(super) fn install(make: Installer) -> Installed {
-    INSTALLED.with(|i| *i.borrow_mut() = Some(make));
-    Installed
+    Installed(INSTALLED.with(|i| i.borrow_mut().replace(make)))
 }
 
 #[cfg(unix)]
@@ -299,3 +321,24 @@ mod runtime_follow_on_policy;
 
 #[path = "runtime_follow_on.rs"]
 mod runtime_follow_on;
+
+// Inject drift only after registry authentication has completed, before the consumer closes.
+type RegistryObserver = Box<dyn FnOnce()>;
+thread_local! {
+    static REGISTRY_OBSERVER: std::cell::RefCell<Option<RegistryObserver>> = const { std::cell::RefCell::new(None) };
+}
+pub(super) struct RegistryObservation(Option<RegistryObserver>);
+impl Drop for RegistryObservation {
+    fn drop(&mut self) {
+        REGISTRY_OBSERVER.with(|slot| *slot.borrow_mut() = self.0.take());
+    }
+}
+pub(super) fn after_registry_read(observer: RegistryObserver) -> RegistryObservation {
+    RegistryObservation(REGISTRY_OBSERVER.with(|slot| slot.replace(Some(observer))))
+}
+pub(in crate::isolated_maintenance) fn registry_observed() {
+    let observer = REGISTRY_OBSERVER.with(|slot| slot.take());
+    if let Some(observer) = observer {
+        observer();
+    }
+}

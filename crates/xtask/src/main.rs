@@ -6,7 +6,7 @@ mod agent_api_backend_type_leak_guard;
 mod capability_matrix_audit;
 mod claude_snapshot;
 mod claude_wrapper_coverage;
-mod close_proving_run;
+pub use xtask::close_proving_run;
 mod codex_snapshot;
 mod codex_wrapper_coverage;
 use xtask::{depth_fixture_snapshot, depth_fixture_wrapper_coverage};

@@ -248,6 +248,8 @@ impl Fixture {
     }
     fn population(&self) -> Population {
         Population {
+            reporting: vec![],
+            reporting_conflicts: BTreeSet::new(),
             current: self.current.current.clone(),
             definition_sha256: self.current.definition_sha256.clone(),
             environment: self.current.environment.clone(),
@@ -671,3 +673,27 @@ fn unchanged_adequacy_mapping_survives_an_unrelated_source_commit() {
 }
 
 mod native_admission;
+
+#[test]
+fn reporting_checkpoint_substantive_pass_and_failure_remain_conflicts_and_counterexamples() {
+    let mut f = Fixture::new();
+    let mut population = f.population();
+    population
+        .reporting_conflicts
+        .insert((f.receipt.producer.run_id, f.receipt.producer.run_attempt));
+    let verdict = f.evaluate(population).unwrap();
+    assert_eq!(verdict.result, DepthResult::Unverified);
+    assert_eq!(
+        verdict.reason,
+        "missing, stale, nonterminal or nonqualifying evidence"
+    );
+    f.receipt.cases.executed[0].outcome = CaseOutcome::Failed;
+    f.update();
+    let mut population = f.population();
+    population
+        .reporting_conflicts
+        .insert((f.receipt.producer.run_id, f.receipt.producer.run_attempt));
+    let verdict = f.evaluate(population).unwrap();
+    assert_eq!(verdict.result, DepthResult::Failed);
+    assert_eq!(verdict.reason, "qualifying counterexample");
+}

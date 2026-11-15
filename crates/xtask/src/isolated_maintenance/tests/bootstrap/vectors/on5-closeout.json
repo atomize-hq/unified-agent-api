@@ -1,0 +1,16 @@
+{
+  "lifecycle_stage": "closed_baseline",
+  "support_tier": "publication_backed",
+  "current_owner_command": "close-proving-run --write",
+  "last_transition_by": "xtask close-proving-run --write",
+  "state": "closed",
+  "approval_source": "governance-review",
+  "maintenance_mode": "explicitly_deferred",
+  "human": {
+    "manual_control_plane_edits": 0,
+    "partial_write_incidents": 0,
+    "ambiguous_ownership_incidents": 0,
+    "duration_seconds": 17,
+    "explicit_none_reason": "The connected offline proving run recorded no residual friction."
+  }
+}

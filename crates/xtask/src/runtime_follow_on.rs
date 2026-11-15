@@ -187,16 +187,23 @@ pub fn run_in_workspace<W: Write>(
             return depth::run(workspace_root, args, route, writer);
         }
     }
-    if args.write {
-        // Ordinary approvals keep the original workspace refusal, even inside an isolated route.
-        let depth_approval = load_approval_artifact(workspace_root, &args.approval)
+    if args.write || args.dry_run {
+        // Owning ON2 dry-runs dispatch above. Writes keep their existing depth-approval and
+        // captured-route exemption. A remaining dry-run is exempt only for the installed route's
+        // own subject (the maintenance create lane's private freeze); a foreign depth approval
+        // borrows no route. All others check workspace depth.
+        let approval = load_approval_artifact(workspace_root, &args.approval)
             .ok()
-            .is_some_and(|a| a.support_depth_version.is_some());
-        if !depth_approval
-            || crate::isolated_maintenance::route(workspace_root)
-                .map_err(Error::Validation)?
-                .is_none()
-        {
+            .filter(|a| a.support_depth_version.is_some());
+        let route =
+            crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?;
+        let exempt = match (&approval, &route) {
+            (Some(approval), Some(route)) => {
+                args.write || approval.descriptor.agent_id == route.context().subject_agent()
+            }
+            _ => false,
+        };
+        if !exempt {
             xtask::depth_routes::refuse_workspace(workspace_root, "runtime_follow_on")
                 .map_err(Error::Validation)?;
         }

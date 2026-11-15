@@ -65,7 +65,7 @@ pub(super) fn qualifications(view: &View) -> Result<BTreeSet<Qualification>, Str
     }
     Ok(values)
 }
-fn cells(view: &View) -> Result<BTreeSet<(String, String)>, String> {
+pub(super) fn cells(view: &View) -> Result<BTreeSet<(String, String)>, String> {
     let raw = view
         .source
         .read(crate::capability_matrix::DEFAULT_OUT_PATH)?;
@@ -224,6 +224,7 @@ thread_local! {
 type PublicationVerdicts = (
     std::path::PathBuf,
     std::collections::BTreeMap<String, crate::depth_evidence::EvidenceVerdicts>,
+    Option<std::collections::BTreeMap<String, String>>,
 );
 struct PublicationEvaluation(Option<PublicationVerdicts>);
 impl Drop for PublicationEvaluation {
@@ -243,7 +244,7 @@ impl crate::depth_evidence::EvidenceVerdicts {
     ) -> Result<Self, String> {
         let bound = VIEW_VERDICTS.with(|slot| {
             let slot = slot.borrow();
-            slot.as_ref().map(|(bound, values)| {
+            slot.as_ref().map(|(bound, values, _)| {
                 if root.canonicalize().map_err(|e| e.to_string())? != *bound {
                     return Err("publication evaluation belongs to another view".into());
                 }
@@ -261,20 +262,50 @@ impl crate::depth_evidence::EvidenceVerdicts {
         crate::depth_evidence::production_results(root, record)
     }
 
+    /// Evidence identities from the same freshly evaluated proposal scope. Existing ordinary
+    /// derivation keeps its Git-bound reader. Recheck artifact bytes at each renderer read.
+    pub(crate) fn publication_evidence(
+        root: &Path,
+    ) -> Result<Option<std::collections::BTreeMap<String, String>>, String> {
+        let hashes = VIEW_VERDICTS.with(|slot| -> Result<_, String> {
+            let slot = slot.borrow();
+            let Some((bound, _, hashes)) = slot.as_ref() else {
+                return Ok(None);
+            };
+            if root.canonicalize().map_err(|e| e.to_string())? != *bound {
+                return Err("publication evidence belongs to another view".into());
+            }
+            Ok(hashes.clone())
+        })?;
+        if let Some(hashes) = &hashes {
+            let source = crate::runtime_advertising::source::Source::workspace(root)?;
+            for (path, expected) in hashes {
+                let bytes = source
+                    .optional_bytes(path)?
+                    .ok_or("publication evidence disappeared after evaluation")?;
+                if crate::depth_ci::reference(path, &bytes).sha256 != *expected {
+                    return Err("publication evidence changed after evaluation".into());
+                }
+            }
+        }
+        Ok(hashes)
+    }
+
     fn with_publication_results<T>(
         root: &Path,
         values: std::collections::BTreeMap<String, Self>,
+        evidence: Option<std::collections::BTreeMap<String, String>>,
         render: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         let previous = VIEW_VERDICTS.with(|slot| {
             let mut slot = slot.borrow_mut();
-            if slot.as_ref().is_some_and(|(bound, _)| *bound != root) {
+            if slot.as_ref().is_some_and(|(bound, _, _)| *bound != root) {
                 return Err("nested publication evaluation belongs to another root".to_owned());
             }
             // An explicitly scoped full validator can invoke IN1, which independently
             // re-evaluates the same root. Restore the outer source; never reuse its verdicts.
-            Ok(slot.replace((root, values)))
+            Ok(slot.replace((root, values, evidence)))
         })?;
         let _guard = PublicationEvaluation(previous);
         render()
@@ -313,13 +344,20 @@ impl crate::depth_evidence::EvidenceVerdicts {
                         &version,
                     )?;
                     let digest = record.stated_sha256()?;
-                    let verdicts = if record.acceptance_entries.iter().any(|entry| {
-                        matches!(
-                            entry,
-                            crate::depth_record::AcceptanceEntry::MaintenanceCloseout { .. }
-                                | crate::depth_record::AcceptanceEntry::Promotion { .. }
-                        ) && entry.record_sha256() == digest
-                    }) {
+                    let onboarding_reporting =
+                        matches!(record.event, crate::depth_record::Event::Onboarding { .. })
+                            && record.execution.is_some();
+                    if onboarding_reporting && record.acceptance_entries.is_empty() {
+                        Self::check_reporting_assembly(root, &record, &host)?;
+                    }
+                    let verdicts = if onboarding_reporting
+                        || record.acceptance_entries.iter().any(|entry| {
+                            matches!(
+                                entry,
+                                crate::depth_record::AcceptanceEntry::MaintenanceCloseout { .. }
+                                    | crate::depth_record::AcceptanceEntry::Promotion { .. }
+                            ) && entry.record_sha256() == digest
+                        }) {
                         let (evaluated, verdicts) =
                             Self::bind_view(&view, context, &host, relative)?.evaluate()?;
                         if evaluated != record {
@@ -343,10 +381,11 @@ impl crate::depth_evidence::EvidenceVerdicts {
             }
         }
         view.verify_current(root)?;
-        let outcome = Self::with_publication_results(root, values, validate);
-        view.verify_current(root)?;
-        captured.recheck(root)?;
-        outcome
+        let outcome = Self::with_publication_results(root, values, None, validate);
+        super::admission::observations::after_decision(outcome, || {
+            view.verify_current(root)?;
+            captured.recheck(root)
+        })
     }
 
     /// Freshly evaluate the exact proposed records before invoking file-based renderers.
@@ -363,6 +402,8 @@ impl crate::depth_evidence::EvidenceVerdicts {
         };
         let host = captured.evidence_host(caller)?;
         let mut values = std::collections::BTreeMap::new();
+        let proposed = view.evaluation_source(caller)?;
+        let mut evidence = std::collections::BTreeMap::new();
         for entry in &captured.registry().agents {
             for (_, path) in crate::depth_record::record_files(&root.join(&entry.manifest_root)) {
                 let path = path
@@ -371,6 +412,19 @@ impl crate::depth_evidence::EvidenceVerdicts {
                     .to_str()
                     .ok_or("non-UTF8 record path")?;
                 let (record, verdicts) = Self::bind_view(view, context, &host, path)?.evaluate()?;
+                for file in record
+                    .execution
+                    .iter()
+                    .flat_map(|e| &e.results)
+                    .flat_map(|r| &r.evidence)
+                {
+                    if let Some(bytes) = proposed.source.optional_bytes(&file.path)? {
+                        evidence.insert(
+                            file.path.clone(),
+                            crate::depth_ci::reference(&file.path, &bytes).sha256,
+                        );
+                    }
+                }
                 #[cfg(test)]
                 EVALUATED_ENTRIES
                     .with(|entries| entries.borrow_mut().push(record.acceptance_entries.clone()));
@@ -380,7 +434,8 @@ impl crate::depth_evidence::EvidenceVerdicts {
                 );
             }
         }
-        let outcome = Self::with_publication_results(root, values, render);
+        proposed.verify_current(view, caller)?;
+        let outcome = Self::with_publication_results(root, values, Some(evidence), render);
         view.verify_current(caller)?;
         captured.recheck(caller)?;
         outcome

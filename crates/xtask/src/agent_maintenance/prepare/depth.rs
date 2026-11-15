@@ -136,15 +136,12 @@ pub(super) fn freeze(
 }
 
 pub(super) fn append(
-    root: &Path,
-    registry: &AgentRegistry,
     plan: &FreezePlan,
+    entry: &AgentRegistryEntry,
+    bundle: crate::support_matrix::PublicationBundle,
     files: &mut Vec<PreparedFile>,
 ) -> Result<(), Error> {
     let selection = &plan.record.policy.selection;
-    let entry = registry
-        .find(&selection.agent_id)
-        .ok_or_else(|| Error::Validation("missing depth agent".into()))?;
     let request_path = crate::agent_lifecycle::maintenance_request_path(&selection.agent_id);
     let proposed_request = files
         .iter()
@@ -199,8 +196,6 @@ pub(super) fn append(
         ),
         contents: record.into_bytes(),
     });
-    let bundle = crate::support_matrix::preview_preparation(root, registry, &plan.record)
-        .map_err(Error::Validation)?;
     for (path, contents) in [
         (crate::support_matrix::JSON_OUTPUT_PATH, bundle.json),
         (crate::support_matrix::MARKDOWN_OUTPUT_PATH, bundle.markdown),
@@ -214,16 +209,5 @@ pub(super) fn append(
             contents: contents.into_bytes(),
         });
     }
-    let proposed = files
-        .iter()
-        .map(|file| {
-            Ok((
-                file.relative_path.clone(),
-                String::from_utf8(file.contents.clone())
-                    .map_err(|e| Error::Validation(e.to_string()))?,
-            ))
-        })
-        .collect::<Result<_, Error>>()?;
-    crate::depth_acceptance::check_reporting_preparation(root, registry, proposed)
-        .map_err(Error::Validation)
+    Ok(())
 }

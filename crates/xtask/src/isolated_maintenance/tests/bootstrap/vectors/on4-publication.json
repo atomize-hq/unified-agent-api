@@ -1,0 +1,20 @@
+{
+  "lifecycle_stage": "published",
+  "support_tier": "publication_backed",
+  "current_owner_command": "refresh-publication --write",
+  "last_transition_by": "xtask refresh-publication --write",
+  "proposal_subprocesses": [
+    "make hygiene",
+    "make fmt-check",
+    "python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "make clippy",
+    "cargo clean",
+    "make check",
+    "cargo test --workspace --all-targets --all-features",
+    "make publish-guards",
+    "make loc-check",
+    "make actionlint",
+    "make security",
+    "make unsafe-report"
+  ]
+}

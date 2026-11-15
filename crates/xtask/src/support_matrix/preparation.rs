@@ -18,6 +18,14 @@ pub fn preview_preparation(
     registry: &AgentRegistry,
     record: &DepthRecord,
 ) -> Result<PublicationBundle, String> {
+    load_preparation(workspace, registry, record)?.render()
+}
+
+pub fn load_preparation(
+    workspace: &Path,
+    registry: &AgentRegistry,
+    record: &DepthRecord,
+) -> Result<PreparationInputs, String> {
     let selection = &record.policy.selection;
     let mut roots = Vec::new();
     for entry in registry
@@ -64,31 +72,50 @@ pub fn preview_preparation(
     if !roots.iter().any(|root| root.agent == selection.agent_id) {
         return Err("depth preparation agent is not published".into());
     }
-    let rows = derive_rows_for_loaded_roots(&roots)?;
-    let before: SupportMatrixArtifact = serde_json::from_slice(
-        &fs::read(workspace.join(JSON_OUTPUT_PATH)).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    if let Some(error) = before.revision_error() {
-        return Err(error);
+    Ok(PreparationInputs {
+        rows: derive_rows_for_loaded_roots(&roots)?,
+        projection: derive_runtime_support_projection_for_loaded_roots(&roots)?,
+        before: serde_json::from_slice(
+            &fs::read(workspace.join(JSON_OUTPUT_PATH)).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?,
+        markdown: fs::read_to_string(workspace.join(MARKDOWN_OUTPUT_PATH))
+            .map_err(|e| e.to_string())?,
+    })
+}
+
+/// Independently derived reporting rows, runtime projection and predecessor publication.
+/// All filesystem-backed report intake finishes before this pure rendering input is returned.
+pub struct PreparationInputs {
+    rows: Vec<SupportRow>,
+    projection: Vec<super::runtime_support::RuntimeSupportProjectionRecord>,
+    before: SupportMatrixArtifact,
+    markdown: String,
+}
+impl PreparationInputs {
+    pub fn render(&self) -> Result<PublicationBundle, String> {
+        let rows = &self.rows;
+        let before = &self.before;
+        if let Some(error) = before.revision_error() {
+            return Err(error);
+        }
+        // C can retain E mechanically, but cannot newly assert its execution/reuse/debt verdicts.
+        // These reporting-only limits are stricter than check 9's qualified-acceptance categories.
+        let previous = positive_results(&before.rows)?;
+        if let Some(fact) = positive_results(rows)?.difference(&previous).next() {
+            return Err(format!(
+                "preparation requires a deferred execution/debt verdict for {fact:?}"
+            ));
+        }
+        render_publication_artifacts(
+            &self.markdown,
+            rows,
+            render_agent_api_runtime_support_data_from_projection(
+                &self.projection,
+                EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
+            ),
+        )
     }
-    // C can retain E mechanically, but cannot newly assert its execution/reuse/debt verdicts.
-    // These reporting-only limits are stricter than check 9's qualified-acceptance categories.
-    let previous = positive_results(&before.rows)?;
-    if let Some(fact) = positive_results(&rows)?.difference(&previous).next() {
-        return Err(format!(
-            "preparation requires a deferred execution/debt verdict for {fact:?}"
-        ));
-    }
-    let projection = derive_runtime_support_projection_for_loaded_roots(&roots)?;
-    render_publication_artifacts(
-        &fs::read_to_string(workspace.join(MARKDOWN_OUTPUT_PATH)).map_err(|e| e.to_string())?,
-        &rows,
-        render_agent_api_runtime_support_data_from_projection(
-            &projection,
-            EMBEDDED_RUNTIME_SUPPORT_FAMILIES,
-        ),
-    )
 }
 
 type PositiveResult = (String, String, String, String);

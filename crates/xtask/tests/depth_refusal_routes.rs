@@ -10,6 +10,8 @@ mod support;
 
 #[path = "depth_refusal_routes/lower.rs"]
 mod lower;
+#[path = "depth_refusal_routes/mediation_matrix/mod.rs"]
+mod mediation_matrix;
 #[path = "depth_refusal_routes/neutral.rs"]
 mod neutral;
 #[path = "depth_refusal_routes/onboarding.rs"]

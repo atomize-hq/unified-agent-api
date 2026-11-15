@@ -139,23 +139,7 @@ pub fn resolve(
         )?);
     }
 
-    // These are the canonical paths written by manifest-union/report and the wrapper generator.
-    // Keep the target set from RULES rather than discovering files in a report directory.
-    let mut input_paths = vec![
-        format!("{manifest_root}/snapshots/{version}/union.json"),
-        format!("{manifest_root}/wrapper_coverage.json"),
-        format!("{manifest_root}/reports/{version}/coverage.any.json"),
-        format!("{manifest_root}/reports/{version}/coverage.all.json"),
-    ];
-    for target in expected_targets {
-        input_paths.push(format!("{manifest_root}/snapshots/{version}/{target}.json"));
-        input_paths.push(format!(
-            "{manifest_root}/reports/{version}/coverage.{target}.json"
-        ));
-    }
-    let mut output_paths = input_paths.clone();
-    output_paths.push(format!("{manifest_root}/versions/{version}.json"));
-    output_paths.push(format!("{manifest_root}/artifacts.lock.json"));
+    let (input_paths, output_paths) = delivery_paths(manifest_root, version, expected_targets);
 
     Ok(AcquisitionPlan {
         plan_schema_version: 1,
@@ -292,4 +276,30 @@ impl AcquisitionPlan {
             .iter()
             .any(|t| t.archive == ArchiveKind::NpmTgz.as_str())
     }
+}
+
+/// Literal acquisition destinations shared with the freeze admission boundary.
+pub(crate) fn delivery_paths(
+    manifest_root: &str,
+    version: &str,
+    expected_targets: &[String],
+) -> (Vec<String>, Vec<String>) {
+    // These are the canonical paths written by manifest-union/report and the wrapper generator.
+    // Keep the target set from RULES rather than discovering files in a report directory.
+    let mut input_paths = vec![
+        format!("{manifest_root}/snapshots/{version}/union.json"),
+        format!("{manifest_root}/wrapper_coverage.json"),
+        format!("{manifest_root}/reports/{version}/coverage.any.json"),
+        format!("{manifest_root}/reports/{version}/coverage.all.json"),
+    ];
+    for target in expected_targets {
+        input_paths.push(format!("{manifest_root}/snapshots/{version}/{target}.json"));
+        input_paths.push(format!(
+            "{manifest_root}/reports/{version}/coverage.{target}.json"
+        ));
+    }
+    let mut output_paths = input_paths.clone();
+    output_paths.push(format!("{manifest_root}/versions/{version}.json"));
+    output_paths.push(format!("{manifest_root}/artifacts.lock.json"));
+    (input_paths, output_paths)
 }

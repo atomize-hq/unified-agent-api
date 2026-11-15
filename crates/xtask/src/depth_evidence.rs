@@ -269,3 +269,12 @@ impl EvidenceReceipt {
         }
     }
 }
+
+#[cfg(all(test, unix))]
+pub(crate) use verdict::prove_unobserved_admission;
+
+#[cfg(test)]
+pub(crate) use verdict::prove_reporting;
+
+#[cfg(test)]
+pub(crate) use verdict::prove_refused_reporting;

@@ -1,5 +1,5 @@
 //! Final integration reuses owning predicates; entries and route labels grant no authority.
-use super::{input::View, manual, promotion};
+use super::{admission::observations, input::View, manual, promotion};
 use crate::{
     agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH},
     depth_record::AcceptanceEntry,
@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, path::Path};
 mod binding;
 mod bootstrap;
 mod generation;
+mod onboarding;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     // Resolve repository-wide authority before enumerating or narrowing to any manifest root.
@@ -28,18 +29,35 @@ impl crate::isolated_maintenance::Route {
         revision: &str,
         validate: impl FnOnce() -> Result<T, String>,
     ) -> Result<T, String> {
+        let mut emitter = self.context().admission_emitter()?;
+        let observations = super::admission::observations::Capture::start()?;
+        let outcome = self.evaluate_admitted_publication(root, revision, validate, &mut emitter);
+        let outcome = observations::after_decision(outcome, || Ok(()));
+        emitter.finish(root, outcome, observations.finish())
+    }
+
+    fn evaluate_admitted_publication<T>(
+        self,
+        root: &Path,
+        revision: &str,
+        validate: impl FnOnce() -> Result<T, String>,
+        emitter: &mut super::admission::emitter::Emitter,
+    ) -> Result<T, String> {
         // Only bootstrap lacks a resolved enrollment. Existing routes must retain their
         // capture -> proposal -> binding error order, including competing input failures.
         if self.context().bootstrap_pending()? {
             let initial = binding::capture(root, revision, self.context())?;
+            emitter.parent = Some(initial.parent.clone());
+            emitter.prepare(root)?;
             if let Some(checkpoint) = self.context().bootstrap_checkpoint(root, &initial.parent)? {
                 if checkpoint.publication_changed {
                     checkpoint
                         .with_view(root, |view| bootstrap::publication(view, &initial.parent))?;
                 }
                 let outcome = checkpoint.with_registry(root, validate);
-                initial.recheck(root, self.context())?;
-                return outcome;
+                return observations::after_decision(outcome, || {
+                    initial.recheck(root, self.context())
+                });
             }
         }
         let captured = self.capture(root)?;
@@ -48,6 +66,8 @@ impl crate::isolated_maintenance::Route {
             return Err("isolated IN1 binding lost its captured authority".into());
         };
         let binding = binding::capture(root, revision, context)?;
+        emitter.parent = Some(binding.parent.clone());
+        emitter.prepare(root)?;
         // Only onboarding can observe a first declaration. Maintenance keeps its existing
         // admission even when its parent lacks the subject entry or depth table.
         let checkpoint = if context.bootstrap_declared_onboarding() {
@@ -60,8 +80,7 @@ impl crate::isolated_maintenance::Route {
                 checkpoint.with_view(root, |view| bootstrap::publication(view, &binding.parent))?;
             }
             let outcome = checkpoint.with_registry(root, validate);
-            binding.recheck(root, context)?;
-            return outcome;
+            return observations::after_decision(outcome, || binding.recheck(root, context));
         }
         let outcome = crate::depth_evidence::EvidenceVerdicts::with_integration_publication(
             root,
@@ -77,8 +96,7 @@ impl crate::isolated_maintenance::Route {
                 validate()
             },
         );
-        binding.recheck(root, context)?;
-        outcome
+        observations::after_decision(outcome, || binding.recheck(root, context))
     }
 }
 
@@ -259,12 +277,35 @@ pub(super) fn admit(
     }
     for (version, record) in &new.records {
         let digest = record.stated_sha256()?;
+        let qualified = qualifications
+            .iter()
+            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version);
+        let previous = old
+            .records
+            .get(version)
+            .map(|r| r.acceptance_entries.as_slice())
+            .unwrap_or(&[]);
+        let added = &record.acceptance_entries[previous.len()..];
+        let effects: Vec<_> = comparison
+            .effects
+            .iter()
+            .filter(|e| e.version == *version)
+            .collect();
+        if record.policy.selection.enrollment.lifecycle_path
+            == crate::agent_registry::support_depth::LifecyclePath::Onboarding
+        {
+            if let Some(kind) = onboarding::candidate(new, record)? {
+                if qualified || !added.is_empty() || !effects.is_empty() {
+                    onboarding::admit(root, old, new, tip, record, kind)?;
+                } else {
+                    onboarding::reporting(root, old, new, tip, record, kind)?;
+                }
+                continue;
+            }
+        }
         // Dependency-only changes can invalidate a still-published qualification without
         // changing the record, its entries or any newly accepting value.
-        if qualifications
-            .iter()
-            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version)
-        {
+        if qualified {
             if record.policy.selection.enrollment.lifecycle_path
                 != crate::agent_registry::support_depth::LifecyclePath::Maintenance
                 || !record.policy.path_enabled
@@ -280,17 +321,6 @@ pub(super) fn admit(
                 return Err("qualified publication has no current entry".into());
             }
         }
-        let previous = old
-            .records
-            .get(version)
-            .map(|r| r.acceptance_entries.as_slice())
-            .unwrap_or(&[]);
-        let added = &record.acceptance_entries[previous.len()..];
-        let effects: Vec<_> = comparison
-            .effects
-            .iter()
-            .filter(|e| e.version == *version)
-            .collect();
         if added.is_empty() && effects.is_empty() {
             continue;
         }

@@ -1,4 +1,8 @@
 //! Public ON1 starts the connected, credential-free onboarding chain.
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use clap::Parser;
 
@@ -76,6 +80,10 @@ fn public_on1_raw_descriptor_uses_the_same_approval_bound_plan() {
 }
 
 pub(super) fn canonical_context(f: &Fixture) {
+    canonical_context_for(f, false);
+}
+
+fn canonical_context_for(f: &Fixture, producer: bool) {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let raw = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
     let manifest: toml_edit::DocumentMut = raw.parse().unwrap();
@@ -86,11 +94,19 @@ pub(super) fn canonical_context(f: &Fixture) {
     for path in [
         "Cargo.toml",
         "crates/agent_api/src",
-        "cli_manifests",
         "docs/specs/unified-agent-api",
     ] {
+        if producer && path == "crates/agent_api/src" {
+            // Keep the reporting selectors used before ON2 restores full conformance source.
+            for name in ["runtime_support.rs", "runtime_support_data.rs"] {
+                let file = format!("{path}/{name}");
+                declaration::copy(&repo.join(&file), &f.root.path().join(file));
+            }
+            continue;
+        }
         declaration::copy(&repo.join(path), &f.root.path().join(path));
     }
+    baseline::manifests(f.root.path());
     f.commit();
     local(f, &head(f));
 }
@@ -107,25 +123,56 @@ fn validate(f: &Fixture) {
 }
 
 pub(super) fn declared_chain() -> Fixture {
+    declared_chain_for(false)
+}
+
+/// Producer fixtures need actual writer outputs; the ordinary connected tests above/below
+/// separately prove IN1 admission/observation. Do not replay that unrelated proof during setup.
+pub(super) fn declared_chain_for(producer: bool) -> Fixture {
+    declared_chain_from(setup(false), producer)
+}
+
+/// Establish a full host commit identity before ON1 and the first retained IN1 decision.
+pub(super) fn declared_chain_with_host_approval() -> Fixture {
     let f = setup(false);
-    canonical_context(&f);
+    let raw = fs::read_to_string(f.root.path().join(APPROVAL))
+        .unwrap()
+        .replace("abc1234", &f.baseline);
+    write(f.root.path(), APPROVAL, raw);
+    f.commit();
+    local(&f, &head(&f));
+    declared_chain_from(f, false)
+}
+
+fn declared_chain_from(f: Fixture, producer: bool) -> Fixture {
+    canonical_context_for(&f, producer);
     assert!(!f.root.path().join(ROOT).exists());
     let _installed = f.install();
+    let checkpoint = if producer {
+        producer_checkpoint
+    } else {
+        integrate
+    };
     let approval = fs::read(f.root.path().join(APPROVAL)).unwrap();
     let parent = head(&f);
     crate::onboard_agent::run_in_workspace(f.root.path(), approval_args(), &mut Vec::new())
         .unwrap();
-    integrate(&f, &parent);
+    checkpoint(&f, &parent);
     let parent = head(&f);
     adopt(&f);
-    integrate(&f, &parent);
+    checkpoint(&f, &parent);
     let parent = head(&f);
     producer::acquire(f.root.path());
-    integrate(&f, &parent);
+    checkpoint(&f, &parent);
     let parent = head(&f);
     metadata(&f);
     let next = declaration::publish(&f, &parent);
-    admit_and_observe(&f, &parent, &next);
+    if producer {
+        f.host();
+        local(&f, &next);
+    } else {
+        admit_and_observe(&f, &parent, &next);
+    }
     validate(&f);
     assert!(AgentRegistry::load(f.root.path())
         .unwrap()
@@ -142,7 +189,9 @@ pub(super) fn declared_chain() -> Fixture {
     let parent = head(&f);
     declaration::declare(&f);
     let next = declaration::publish(&f, &parent);
-    check_integration(f.root.path(), &parent).unwrap();
+    if !producer {
+        check_integration(f.root.path(), &parent).unwrap();
+    }
     assert!(route(f.root.path())
         .unwrap()
         .unwrap()
@@ -154,7 +203,9 @@ pub(super) fn declared_chain() -> Fixture {
         .is_none());
     f.host();
     local(&f, &next);
-    check_integration(f.root.path(), &parent).unwrap();
+    if !producer {
+        check_integration(f.root.path(), &parent).unwrap();
+    }
     let registry = crate::isolated_maintenance::registry(f.root.path()).unwrap();
     let entry = registry.find("depth_fixture").unwrap();
     assert!(entry.support_depth.is_some());
@@ -242,10 +293,7 @@ fn public_on1_refuses_divergent_scaffolds_and_retained_acceptance() {
             _ => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
         }
         f.commit();
@@ -274,10 +322,7 @@ fn public_on1_creation_admission_refuses_injected_table_record_and_entry() {
             0 => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
             1 => write(f.root.path(), RECORD, "{}"),
             _ => write(
@@ -323,10 +368,7 @@ fn public_on1_absent_route_keeps_ordinary_success_and_depth_refusal() {
     write(
         f.root.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     let before = fs::read(f.root.path().join(STATE)).unwrap();
     assert!(crate::onboard_agent::run_in_workspace(
@@ -432,4 +474,11 @@ fn public_on1_installed_approval_errors_never_fall_back_to_raw_descriptor() {
             assert!(git(f.root.path(), &["status", "--porcelain=v1"]).is_empty());
         }
     }
+}
+
+/// Pin actual public-writer output for producer fixture setup, without claiming IN1 admission.
+pub(super) fn producer_checkpoint(f: &Fixture, parent: &str) {
+    let next = candidate(f, parent);
+    f.host();
+    local(f, &next);
 }

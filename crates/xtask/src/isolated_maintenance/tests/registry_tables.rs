@@ -1,5 +1,13 @@
 //! Roadmap B.8: registry parsing admits a `support_depth` table only for the installed isolated
 //! profile's compiled subject. Production parsing keeps refusing every table.
+#[path = "../../../tests/support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::isolated_maintenance::{registry as routed, RegistryError};
 
@@ -134,7 +142,7 @@ fn a_failing_route_never_falls_back_to_a_registry_production_would_accept() {
 
 #[test]
 fn the_committed_production_registry_is_unchanged_and_carries_no_table() {
-    let committed = include_str!("../../../data/agent_registry.toml");
+    let committed = registry_fixture::undeclared_registry();
     let production = AgentRegistry::parse(committed).unwrap();
     assert!(production.agents.iter().all(|a| a.support_depth.is_none()));
     assert!(production.find("depth_fixture").is_none());
@@ -145,7 +153,10 @@ fn the_committed_production_registry_is_unchanged_and_carries_no_table() {
             production
         );
     }
-    // And the shipped production load is the same registry.
+    // The actual candidate is independently routed and validated against its committed bytes.
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    assert_eq!(AgentRegistry::load(&workspace).unwrap(), production);
+    let candidate = candidate_registry::registry(&workspace);
+    let actual = fs::read_to_string(workspace.join(REGISTRY_RELATIVE_PATH)).unwrap();
+    assert_eq!(candidate, AgentRegistry::parse_unenforced(&actual).unwrap());
+    assert_eq!(candidate_registry::registry(&workspace), candidate);
 }

@@ -208,6 +208,10 @@ head association alone is insufficient. Missing population facts or an unsupport
 unverified; a favorable selected receipt cannot hide another qualifying run. Contradictory passing
 and failing qualifying attempts yield unverified pending investigation.
 
+The [request-freeze checkpoint rule](#authenticated-request-freeze-checkpoints-and-implementation-readiness)
+defines the authenticated receipt exception for the packet-bound synthetic maintenance and
+onboarding producer. Reporting checkpoints remain applicable population members.
+
 An authenticated authorized maintainer adoption must bind the exact mapping digest, reviewed
 source and reviewer/executor invocations, and attest independence and the substantive counterfactual
 for each assertion. The evaluator requires nonempty assertion/production bindings, complete case
@@ -222,7 +226,7 @@ recognized live producer until the following CI adapter slice; it reports unveri
 accepting caller-supplied host assertions. It supplies no writer admission or production enrollment.
 Publisher consumption follows with that adapter, keeping existing production enrollment refusal.
 
-For depth-enrolled ON4 gates, the following bounded evaluation is specified, not installed
+For depth-enrolled ON4 gates, the following bounded evaluation is required
 (OR-P13, [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
 Before delivery, the depth-reading parts of the fixed charter checklist item 7 command inventory
 MUST run through the commands' shared checking functions in the proposal's scratch view, inside
@@ -247,6 +251,22 @@ candidate bytes; an admission-relevant change MUST fail independent evaluation, 
 change may pass fresh checks. No serialized verdict, environment token, reusable gate receipt or
 candidate-hosting step is introduced. Local preparation, independent checks, current IN1 admission
 and the terminal integration gate retain the separate meanings stated by the charter.
+
+Slice 10a implements the shared A-check machinery in `xtask/readonly_gates.rs`. The proposal
+entry borrows slice 7's fresh owning evaluation, requires the controller's exact expected record
+and runs support, capability check/audit, each applicable registered manifest validator and runtime-advertising
+conformance without delivery. Standalone support checking freshly authenticates committed inputs.
+Both runtime-advertising readers use the routed registry in check mode, and standalone check-mode
+consumers close their independently resolved route. Ordinary rendering and the validator without
+`--tip` retain production verdict selection. Per-root `--tip` and all-root IN1 retain owning
+admission. The connected proposal proof and independent fake-host process composition are
+credential-free machinery evidence. Slice 10b implemented the registry-reader conversions and
+records ordinary/declared fixture validation and the lead-owned full-workspace leg. Slice 8 installed ON4 controller wiring.
+`readonly_gates_two_phases_real_checkers_and_independent_process` and
+`readonly_gates_proposal_runs_every_a_checker` passed, including independently initialized
+child authority and substantive shared-check refusals. The complete real subprocess inventory
+and protected host proof remain phase C requirements. Results are recorded in the
+[slice 10 report](../agents/lifecycle/s10-readonly-gates-report.md).
 
 ## D2 isolated CI producer
 
@@ -318,8 +338,8 @@ Event's date, without filtering on a selected receipt or success. A canonical-re
 with the same frozen Event/P/O is applicable before artifact inspection, across pull_request,
 merge_group, workflow_dispatch and push. Every attempt from 1 through the authenticated attempt
 count is included. Unknown applicable events, missing/nonterminal attempts, absent/expired
-witnesses, changing totals/populations, duplicates or the 1,000-row/100-attempt bounds refuse
-verification. Foreign-repository heads are outside this producer profile. The approved collector
+required execution witnesses, changing totals/populations, duplicates or the
+1,000-row/100-attempt bounds refuse verification. Foreign-repository heads are outside this producer profile. The approved collector
 records checkout HEAD; a PR checkout must be the host head or a two-parent test merge whose second
 parent is that head. Workflow implementation and checkout commit agree. The adapter confirms
 source/tree, reviewed implementation, graph/configuration and current scoped inputs separately.
@@ -328,8 +348,8 @@ Successful collection/upload/binding steps in the exact attempt's `Rust tests (w
 must expose exactly one timestamped `DEPTH_ARTIFACT_BINDING=` JSON log record within the binding
 step. Its `id`, `name`, and `digest` agree with immutable API artifact metadata and the downloaded
 ZIP's SHA-256 and size. A failure elsewhere in that job does not erase a faithfully collected
-counterexample. All applicable attempts must agree on environment and content-addressed toolchain
-report; a favorable run never selects those current inputs by itself.
+counterexample. All execution-required attempts must agree on environment and content-addressed
+toolchain report; a favorable run never selects those current inputs by itself.
 
 The maintainer review/comment body contains exactly one fenced `depth-adequacy-v1` JSON object:
 
@@ -368,8 +388,8 @@ implementation integration or exact maintainer adoption, this diagnostic cannot 
 
 Producer approval includes the presence/absence of root `.cargo/config`, `.cargo/config.toml`,
 `rust-toolchain` and `rust-toolchain.toml`; the initial profile requires all four absent. Before
-artifact processing the adapter approves the independently authenticated run/attempt head's
-producer/workflow closure as well as the separately checked actual checkout. A witness-provided
+artifact processing for an execution-required attempt the adapter approves the independently
+authenticated run/attempt head's producer/workflow closure as well as the separately checked actual checkout. A witness-provided
 synthetic merge cannot approve an unreviewed executed workflow. Artifact decoding executes only
 the helper read from the immutable independently approved staging anchor, never executable bytes
 from a discovered candidate head.
@@ -461,7 +481,8 @@ The synthetic onboarding selection below specifies the only pre-declaration exce
 protected-baseline declaration and registry-equality requirements: the exact ON1 bootstrap delta
 and the maintainer's first declaration transition (OR-P1, OR-P14,
 [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
-They are not installed. All other scope, source approval, freshness and ownership checks remain.
+They are implemented within the finite synthetic route. Scope, source approval, freshness
+and ownership continue to govern the complete candidate.
 
 Planning, a derived invocation-local proposal view and apply MUST retain the caller's binding and
 check freshness against independently observed host/source/tip and coherent local inputs. A copied
@@ -475,6 +496,470 @@ unfavorable witnesses and missing/unfinished-producer refusals retained. Consume
 producer without producer self-admission. The complete CI result policy and terminal gate still
 govern MERGE. Existing channel/CORE fixture profiles retain whole-workflow completion; this
 foundation does not implement packet evidence, change their behavior or enable production results.
+
+## Authenticated request-freeze checkpoints and implementation readiness
+
+For the packet-bound synthetic maintenance and onboarding producer, the following shared rule
+specifies the reporting-only exception for the genuine MA2 request freeze before MA4 and genuine
+ON2 freeze before implementation. The mechanisms below govern its implementation. Production/live
+activation MUST remain closed until separately authorized phase C proves trusted-emitter isolation
+and exact host transport in the real workflow layout. The
+[freeze/readiness design](../agents/lifecycle/support-depth-freeze-readiness-design.md#four-mechanism-decisions)
+records delivery and qualification obligations. FR1–FR3 implement the isolated admission/history,
+complete-tree freeze/acquisition and reporting-context mechanisms. Their measured fake-host
+boundaries and real-transport obligations are recorded in
+[Annex A.4](support-depth-contract.md#a4-reconciliation-and-conformance-status).
+An evaluator MUST refuse the exception whenever required authority cannot be established.
+
+1. Applicability and complete independent population discovery MUST precede classification.
+   Every matching original Event/P/O run and attempt remains represented, across PRs and all
+   supported events, including reporting checkpoints, unsuccessful attempts, retries and missing
+   or nonterminal attempts. Each row MUST retain authenticated identity, observable outcome,
+   classification and its authority or reason. An independently generation-bound checkpoint
+   MUST NOT disappear solely because an auxiliary producer fixture is absent. Unavailable
+   required binding facts, ambiguous classification or incomplete/changing population prevents
+   verification. Every attempt from 1 through the authenticated attempt count and existing
+   pagination, duplicate, unsupported-event and discovery-bound refusals still apply.
+2. An applicable attempt MAY omit a support-execution receipt only if independently authenticated
+   as the exact authorized reporting-only request-freeze checkpoint in its permitted context.
+   Source differences, absent artifacts, lifecycle labels, timestamps, PR identity and selected
+   results supply no checkpoint authority. A checkpoint establishes zero successful obligations,
+   substantive execution, adoption or currentness. Verification still requires independently
+   qualifying execution and adoption for every due obligation. Checkpoints alone leave support
+   unverified.
+3. Protected IN1 MUST authorize the exact freeze transition, including MA2's authenticated combined
+   acquisition + freeze transition, against its authenticated predecessor through independently
+   approved policy. The combined reporting-context, admission and protected-history proof MUST
+   bind authenticated repository identity, original
+   Event/P/O/enrollment, predecessor and its admission, exact admitted head/tree, actual checkout relationship, complete source/context
+   closure governing reporting versus execution, approved IN1 implementation/workflow provenance,
+   host admission run/check and attempt with its decision, and protected lifecycle history.
+   An independently approved pure transition planner shared with the real MA2 and ON2 freeze
+   writers MUST derive the exact freeze delta from the authenticated predecessor plus any
+   independently validated acquisition delta, original request/approval, authoritative
+   generation/writer inputs, retained entries/work and approved policy identity. For genuine MA2,
+   acquisition and freeze MAY share the existing single transport commit. The acquisition delta
+   MUST be authenticated through existing acquisition authority, using the exact resolved
+   acquisition output paths, acquired-input references, lockfile checksums and contents, applicable
+   OF-P4 maintainer acquisition statement, and existing acquisition validators. OF-P4 supplies
+   onboarding provenance only from the named protected integration ref. Each changed acquisition
+   output MUST have independently authenticated exact bytes, presence/absence, mode and object
+   kind. A path label, candidate digest or semantic validation alone supplies no such authority.
+   Any output lacking byte-for-byte acquisition authentication MUST remain an explicit FR2
+   prerequisite and MUST refuse checkpoint admission until resolved. Version metadata and the
+   complete lockfile lie outside O's acquired-input references. Only the authenticated
+   acquisition outputs MAY enter that delta. Registry, RULES, SCHEMA and other policy inputs retain
+   their existing prerequisite authority. The freeze delta MUST equal the shared planner output
+   over those authenticated inputs. The complete expected tree MUST equal the authenticated
+   predecessor + validated acquisition delta + planned freeze delta. IN1 MUST require complete
+   candidate-tree equality, including exact bytes, modes, object kinds, creates, replacements,
+   deletions and preservation everywhere else.
+   The plan MUST cover every actual writer effect, executable packet content and reporting/runtime
+   projections. Variable inputs MUST have explicit independently authenticated sources. IN1 MUST
+   NOT execute candidate writers or packets, trust candidate expected-output files or policy
+   selection, or substitute local workspace bytes for the authenticated predecessor. Hidden
+   implementation, dependency, build, workflow and unrelated changes fail reporting eligibility.
+   Candidate-authored admission files and similarly named successful checks cannot establish
+   authority.
+   ON2's existing boundary has acquisition and its OF-P4 statement admitted on the integration
+   branch before the dry-run freeze. Its checkpoint therefore has an empty acquisition delta and
+   MUST preserve those predecessor inputs. Candidate-only acquisition or statement bytes MUST
+   refuse. These rules preserve the existing MA2 transport commit boundary.
+   [Acquisition authority inspection and FR2 prerequisites](../agents/lifecycle/support-depth-freeze-readiness-design.md#acquisition-authority-at-the-ma2-commit-boundary).
+4. The admitted checkpoint and its permitted checkout/context relationships MUST be immutable
+   within the generation. Later admission or success MUST NOT replace that authority or
+   retrospectively exempt another candidate. Checkpoint eligibility does not seal the attempt
+   population. A later retry of the exact historical checkpoint MAY retain reporting status only
+   under that same authenticated context, without reopening the freeze window or clearing
+   execution evidence. A test merge, merge group, dispatch, push or retry MUST authenticate its
+   actual source, workflow and relevant inputs against the permitted relationship. Nominal head
+   association alone grants no exception.
+5. Readiness is the independently authenticated protected IN1 admission of the first
+   execution-required checkpoint, linked to the previously admitted freeze checkpoint and the
+   same original Event/P/O/enrollment with the bindings in rule 3. It is irreversible within the
+   generation and supplies zero execution, adoption or support credit. Applicable attempts'
+   lifecycle progression MUST be checked against authenticated IN1 admission history through
+   the shared progression predicate, including admitted higher-stage ancestors with no producer
+   run. History discovery MUST be independent of producer discovery, verify commit/tree/blob
+   identities against authenticated anchors and exhaust relevant parent relationships from the
+   generation anchor to candidate/protected roots. Predecessor references MUST cross-check that
+   history. Relevant host populations and protected roots MUST be rechecked before acceptance.
+   A descendant rollback or a new freeze-labelled head after readiness, including another
+   PR, MUST NOT reopen reporting eligibility. Missing, conflicting, expired or revoked authority
+   leaves dependent conclusions unverified and cannot restore a freeze window.
+6. Every matching candidate without positively authenticated reporting authorization remains
+   execution-required. Initial implementation and later execution/publication/proving attempts
+   require ordinary execution authentication, even if unsuccessful, on another PR, before
+   readiness, or never admitted. A later successful readiness admission MUST NOT exempt those
+   attempts. Collection MUST neither invoke nor wait for its own packet admission. Structural
+   freeze authorization MUST NOT require the execution receipt waived by rule 2, and readiness
+   authentication MUST NOT become a prerequisite to the verdict authorizing that same admission.
+7. Reporting classification waives only the support-execution receipt. Repository, run/attempt,
+   original generation, head/tree, actual checkout, workflow/context, authority and observable
+   outcome MUST still be authenticated. Unknown, nonterminal, cancelled, aborted or failed
+   designated reporting/producer outcomes and failed collection prevent verification. A terminal
+   successful designated reporting/producer outcome is required at the existing `rust-tests`
+   scope. Whole-workflow completion remains governed separately before MERGE. If a designated
+   checkpoint invokes substantive support execution or supplies execution evidence, the exception
+   is invalid. The evaluator MUST retain and authenticate both passing and failing evidence and
+   apply the existing counterexample/conflict rules. Unexpected passing checkpoint output cannot
+   establish adopted support.
+8. Historical checkpoint source authentication establishes only that checkpoint's identity,
+   permitted delta and context. Every execution-required attempt MUST meet the existing complete
+   protected-staging source approval, actual built/workflow closure, indexed bytes/modes,
+   graph/configuration/compiled populations, toolchain/environment, provenance and current scoped
+   input predicates. Source approval MUST be evaluated against independently obtained protected
+   staging at evaluation time. Earlier execution at identical source S MAY qualify after S reaches
+   that staging with all other predicates satisfied. An execution at S1 followed by current S2
+   still fails exact source equality. A different historical execution closure cannot qualify
+   through readiness.
+   Independent adoption, due obligations, separate maintenance/onboarding generations and
+   receipts, enrollment origin and currentness rules still apply. Collection MUST reuse the
+   existing command and `rust-tests` job under the source-installed finite profile selection.
+   CP-P5 consumer ordering, the terminal workflow/MERGE gate and the finite synthetic wrapper
+   scope continue to govern.
+9. Protected IN1 MUST emit a canonical versioned admission record after the required terminal
+   producer dependency, owning/progression/freeze checks and per-root freshness loops, and before
+   successful admission completion. The record MUST contain its schema/kind, repository and
+   original Event/P/O/enrollment/generation identity, candidate and parent commit/tree,
+   actual checkout commit/tree, evaluated source/context and head relationship, old/proposed
+   lifecycle state, checkpoint kind, decision and bounded reasons, predecessor admission identities,
+   approved IN1 source/workflow
+   and complete relevant policy/dependency closure, observed protected roots/tips, accepted origin,
+   registry anchor and other authoritative inputs, consumed context/evidence identities where
+   applicable, and host workflow/run/attempt/job/check/event claims. Admissions without depth
+   producers MUST be representable. The first record MUST bind an authenticated bootstrap or
+   enrollment anchor. IN1 MUST retain reached refusal decisions. Failed publication, crashes or
+   cancellation cannot establish successful authenticated admission. Admission records the
+   decision over observed roots before integration. Subsequent protected lineage MUST be
+   independently authenticated. Bounded reconstruction supplies a cross-check of the retained
+   decision and MUST NOT replace it with a later re-evaluation.
+10. The existing collector's trusted reporting path MUST emit a canonical versioned reporting-only
+    context record before its own IN1 admission. It MUST contain schema/kind, repository and
+    original Event/P/O/enrollment, host run/attempt/job/event/head/workflow and relevant
+    dispatch/input identities, actual candidate-data checkout commit/tree and permitted head
+    relationship, separately identified approved collector/policy source and relevant build/workflow
+    closure, complete relevant source/context/configuration and required indexed/worktree
+    observations, dispatcher mode, observation that the enrolled substantive path was not invoked,
+    reporting outcome and candidate/predecessor references or digests. The claim is bounded to
+    the approved dispatcher's isolated observation of its enrolled path. Context publication and
+    terminal producer observation MUST precede independent IN1 checks/admission publication.
+    The evaluator MUST join context, admission and protected history. The producer MUST NOT
+    depend on its own future admission or require that admission's digest in its payload.
+11. Each control record MUST have deterministic canonical bytes and a format-specific
+    domain-separated digest, be published through the existing proof transport, and have a
+    fixed-format versioned commitment binding kind, payload digest and returned artifact identity
+    in the exact emitting job's host-retained log. The evaluator MUST independently authenticate
+    approved policy/workflow provenance and the exact emitting job/run/attempt/event, using
+    attempt-specific job enumeration and that job's log, then verify artifact identity and payload
+    bytes. Same-name checks, aggregate-log matches and same-run artifact membership alone grant
+    no authority. Missing, duplicate, ambiguous or conflicting commitments, wrong-job or
+    cross-attempt replay and substituted bytes MUST prevent verification. Retries MUST have
+    separately authenticated observations. Decision identities MUST be immutable. Conflicting
+    decisions over one substantive `inputs_identity` MUST prevent verification. The key MUST bind
+    candidate/parent/checkout objects, repository, policy, enrollment anchor, roots/tips/registry,
+    evaluated blobs, normalized observed authority, checkpoint/transition classification, bootstrap
+    anchoring and generation. Decision reasons, including freeze reasons, MUST be excluded.
+    Predecessors MUST contribute a sorted set of commit/transition-digest pairs. Equivalent
+    predecessor retries MUST yield the same key. Emitting session claims and predecessor record
+    identities MUST be excluded. Every reached decision MUST participate, including quarantined
+    decisions. Only complete records contribute frontier, readiness or progression authority.
+    Observation-incomplete and history-deficient records MUST be quarantined and MUST permit
+    healthy retries and other candidates to reconstruct. Reconstruction MUST fail only for genuine
+    integrity failures, including object mismatches, history gaps, bound overflow, duplicate
+    identities and contradictory reached decisions over one key. Different root snapshots and
+    independently observed host authority MUST remain distinguishable. Revocation MUST affect present eligibility while
+    preserving historical readiness and execution accountability.
+12. Trusted emitters MUST be isolated from candidate-controlled processes that could alter their
+    runtime, inputs, observations or publication. Protected IN1 MUST use a clean separate
+    VM-backed hosted job executing independently approved policy/dependencies with candidate
+    material as bounded data. The existing `rust-tests` reporting branch MUST be selected and run before any
+    candidate-controlled code in that job, with exclusively trusted execution through publication
+    and no concurrent candidate processes. Candidate code, builds/tests/helpers, local actions,
+    packets, build scripts and candidate executable caches MUST NOT execute in trusted emitter
+    runtimes. A second process/directory, later step, signature or approved workflow provenance
+    alone cannot establish isolation. Required tests MUST be preserved through a reviewed layout.
+    Phase C MUST prove that layout and transport, with a reviewed workflow-layout amendment if
+    needed before activation. Collection continues to use the existing command/job and finite
+    profile. CP-P5 read-only host credentials MUST NOT become signing authority.
+13. Independently enumerated host streams MUST enforce 1,000-run and 100-attempt limits.
+    Admission-history resolution MUST enforce a 1,000-unique-commit bound, and each canonical
+    decision/context control record MUST be at most 64 KiB. Existing source/object/artifact bounds
+    remain required. Exhaustion MUST yield `unverified` without truncating required discovery.
+    Retention MUST be explicitly configured. Unavailable, expired or deleted required payloads,
+    commitments, history or provenance MUST yield `unverified`. Verification requires continued
+    availability of all required evidence.
+14. Maintenance collection and discovery MUST use the same canonical binding resolver over the
+    authenticated standing request and canonical versioned depth report at exact immutable host
+    heads. It MUST validate supported structures/versions, agreement on original request/approval,
+    frozen P/O, enrollment/agent and all existing binding fields, and re-derive values required by
+    existing policy before enumerating matching attempts. Auxiliary fixture presence, absence or
+    contents MUST NOT decide generation membership. Coherent records identifying another
+    generation with no conflicting authenticated association receive out-of-generation treatment.
+    A target binding in either record with the other missing, malformed, stale or contradictory,
+    ambiguous report entries, or removed/replaced required records at a head independently
+    associated through authenticated original packet-PR membership or admission/enrollment history
+    MUST yield `unverified`. Retained complete-admission association follows rehashed bounded
+    ancestry through unadmitted descendants. A complete admission for another generation ends
+    that ancestry branch's association. Incomplete admissions confer no association authority.
+    Heads without an independent target-generation association retain ordinary unrelated-head treatment. Records
+    supply authenticated input evidence. Reporting authorization requires the combined proof.
+
+### Reporting-context control record v1
+
+`depth_ci/reporting.rs` defines independently versioned `ContextRecord` with
+`schema_version = 1` and `kind = reporting_only`. It uses the IN1 canonical JSON encoding and
+64 KiB bound. Its SHA-256 domain is `support-depth-reporting-context-v1` followed by NUL.
+The fixed log line is `DEPTH_REPORTING_CONTEXT_V1 kind=reporting_only sha256=<digest> artifact=<id>`.
+The existing bounded control ZIP envelope contains one `admission.json` payload for either kind.
+Kind-specific parsers and digest domains authenticate the payload after shared envelope checks.
+
+The record has the following members.
+
+- `repository`, `generation` and `enrollment_anchor` use the IN1 repository, original Event/P/O/
+  selection and commit/tree representations.
+- `candidate`, `predecessor`, `predecessor_admissions` and `candidate_record` bind commit/tree
+  objects, the authenticated sorted predecessor frontier and the canonical depth-record Git blob.
+- `policy` separately identifies the approved collector implementation, workflow source, complete
+  build/workflow closure, workflow/job/app identities. The isolated job key is `rust-tests`.
+- `invocation` contains exact `claims`, actual `checkout`, ordered `checkout_parents`,
+  `dispatch_inputs`, `configuration` and `substantive_invoked`. The installed isolated dispatcher
+  consumes `depth_mode` and `profile`. Other input/configuration text is ignored before capture.
+- `head_relationship` is `exact_head` or `pr_test_merge`. A PR test merge has exactly two parents,
+  with the candidate second, and its tree equals the exact freeze tree. `source_observations`
+  binds complete candidate, checkout and predecessor trees. `indexed_tree` and `worktree_tree`
+  bind the clean actual checkout observed before dispatch.
+- `selected_mode` is `reporting_only`. `enrolled_substantive_path_not_invoked` records the trusted
+  branch's bounded observation. `reporting_outcome` is `success`, `failure` or `aborted` and
+  `collection_complete` records successful collection. Only complete successful contexts with
+  affirmative non-invocation observation and no substantive invocation can classify reporting.
+
+IN1 captures the authenticated context identity in `producer_context` before owning predicates.
+Closing reads retain the captured identity on incompleteness. A context supplies reporting
+classification only through a successful, eligible, exact-transition IN1 admission referencing
+that context and protected lineage. Each retry has a separate context and admission association.
+Reporting attempts remain in the complete population and contribute zero support credit.
+Unexpected substantive witnesses remain execution observations and invalidate reporting treatment.
+
+### IN1 admission control record v1
+
+The isolated FR1 route uses an independently versioned `in1_admission` JSON object. Canonical
+bytes are compact UTF-8 JSON with lexicographically ordered object members, decimal integers,
+ordered arrays and no trailing newline. Parsing MUST reproduce those exact bytes. Unknown
+members, duplicate members, alternate encodings, unsupported versions and payloads exceeding
+65,536 bytes MUST refuse. The identity is SHA-256 over the literal UTF-8 domain
+`support-depth-in1-admission-v1` followed by one NUL byte and the canonical payload. Generation
+identity uses the separate `support-depth-in1-generation-v1` NUL-terminated domain over canonical
+generation bytes.
+
+The record contains the following fields.
+
+- `schema_version` is `1` and `kind` is `in1_admission`.
+- `repository` records the host name, numeric repository id and owner id.
+- `generation` contains the original Event, complete selection/enrollment, P identity and
+  optional O identity. `generation_sha256` binds its canonical identity. Both are null for
+  record-free bootstrap/preparation.
+- `candidate`, `parent`, `checkout`, `enrollment_anchor` and `protected_tip` each contain full
+  commit and tree identities. FR1 emits `head_relationship` as `exact_head`.
+- `old_state` and `new_state` contain lifecycle path, authenticated blob identity and stage when
+  present. The blob preserves the complete evaluated lifecycle state.
+- `checkpoint`, `decision` and `reasons` record the evaluated transition. FR2a emits
+  `request_freeze` only after exact writer-derived complete-tree equality and independent
+  writer-input authentication. Other depth candidates remain `execution_required`. Record-free
+  decisions retain FR1's `bootstrap` / `unclassified` representation. Optional `bootstrap=true`
+  independently records first-decision anchoring when a depth transition has its own checkpoint
+  kind. Omitted `bootstrap` means false, preserving earlier v1 canonical records. Optional
+  `transition` contains domain-separated `planner` and `writer_inputs` identities for an exact
+  freeze. IN1 MUST compute this classification before owning-predicate evaluation from authenticated
+  Git objects and independently observed freeze/acquisition inputs, including for a candidate
+  subsequently refused by owning predicates. An exact classification supplies checkpoint identity;
+  readiness authority requires a complete admitted decision and the reporting-context join.
+  The consumed observations MUST be pinned and rechecked after planning and around publication.
+  The final freeze/acquisition stability read occurs after artifact upload and before sealing the
+  exact job-log commitment. A failed read adds incompleteness to the pinned decision and uploads
+  that final payload before committing its artifact identity. The earlier uncommitted artifact
+  supplies no admission authority.
+  A changed or unavailable closing read MUST add `observation_incomplete` while preserving the
+  captured checkpoint, transition and substantive authority. If an initial freeze/acquisition read
+  is unavailable, input capture MUST fail as an incomplete attempt before policy evaluation.
+  A successful observation of absent authority can select `execution_required` with its bounded
+  reason. Decisions are `admitted` or `refused`. The bounded reasons include
+  `owning_predicates_satisfied`, `owning_predicate_refused`, `exact_freeze_tree`,
+  `freeze_tree_mismatch`, `freeze_authority_unavailable`, `freeze_authority_mismatch`,
+  `acquisition_authority_unavailable`, `freeze_planning_refused` and `observation_incomplete`,
+  with at most sixteen entries.
+  FR2a supplies the empty-only acquisition seam. FR2b authenticates the combined MA2 acquisition
+  delta before freeze derivation and complete-tree comparison. FR3 supplies the reporting-context
+  join required for an execution exception.
+  After initial input capture succeeds, an unavailable producer or isolated-host read before a
+  substantive decision yields a refused decision with the sole reason `observation_incomplete`. This state is sticky through subsequent
+  successful reads, including source object acquisition and retained history reads during
+  predicate evaluation. Only these incomplete-only refusals are excluded from both sides of
+  identical-input conflict comparisons.
+  Once the owning predicates reach admission or refusal, the emitter MUST preserve that decision,
+  its corresponding owning reason and the normalized authority facts consumed up to that boundary.
+  Closing captured-context and binding rechecks MUST still run. Any failed closing recheck adds
+  `observation_incomplete` after the owning reason, without replacing the decision or changing
+  its substantive authority commitment. Reached records contain their owning reason, followed
+  by the captured freeze reason when applicable, then `observation_incomplete` on closing failure.
+  These reached decisions MUST participate in identical-input conflict comparisons. Any record
+  containing `observation_incomplete` MUST
+  NOT authorize readiness, predecessor frontiers, generation-history completion or progression,
+  and its emitting job MUST conclude failure. A closing failure prevents invocation success.
+  Reached contradictory decisions over identical normalized authority MUST refuse.
+- `predecessors` is a sorted unique list of retained successful decision identities at every
+  applicable parent frontier. Before invoking the owning policy predicates, IN1 MUST resolve
+  that frontier from authenticated history and pin both the predecessor identities and checkpoint
+  classification. An empty authenticated frontier selects first-decision anchoring through
+  `bootstrap=true` for a depth candidate or `checkpoint=bootstrap` for a record-free candidate.
+  Existing record-free frontiers select `unclassified`. Retention-time reconstruction MUST
+  preserve those pinned values on both admission and refusal. A failed reconstruction adds
+  `observation_incomplete` to the reached decision, retains its original evaluated-input identity and prevents invocation success.
+  History MUST check parent-frontier coverage and Bootstrap classification. Any record with
+  deficient, unavailable or superseded predecessor references or inconsistent classification MUST
+  be quarantined in reconstructed history, for both reached admissions and refusals. Quarantined
+  records MUST contribute no authority to frontier completeness, readiness, generation-history
+  completion or progression. Their presence MUST permit reconstruction and healthy complete
+  retries. Every reached decision retains its substantive-key conflict participation. The sole-reason
+  incomplete-only refusal is exempt because no decision was reached. Late retries remain
+  independently discoverable, and earlier retained predecessor references remain immutable.
+- `policy` names independently supplied implementation/workflow provenance, workflow id, job key,
+  app id and the approved closure. The isolated FR1 route resolves `workflow_commit` from the
+  source-installed authenticated protected installation commit, independently of candidate JSON.
+  `closure` records Git tree/blob ids for `crates`, `Cargo.toml`, `Cargo.lock`, `.github`,
+  `.github/workflows/ci.yml`, `scripts`, `scripts/depth_ci_archive.py` and installed profile scopes.
+  The evaluator rehashes bounded Git objects and requires each evaluated source object to equal
+  the independently protected anchor's object, as producer closure approval does. Root Cargo and
+  toolchain overrides remain unsupported. `implementation` is SHA-256 of canonical closure JSON
+  prefixed by `support-depth-in1-git-policy-v1` and a NUL byte; it summarizes those Git identities,
+  never uncommitted files or a compile-time directory inventory. Candidate-provided hashes cannot
+  approve policy. Phase C must bind the deployed evaluator to that approved source and runtime.
+  `canonical_tip`, `accepted_origin`, `registry_blob` and `inputs` bind observed authority and
+  evaluated input blob identities.
+- `observed_authority` is a lowercase SHA-256 commitment to normalized authoritative host
+  facts consumed during this IN1 evaluation. Approved predicate code derives these facts from
+  authenticated producer and isolated-host reads. Candidate files cannot supply facts.
+  The normalized fact set contains the following data.
+
+  - Applicable Event/P/O producer run/attempt identities, head commit, workflow path/id,
+    repository and event, sorted canonically. Ignored out-of-scope runs contribute no content
+    facts. The closing population comparison contributes an explicit discovery-stability boolean.
+    The canonical profile includes the required enclosing terminal status. IR-P3
+    uses producer job terminal state while the enclosing workflow may progress independently.
+  - The unique packet PR identity and governing base, matching witness artifact identities,
+    names, exact run/head bindings, expiry, size and digest, and downloaded witness-byte digests.
+    Producer job identities, run/attempt, status/conclusion and the exact required collection,
+    upload and binding step statuses/conclusions are included. Only the binding step's time
+    interval is consumed. Log facts contain matching artifact-binding id/name/digest tuples.
+  - Every accepted authorized adoption's endorsement kind, repository, PR/id, author login/id,
+    accepted permission, source commit, mapping digest and digest of the exact referenced body
+    bytes. Exhausted authorized-adoption populations explicitly encode an empty array for absence.
+    Author login and current permission MUST be authenticated before any fallible adoption-body
+    parsing or referenced-source/mapping processing. Unauthorized comments, including malformed
+    adoption JSON, and ignored records contribute no content facts and MUST NOT truncate capture
+    or alter discovery completeness. Ordinary authorized comments contribute no adoption facts.
+  - Independently observed freeze writer inputs and authenticated acquisition observations with
+    approved acquisition policy, including successful observations of absence. The record's
+    checkpoint, bootstrap and transition fields independently bind the captured classification.
+  - Isolated and canonical repository ids/owners/names, protected staging identities and protection,
+    baseline/candidate ancestry status and merge base, candidate host presence, governing registry
+    path/type/blob, and canonical approved-scope path/blob/mode/type inventory with tree truncation
+    and completeness. Source rows outside installed scopes contribute no content facts.
+  - Each discovered producer, PR, artifact, job, comment and review stream records a start fact
+    (`discovery`, `false`) and, only after bounded exhaustive pagination, a completion fact
+    (`discovery`, `true`). Relevant population facts include empty arrays for observed absence.
+    Comment/review stream completion is independent of ignored record counts and page boundaries.
+    Before a substantive decision, transport-unavailable reads contribute only the fixed
+    `["unavailable"]` availability fact and set `observation_incomplete`. After that boundary,
+    failed closing reads set the separate incompleteness reason without salting the pinned fact
+    set. Error text contributes no facts.
+
+  Each fact hashes canonical `[endpoint, kind, SHA256(canonical(normalized_value))]` under the
+  NUL-terminated `support-depth-in1-host-read-v1` domain. Population facts use the stream endpoint
+  before pagination parameters, retaining its semantic query, and arrays sorted by canonical
+  JSON bytes, preserving multiplicity. Unrelated workflow metadata, ignored log/comment text and
+  population ordering preserve identity. Fact digests use lowercase hexadecimal. The sorted
+  unique set of fact digests is encoded canonically and hashed under
+  `support-depth-in1-observed-authority-v1` followed by NUL. The empty set represents an evaluation
+  consuming no host facts. Facts are pinned when the owning predicates reach their substantive
+  decision; closing observations track completeness separately. If no substantive decision is
+  reached, capture ends before retention-time admission-history reconstruction and publication. Repeated reads
+  and independent read order preserve identity. Existing host response, pagination,
+  attempt, population and canonical encoding bounds apply, and the record retains its 65,536-byte
+  bound. This required fixed-size digest participates in evaluated-input identity. Reached
+  contradictions over the same repository inputs and normalized authority refuse, even when a
+  reached decision also records failed closing observations. An incomplete-only observation
+  retains a refusal that permits a later complete retry to recover.
+- `producer_context` is nullable and `execution_evidence` lists consumed evidence identities.
+  FR3 supplies the reporting-context association. An admission without a producer is supported.
+- `claims` binds workflow run, attempt, emitting job, check and event to independent host facts.
+  The invocation event MUST be obtained independently before policy evaluation and matched against
+  the emitting session event before publication. The entire `claims` object is excluded from
+  evaluated-input identity.
+
+`inputs_identity` uses the NUL-terminated `support-depth-in1-inputs-v1` domain over canonical
+record JSON after removing `claims`, `decision` and `reasons` and replacing `predecessors` with
+its sorted unique array of `[commit, transition_digest]` pairs from independently authenticated
+referenced records. A transition digest uses the NUL-terminated
+`support-depth-in1-transition-v1` domain over canonical `[old_state, new_state]`, including null
+states. Unresolved audit references mark history deficiency and contribute no authenticated pair.
+Checkpoint classification, bootstrap anchoring, transition identities and every other substantive
+field remain in the key. Freeze reasons follow the exclusion applied to all decision reasons.
+Complete and incomplete reached decisions with an identical key MUST conflict when their decisions differ.
+
+All other identity-bearing record fields MUST also be captured before the owning policy predicates
+run. This includes authenticated root/policy snapshots, content-addressed candidate/parent/checkout
+objects, lifecycle states, generation and its digest, authoritative input blob maps and execution
+references. Explicit absence is permitted only after a successful authenticated source lookup.
+Malformed present state/depth bytes and failed source reads MUST abort input capture. Such an
+invocation cannot reach a substantive owning decision or publish a record with substituted nulls,
+empty maps or default classifications. Its independently started attempt remains incomplete and
+unverified. `producer_context` is captured from authenticated reporting-context reads during prepare when present. Normalized host facts
+continue accumulating during evaluation and are pinned at the reached decision boundary.
+
+After input capture, closing or emission failures MUST preserve every pinned identity field and
+the reached decision. A retained reached-incomplete decision participates in conflict detection
+against a contradictory complete retry over those same inputs, while supplying no successful
+historical authority. Later parent-frontier changes can quarantine either decision in reconstructed
+history while preserving its pinned inputs and substantive-key conflict participation.
+
+The fixed commitment line has exactly this form, with a lowercase 64-character payload digest
+and a positive decimal returned artifact id.
+
+```text
+IN1_ADMISSION_V1 kind=in1_admission sha256=<digest> artifact=<id>
+```
+
+It MUST appear exactly once in the approved job's retained log within its binding step interval.
+Attempt-specific job enumeration MUST authenticate the workflow job key, app, check and attempt.
+The downloaded proof artifact MUST contain exactly one regular `admission.json` entry. Its host
+archive digest/size, canonical payload digest, provenance and association claims MUST agree.
+The transport MUST independently stream-decompress the complete entry with a 65,536-byte expanded
+limit, require completed decompression with no excess compressed data, and verify the actual
+expanded length and CRC against the ZIP declarations. Local and central declarations MUST agree
+when present. A declared size or CRC matching only a prefix MUST refuse.
+When flag bit 3 is set, the required data descriptor, with or without its signature and including
+ZIP64 sizes, MUST match those declarations and actual payload values. Missing, truncated or
+inconsistent descriptors MUST refuse.
+Required publication precedes successful completion. Upload/log failure leaves an incomplete
+attempt. The fake host models these facts independently of producer artifacts.
+
+Independent discovery permits at most 1,000 runs and 100 attempts per run in each host stream,
+1,000 unique commits per resolution and 64 KiB per control record. Every relevant parent is
+traversed to the authenticated enrollment anchor, with commit/tree/blob content hashes checked.
+Complete populations and protected roots are checked again after resolution and at consumption.
+Generation-history completeness MUST cover both protected lineage and every candidate ancestor
+through all parents back to the authenticated anchor. Within that generation, an ancestor whose
+lifecycle stage differs from any same-generation parent's stage, or first introduces the generation,
+MUST have an authenticated retained `admitted` decision for that commit and generation. The
+enrollment anchor at or below `enrolled` remains the bootstrap exception. Absence of that decision
+is missing authority and MUST yield `unverified`, including for an unmerged ancestor whose run
+disappeared from an otherwise complete listing. Ordinary ancestors preserving the generation and stage require no
+admission. A pending candidate's own transition requires no future admission in this history check.
+Overflow, gaps, missing predecessors, conflicts over identical evaluated inputs or unavailable
+required publication yield unverified authority. Revocation removes present eligibility and
+preserves historical progression. These are credential-free modeled-host predicates. Deployed
+GitHub policy provenance, emitter isolation, retention and transport qualification remain phase C.
 
 ## Synthetic wrapper machinery-proof profile
 
@@ -588,15 +1073,23 @@ flag selects onboarding scope, and every other agent, version, target or path re
 installs no isolated profile, so no route exists. The production registry keeps refusing
 `support_depth` tables, and the canonical registry never lists `depth_fixture`.
 
-**Grants nothing.** The selection admits a workspace and nothing more:
-- the `synthetic-wrapper-v1` producer, receipts and verdict above stay bound to the maintenance
-  Event, and an onboarding generation's evidence stays unverified until the separately bound
-  onboarding producer variant specified below is implemented (OR-P5);
-- maintenance routes refuse an onboarding enrollment, as they do today;
-- ON1 to ON5 keep refusing depth until roadmap E.6 wires them, in the isolated workspace only;
-- the create lane gets no packet freeze, pointer, `validated` or `supported` route.
+**Present implementation boundary.** At `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`,
+the separately bound onboarding producer variant and finite public in-process ON1–ON5/IN1
+routes are implemented. Maintenance and onboarding retain independent Event/P/O populations
+and adoption. Maintenance routes refuse onboarding acceptance. The create lane's pointer,
+validated/supported status, marker retirement, maintenance drift-clearance and same-version
+path-transfer effects remain refused by the owning predicates and complete aggregate checks.
+`e7_connected_onboarding_qualified_chain` and the repaired sibling passed with independently
+modeled full-schema producer/artifact observations. The producer's outcomes and terminality
+remain modeled, ON2 copies substantive wrapper source/tests, and ON4 uses its test S/T runner.
+`e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` passed with zero
+substantive executions, empty reporting E and all eleven obligations unverified.
+Actual protected-host issuance, real subprocess checks and native queue acceptance remain
+phase C obligations requiring explicit maintainer authorization.
+[Slice 12 results](../agents/lifecycle/s12-e7-connected-proof-report.md),
+[phase C handoff](../agents/lifecycle/support-depth-isolated-proof-plan.md#phase-c-handoff-after-slice-13).
 
-**Bootstrap and first declaration (specified, not installed).** OR-P1 and OR-P14 of the
+**Bootstrap and first declaration within the implemented finite synthetic route.** OR-P1 and OR-P14 of the
 [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)
 extend only this source-installed synthetic route with these bounded states:
 
@@ -627,7 +1120,7 @@ or depth acceptance authority.
    tip first is not admission. Only ON1 and this transition have registry-delta exceptions. ON2
    MUST still refuse unresolved enrollment and can freeze only after the charter's prerequisites.
 
-**Finite approval adapter (specified, not installed).** The private projection shared by routed
+**Finite approval adapter within the implemented synthetic route.** The private projection shared by routed
 ON1–ON5 and IN1 MUST validate the complete compiled synthetic descriptor and approval, rejecting
 unknown or misplaced fields and any fake backend (OR-P2,
 [routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
@@ -637,7 +1130,7 @@ operate on validated path/Event/subject inputs; neither `depth_fixture` nor Code
 ownership, adequacy, currentness, effect admission, integration or delivery checks. Production
 approval acceptance is unchanged; no second subject is added.
 
-**Onboarding producer binding (specified, not installed).** OR-P5 of the
+**Onboarding producer binding within the implemented synthetic route.** OR-P5 of the
 [routing design, "Maintainer decisions" and "Inspection A — producer population and CI terminality"](../agents/lifecycle/support-depth-onboarding-routing-design.md#inspection-a--producer-population-and-ci-terminality)
 adds a finite onboarding variant of `synthetic-wrapper-v1`, reusing the fake CLI, substantive
 cases, target, eleven due obligations, revision-1 receipt schema, adoption format and IR-P3
@@ -651,6 +1144,9 @@ needs fresh evidence and independent adoption of every due mapping.
 
 Initial implementation and later publication/proving runs on the same Event/P/O, including all
 retries, remain applicable even on another PR or without a witness (OR-P5, same design section).
+The exact pre-implementation freeze is subject to the shared
+[request-freeze checkpoint rule](#authenticated-request-freeze-checkpoints-and-implementation-readiness);
+ON2 implementation remains execution-required, including unsuccessful candidates before readiness.
 Missing, unfinished or aborted producers, failed evidence steps, revoked adoption, changed source
 or dependencies and incomplete/changing populations cannot qualify. Failed attempts remain
 observable. Terminal authenticated `rust-tests` producer evidence may qualify while the enclosing
@@ -662,5 +1158,6 @@ This can qualify only the synthetic wrapper promise, never a runtime adapter or 
 **Templates.** `crates/xtask/tests/fixtures/depth-synthetic/onboarding/` holds the isolated
 registry-entry variant with deferred maintenance and the approval template. It also holds a
 template acquisition statement at `governance/depth-acquisition/<version>.toml` (OF-P4 B), which
-lists each acquired input that O binds (OF-P6). The statement's fields are not normative until the
-onboarding charter defines them (slice 1), and nothing reads it until slice 2.
+lists each acquired input that O binds (OF-P6). The onboarding charter defines the statement fields. ON2 and IN1 read and authenticate the
+statement against protected acquisition. ON3–ON5 recheck its frozen acquired inputs. Executed
+results and the isolated public-dispatch diagnostic gap are recorded in Annex A.4.

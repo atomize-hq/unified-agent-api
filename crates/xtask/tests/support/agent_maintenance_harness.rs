@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+#[path = "registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     collections::BTreeMap,
     fs,
@@ -311,13 +315,13 @@ pub fn snapshot_without_execute_runs(root: &Path) -> BTreeMap<String, Vec<u8>> {
 fn seed_registry(root: &Path) {
     write_text(
         &root.join("crates/xtask/data/agent_registry.toml"),
-        include_str!("../../data/agent_registry.toml"),
+        registry_fixture::undeclared_registry(),
     );
 }
 
 fn seed_execute_support_files(root: &Path) {
     let registry =
-        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+        xtask::agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
             .expect("parse seeded registry");
     let entry = registry.find("codex").expect("codex registry entry");
     write_text(
@@ -367,7 +371,7 @@ fn seed_execute_support_files(root: &Path) {
 
 fn execution_request_toml(run_id: &str) -> String {
     let registry =
-        xtask::agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
+        xtask::agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
             .expect("parse seeded registry");
     let entry = registry.find("codex").expect("codex registry entry");
     let prompt = xtask::agent_maintenance::contract_policy::packet_pr_prompt_template(

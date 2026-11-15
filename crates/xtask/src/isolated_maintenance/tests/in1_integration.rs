@@ -2,7 +2,11 @@
 use super::*;
 use crate::depth_acceptance::check_integration;
 
+pub(super) mod admission;
+mod history_failure;
 mod maintenance_observation;
+#[cfg(target_os = "linux")]
+mod observed_authority;
 mod regressions;
 
 // Moved from tests.rs to keep its module declarations within the code-line cap.
@@ -41,7 +45,7 @@ fn local(f: &Fixture, tip: &str) {
 }
 /// Commit a candidate without pushing the fake protected tip. Host comparisons deliberately
 /// claim ancestry even in negative tests: IN1 must independently check the local Git objects.
-fn candidate(f: &Fixture, tip: &str) -> String {
+pub(super) fn candidate(f: &Fixture, tip: &str) -> String {
     git(f.root.path(), &["add", "."]);
     git(
         f.root.path(),
@@ -307,7 +311,7 @@ mod connected {
         path.to_string_lossy().into_owned()
     }
 
-    fn frozen(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
+    pub(super) fn frozen(classified: bool) -> (Fixture, crate::depth_evidence::SyntheticHost) {
         let (f, mut args) = workspace();
         let root = f.root.path();
         args.request_commit = "0b1e1f0a478af0cd06d6ba6998ab594f09fbe592".into();

@@ -2,6 +2,7 @@ use super::*;
 use crate::{
     depth_evidence::payload::{Package, PackageOrigin},
     git_inputs::GitInputs,
+    runtime_advertising::source::Source,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,28 +34,34 @@ pub(super) fn normalize(id: &str) -> String {
 pub(super) fn resolve(
     root: &Path,
     view: &mut GitInputs,
+    source: &Source,
     metadata: &Value,
     compiled: &BTreeSet<String>,
     profile: profile::Profile,
 ) -> Result<DependencyGraph, String> {
     let mut result = resolve_for(root, view, metadata, compiled, profile.package())?;
-    for path in [
-        "Cargo.toml",
-        "Cargo.lock",
-        profile.contract(),
-        profile.fixture(),
-    ] {
+    for path in ["Cargo.toml", "Cargo.lock", profile.contract()] {
         view.required(path)?;
         result.inputs.push(view.reference(path)?);
+    }
+    if profile == profile::Profile::SyntheticOnboarding {
+        // The record and lifecycle are authenticated as Event/P/O projections, allowing ON3-ON5
+        // reporting to advance. Immutable approval and acquisition bytes remain dependencies.
+        view.required(super::onboarding::APPROVAL)?;
+        result
+            .inputs
+            .push(view.reference(super::onboarding::APPROVAL)?);
+    } else if profile != profile::Profile::Synthetic {
+        view.required(profile.fixture())?;
+        result.inputs.push(view.reference(profile.fixture())?);
     }
     result.scopes.push(profile.directory().into());
     for path in view.files_under(profile.directory())? {
         result.inputs.push(view.reference(&path)?);
     }
     if profile != profile::Profile::Channel {
-        let record = profile.record(
-            std::str::from_utf8(&view.required(profile.fixture())?).map_err(|e| e.to_string())?,
-        )?;
+        use super::profile::GenerationResolver;
+        let record = profile.committed_generation(source)?.record;
         for input in record.obligations.unwrap().acquired_inputs {
             view.required(&input.path)?;
             let current = view.reference(&input.path)?;

@@ -1,3 +1,7 @@
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
 use std::{path::PathBuf, process::Command};
 
 fn workspace() -> PathBuf {
@@ -11,6 +15,10 @@ fn workspace() -> PathBuf {
 
 #[test]
 fn checked_in_runtime_advertising_model_is_conformant() {
+    if std::env::var_os("S10_DECLARED_REGISTRY_READER").is_some() {
+        candidate_registry::check_runtime_advertising(&workspace());
+        return;
+    }
     let out = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(["runtime-advertising-model", "--check"])
         .current_dir(workspace())

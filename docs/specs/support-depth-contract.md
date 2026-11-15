@@ -834,7 +834,7 @@ A synthetic agent in an isolated workspace MAY prove the onboarding machinery. I
 real agent. A real agent's promised scope is qualified by its own upstream evidence before any
 acceptance effect.
 
-Specified, not installed: OR-P2, OR-P5 and OR-P12 of the
+OR-P2, OR-P5 and OR-P12 of the
 [routing design, "Proving evidence and refusal coverage"](../agents/lifecycle/support-depth-onboarding-routing-design.md#proving-evidence-and-refusal-coverage)
 bound the synthetic onboarding proof to a non-runtime, capability-free wrapper promise with
 onboarding-bound evidence and fresh adoption. Its connected credential-free in-process
@@ -923,27 +923,26 @@ D4's MA4 implementation executes in an independent candidate and compares host-h
 snapshots through the existing effect detector (`xtask/agent_maintenance/execute/guarded.rs`,
 `execute/candidate.rs`, `xtask/depth_acceptance/relay.rs`). It refuses acceptance effects,
 request/marker changes and unresolved debt authority before expected-before delivery. Rejected
-candidate outputs are retained outside the caller workspace. This is bounded relay mediation;
-closeout, promotion, remaining writers, final integration admission and the full maintenance proof
-remain separate work, and production depth remains disabled.
+candidate outputs are retained outside the caller workspace. This is bounded relay mediation. Annex A.4 records the later closeout, promotion, remaining
+writer and final-admission implementation results. The independent maintenance host proof remains
+due and production depth remains disabled.
 
 ## Annex A: route inventory
 
-Source revision: `staging` at `dd10558157583f1969b4ac0a412107ef617648e1`
-(PR #296, D7 plus the stream-parity synchronization repair). This inventory replaces the
-pre-enforcement snapshot at `f61534be` and its bounded updates. Paths below are repository-relative;
-`xtask/` abbreviates `crates/xtask/src/`, and `wf/` abbreviates `.github/workflows/`.
-It inventories present source behavior, not completion of the isolated maintenance-chain proof.
-The [phase E proof plan](../agents/lifecycle/support-depth-isolated-proof-plan.md) names the
-remaining evidence and proposed scope; its policy recommendations are not authorizations.
-The closeout-published qualification rules in A.1 and A.2, amended under CP-P3, are requirements
-on the MA5, MA6 and IN1 implementations; the source at this revision does not implement them yet.
+Enforcement revision for this inventory is `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`,
+the merged slices 1–12 tree, including PR #369's slice-11 ON2 dry-run guard repair.
+Paths are repository-relative. `xtask/` abbreviates `crates/xtask/src/` and `wf/`
+abbreviates `.github/workflows/`. File and line citations below refer to this revision.
+The PR #296 inventory was historical evidence. CP-P3 maintenance publication and the finite
+synthetic ON1–ON5/IN1 routes are now implemented. The normative requirements below continue
+to govern each route. Current executed results and remaining proof are recorded in A.4 and the
+[slice-13 report](../agents/lifecycle/s13-final-inventory-report.md).
 
-The ON/IN1 forward requirements below adopt OR-P1–OR-P14 of the
-[routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions).
-They are specified, not installed. The historical source inventory retains its stated baseline;
-existing private freeze/candidate mechanics do not establish a connected synthetic onboarding
-positive. Production refuses depth, and this amendment installs no profile, table or enabled path.
+OR-P1–OR-P14 are implemented within the source-installed synthetic boundary. The completed
+credential-free E.7 implementation proof uses fake authenticated host observations, an offline
+ON2 executor and a test S/T gate runner. The independent disposable-repository run under
+CP-P5 / OR-P12 remains due and requires explicit maintainer authorization. Production loading
+continues to refuse enrollment and `LIVE_PROFILE` remains absent.
 
 Host configuration was read without mutation on 2026-10-24 America/Indianapolis
 (`2026-10-25T03:04:34Z`): `scripts/check_staging_ruleset.py` reported `match`, ruleset
@@ -965,8 +964,8 @@ Three distinctions apply throughout this inventory:
   Additional retained-record guards prevent omission of the declaration from bypassing unsupported
   writers. A refused route has no positive production-depth claim.
 - **Owning core:** preparation, relay, closeout and promotion have bounded private/admitted paths
-  with independent checks. Their positive fixed-producer fixtures prove composition, not a public
-  CLI path with authenticated adequate evidence.
+  with independent checks. Their executed synthetic public in-process fixtures establish the bounded writer and
+  admission composition described in A.4. Independent host evidence remains a phase C obligation.
 - **Final integration:** D7 re-establishes admission against the exact candidate and parent before
   the native queue's conditional ref update. A local plan, caller name, matching digest or existing
   entry is not an integration receipt. `production_results` currently returns no verified results;
@@ -978,32 +977,37 @@ Three distinctions apply throughout this inventory:
 Existing route IDs are preserved; NE8 and LW1 make the generated advertising writer and lower
 storage boundaries explicit. "Branch" means candidate preparation followed by IN1. A neutral
 route has no lifecycle acceptance authority. Source references name the entry and owning boundary;
-A.4 distinguishes existing tests from proof still required.
+A.4 distinguishes existing tests from proof still required. Binary dispatch is
+`xtask/main.rs:347`, `:409`, `:458` and `:462` through `:534`, including legacy
+Codex metadata/retention/validation aliases.
 
-| Id | Entrypoint / callers | Outputs and scope | Present depth behavior / owning source | Integration |
+| Id | Entrypoint / callers | Outputs and scope | Present owning boundary at the enforcement revision | Executed result anchor |
 | --- | --- | --- | --- | --- |
-| MA1 | `prepare-agent-maintenance`; open-PR workflow, maintainer; nightly release-watch dispatch | Request/packet; private core freezes P, then O where acquisition exists, record and coherent aggregate publication | Public builder/apply refuse declarations and retained depth; private `prepare/{depth,guard}.rs` preserves selection/entries/due work, refuses acceptance, binds/rebuilds before apply. `prepare.rs`, `prepare/report.rs`; exact workflow delivery via `scripts/maintenance_transport.py` | Branch |
-| MA2 | `parity-acquire.yml`, reusable or dispatch | Acquisition inputs, reported metadata, packet re-freeze, complete support JSON/Markdown/runtime projection; aggregate effects | Committing destination refuses `staging`/`main` before checkout; requires `AUTOMATION_TOKEN`; stages acquisition before re-freeze and exact delivery before audit; rejected push is not rebased/retried. Depth preparation and neutral writers still refuse public depth scope; shell transport is not depth authority | Preparation branch, PR then IN1 |
-| MA3 | `refresh-agent --write` | Packet docs and requested support/runtime/capability projections, aggregate scope | `refresh.rs::apply_refresh_plan` and neutral batch boundary refuse depth workspace; no admitted positive depth refresh path | Branch |
-| MA4 | `execute-agent-maintenance --write`; executor may invoke generators | Frozen write envelope: wrapper/adapter code, version reports/metadata, publication, request/marker directories and debt inventory | `execute/{guarded,candidate,delivery_index,tree}.rs` captures independent candidate/Git state, finalizes after all execution outcomes and delivers only checked reporting changes. `depth_acceptance/relay.rs` preserves Event/P/O/entries, refuses acceptance, request/marker edits, changed frozen inputs and uncorroborated debt edits. Candidate is not an OS sandbox | Branch |
-| MA5 | `close-agent-maintenance`, `prepare-agent-closeout`, exported lower closeout planner/writer | Closeout and docs; first command may update lifecycle evidence/drift; owning admission adds exact entry. Both writers also deliver the support JSON/Markdown rows of the closeout's own agent and version, qualified where the post-entry record supports it, in the same batch (see "Closeout-published qualification" below). No other agent's or version's row, and no runtime-support projection, capability publication, pointer, metadata or marker | `closeout/write.rs::CloseoutPlan`, `prepare_closeout.rs::write_and_verify` use `closeout_proposal::Proposal` at apply. Shared `depth_acceptance/manual.rs` requires current request path/bytes, exact generation marker on integration parent, current P/O/E, evaluated evidence and debt. It still refuses every publication output as unowned, and neither writer renders publication: the batch below is required and not yet implemented. Public loading/evidence still prevent production depth success | Branch |
-| MA6 | `manifest-promote`; `parity-promote.yml` | Root/per-target pointers, `current.json`, validated metadata, marker retirement, own entry and aggregate support/runtime/capability outputs | `manifest_promotion::{build_plan,PromotionPlan::apply}` checks clean exact validation revision and pinned integration tip, renders one proposal, re-admits at apply. It renders publication before admission appends its entry; the required order is below. `depth_acceptance/promotion.rs` requires maintenance authority, admitted retained closeout, current evidence/debt and its own target entry. Workflow no longer carries pointer/marker policy in shell | Promotion PR, IN1 |
-| ON1 | `onboard-agent --dry-run/--write`, approval and raw-descriptor forms | Manifest scaffold/current and lifecycle state | `onboard_agent/execution.rs` captures installed authority once; `routing.rs` shares the finite bootstrap plan with IN1 creation replay. The compiled non-runtime descriptor omits its backend; the private whole-descriptor approval reader grants no production approval acceptance. Candidate registry uses the ordinary parser. ON1 emits no depth table, version metadata, record, entry or acceptance, and expected-before delivery rechecks the captured caller/host before apply. Declared onboarding, maintenance and Codex scopes retain unsupported-write refusal; an installed-route failure errors without fallback. Route absence preserves ordinary behavior. IN1 admits actual absent-to-scaffold output, record-free preparation, then the separate maintainer-owned declaration; each is admitted before protected-tip advance and observed afterward (OR-P1–OR-P3, OR-P14; [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)). No live profile is installed | Branch, then IN1 |
-| ON2 | `runtime-follow-on`, `repair-runtime-evidence` | Runtime implementation/evidence and pre-publication lifecycle; executor can affect indirect inputs. The installed finite synthetic dry run freezes P/O and writes the depth record, lifecycle object and coherent reporting publication | Public dry-run/write dispatch through the captured declared onboarding route; unresolved bootstrap and installed-route errors refuse without fallback. The finite approval adapter validates the complete wrapper-only descriptor; production loading is unchanged. Dry run uses the shared freeze and reporting renderers and rejects acceptance effects before checked delivery. Write authenticates the executable prepared contract/prompt, checks actual wrapper implementation/tests without a fake backend or agent_api requirement, and uses shared candidate observation/finalization/delivery. Failed runs retain only trusted attempt state and diagnostics; success preserves the record and depth object and records the observed written-path digest. Neither path adds entries or accepts effects; dry run refuses after `runtime_integrated`. OF-P1–P9 regressions remain. Repair remains refused pending slice 4. No production declaration or live profile is installed | Branch |
-| ON3 | `prepare-publication` | Publication packet, lifecycle `publication_ready` | Entry and lower packet/lifecycle writers refuse depth workspace; no acceptance authority for maintenance scope. Specified, not installed (OR-P3, OR-P4, OR-P6, OR-P9): after committed ON2 implementation has producer evidence, the routed controller delivers reporting E, bound receipt/payload files and coherent reporting publication with packet/lifecycle in one checked proposal, preserving Event/P/O/object and every entry. No entry, qualification, acceptance or retargeting; frozen acquisition and runtime handoff remain checked ([routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)) | Branch |
-| ON4 | `refresh-publication` | Aggregate support/runtime/capability outputs; lifecycle `published` | `publication_refresh.rs` and neutral/lower writers refuse depth workspace before effects. No onboarding depth publication path. Specified, not installed (OR-P3, OR-P4, OR-P7–OR-P9, OR-P13): owning onboarding admission derives only its generation's exact Publication entry, packet-bound published assertion and supported qualification/advertising effects; freshly evaluate the post-entry record, render and re-admit every touched tuple. The charter checklist item 7 two-phase gate applies; local success delivers a branch candidate, with independent checks/current IN1/terminal gate still due before protected acceptance ([routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)) | Branch |
-| ON5 | `close-proving-run`, `prepare-proving-run-closeout` | Proving closeout; lifecycle `closed_baseline`, evidence lists/drift | Both entries refuse depth workspace; lower lifecycle/batch writers also refuse. D7 rejects unsupported onboarding acceptance effects, including incorrectly attributed drift clearance. Specified, not installed (OR-P3, OR-P4, OR-P7–OR-P10): prepared ON5 is reporting-only and refuses acceptance/retargeting. Final ON5 alone owns its generation's exact closed artifact, ProvingRunCloseout entry, closed_baseline assertion and proving evidence id through one freshly evaluated/re-admitted proposal. Depth ON5 with drifted refuses; no automatic or same-version retained maintenance transfer ([routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)) | Branch |
-| NE1 | `support-matrix` write; maintenance/publication callers | Complete support bundle across agents | `support_matrix/publication.rs::write_publication_artifacts` refuses depth workspace. Pure generation/rendering is not delivery authority; owning proposals use renderers then admit aggregate effects | Caller / IN1 |
-| NE2 | `capability-matrix` write | Aggregate capability publication | `capability_matrix.rs` refuses depth workspace; added advertising is also detected at final integration, regardless of how code was edited | Caller / IN1 |
-| NE3 | `manifest-version-metadata`, historical alias `codex-version-metadata` | One version's status and target outcomes | `manifest_version_metadata.rs::run_with_default_root` refuses depth manifest; internal read-only planner is used by owning promotion. Caller `--status` is not authority | Caller / IN1 |
-| NE4 | Manifest validator fix modes and aliases | Pointer formatting/missing `none` pointers; `current.json` | `manifest_validate/fix_mode.rs` refuses depth manifest before writes. Check mode is read-only; `--tip` additionally invokes repository-wide IN1 admission | Caller / IN1 |
-| NE5 | Retention commands and aliases, write mode | Removes snapshot/report directories, potentially retained records | `manifest_retain.rs` refuses depth manifest before pruning. It has no authority to remove a depth record | Caller / IN1 |
-| NE6 | Codex/Claude/OpenCode snapshot legacy `--out-dir` | `current.json` when directory is a manifest root | All three snapshot entries use `depth_routes::refuse_destination` before legacy output; arbitrary unsupported edits still meet IN1. Versioned snapshot output is an acquisition input, not a depth acceptance output | Caller / IN1 |
-| NE7 | `historical-lifecycle-backfill` | Packet/proving-closeout/lifecycle for several agents | Entry refuses depth workspace; lower writers refuse as well. Historical status grants no authority over a retained depth generation | Caller / IN1 |
-| NE8 | `runtime-advertising-model` write | `crates/agent_api/src/runtime_advertising/data.rs`, indirect capability advertising | `runtime_advertising/mod.rs::run` refuses depth workspace on write; check mode is non-mutating. D7 compares actual runtime advertising on any candidate | Caller / IN1 |
-| LW1 | Public `workspace_mutation::apply_mutations`; lifecycle/packet storage helpers, every caller | Proposed outputs across all scopes, lifecycle and publication packets | `workspace_mutation/delivery.rs`, `agent_lifecycle/storage.rs` refuse declared/retained depth and proposed record/enrollment destinations. Crate-private `apply_admitted_mutations` is reachable from MA1/MA4/MA5/MA6 and installed finite ON1/ON2 only after owning checks; it grants no authority by itself | Caller / IN1 |
-| IN1 | Integration ref update, including all branch writers | Every depth-gated output and dependency; every registered retained root | Required checks and native queue validate exact merge result/base; `manifest_validate/depth/merge.rs` calls `depth_acceptance/integration.rs` before requested-root narrowing. Shared generation/closeout/promotion/current-qualification checks; a newly published qualification is attributed as "Closeout-published qualification" below states; native tip-conditional MERGE ref update. Slice 1 installs bounded synthetic bootstrap/preparation/first-declaration admission under the existing authenticated candidate/parent/tip binding, followed by post-tip observation (OR-P1, OR-P14; record-free IN1 dispatch from OR-P8). Preparation preserves scaffold registry bytes and exact approval; declaration admits only the reviewed onboarding table/CORE rows, matching acquisition statement and coherent reporting, with no record, entry or acceptance. Slice 3 independently re-establishes new/changed synthetic onboarding reporting freezes through the finite approval adapter, current P/O derivation and lifecycle object, acquisition statement/bytes at the pinned parent and preserved selection/entries, including post-tip observation. Actual ON2 freeze and implementation candidates are integration-admissible; hand-assembled inconsistent freezes, orphan parent bindings and candidate-only acquisition provenance refuse. Still specified, not installed (OR-P3, remaining OR-P8, OR-P13): reporting E and ON4/ON5 owning effect/entry dispatch, and onboarding unchanged-qualification re-evaluation. Independent committed-candidate checks/current admission/terminal gate precede the ref update; proposed entries or local passes grant no authority ([routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)) | `staging` itself |
-| HE1 | Hand edit, external tool, unsupported output-path use | Any output or invalidating dependency | No caller authority. Candidate is judged from its values by IN1; forbidden entries, lost records, stale qualification and wrong lifecycle effects refuse | IN1 |
+| MA1 | `prepare-agent-maintenance`, open-PR/nightly transport | Request, packet, P/O record, reporting support bundle | `xtask/agent_maintenance/prepare/guard.rs:194` rebuilds and checks the exact reporting plan, snapshots and route before apply | `fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1`, [FR2](../agents/lifecycle/fr2-freeze-planner-report.md) |
+| MA2 | `parity-acquire.yml` reusable/dispatch and re-freeze | Snapshots, coverage/reports, reported metadata, lockfile, MA1 outputs | `xtask/depth_acceptance/admission/freeze.rs:85` and shared planner require independently retained complete acquisition authority and exact tree equality. Checked single-commit transport preserves its destination/token/stand-down checks at `wf/parity-acquire.yml:707`, `:773`, `:819` and `:1064` | `fr2_ma2_combined_acquisition_and_freeze_real_in1`, [FR2](../agents/lifecycle/fr2-freeze-planner-report.md) |
+| MA3 | `refresh-agent --write` and cached apply | Packet docs, aggregate support/runtime/capability projections | `xtask/agent_maintenance/refresh.rs:212` refuses declared/retained depth before neutral delivery | `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| MA4 | `execute-agent-maintenance --write`, executor generators | Wrapper/adapter source, reporting E/files, reports/metadata/publication and diagnostics within the envelope | `xtask/candidate_execution/candidate.rs:106`, `xtask/depth_acceptance/relay.rs:8` observe every outcome, preserve Event/P/O/entries, refuse acceptance, request/marker and unsupported debt changes | Public onboarding refusal in `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md). Completed unrestricted-host lead gates are recorded in A.4 |
+| MA5 | `close-agent-maintenance`, `prepare-agent-closeout`, lower closeout plan/apply | Exact closeout/entry/docs, optional lifecycle evidence, own agent/version support JSON/Markdown | `xtask/depth_acceptance/manual.rs:163`, `publication.rs:521` require maintenance ownership, parent marker, current P/O/E/debt and fresh post-entry scoped publication. CP-P3 is implemented | `maintenance_and_onboarding_authorities_cannot_substitute`, [S7](../agents/lifecycle/s7-onboarding-predicates-report.md). Public wrong-owner matrix and lead full gates completed the local controls; results in A.4 |
+| MA6 | `manifest-promote`, `parity-promote.yml` | Pointers/current, validated metadata, Promotion entry, marker retirement and aggregate publication | `xtask/manifest_promotion.rs:49`, `xtask/depth_acceptance/promotion.rs:121` bind exact validated HEAD/protected tip, append own entry before fresh rendering and re-admit at apply | `retained_closeout_promotes_after_both_working_files_are_replaced` passed in [S7](../agents/lifecycle/s7-onboarding-predicates-report.md), public wrong-owner/ordinary sibling in `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| ON1 | `onboard-agent --dry-run/--write`, approval/raw descriptor | Ordinary registry/scaffold/current/pointers, governing templates, lifecycle and pack/written-path inventory | `xtask/onboard_agent/execution.rs:4`, `routing.rs:26` capture exact bootstrap authority and ordinary-parser plan. First declaration is separately maintainer-owned. Replay over retained bindings refuses | `public_on1_connected_preparation_metadata_and_first_declaration_chain`, [S10](../agents/lifecycle/s10-readonly-gates-report.md), and `e7_connected_onboarding_qualified_chain`, [S12](../agents/lifecycle/s12-e7-connected-proof-report.md) |
+| ON2 | `runtime-follow-on --dry-run` | P/O record, lifecycle object, seven run files, coherent reporting support bundle | `xtask/runtime_follow_on.rs:173`, `runtime_follow_on/depth.rs:1`, `freeze_transition/delivery.rs:84` capture approval/freeze/view and refuse acceptance. Ordinary persistence checks both dry-run and write before context loading. PR #369 repaired this guard | `public_on2_connected_freeze_write_admission_and_observation` and `on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| ON2 | `runtime-follow-on --write` | Observed wrapper source/tests, runtime bundle, lifecycle selector/digest, trusted failure diagnostics | `xtask/candidate_execution/create_lane.rs:50` validates prepared contract/prompt, protects record/object/acquisition, observes unconditionally and admits reporting effects. Post-integration re-freeze refuses | `e7_connected_onboarding_qualified_chain`, `e7_forged_serialized_baseline_cannot_hide_a_snapshot_edit`, `e7_interrupted_offline_executor_retains_only_trusted_failure_diagnostics`, [S12](../agents/lifecycle/s12-e7-connected-proof-report.md) |
+| ON2 | `repair-runtime-evidence --check/--write` | Runtime bundle and lifecycle selector/provenance together | `xtask/repair_runtime_evidence/routed.rs:11`, `:296` require protected/candidate runtime-integrated state, exact run/written-path digest, frozen inputs and reporting-only batch. Record/entries stay preserved and repair supplies no depth E | `public_repair_sibling_chain_preserves_frozen_generation_and_written_paths`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md), `e7_connected_onboarding_repaired_qualified_chain`, [S12](../agents/lifecycle/s12-e7-connected-proof-report.md) |
+| ON3 | `prepare-publication --check/--write` | E/receipt/payload files, packet, publication-ready lifecycle and reporting JSON/Markdown/runtime | `xtask/prepare_publication/routed.rs:10` assembles authenticated E and checks full reporting/relay effects and frozen runtime/acquisition before one rechecked batch | `public_on3_connected_active_reporting_e_and_real_in1`, `public_on3_connected_repaired_runtime_selection_and_real_in1`, [S6](../agents/lifecycle/s6-on3-reporting-report.md) |
+| ON4 | `refresh-publication --check/--write` | Exact Publication entry, packet-bound published assertion, aggregate support/runtime/capability output and docs | `xtask/publication_refresh/routed.rs:16`, `:216` run fresh post-entry evaluation, aggregate admission, proposal A checks and S/T executor before expected-before delivery | `public_on4_connected_publication_real_in1_and_observation`, [S8](../agents/lifecycle/s8-on4-publication-report.md), `e7_connected_onboarding_qualified_chain`, [S12](../agents/lifecycle/s12-e7-connected-proof-report.md). Completed ON4 preparation/aggregate/restoration and the S/T seam are recorded in A.4 |
+| ON5 | `prepare-proving-run-closeout --check/--write` | Prepared closeout, docs, reporting lifecycle provenance with published assertion preserved | `xtask/prepare_proving_run_closeout/routed.rs:9`, `xtask/depth_acceptance/onboarding/on5.rs:189` check exact prepared transition, retained proving authority and full reporting/relay proposal | `public_on5_refusals_local_final_and_conflict_preservation`, [S9](../agents/lifecycle/s9-on5-closeout-report.md) |
+| ON5 | `close-proving-run` | Exact closed artifact, ProvingRunCloseout entry, closed-baseline/evidence, docs and support bundle | `xtask/close_proving_run/routed.rs:9` and `xtask/depth_acceptance/onboarding/on5.rs:23` bind settlement/runtime/acquisition, derive entry, freshly evaluate and re-admit. Drift clearance and same-version path transfer refuse | `public_on5_refusals_local_final_and_conflict_preservation`, `public_on5_release_watch_prepared_closed_real_in1_and_observation`, [S9](../agents/lifecycle/s9-on5-closeout-report.md), qualified E.7 chain in [S12](../agents/lifecycle/s12-e7-connected-proof-report.md) |
+| NE1 | `support-matrix` write and lower bundle delivery | Complete support JSON/Markdown/runtime bundle | `xtask/support_matrix/publication.rs:130` refuses depth. Renderers serve admitted owners. Check mode independently authenticates committed inputs | `every_ne_command_and_alias_refuses_onboarding_carriers`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE2 | `capability-matrix` write, explicit `--out` | Aggregate capability Markdown or caller-selected file | `xtask/capability_matrix.rs:29`, `depth_routes/destination.rs:124` check generating workspace, resolved destination, aliases and every caller-directory creation before checked open/write | Same binary neutral matrix and `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE3 | `manifest-version-metadata`, `codex-version-metadata` | Version status/target outcomes | `xtask/manifest_version_metadata.rs:194` refuses depth before write. Pre-declaration ordinary snapshotted metadata and owning promotion retain their boundaries | Same binary neutral matrix, [S11](../agents/lifecycle/s11-mediation-matrix-report.md), pre-declaration positive in public ON1 chain, S10 |
+| NE4 | `manifest-validate --mode fix`, `codex-validate` alias | Pointer formatting/defaults and current projection | `xtask/manifest_validate/fix_mode.rs:5` refuses depth. Read-only check remains available, `--tip` also invokes all-root IN1 | Same binary neutral matrix, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE5 | `manifest-retain --apply`, `codex-retain` | Snapshot/report directory removals | `xtask/manifest_retain.rs:68` refuses depth before pruning retained records | Same binary neutral matrix, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE6 | Codex/Claude/OpenCode snapshots, legacy `--out-dir` | Snapshot/current output | `xtask/codex_snapshot.rs:82`, `claude_snapshot.rs:86`, `opencode_snapshot.rs:92` guard enclosing destination before upstream execution. Versioned acquisition is input-only | Same binary neutral matrix over all three commands, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE7 | `historical-lifecycle-backfill --all/--agent` | Lifecycle/packet/proving artifacts and docs | `xtask/historical_lifecycle_backfill.rs:218` and public lower storage refuse depth | Same binary neutral matrix, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| NE8 | `runtime-advertising-model` write | Generated runtime advertising Rust data | `xtask/runtime_advertising/mod.rs:86` refuses depth writes. Both check-mode registry readers authenticate their route | Same binary neutral matrix, [S11](../agents/lifecycle/s11-mediation-matrix-report.md), `readonly_gates_generation_and_neutral_writers_keep_their_controls`, [S10](../agents/lifecycle/s10-readonly-gates-report.md) |
+| LW1 | Public batch and lifecycle/packet storage, every caller | Arbitrary proposed files/removals, lifecycle and packets | `xtask/workspace_mutation/delivery.rs:4`, `agent_lifecycle/storage.rs:54` scan workspace, enclosing/nested scopes and proposed records/registry destinations before mechanics | `onboarding_retained_and_proposed_lower_writer_matrix`, `outer_callers_refuse_enclosed_depth_destinations`, `ordinary_lower_writers_deliver_literal_bytes`, [S11](../agents/lifecycle/s11-mediation-matrix-report.md) |
+| IN1 | `manifest-validate --tip`, authenticated integration admission and post-tip observation | All depth effects, retained roots, unchanged qualifications, independent admission artifacts | `xtask/manifest_validate/depth/merge.rs:44`, `depth_acceptance/integration.rs:172`, `integration/onboarding.rs:20` compare old/new root union before requested-root narrowing and independently dispatch each owner. `admission/emitter.rs:67` pins classification/history and retains actual decisions | Every primary E.7 checkpoint in `e7_connected_onboarding_qualified_chain`, [S12](../agents/lifecycle/s12-e7-connected-proof-report.md), FR1–FR3 history/context results in A.4 |
+| HE1 | Hand edits, external tools and arbitrary destinations | Every output and invalidating dependency | `xtask/depth_acceptance/integration.rs:172` and `integration/onboarding.rs:20` derive authority from complete candidate values and current evidence | Committed forgery/retarget/downgrade cases in `public_on5_refusals_local_final_and_conflict_preservation`, [S9](../agents/lifecycle/s9-on5-closeout-report.md). Native queue enforcement remains phase C |
 
 The request nesting environment flag is an ergonomic refusal, not a security boundary.
 MA4's host guard applies independently of what the executor invokes. Other branch-local tools
@@ -1042,8 +1046,8 @@ MA6 and IN1:
    This maintenance attribution MUST NOT classify onboarding effects: IN1 separately establishes
    ON4 `Publication` or ON5 `ProvingRunCloseout` ownership from the exact independently admitted
    artifact, current record digest and actual candidate effects (OR-P4, OR-P8,
-   [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition);
-   specified, not installed). An entry locator grants no authority, and no unmatched entry or
+   [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+   Slices 8–9 install the bounded synthetic ON4 and ON5 dispatches, with executed results in A.4. An entry locator grants no authority, and no unmatched entry or
    unrelated aggregate effect may pass through this exception.
 5. **MA6 ordering.** MA6 runs in this order: its owning admission appends its own `Promotion`
    entry; the proposed post-entry tree is built; that exact record is evaluated freshly; support,
@@ -1070,21 +1074,30 @@ lower delivery boundary for proposed batches/lifecycle files, not an extra lifec
 Statements about owning positive behavior refer to the bounded cores, subject to A.1's refusal
 and evidence limits; they do not assert public production enablement.
 
-| Output | Writers / indirect routes | Present check and remaining requirement |
+| Output | Writers / indirect routes | Owning guard and current source |
 | --- | --- | --- |
-| Registry declaration and bootstrap identity | ON1 ordinary scaffold; maintainer first declaration; HE1 | Finite synthetic scope captures protected registry/approval. Public approval/raw ON1 and IN1 creation replay share the same depth-free plan and strict finite approval reader. IN1 admits only absent-to-exact-scaffold, record-free preparation preserving registry/approval, then the separate exact onboarding declaration with reviewed CORE rows and acquired statement; no record/entry/acceptance. Captured route freshness and ordinary proposed-registry validation precede ON1 delivery |
-| Depth records and entries | MA1 (P/O), MA2 via re-freeze, MA4 (reporting E), MA5/MA6 (own entry); installed finite ON2 dry run (P/O); LW1 and NE5 can otherwise target/remove them | Private freeze/relay/owning admission preserves prior records, entries, selection and due work; unsupported lower/pruning delivery refuses. IN1 checks new/changed generations, retained invariants and exact new entry authority for all roots. For a changed synthetic onboarding freeze it independently re-derives P/O, checks the finite approval and lifecycle object, acquisition statement/bytes at the pinned parent (also on post-tip observation), and preserved selection/entries; asserted hashes alone grant no admission. The public synthetic chain reaches freeze and implementation admission/observation; later acceptance remains unproved |
-| Support publication JSON and Markdown | MA1 private bundle; MA2/MA4/MA6 via owning proposal/renderers; MA5 via its closeout batch, rows of its own agent and version only (CP-P3); MA3, ON2 dry-run reporting, ON4, NE1, LW1 | Aggregate current derivation and actual-effect detection; finite record-free preparation/first-declaration IN1 requires coherent reporting with no qualification or acceptance. Neutral/public depth paths refuse. Existing qualification is re-evaluated even without record changes. Dependency invalidation may downgrade honestly to `unverified`. A newly published qualification is a closeout effect only under A.1 "Closeout-published qualification" rule 4; MA5's batch is required and not yet implemented |
-| Capability publication / advertising | MA3, ON4, NE2, NE8; MA4/MA6; any adapter/runtime code edit under HE1 | Neutral guards; real source/projection comparison and aggregate currentness at IN1. Added advertising needs its own admitted acceptance destination; generated freshness alone is insufficient |
-| Version metadata | MA2/MA4/MA6, NE3, LW1 | Neutral write refuses depth; owning promotion checks exact validated commit/targets. Finite bootstrap IN1 admits ordinary pre-declaration NE3 `snapshotted` metadata only with actual acquisition and no passed outcomes; metadata precedes first declaration. IN1 detects status and passed-target acceptance values, including hand edits |
-| `current.json` | MA6, NE4, NE6, ON1, LW1 | ON1 bootstrap uses the ordinary empty-input renderer, with exact replay and divergent-scaffold refusal; the finite onboarding effect-reader projection recognizes only those exact compiled scaffold bytes after the first record appears (versioned-union and maintenance parsing is unchanged); other routes use guarded promotion or explicit unsupported refusal. Expected-target changes are checked independently of an unchanged pointer/projection |
-| Root and per-target pointers | MA6, NE4, LW1 | One admitted promotion proposal; fix mode refuses depth. Destination tuple receives acceptance; displaced tuple remains reporting and keeps its record/work |
-| Embedded runtime-support projection | MA1 private bundle; MA2/MA4/MA6; ON2 dry-run reporting; MA3, ON4, NE1, LW1. MA5 renders it with the bundle but MUST leave it unchanged (CP-P3) | Delivered with complete support bundle; aggregate derivation and IN1 check every touched tuple, not just the named agent |
-| Stand-down marker removal | MA6, MA4 envelope, LW1 | Guarded promotion retires its marker coherently; relay forbids marker changes. Parent marker is required for new closeout authority. Marker addition/change is not itself depth-gated, but cannot self-authorize a closeout on the candidate |
-| Maintenance request | MA1, MA2 re-freeze, MA4 envelope, LW1 | Shared Event/P/O binding and same-version/lifecycle freeze; private preparation preserves displaced records. Relay refuses request changes; IN1 validates reporting-only generation changes across roots |
-| Maintenance closeout | MA5; MA4 envelope/LW1 are potential unsupported writers | Both manual writers re-admit the exact proposal and add its entry in the same checked batch; relay refuses acceptance. Existing output/absence survives refusal; current production evidence cannot authorize a positive result |
-| Proving-run closeout | ON5, NE7, LW1 | Unsupported depth workspace refuses at entry/lower boundary; IN1 refuses unsupported onboarding acceptance. No maintenance authority is borrowed |
-| Lifecycle acceptance values | ON1–ON5, NE7, MA5, LW1; MA4 envelope can reach maintenance files | Public finite bootstrap ON1 writes and IN1 independently admits only ordinary enrolled/bootstrap lifecycle identity at creation, then preserves it through preparation/declaration, with no frozen depth object or publication/closeout packet. Finite ON2 alone writes the frozen object; its write candidate preserves that object and records reporting `runtime_integrated` evidence through shared finalization. Public unsupported guards and value-derived attribution remain; MA5's owning batch may report its closeout in private proofs. Drift clearance requires candidate generation attribution even when the lifecycle file disappears |
+| Registry/scaffold/governing files and ON1 written-path inventory | ON1, maintainer preparation/first declaration, HE1, proposed LW1/NE2 output | Exact ordinary bootstrap replay and separate first-declaration admission in `xtask/onboard_agent/routing.rs:26`, `depth_acceptance/integration.rs:172`. LW1/NE2 proposed registry/record guards refuse |
+| Versioned depth record P/O and frozen lifecycle object | MA1/MA2, ON2 dry-run, attempted HE1/LW1/NE5/NE2 | Owning freeze planner and route checks in `xtask/freeze_transition/delivery.rs:84`, `runtime_follow_on/depth.rs:1`, `agent_maintenance/prepare/guard.rs:194`. All-root generation/retention admission in `depth_acceptance/integration.rs:172` |
+| Record reporting E and bound receipt/payload files | MA4 invocation channel/relay, ON3 controller, HE1 | Invocation/Event/P/O and allowed bytes in `xtask/depth_evidence/staged.rs:374`, authenticated ON3 proposal in `prepare_publication/routed.rs:10`. Each consumer independently authenticates population/E |
+| Acceptance entries | MA5 MaintenanceCloseout, MA6 Promotion, ON4 Publication, final ON5 ProvingRunCloseout, attempted HE1/LW1 | Exact current artifact/digest, fresh post-entry evidence and aggregate admission in `xtask/depth_acceptance/manual.rs:163`, `promotion.rs:121`, `publication_refresh/routed.rs:16`, `close_proving_run/routed.rs:9`. Independent owner dispatch in `integration/onboarding.rs:20` |
+| Runtime run prompt/contract/status/validation/summary/written-paths/handoff | ON2 dry-run/write, repair, attempted executor edits | `xtask/candidate_execution/create_lane.rs:50` protects prepared controller files and authenticates runtime identity. `repair_runtime_evidence/routed.rs:11` preserves recorded digest. ON3/ON4/ON5 validate exact selected runtime bundle |
+| Wrapper/adapter implementation and diagnostics/recovery candidate | MA4, ON2 write, HE1 | Unconditional independent observation, envelope/index checks and reporting-only admission in `xtask/candidate_execution/candidate.rs:106`, `:164`, `create_lane.rs:262`. Failure diagnostics remain attributable |
+| Support JSON/Markdown | MA1/MA2/MA4/MA6, MA5 own rows only, ON2 dry-run, ON3, ON4, final ON5. Unsupported MA3/NE1/LW1 and arbitrary NE2 destinations | Full derived reporting or owning acceptance batch in `xtask/depth_acceptance/publication.rs:521`, `prepare_publication/routed.rs:10`, `publication_refresh/routed.rs:16`, `close_proving_run/routed.rs:9`. Current aggregate validation in `depth_acceptance/integration.rs:231` |
+| Embedded runtime-support projection | MA1/MA2/MA4/MA6, ON2 dry-run, ON3, ON4, final ON5. Unsupported MA3/NE1/LW1 | Same complete support bundles and aggregate guards. MA5 renders it with the bundle but MUST leave it unchanged (CP-P3), `xtask/depth_acceptance/publication.rs:521` |
+| Capability Markdown and runtime advertising | MA4/MA6/ON4 admitted proposals, MA3/NE2/NE8 attempts, HE1 source edits | Raw foreign additions checked before record filtering in `xtask/depth_acceptance/onboarding/advertising.rs:6`. NE2 destination guard and NE8 write refusal remain. Wrapper-only positive has zero capability mappings |
+| Version metadata/status/target outcomes | Acquisition MA2, reporting MA4, promotion MA6, pre-declaration NE3, unsupported post-declaration NE3/LW1, HE1 | `xtask/manifest_version_metadata.rs:194`, `manifest_promotion.rs:49`, `depth_acceptance/promotion.rs:121` and raw effect detectors. ON owners refuse validated/supported/passed-target effects |
+| Root/per-target pointers and current projection | MA6, ON1 initial none/current scaffold, NE4/NE6/LW1 attempts, HE1 | Exact scaffold replay or owning promotion in `xtask/onboard_agent/routing.rs:26`, `manifest_promotion.rs:49`. Fix/legacy/lower depth writes refuse |
+| Maintenance request/packet/docs and external transport report | MA1/MA2, MA3 refresh attempts, MA4 envelope attempts, LW1/HE1 | `xtask/agent_maintenance/prepare/guard.rs:194` replays exact plan, `depth_acceptance/relay.rs:1` refuses request/marker changes, FR3 canonical resolver authenticates standing request/report |
+| Maintenance closeout/docs and lifecycle evidence/drift | Both MA5 writers/lower planner, MA4/LW1 attempts, HE1 | `xtask/agent_maintenance/closeout_proposal.rs:258`, `depth_acceptance/publication.rs:521`, `manual.rs:163` require maintenance owner, parent marker and scoped current evidence |
+| Stand-down marker | Maintainer establishment, MA6 retirement, MA4/LW1 attempts | `xtask/depth_acceptance/promotion.rs:121` checks coherent retirement, `manual.rs:163` checks parent-established generation. Relay refuses marker changes. Candidate-only marker confers no closeout authority |
+| Publication-ready packet and lifecycle assertions | ON3 packet/reporting, ON4 published assertion/docs, ON5 provenance/closed assertion, ON1/ON2 earlier stages, NE7/LW1 attempts | `xtask/prepare_publication/routed.rs:10`, `publication_refresh/routed.rs:16`, `depth_acceptance/onboarding/on5.rs:23` bind exact approval/Event/P/O/runtime/packet and preserve raw frozen object. Public storage refuses unsupported depth |
+| Proving closeout and onboarding docs | Prepared and final ON5, NE7/LW1 attempts, bounded human HE1 edits | `xtask/prepare_proving_run_closeout/routed.rs:9`, `close_proving_run/routed.rs:9` share semantic/settlement validation with IN1. Prepared retains published authority, final owns exact closed bytes/entry. Historical proving authority cannot be replaced by preparation |
+| Acquisition snapshots/union/coverage/reports, raw help and lockfile | Versioned snapshot commands, manifest-union/report, wrapper-coverage, MA2 transport, permitted MA4 reporting or HE1 edits | Input-only generation supplies no acceptance. `xtask/depth_acceptance/admission/freeze.rs:85` requires complete authenticated MA2 acquisition bytes. `prepare_publication/acquired_inputs.rs:17` checks every frozen ON input through ON3–ON5 |
+| CI witness/archives, admission records/commitments, reporting contexts | Existing rust-tests collector/upload/bind, IN1 emitter, reporting dispatcher | `xtask/depth_ci/collector.rs:688`, `depth_acceptance/admission/emitter.rs:67`, `depth_ci/reporting/dispatcher.rs:5` bind exact run/job/attempt/source and closing observations. Candidate copies grant no authority. Deployed issuance/transport remains phase C |
+
+Every row also admits HE1 attempts through IN1 and reaches the LW1 refusal if delivered through
+public lower storage. A.1 and A.4 attach executed test names and report results to each owner or
+refusal. The source-installed synthetic route admits one path, version and target per workspace.
 
 Input-only writers remain relevant without becoming new depth-gated outputs:
 `manifest-union`, `manifest-report`, versioned snapshots, wrapper-coverage generators, code/evidence
@@ -1096,10 +1109,29 @@ or retirement from executor assertions. Direct maintainer edits still meet IN1 a
 closeout/debt predicates. Reports and coverage files do not become authoritative depth evidence
 merely by being collected.
 
-Installed finite ON2 includes the reporting publication described above. Specified, not installed:
-the remaining A.2 output owners include ON3 reporting E/receipt/payload files and coherent reporting publication, ON4's own `Publication`
-entry, and final ON5's own `ProvingRunCloseout` entry (OR-P4, OR-P6, OR-P8,
-[routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
+The forward input-only forms are `manifest-union` and aliases `codex-union` / `claude-union`
+(`xtask/manifest_union.rs:134`, union snapshot), `manifest-report` / `codex-report`
+(`xtask/manifest_report.rs:61`, coverage reports), and the Codex/Claude/synthetic
+wrapper-coverage commands (`xtask/codex_wrapper_coverage.rs:51`,
+`claude_wrapper_coverage.rs:51`, `depth_fixture_wrapper_coverage.rs:53`, wrapper coverage JSON).
+The three versioned snapshot forms and `depth-fixture-snapshot`
+(`xtask/depth_fixture_snapshot.rs:64`) write acquisition shards and optional raw help.
+`manifest-acquisition-plan` (`xtask/manifest_acquisition.rs:117`) emits a plan to stdout or
+its requested JSON destination. Noncanonical destinations meet HE1/IN1 on their actual effects.
+`public_on1_connected_preparation_metadata_and_first_declaration_chain` in S10 executes the
+synthetic acquisition/union/coverage/report writers before declaration and real IN1 readback.
+FR2's combined acquisition test authenticates the complete corresponding MA2 output inventory.
+Existing collector forms `depth-ci-collect`, `depth-core-collect` and `depth-synthetic-collect`
+write bounded target witnesses or select the authenticated reporting dispatcher
+(`xtask/depth_ci/collector.rs:636`). The MA4 helper `depth-evidence-assemble` writes only its
+invocation-bound reporting offer through `xtask/depth_evidence/staged.rs:374`. Its relay and
+IN1 consumers retain independent E authentication. Preview/probe forms remain read-only.
+The owner/refusal results above and A.4 govern acceptance effects from all of these outputs.
+
+Installed finite ON2 includes the reporting publication described above. Finite ON3 delivers
+reporting E/receipt/payload files and coherent reporting publication. ON4 owns its exact
+`Publication` entry, and final ON5 owns its exact `ProvingRunCloseout` entry (OR-P4, OR-P6,
+OR-P8, [routing design, “Route composition”](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
 These use checked owning proposals, not a neutral/LW1 bypass. ON3 and prepared ON5 refuse
 acceptance/retargeting; ON4/ON5 gain no pointer, passed-target, `validated`/`supported`, marker
 retirement or maintenance drift-clearance authority. Aggregate truthful reporting can touch other
@@ -1107,8 +1139,9 @@ rows, but any acceptance destination outside the owned generation refuses the wh
 
 ### A.3 Serialization domains and restoration
 
-Specified, not installed: routed ON proposals use expected-before, conflict-preserving local
-delivery/restoration; ON3–ON5 proposals and applicable proposal-phase checks precede delivery,
+Routed ON proposals implement expected-before, conflict-preserving local delivery and
+restoration within the finite synthetic route. ON3–ON5 proposals and applicable proposal-phase
+checks precede delivery,
 with only ON4's fixed gates split as the charter checklist item 7 states (OR-P3, OR-P13,
 [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
 Local ON4 success promises successful preparation and delivery of a branch candidate only.
@@ -1124,7 +1157,11 @@ introduces no filesystem lock, crash-atomic transaction, lifecycle stage or reus
 | Integration branch | IN1, through it all routes, aggregate regeneration and hand edits | Native queue validates exact candidate/base and conditionally updates the ref. Effective staging policy requires the queue and checks; D7 is the semantic backstop. Post-push `depth-tip.yml` detects the actual before/after transition, but cannot retroactively prevent a push |
 | Packet candidate | MA1/MA2 automation, maintainer MA3/MA5, MA4 executor/delivery | Workflow groups and fresh stand-down checks reduce collisions; they are not a cross-route lock. MA1 rebuilds bound proposal; MA4 runs against an independent candidate with Git/index/output observations; MA5 re-admits observed inputs. Expected-before delivery/rollback protects observed edits, not an atomic filesystem transaction |
 | Promotion candidate | MA6 and aggregate renderers | Exact HEAD/validation/integration revision, one proposal re-admitted at apply; source changes, marker/evidence/debt changes and moved integration tip refuse. Final authority still belongs to IN1 |
-| Aggregate publication | MA1/MA2/MA3/MA4/MA6, MA5 (own agent and version rows only, CP-P3), ON4, NE1/NE2/NE8, code editors | Candidate may touch other agents; all-root admission and aggregate derivation run again on the merge result. Branch-local textual conflict resolution is not evidence of admission |
+| Aggregate publication | MA1/MA2/MA3/MA4/MA6, MA5 (own agent and version rows only, CP-P3), ON2 freeze, ON3, ON4, final ON5, NE1/NE2/NE8, code editors | Candidate may touch other agents. All-root admission and aggregate derivation run again on the merge result. Branch-local textual conflict resolution is not evidence of admission |
+| Onboarding branch candidate | ON1 scaffold, ON2 freeze/implementation/repair, ON3, ON4 and both ON5 | Captured approval/registry/host/source/view and expected-before outputs are rechecked. `xtask/candidate_execution/create_lane.rs:308` owns attempt substitution under the index lock. `workspace_mutation.rs:581` preserves concurrent state on rollback. Completed S9 conflict tests and S12 chain results are in A.4 |
+| Executor/index publication | MA4 and ON2, evidence files and trusted diagnostics | `xtask/candidate_execution/delivery_index.rs:209`, `:246` publish and unpublish exact introduced entries under the index lock. Source/caller/index drift refuses. The lock has local index scope |
+| Local file batch | Every admitted and public lower caller | `xtask/workspace_mutation.rs:248` stages jailed temporary files, rechecks each expected-before value and invokes owned rollback at `:581`. Every caller retains its semantic owner |
+| Evidence/admission transport | Collector, reporting dispatcher, IN1 emitter and authenticated consumers | `xtask/depth_ci/reporting/dispatcher.rs:5`, `depth_acceptance/admission/emitter.rs:272` retain attempt-specific identities, pinned decisions and closing reads. FR1–FR3 fake-host results are recorded in A.4. Real issuance and retention require phase C |
 
 `workspace_mutation` classifies expected-before files and restores only its observed owned writes;
 its rollback preserves intervening bytes/type/mode changes or reports a conflict. D4 rejects a
@@ -1132,66 +1169,114 @@ failed executor candidate instead of copying unauthorized product changes back i
 diagnostics/recovery candidate remain attributable. D5 no longer writes a new closeout then
 restores an old artifact after validation: both manual paths use a prospective checked batch.
 
-Unsupported onboarding publication/lifecycle restoration paths remain in
+Ordinary onboarding publication/lifecycle restoration implementations remain in
 `publication_refresh.rs`, `prepare_publication.rs` and `repair_runtime_evidence.rs`.
-They are reached only after the depth workspace refusal in supported use; no depth-safe
+The ordinary write paths retain their outer unsupported-depth guards. Routed owners use the
+checked batches inventoried in A.4. No depth-safe
 serialization claim is made for those legacy restoration implementations. Removing their refusal
 would require fresh ownership/restoration proof. There is no cross-process lock or crash-atomic
 multi-file transaction. If a route performs a final gated sequence outside IN1, the existing
 [Final depth admission](#final-depth-admission) serialization requirement still applies; E1 changes
 none of those rules.
 
+Slice 7 private owning-predicate coverage is in
+`depth_acceptance::onboarding::tests::{private_publication_and_proving_bind_exact_artifact_and_record,each_due_obligation_missing_has_its_own_bounded_refusal,wrong_path_event_packet_and_lifecycle_refuse,classification_carried_work_and_debt_refuse,stale_evidence_and_pre_entry_verdicts_cannot_satisfy_onboarding,aggregate_effect_allowlists_refuse_pointers_status_passed_targets_and_marker_retirement,outside_generation_effect_and_foreign_entry_refuse_the_entire_batch,maintenance_and_onboarding_authorities_cannot_substitute}`.
+Additional exact-artifact, debt, preserved-field, outside-generation metadata and public IN1 refusal
+cases are in `depth_acceptance::onboarding::tests::adversarial`.
+Those original outside-generation cases target another version of the same agent, not a foreign agent.
+`tests::review_round1::foreign_advertising_without_records_refuses_raw_additions` separately
+adds capability cells and runtime advertising for registered `codex` with no depth record.
+The connected test below also runs `tests::review_round1::connected_refusals`: real current P/O
+derivation rejects changed acquired bytes (union, target shard, wrapper coverage and report)
+and policy inputs; exact forbidden pointer/status, foreign metadata and capability-cell
+destinations pass through `evaluate_proposed` and refuse before its renderer is invoked.
+The connected scenario, now run by
+`depth_acceptance::onboarding::tests::readonly_gates::readonly_gates_proposal_runs_every_a_checker`,
+continues its actual ON3 checkpoint through private post-entry publication and proving evaluation.
+The private proving predecessor is the publication predicate’s in-memory output.
+Public ON4/ON5 and IN1 execution are recorded separately in A.4. Validation outcomes
+and sandbox limits are recorded in the [slice-7 report](../agents/lifecycle/s7-onboarding-predicates-report.md).
+
+**Slice 10a read-only gate machinery.** `readonly_gates::check_proposed` runs the fixed A
+checks inside slice 7's borrowed fresh evaluation and requires the exact expected record including
+entries. `support-matrix --check` establishes fresh committed evaluation independently. Capability
+check/audit and runtime-advertising check establish their own routed registry boundary and closing
+observations. The shared validator adapter runs complete check mode for required registry roots, including
+roots whose prerequisites disappeared. Only the exact unadopted aider/Gemini root pairs retain
+schema-free exemptions, and depth or partial prerequisites require full validation there too
+(`xtask/readonly_gates.rs:86`).
+Ordinary validator invocation without `--tip` retains its production verdict behavior. Explicit
+per-root `--tip` validation and all-root IN1 retain their existing owning admission dispatch.
+The credential-free tests `isolated_maintenance::tests::readonly_gates` cover the real checking
+functions in scratch and committed phases, an independently initialized test process, exact-record
+sealing, changed evidence, harmless changes, drift and production/neutral controls. The connected
+`depth_acceptance::onboarding::tests::readonly_gates::readonly_gates_proposal_runs_every_a_checker`
+also calls the proposal entry point over actual ON3 output. Validation results and proof limits are
+recorded in the [slice 10a report](../agents/lifecycle/s10-readonly-gates-report.md).
+Slice 10b converted the inventoried registry readers and depth-absence assertions. Its report
+records the executed ordinary/declared fixture runs and the lead-owned full-workspace leg.
+Slice 8 installed ON4 wiring. Phase C must execute the complete fixed subprocess inventory
+and protected host run. The completed real shared-check composition remains separate evidence.
+
 ### A.4 Reconciliation and conformance status
 
-The forward/backward scan included public dispatch in `xtask/main.rs`, write-side entrypoints,
-all callers of crate-private admitted delivery, public lower storage, `scripts/`, workflow shell,
-restorations and generated runtime advertising. NE8 and LW1 were previously implicit; promotion
-shell writes, unsafe legacy retention and the unprotected-staging description are replaced above
-by their current owning-command/refusal/host behavior.
+This reconciliation covers the enforcement revision stated in Annex A. Forward and backward
+scans include dispatch, aliases, ordinary and routed writers, imported admitted-delivery aliases,
+temporary writes, workflow transport, restorations, generated advertising and arbitrary hand edits.
+The detailed private-call inventory below reuses slice 11 and adds current file/line anchors in
+[slice 13](../agents/lifecycle/s13-final-inventory-report.md#private-delivery-and-restoration).
 
-Existing source and conformance anchors (test names are searchable in the named files):
+#### Lead-gate reconciliation
 
-The following onboarding additions are specified, not installed or executed (OR-P1–OR-P14,
-[routing design, "Proving evidence and refusal coverage" and "Implementation slices"](../agents/lifecycle/support-depth-onboarding-routing-design.md#proving-evidence-and-refusal-coverage)).
-The [validation test list](../agents/lifecycle/support-depth-validation-test-list.md#onboarding-routing-cases-pending)
-records their pending cases. The existing evidence rows below do not certify these additions:
+The lead supplied these local/offline gate results from an unrestricted host. They supersede
+worker-report execution limits; they are not new runs performed for this documentation repair.
 
-- **ON1/IN1 (OR-P1, OR-P14):** prove actual empty-root bootstrap, each record-free preparation
-  checkpoint and the separate first declaration, with IN1 admission before tip advance and
-  post-tip readback. No seeded lifecycle/record stands in for ON1; only the two named transitions
-  may change registry bytes.
-- **ON2/ON3 (OR-P2, OR-P5, OR-P6, OR-P9):** the installed executable wrapper-only freeze/write
-  chain reaches both IN1 checkpoints. Extend it through repair to onboarding-bound eleven-obligation producer evidence and controller-owned reporting
-  E/files/publication, preserving acquisition/P/O/entries. A maintenance receipt cannot prove it.
-- **ON4/ON5/IN1 (OR-P3, OR-P4, OR-P7, OR-P8, OR-P13):** prove exact entry ownership, fresh
-  post-entry evaluation/render/re-admission, all-root currentness, both real shared gate phases
-  and local/final agreement. Declared-registry workspace tests must retain their assertion
-  purpose. An admission-relevant changed candidate must fail independent evaluation after a
-  local pass; concurrent state survives failure handling.
-- **Other routes and handoff (OR-P10, OR-P11):** execute onboarding declared/retained/proposed
-  destination refusals at every unsupported public entry/alias and lower caller, including
-  maintenance/onboarding wrong-owner cases and same-version retained path transfer. Broad
-  refusal remains conforming; neutral writers and public LW1 gain no bypass.
-- **Proof limits (OR-P12):** the connected credential-free installed-route test is due separately
-  from the phase C independent protected-host run. Neither stubbed gates nor the wrapper-only
-  positive prove native queue execution, shared capability advertising, another agent's
-  onboarding acceptance, production qualification or path enablement. The synthetic positive
-  stays debt-free; unsupported onboarding debt/drift changes refuse (OR-P7).
+| Slice / revision | Lead-gate result |
+| --- | --- |
+| S11 full gate, `c9920d58` | Ordinary `cargo test -p xtask --tests`: 1767 passed; declared xtask library leg: 702 passed. Failures were limited to the two `depth_evidence::native::context` ForeignLoader tests (host flakes), EAGAIN (`os error 11`) under load, and the stale-packet checkpoint repaired in `8a34a55b` |
+| S11 focused after fixes, including `8a34a55b` | `isolated_maintenance::tests::mediation_matrix` 7/7 in 2670s, including both long connected tests; `depth_routes` 4/4; `workspace_mutation` 10/10; `depth_refusal_routes` 29/29 |
+| S12 full gate, `95bc9706` | Ordinary gate: 1780 passed. Failures were limited to the same ForeignLoader pair and EAGAIN host flakes, plus five `create_candidate` tests affected by the slice-11 ON2 dry-run persistence-guard regression, repaired in PR #369 (`994b28ab` / `b272e8ab`) |
+| S12 focused, `b272e8ab` | `create_candidate` 17/17; `runtime_follow_on` 50/50; `on2_dry_run` borrow refusal 1/1; `e7_chain` 6/6; `acquired_inputs_tests` 10/10; `depth_refusal_routes` 29/29 |
 
-| Routes / obligation | Existing evidence | What is still due |
+The S11 7/7 result includes `connected_onboarding_mediation_and_admitted_writers` and
+`connected_on4_aggregate_and_restoration`, including the ON4 preparation/gate/rollback body.
+
+Earlier FR1–FR3/S6–S10 PRs likewise merged after lead full gates. Worker sandboxes could
+not open sockets: their socket-blocked/unfinished/unverified execution labels are historical
+provenance only, superseded by these lead results for the implementation checks, including
+MA5/MA6, FR1–FR3 IN1, mediation, aggregate and restoration coverage. The independent
+protected-host phase C run remains required and unauthorized. These local/offline gates do
+not substitute for real subprocess/producer/artifact issuance, protected integration or native
+queue admission/readback proof.
+
+| Boundary | Executed evidence and result | Remaining independent evidence |
 | --- | --- | --- |
-| MA1 P/O and transport, MA2 intake/delivery | `tests/agent_maintenance_prepare/depth_core.rs`: `private_preparation_plans_p_only_and_coherent_o_for_every_adopted_root`, stale-plan/refreeze/displacement cases; `tests/c4_spec_ci_wiring/{workflow_transport,acquisition_destination,acquisition_token,acquisition_refreeze}.rs`; `scripts/test_maintenance_transport.py` | Connected acquisition→freeze proof through actual supported isolated entrypoints, not shell stubs or a global parser bypass |
-| MA4 reporting/failure/restoration | `tests/agent_maintenance_execute/relay.rs`; `tests/c0_spec_validate/depth_records/acceptance/{relay,relay_boundary}.rs`; `depth_acceptance/relay.rs` | Connect executor-start capture to real evidence, audit and both final acceptance steps in the same isolated chain |
-| MA5 owning closeout | `depth_acceptance/manual/tests.rs` and `manual/tests/regressions.rs`: exact parent generation, missing due obligations, stale bindings, concurrent input/output and public lower-boundary refusals; ordinary `tests/agent_maintenance_closeout/` | Authenticated all-due positive closeout, both public manual entrypoints, preserving an older closeout on negative outcomes; the CP-P3 batch with qualified own rows, its refusals and its IN1 closeout attribution |
-| MA6 / LW1 | `depth_acceptance/manual/tests/promotions.rs`; `tests/depth_promotion.rs`: coherent ordinary promotion, stale plan, nested anchors, proposed depth record and lower packet/batch refusal | Genuine evidence-backed positive promotion after closeout/replaced working files and native queue delivery, rendered in the CP-P3 MA6 order |
-| ON1 scope / record-free IN1 (OR-P1, OR-P2, OR-P14) | `isolated_maintenance/tests/bootstrap.rs`: `bootstrap_absent_and_unselected_subject_require_exact_approval_and_scaffold`, `bootstrap_scope_refuses_records_foreign_descriptor_and_unknown_scope_without_fallback`, `finite_approval_projection_rejects_unknown_misplaced_backend_and_foreign_fields`, `bootstrap_route_absence_keeps_production_depth_refusal`, `bootstrap_scratch_view_keeps_exact_registry_bytes`, `bootstrap_checkpoint_cannot_be_reused_for_changed_candidate_or_worktree`, `bootstrap_creation_is_admitted_before_tip_and_observed_after_tip`, `bootstrap_creation_refuses_depth_tables_invented_metadata_and_non_scaffold_files`, `preparation_checkpoints_admit_governing_acquisition_and_ne3_then_observe_each_tip`, `preparation_refuses_every_binding_and_acceptance_effect`, `preparation_rename_cannot_hide_an_unrelated_file_deletion`; `bootstrap/declaration.rs`: `first_declaration_is_admitted_before_tip_and_only_captured_after_tip_readback`, `first_declaration_refuses_extra_tables_records_entries_acceptance_and_selection_changes`; existing `subject.rs`, `onboarding_scope.rs` and private dry-run controls | Later ON2–ON5 connected chain and independent protected host run; these in-process scope/IN1 proofs install no live profile or production parsing |
-| Public ON1 / connected bootstrap (OR-P1–OR-P3, OR-P11, OR-P14) | `isolated_maintenance/tests/bootstrap/public_on1.rs`: `public_on1_empty_root_scaffold_and_committed_replay`, `public_on1_raw_descriptor_uses_the_same_approval_bound_plan`, `public_on1_connected_preparation_metadata_and_first_declaration_chain` (actual ON1, compiled-template adoption, real CLI snapshot/raw help and wrapper/union/report writers, ordinary NE3, full canonical validation, admitted declaration/readback); `public_on1_refuses_foreign_descriptors_and_mixed_approval_without_writes`, `public_on1_refuses_divergent_scaffolds_and_retained_acceptance`, `public_on1_creation_admission_refuses_injected_table_record_and_entry`, `public_on1_absent_route_keeps_ordinary_success_and_depth_refusal`, `public_on1_maintenance_and_codex_controls_refuse_without_fallback`, `public_on1_rechecks_host_and_preserves_concurrent_scaffold_before_delivery`, `public_on1_installed_approval_errors_never_fall_back_to_raw_descriptor`; ordinary `onboard_agent_entrypoint` and `onboard_agent_closeout_preview` suites; `bootstrap/sweep.rs::bootstrap_creation_replays_all_parent_filesystem_conflicts` preserves ordinary backend checks and finite wrapper checks without inventing a backend | Credential-free in-process chain through declaration, extended by the ON2 row below. No producer-evidence qualification, public ON3–ON5 acceptance, live profile or independent protected host run |
-| Public ON2 / freeze and implementation IN1 (OR-P2, OR-P3, OR-P6, OR-P8, OR-P9) | `isolated_maintenance/tests/bootstrap/public_on2.rs`: `public_on2_connected_freeze_write_admission_and_observation` extends actual ON1/acquisition/declaration outputs through public P/O freeze, coherent publication, IN1 admission/observation, subprocess wrapper implementation with observed lifecycle-bound evidence, then implementation IN1 admission/observation, refusal of deleted/retargeted lifecycle objects even with an unchanged record, and post-integration second-freeze refusal; `public_on2_refuses_before_declaration_and_in1_refuses_hand_assembled_freeze`, `public_on2_in1_requires_parent_acquisition_and_intact_binding`. `public_on2_in1_refuses_lifecycle_rollback_and_closed_generation_refreeze` integrates a successful write, restores the exact pre-write enrolled state with the record intact, and verifies IN1 refusal before and after tip movement plus public dry-run refusal against the closed protected generation. `public_on2_release_watch_accepts_actual_on1_empty_current` uses actual ON1 output with an authenticated release-watch registry/approval settlement through public freeze and IN1 admission/observation, retaining descriptor checks. `isolated_maintenance/tests/runtime_follow_on/public.rs`: `runtime_follow_on_public_installed_errors_never_fall_back`, `runtime_follow_on_public_failed_candidates_preserve_record_inputs_and_truthful_diagnostics`, `runtime_follow_on_public_forged_prepared_packet_refuses_before_attempt`, `runtime_follow_on_public_delivery_preserves_concurrent_caller_and_reports_refusal`; existing `runtime_follow_on.rs` OF tests and `runtime_follow_on/authority.rs` hardened Git cases; `candidate_execution/create_lane{,_identity}_tests.rs`, unchanged MA4 suites and ordinary `tests/runtime_follow_on_entrypoint.rs` | Credential-free installed route only. Source/test presence and runtime handoff are reporting implementation checks, not independent depth E. Repair (4), onboarding producer binding (5), ON3–ON5 (6–9), independent gates and protected host run remain due |
-| ON1–ON5, NE1–NE8, LW1 | Source guards in A.1; lower-route/nested/proposed-output cases in `tests/depth_promotion.rs`; ordinary entrypoint suites | A retained-depth refusal case at every actual unsupported public entrypoint/lower boundary, with no changed protected output; source inspection alone is not that execution proof |
-| Debt | Conditional renewal/whole-row-retirement planners in `tests/support_depth_debt.rs`, `tests/support_depth/debt.rs`, retaining corroboration requirements; audit reconciliation consumers | Connected refusal of unsupported debt edits, including widened/new debt. The positive chain remains debt-free; a successful new debt writer requires separate design. Debt never waives depth |
-| Evidence | `tests/depth_evidence*.rs`, `tests/depth_ci_archive.rs`; authenticated isolated V1 profile in `depth_evidence/verdict/github/` | The D2 profile remains fixed to canonical repository, `codex/0.0.0`, Linux `controlled_channel` V1. The evidence bridge adds a second fixed isolated Codex CORE profile, per-obligation authentication and opaque evaluated results; see `support-depth-evidence-v1.md`, isolated CORE bridge, and `verdict/github/tests.rs`. Live adequacy requires implementation integration and exact independent maintainer adoption. Neither profile accepts a receipt-supplied repository or production origin. `depth_evidence/results.rs::production_results` remains empty; public-route wiring and complete-chain proof remain due |
-| IN1 / HE1 | `depth_acceptance/manual/tests/integration.rs`: forged entries/request hash, other-root generation, unchanged qualification, moving parent, unsupported lifecycle and local/final agreement; `tests/c0_spec_validate/depth_records/merge*`; `tests/c4_spec_ci_wiring/{integration_gate,depth_merge}.rs`; `scripts/test_staging_{integration,ruleset}.py`; successful PR #296 queue/push checks | End-to-end depth-positive host run and forbidden-depth candidate refusal on an isolated protected integration branch. The ordinary production merge and earlier host refusal exercises do not prove that positive chain |
-| Rollback | `workspace_mutation/tests.rs`: intervening edit/symlink/mode/removal; relay delivery conflict tests | Connected failure checks must preserve concurrent caller state and fail without a final acceptance effect |
+| Admission/history FR1 | [FR1 round 7](../agents/lifecycle/fr1-admission-history-report.md#round-7-validation) records 83 depth-acceptance, 78 verdict and 61 bootstrap passes, 35 IN1 passes. The lead full gates above supersede its four worker-limited IN1 fixtures. `public_on2_connected_freeze_write_admission_and_observation` retains higher-stage admissions without a producer and rejects rollback/history gaps | Deployed trusted emitter/source/runtime binding, exact job-log/artifact association and retention |
+| Complete-tree freeze/acquisition FR2 | `fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1`, `fr2_ma2_freeze_only_complete_tree_canonical_packet_and_real_in1`, `fr2_ma2_combined_acquisition_and_freeze_real_in1` passed with real writers and IN1. Planner I/O failures retain incomplete quarantined attempts. [FR2 results](../agents/lifecycle/fr2-freeze-planner-report.md) | Real independent acquisition authority and checked single-commit transport |
+| Reporting context/canonical discovery FR3 | `fr3_reporting_context_real_ma2_and_later_execution_population` and the genuine ON2 freeze test passed. Complete reporting populations have zero execution credit. Original execution at S verifies after real IN1 admits identical S, changed S2 refuses. Canonical request/report binding validates retained records even after an ordinary later request. [FR3 results](../agents/lifecycle/fr3-reporting-context-report.md) | Real reporting branch before candidate execution, context/admission join across jobs/retries/events |
+| ON1/ON2 | `public_on1_connected_preparation_metadata_and_first_declaration_chain` passed in S10 bootstrap coverage. `public_on2_connected_freeze_write_admission_and_observation` passed in ordinary and declared S11 runs. [S10](../agents/lifecycle/s10-readonly-gates-report.md), [S11](../agents/lifecycle/s11-mediation-matrix-report.md) | Real CLI route installation and protected host advances |
+| ON2 repair/ON3 | `public_repair_sibling_chain_preserves_frozen_generation_and_written_paths` passed in S11. `public_on3_connected_active_reporting_e_and_real_in1` and `public_on3_connected_repaired_runtime_selection_and_real_in1` passed in the final S6 three-test run. [S6](../agents/lifecycle/s6-on3-reporting-report.md), [S11](../agents/lifecycle/s11-mediation-matrix-report.md) | Actual producer/artifact issuance and deployed consumers |
+| Owning predicates | `private_publication_and_proving_bind_exact_artifact_and_record`, `each_due_obligation_missing_has_its_own_bounded_refusal`, `classification_carried_work_and_debt_refuse`, `maintenance_and_onboarding_authorities_cannot_substitute` and aggregate/adversarial tests passed. [S7](../agents/lifecycle/s7-onboarding-predicates-report.md) | Real independent all-due adoption/currentness |
+| Read-only checks | `readonly_gates_two_phases_real_checkers_and_independent_process` and `readonly_gates_proposal_runs_every_a_checker` passed, including independent child authority and every substantive A-check refusal. Final broader filter had nine passes and its explicitly launched ignored child. [S10](../agents/lifecycle/s10-readonly-gates-report.md#focused-validation) | Complete real S/T subprocess inventory and actual protected-candidate CI execution |
+| ON4 | `public_on4_connected_publication_real_in1_and_observation` passed in S8 round 1b. Exact packet/runtime validation, fresh unchanged qualification and truthful downgrade are covered. The lead S11 mediation run (7/7, 2670s) also completed ON4 preparation, aggregate and restoration. [S8](../agents/lifecycle/s8-on4-publication-report.md#refusal-ordering) | Independent protected-host subprocess/producer/queue proof |
+| Both ON5 / restoration | Final S9 five-test filter passed, including `public_on5_refusals_local_final_and_conflict_preservation` and `public_on5_release_watch_prepared_closed_real_in1_and_observation`. Four real partial-delivery replacement/removal/mode/symlink conflicts preserve concurrent state and recovery bytes. [S9](../agents/lifecycle/s9-on5-closeout-report.md#round-1-focused-validation) | Independent protected host/queue run, same-version handoff remains refused pending transition design |
+| E.8 public refusal matrix | Final S11 ordinary and declared builds each passed all 29 binary tests, lower/maintenance groups, retained/proposed lower matrix, four destination-guard unit tests and ten mechanical writer tests. Both long connected matrices completed within the lead S11 7/7 run (2670s). Exact tests are indexed below and in the [validation list](../agents/lifecycle/support-depth-validation-test-list.md#executed-slices-6-12) | Independent protected-host proof remains required |
+| E.7 implementation gate | `e7_connected_onboarding_qualified_chain`, `e7_connected_onboarding_repaired_qualified_chain`, `e7_connected_onboarding_release_watch_chain`, `e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` passed. Execution/interruption and eight-input deletion regressions passed separately. Lead post-fix `b272e8ab` results include `create_candidate` 17/17 and `runtime_follow_on` 50/50, as recorded above. [S12](../agents/lifecycle/s12-e7-connected-proof-report.md) | CP-P5 / OR-P12 independent disposable-repository proof. Fake host, modeled full-schema producer and S/T runner limits remain explicit |
+| MA5/MA6 and IN1 maintenance controls | S7 passed 41 unchanged maintenance predicates, including `positive_closeout_and_exact_entry_are_delivered_in_one_checked_batch` and `retained_closeout_promotes_after_both_working_files_are_replaced`. The unrestricted-host lead full gates above supersede the worker-only limits on ten MA5/MA6 controls and four FR1–FR3 IN1 cases. Public wrong-owner/ordinary siblings and both connected S11 matrices completed | Independent protected-host maintenance closeout/promotion/queue proof remains required and unauthorized in phase C |
+
+The complete E.7 new-entry claim is the explicit-deferral primary chain. The release-watch
+sibling uses a pre-freeze protected-authority setup seam and supplies bounded ON2→ON5 settlement
+coverage. The wrapper-only subject has eleven obligations, two exact entries, pointers at `none`,
+snapshotted metadata and zero capability mappings. Its fake producer uses real full-schema
+witness/artifact forms. Its outcomes and host terminality are modeled. ON2 copies substantive
+wrapper source/tests, and the chain's S/T runner supplies test outcomes. S10's real checking-code
+composition supplies separate evidence. The independent host run must execute actual subprocesses.
+
+S12's deletion tests execute the isolated ON3–ON5 acquired-input bodies. The earlier public
+declared-depth guard leaves deletion-specific public-dispatch diagnostics unproved. S12 also
+records existing Windows test-compilation failures outside its new platform-gated modules.
+Neither gap is counted as a passing result. Every newly cited test name was checked against the
+current source during slice 13, as recorded in its report.
 
 Only `codex`, `claude_code` and `opencode` currently have Annex-B-adopting validator specs and
 the fixed per-root CI loop. `aider` and `gemini_cli` do not: their validator specs state the
@@ -1209,10 +1294,78 @@ Caller-controlled paths do not create an exception to HE1/IN1. The `main` releas
 remains outside this staging inventory and is not certified by this refresh.
 
 This is a source inventory plus existing evidence mapping, not a path-enablement certificate.
-The production refusal, empty production evidence bridge, missing connected positive/public-route
-proof and unsupported-route negative coverage above must be resolved or retained as explicit
-refusals before the relevant scope is enabled. No future profile may turn isolated `0.0.0`
+Production refusal and the empty production evidence bridge remain in place. Completed synthetic
+implementation/refusal evidence and the outstanding independent host proof must meet Path
+enablement before any separately authorized production scope is enabled. No future profile may turn isolated `0.0.0`
 receipts, a test producer, an executor statement or a skipped obligation into production adequacy.
+
+#### E.8 route execution and private delivery reconciliation
+
+The matrix uses `tests/depth_refusal_routes.rs` for the actual binary entries and
+`isolated_maintenance::tests::mediation_matrix` for library entries and the genuine
+ON1–ON5 chain. The [slice 11 report](../agents/lifecycle/s11-mediation-matrix-report.md)
+provides the per-case inventory; the lead-gate reconciliation above supersedes its worker-only
+execution limits. Both connected matrix tests completed in the S11 focused 7/7 run (2670s),
+providing executed mediation, aggregate and restoration coverage alongside S9 and S12.
+
+| Routes | Executed tests and boundary |
+| --- | --- |
+| MA1 / MA2 | `maintenance::ma_intake_and_apply_refuse_onboarding_and_later_version_displacement` executes public preparation and cached apply for the onboarding version and an ordinary later version. The installed `unsupported_routes` test retains maintenance P-only and acquired positives |
+| MA3 | The same maintenance matrix applies a real cached refresh plan through `apply_refresh_plan`, including declaration omission |
+| MA4 | The maintenance matrix executes the public command. Both connected matrix tests execute the real relay checker on removed records, registry edits and a committed onboarding pointer effect |
+| MA5 | The maintenance matrix executes `close-agent-maintenance`, `prepare-agent-closeout` and `write_closeout_outputs`. The connected checkpoint also rejects a record write through `apply_closeout_publication`. MA5 local positive/control coverage is completed by the unrestricted-host lead full gates above |
+| MA6 | The maintenance matrix executes public promotion, including an explicit `DEPTH_LIFECYCLE_BINDING_MISSING` assertion and a valid ordinary promotion sibling. The connected checkpoint executes real promotion against valid actual onboarding output and requires the maintenance-path refusal. The unchanged pure maintenance predicates pass. The unrestricted-host lead full gates above complete the local positive controls |
+| ON1 / ON2 / ON3 / ON4 / both ON5 | Binary `mediation_matrix::onboarding::every_on_entry_refuses_onboarding_carriers_without_scope_authority` includes ON2 dry-run, repair and final `close-proving-run`. `onboarding::on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery` uses a ready ordinary approval and exercises persistence refusal on every carrier, including unrelated subject depth and removed records. The ordinary ON2 boundary guards both persistence modes before context construction. `maintenance::on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route` also requires refusal for a valid foreign depth approval under installed maintenance authority. `connected_onboarding_mediation_and_admitted_writers` crosses actual owning writers and independent IN1 admission/readback |
+| NE1 / NE2 | Binary `mediation_matrix::neutral::every_ne_command_and_alias_refuses_onboarding_carriers`; actual retained-output NE1 lower delivery in both connected checkpoints. `mediation_matrix::destinations` executes NE2 proposed records, registry outputs, directory/file aliases, `data/../data` registry output and a missing `new/../nested` prefix into an enrolled workspace, with unchanged-tree checks. The new cases are `ne2_registry_traversal_refuses_before_replacing_bindings`, `ne2_registry_directory_alias_refuses_before_replacing_bindings` and `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace`. `depth_routes::tests::checked_delivery_refuses_final_and_directory_alias_retargeting`, `checked_delivery_opens_without_following_final_symlinks` and `checked_delivery_rechecks_parent_identity_after_opening` exercise deterministic check/open/write substitutions and preserve protected bytes. Ordinary explicit outputs match the rendered bytes exactly |
+| NE3 / NE4 / NE5 | The binary neutral matrix includes each command and its historical Codex alias, subject/ordinary/nested roots and omitted alias root |
+| NE6 | The binary neutral matrix executes all three legacy snapshot commands against subject and nested nonexistent output directories |
+| NE7 / NE8 | The binary neutral matrix executes all-agent and single ordinary-agent backfill, and runtime-model write. `foreign_advertising_without_records_refuses_raw_additions` covers hand-edited capability/runtime advertising |
+| LW1 | `onboarding_retained_and_proposed_lower_writer_matrix` exercises batch/lifecycle/packet writers at direct/nested caller roots and proposed output destinations. `lower::outer_callers_refuse_enclosed_depth_destinations` covers outer caller batch/lifecycle/packet writes into separately declared and retained nested scopes, including batch removals. `lower::ordinary_lower_writers_deliver_literal_bytes` reads direct and nested lifecycle/packet outputs and compares independent literal bytes. The connected tests repeat carrier checks with actual ON3 and ON5 records |
+| IN1 / aggregate | Both connected matrix tests execute removed/malformed records, omitted/disabled declarations and deleted lifecycle bindings. An ordinary Codex-root `--tip` still refuses a removed foreign onboarding record. `connected_on4_aggregate_and_restoration` executes actual ON4 proposal effects on another agent, version and target, then gate/partial-delivery/rollback controls |
+
+Every production call of `apply_admitted_mutations`, including imported aliases, has
+the following owner. The `#[cfg(test)]` hook/failure variants in
+`workspace_mutation/delivery.rs` call the same mechanical writer under their owning
+controllers. Their compilation scope is test-only.
+
+| Private caller | Owning admission and executed coverage |
+| --- | --- |
+| `workspace_mutation/delivery.rs::apply_mutations` | Public workspace, proposed-output and enclosed-destination guards precede mechanics. Binary lower tests and the library lower matrix execute all three public storage boundaries |
+| `agent_lifecycle/storage.rs::write_json_file` | Its callers are `write_lifecycle_state` and `write_publication_ready_packet`, after their workspace/proposed-output checks and typed validation. Lifecycle storage also preserves the prior depth object. The lower matrix executes both callers |
+| `agent_maintenance/prepare/guard.rs::apply` | MA1/MA2 rebuild the exact bound plan, check reporting effects, route/input/output observations and the complete freeze transition before delivery. Maintenance preparation positives and the E.8 intake/apply matrix exercise this path |
+| `freeze_transition/delivery.rs::apply` | Its production caller is ON2 dry-run freeze in `runtime_follow_on/depth.rs`. Captured approval, derived freeze, complete reporting proposal, view and route are checked first. The connected chain executes it |
+| `candidate_execution/candidate.rs::deliver_with` | MA4 and ON2 observe execution unconditionally, check candidate/Git/envelope/frozen inputs, admit reporting effects, then deliver expected-before output and host diagnostics. The genuine ON2 chain executes it. The lead full gates complete the local MA4 evidence-channel controls; independent host issuance remains phase C |
+| `candidate_execution/create_lane.rs::execute,recheck` | ON2 authenticates the prepared contract before its attempt write. Recheck temporarily restores exactly its own attempt bytes under the index lock, checks captured authority and reinstates the attempt with expected-before mutations. The connected ON2 chain executes these three call sites |
+| `agent_maintenance/closeout_proposal.rs::Proposal::apply_with` | `Proposal::apply` supplies manual-closeout admission, after snapshot verification and exact proposed-view checks. No production caller supplies a replacement callback. Pure maintenance predicate regressions and MA5 controls cover the owning rules |
+| `depth_acceptance/publication.rs::Proposal::apply_closeout_publication` | Both MA5 writers and `CloseoutPlan::apply` re-admit current request/marker/P/O/E, exact closeout entry and the scoped aggregate publication, then recheck captured authority. The E.8 checkpoint refuses a proposed record output here |
+| `manifest_promotion.rs::PromotionPlan::apply` | MA6 rechecks exact validated revision/tip and all proposal inputs, re-runs maintenance promotion admission, then rechecks captured authority. Actual onboarding substitution refuses. The lead full gates complete the local maintenance controls; protected-host proof remains phase C |
+| `depth_evidence/staged.rs::write` | Invocation-bound MA4 evidence offer/channel, bundle identity, Event/P/O, allowed reporting paths and all bytes/digests are checked. Later relay and IN1 independently authenticate E. Local connected coverage is completed by the lead full gates above; independent protected-host channel/artifact issuance remains phase C |
+| `repair_runtime_evidence/routed.rs::deliver` | ON2 repair captures its protected runtime-integrated generation, exact successful contract/written paths and frozen inputs, preserves record/entries and checks the aggregate reporting proposal before view/route rechecks. The existing connected public repair sibling is the execution anchor |
+| `prepare_publication/routed.rs::run` | ON3 assembles authenticated reporting E/files, checks complete aggregate reporting and relay invariants in the bound view, then rechecks view and captured route. Both E.8 connected tests execute actual ON3 |
+| `publication_refresh/routed.rs::deliver` | ON4 derives its exact current Publication entry, evaluates the full aggregate post-entry proposal, executes real proposal A checks and bounded test S/T execution, re-evaluates and rechecks before delivery. Both connected matrix tests execute the owner |
+| `depth_acceptance/onboarding/on5.rs::deliver` | Prepared ON5 checks its exact reporting-only batch and relay invariants. Final ON5 derives the exact proving entry, freshly evaluates the proposed record and checks aggregate effects. Both recheck their captured view/route before mechanics. The full connected matrix executes both entries |
+
+Restoration writers share their owner's admission or retain an outer unsupported-depth
+refusal. The following inventory includes raw restoration and mechanical rollback.
+
+| Restoration writer | Guard and execution anchor |
+| --- | --- |
+| Ordinary ON3 `prepare_publication.rs::write_publication_transition` raw lifecycle rewrite and temporary-packet cleanup | `run_in_workspace` refuses unsupported depth before `run_body`. Routed ON3 uses one expected-before batch. Binary ON3 carrier refusals and the connected ON3 owner execute both boundaries |
+| Ordinary ON4 `publication_refresh.rs::restore_snapshots`, including removal of newly created paths | The ordinary write entry refuses unsupported depth before planning/delivery. Restored files also pass public LW1. Binary ON4 carrier refusals pin that outer boundary |
+| Routed ON4 mechanical rollback | `workspace_mutation::rollback` compares delivered bytes, mode and link kind and preserves intervening replacements/removals/chmod/symlinks plus recovery bytes. `connected_on4_aggregate_and_restoration` executes all four conflict cases after actual writes |
+| Prepared/final ON5 mechanical rollback | Both use `on5::deliver` after owning checks and the same expected-before rollback. `connected_onboarding_mediation_and_admitted_writers` executes final ON5's four partial-delivery conflict cases |
+| ON2 attempt restoration and reinstatement | `create_lane::recheck` requires exact owned attempt bytes and the index lock. The actual connected ON2 entry executes both writes |
+| Ordinary/routed ON2 repair restoration | Ordinary raw backup/lifecycle restoration retains the outer unsupported-depth refusal. Routed repair uses its checked batch and shared rollback. Public repair carrier refusals and the connected repair sibling cover the boundaries |
+| Shared batch backup replacement, rollback and MA4 index unpublication | All private callers above retain their owning checks. Backup restoration compares delivered bytes/modes/kinds, preserves conflicts and continues restoring other owned outputs. Candidate finalization conditionally unpublishes exactly the index entries it introduced |
+
+The private candidate index also has a restoration writer at
+`xtask/candidate_execution/delivery_index.rs:364`, with reinstatement at `:384`. It swaps only
+its jailed independent-candidate index around validation and restores the captured executor
+index. Caller evidence publication/unpublication remains under the index lock, whose private
+work-file install and cleanup are `xtask/agent_maintenance/execute/index_lock.rs:78` and `:82`.
+The S12 completed ON2 chain exercises candidate validation. S9 supplies completed shared batch
+restoration evidence. The full restoration/call-site guard inventory is in the
+[slice-13 report](../agents/lifecycle/s13-final-inventory-report.md#private-delivery-and-restoration).
 
 ### A.5 Promotion after the working files were replaced
 
@@ -1542,7 +1695,9 @@ serialized as the 32 bytes of `{"a":["é\n",true,null],"z":"a"}`, in which `é` 
 
 ### B.8 Present behavior
 
-Source references are to `staging` at `f61534be` and use the abbreviations of Annex A. Today:
+The following is the historical `f61534be` inventory, with later D6/D7 notes kept in their
+original sequence. Current source behavior and executed results are in Annex A/A.4.
+Historical findings follow.
 
 - `xtask/depth_record.rs` reads a record and decides what B.6 and B.7 require, the digest of
   B.5, the comparison of B.4, and whether a record states what a maintenance request froze. It is

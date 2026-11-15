@@ -1,6 +1,10 @@
 //! The governing data `onboard-agent` scaffolds passes `manifest-validate` as written, and drives
 //! the real manifest commands.
 
+#[path = "../support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -27,6 +31,14 @@ fn repo_root() -> PathBuf {
 /// validator's workspace-wide publication check reads. Nothing of the onboarded agent is seeded.
 fn seed_published_roots(fixture: &Path) {
     let repo = repo_root();
+    let ordinary =
+        xtask::agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
+            .unwrap();
+    let prefixes: Vec<String> = ordinary
+        .agents
+        .iter()
+        .map(|entry| format!("{}/", entry.manifest_root))
+        .collect();
     let listed = Command::new("git")
         .args([
             "ls-files",
@@ -42,6 +54,11 @@ fn seed_published_roots(fixture: &Path) {
         .expect("utf-8")
         .split('\0')
         .filter(|p| !p.is_empty())
+        .filter(|p| {
+            !p.starts_with("cli_manifests/")
+                || p.starts_with("cli_manifests/support_matrix/")
+                || prefixes.iter().any(|prefix| p.starts_with(prefix))
+        })
     {
         let to = fixture.join(path);
         fs::create_dir_all(to.parent().expect("parent")).expect("mkdir");

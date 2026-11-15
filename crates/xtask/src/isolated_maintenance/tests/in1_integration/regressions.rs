@@ -1,4 +1,8 @@
 //! Review regressions for authenticated ref binding and byte-oriented Git objects.
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -12,7 +16,7 @@ fn assert_proposal_error_precedes_binding(missing_tracking_ref: bool) {
         for committed in [false, true] {
             let f = Fixture::new_for(subject);
             if onboarding {
-                let canonical = include_str!("../../../../data/agent_registry.toml");
+                let canonical = registry_fixture::undeclared_registry();
                 let declared = include_str!("../../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml");
                 write(
                     f.root.path(),
@@ -158,6 +162,9 @@ struct ParentRace {
 }
 const PARENT: &str = "refs/heads/in1-parent";
 impl Api for ParentRace {
+    fn admissions(&self) -> Result<Arc<dyn crate::depth_acceptance::admission::Host>, String> {
+        self.api.admissions()
+    }
     fn json(&self, endpoint: &str) -> Result<serde_json::Value, String> {
         if endpoint == "repos/fixture/isolated/branches/staging" {
             match self.reads.fetch_add(1, Ordering::SeqCst) + 1 {

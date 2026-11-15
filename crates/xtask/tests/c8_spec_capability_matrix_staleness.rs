@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,9 +48,13 @@ fn seed_fixture_workspace(fixture_root: &Path) {
         &fixture_root.join("Cargo.toml"),
         "[workspace]\nmembers = []\n",
     );
-    copy_repo_file(fixture_root, "crates/xtask/data/agent_registry.toml");
-    let registry = xtask::agent_registry::AgentRegistry::load(&repo_root())
-        .expect("load the committed agent registry");
+    write_text(
+        &fixture_root.join("crates/xtask/data/agent_registry.toml"),
+        registry_fixture::undeclared_registry(),
+    );
+    let registry =
+        xtask::agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
+            .expect("parse ordinary fixture registry");
     for entry in &registry.agents {
         copy_repo_file(
             fixture_root,

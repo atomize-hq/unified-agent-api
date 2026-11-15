@@ -359,3 +359,34 @@ fn write_json(path: &Path, value: &serde_json::Value) -> Result<(), Error> {
     fs::write(path, bytes)
         .map_err(|err| Error::Internal(format!("write {}: {err}", path.display())))
 }
+
+/// Preserve the successful generation's exact inventory bytes and lifecycle digest during repair.
+pub(crate) fn preserve_written_paths(
+    run: &Path,
+    relative: &str,
+    approval: &ApprovalArtifact,
+    inventory: &[u8],
+) -> Result<(), Error> {
+    let paths: Vec<String> =
+        serde_json::from_slice(inventory).map_err(|e| Error::Validation(e.to_string()))?;
+    let status_path = run.join("run-status.json");
+    let mut status: serde_json::Value = serde_json::from_slice(
+        &fs::read(&status_path).map_err(|e| Error::Internal(e.to_string()))?,
+    )
+    .map_err(|e| Error::Internal(e.to_string()))?;
+    status["written_paths"] = json!(paths);
+    write_json(&status_path, &status)?;
+    fs::write(run.join("written-paths.json"), inventory)
+        .map_err(|e| Error::Internal(e.to_string()))?;
+    fs::write(
+        run.join("run-summary.md"),
+        render_runtime_summary(
+            approval,
+            relative,
+            &paths,
+            "Runtime Evidence Repair",
+            "repair-runtime-evidence",
+        ),
+    )
+    .map_err(|e| Error::Internal(e.to_string()))
+}

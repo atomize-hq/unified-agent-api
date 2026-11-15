@@ -26,7 +26,9 @@ pub struct Context<'a> {
 
 impl Revision {
     pub fn workspace(root: &Path) -> Result<Self, String> {
-        Self::load(&Source::workspace(root)?)
+        let source = Source::workspace(root)?;
+        let registry = super::check_registry(root, &source)?;
+        Self::with_registry(&source, &registry)
     }
     pub fn tip(root: &Path, revision: &str) -> Result<Self, String> {
         Self::load(&Source::tip(root, revision)?)

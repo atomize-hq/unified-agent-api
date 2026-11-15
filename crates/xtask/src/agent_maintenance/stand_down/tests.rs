@@ -1,3 +1,7 @@
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -6,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use super::*;
 
-const SEEDED_REGISTRY: &str = include_str!("../../../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = registry_fixture::undeclared_registry();
 
 const REQUEST: &str = "artifact_version = \"1\"\nrequest_recorded_at = \"2026-09-19T08:03:11Z\"\n";
 

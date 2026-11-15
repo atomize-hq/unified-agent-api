@@ -102,7 +102,24 @@ pub(super) fn detect(
             }
         }
     }
-    for version in after.records.keys() {
+    detect_versions(
+        before,
+        after,
+        effects,
+        &after.records.keys().cloned().collect(),
+    )
+}
+
+/// Owning aggregate checks may also inspect accepting destinations without a depth record.
+/// Ordinary comparison retains its existing record-scoped version population above.
+pub(super) fn detect_versions(
+    before: &View,
+    after: &View,
+    effects: &mut BTreeSet<Effect>,
+    versions: &BTreeSet<String>,
+) -> Result<(), String> {
+    let root = &after.entry.manifest_root;
+    for version in versions {
         let path = format!("{root}/versions/{version}.json");
         let read = |view: &View| -> Result<Value, String> {
             let Some(value) = view.optional_json(&path)? else {

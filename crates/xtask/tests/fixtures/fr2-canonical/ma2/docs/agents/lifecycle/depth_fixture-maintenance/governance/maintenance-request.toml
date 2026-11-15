@@ -1,0 +1,105 @@
+artifact_version = "2"
+agent_id = "depth_fixture"
+trigger_kind = "upstream_release_detected"
+basis_ref = "cli_manifests/depth_fixture/latest_validated.txt"
+opened_from = ".github/workflows/agent-maintenance-open-pr.yml"
+requested_control_plane_actions = [
+  "packet_doc_refresh",
+]
+request_recorded_at = "2026-11-03T00:00:00Z"
+request_commit = "abcdef0"
+
+[runtime_followup_required]
+required = false
+items = []
+
+[detected_release]
+detected_by = "fixture"
+current_validated = "0.1.0"
+target_version = "0.2.0"
+latest_stable = "0.3.0"
+version_policy = "latest_stable_minus_one"
+source_kind = "github_releases"
+source_ref = "fixture/isolated"
+dispatch_kind = "packet_pr"
+dispatch_workflow = "agent-maintenance-open-pr.yml"
+branch_name = "automation/depth_fixture-maintenance-0.2.0"
+
+[support_depth]
+policy_identity = "d3132eb6d8b5af674505ddf9a1d910643e1913a01d14abe93bdfceca8f4de389"
+obligations_identity = "0b966187a19ec1ac935bcd13f0aca9ddaa6f4ee60b7f2cb12846785f43114f50"
+
+[support_surface_audit]
+required = true
+surface_kinds = [
+  "commands",
+  "subcommands",
+  "flags",
+  "global_flags",
+  "positional_args",
+]
+excluded_surface_kinds = [
+  "tui_only",
+]
+allowed_deferrals = [
+  "upstream_not_machine_exposed",
+  "platform_evidence_missing",
+  "requires_new_infra",
+  "requires_new_architectural_seam",
+  "outside_registry_maintenance_write_envelope",
+]
+pre_run_debt_count = 0
+expected_post_run_debt_count = 0
+
+[execution_contract]
+executor = "execute-agent-maintenance"
+prompt_template_path = "docs/agents/lifecycle/depth_fixture-maintenance/governance/execute-agent-maintenance-prompt.md"
+prompt_sha256 = "9df6511586dad42060921e6766dd1d3edae9307b16dc4d1cccb61e95340b44d8"
+pr_summary_path = "docs/agents/lifecycle/depth_fixture-maintenance/governance/pr-summary.md"
+closeout_path = "docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-closeout.json"
+requires_manual_closeout = true
+writable_surfaces = [
+  "docs/agents/lifecycle/depth_fixture-maintenance/**",
+  "crates/depth_fixture/**",
+  "crates/agent_api/**",
+  "cli_manifests/depth_fixture/artifacts.lock.json",
+  "cli_manifests/depth_fixture/snapshots/0.2.0/**",
+  "cli_manifests/depth_fixture/reports/0.2.0/**",
+  "cli_manifests/depth_fixture/versions/0.2.0.json",
+  "cli_manifests/depth_fixture/wrapper_coverage.json",
+  "cli_manifests/support_matrix/current.json",
+  "docs/specs/unified-agent-api/support-matrix.md",
+  "crates/agent_api/src/runtime_support_data.rs",
+  "docs/specs/unified-agent-api/non-tui-support-debt.md",
+]
+read_only_inputs = [
+  "docs/agents/lifecycle/depth_fixture-maintenance/OPS_PLAYBOOK.md",
+  "docs/agents/lifecycle/depth_fixture-maintenance/CI_WORKFLOWS_PLAN.md",
+  "docs/agents/lifecycle/depth_fixture-maintenance/governance/execute-agent-maintenance-prompt.md",
+  ".github/workflows/agent-maintenance-open-pr.yml",
+]
+ordered_commands = [
+  "cargo fmt --all",
+  "cargo run -p xtask -- codex-validate --root cli_manifests/depth_fixture",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+green_gates = [
+  "cargo fmt --all",
+  "cargo run -p xtask -- codex-validate --root cli_manifests/depth_fixture",
+  "cargo run -p xtask -- support-matrix --check",
+  "cargo run -p xtask -- capability-matrix --check",
+  "cargo run -p xtask -- capability-matrix-audit",
+  "make preflight",
+]
+
+[execution_contract.recovery]
+recreate_packet_command = "cargo run -p xtask -- refresh-agent --request docs/agents/lifecycle/depth_fixture-maintenance/governance/maintenance-request.toml --write"
+reopen_pr_body_path = "docs/agents/lifecycle/depth_fixture-maintenance/governance/pr-summary.md"
+reopen_pr_branch = "automation/depth_fixture-maintenance-0.2.0"
+notes = [
+  "If PR creation fails after packet generation, rerun packet regeneration from the frozen request and reopen the PR from the generated pr-summary path.",
+  "If the local execution-host preflight (local Codex CLI host via execute-agent-maintenance) fails, fix the Codex binary/auth state and rerun `execute-agent-maintenance --dry-run` before write mode.",
+]

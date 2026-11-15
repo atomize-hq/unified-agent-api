@@ -1,6 +1,9 @@
 //! Invocation-local isolated maintenance binding. Scope and freshness never grant admission.
 // The foundation deliberately has no installed profile or production bound-Proposal caller.
 #![allow(dead_code)]
+pub(crate) mod acquisition;
+mod admission;
+pub(crate) use admission::reporting_host;
 mod host;
 pub(crate) mod onboarding;
 mod scope;
@@ -19,6 +22,9 @@ use std::{
 
 trait Api: Send + Sync {
     fn json(&self, endpoint: &str) -> Result<Value, String>;
+    fn admissions(&self) -> Result<Arc<dyn crate::depth_acceptance::admission::Host>, String> {
+        Err("protected IN1 publication transport is not installed".into())
+    }
 }
 #[derive(Clone)]
 struct Repository {
@@ -27,6 +33,7 @@ struct Repository {
     name: &'static str,
 }
 // Source-installed authority only. No Deserialize, environment loader, public constructor or receipt.
+#[derive(Clone)]
 struct Profile {
     isolated: Repository,
     canonical: Repository,
@@ -130,13 +137,18 @@ pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
     if let Some(registry) = candidate_registry(root).map_err(RegistryError::Isolated)? {
         return Ok(registry);
     }
-    match route(root).map_err(RegistryError::Isolated)? {
+    let result = match route(root).map_err(RegistryError::Isolated)? {
         Some(route) => route
             .registry(root)
             .cloned()
             .map_err(RegistryError::Isolated),
         None => AgentRegistry::load(root).map_err(|err| RegistryError::Production(err.to_string())),
+    };
+    #[cfg(test)]
+    if result.is_ok() {
+        tests::fixture::registry_observed();
     }
+    result
 }
 /// A resolved route and its scoped registry, captured when an MA4 execution started. Only
 /// [`Route::capture`] mints one. MA4's independent candidate cannot resolve the route itself, so
@@ -274,6 +286,7 @@ pub(crate) struct EvidenceHost {
     id: u64,
     owner: u64,
     tip: String,
+    admission: Option<crate::depth_acceptance::admission::Publication>,
 }
 impl EvidenceHost {
     pub(crate) fn repository(&self) -> &'static str {
@@ -289,12 +302,24 @@ impl EvidenceHost {
         &self.tip
     }
     #[cfg(test)]
+    pub(crate) fn for_admission_test(
+        repository: &'static str,
+        tip: &str,
+        admission: crate::depth_acceptance::admission::Publication,
+    ) -> Self {
+        Self {
+            admission: Some(admission),
+            ..Self::for_test(repository, tip)
+        }
+    }
+    #[cfg(test)]
     pub(crate) fn for_test(repository: &'static str, tip: &str) -> Self {
         Self {
             repository,
             id: 10,
             owner: 20,
             tip: tip.into(),
+            admission: None,
         }
     }
 }
@@ -309,6 +334,7 @@ pub(crate) fn evidence_host(root: &Path) -> Result<EvidenceHost, String> {
     Context::resolve(root, LIVE_PROFILE, Arc::new(host::Github))?.evidence_host(root)
 }
 
+#[derive(Clone)]
 pub(crate) struct Context {
     profile: Profile,
     api: Arc<dyn Api>,
@@ -346,6 +372,10 @@ impl Context {
         result.recheck(&result.root)?;
         Ok(result)
     }
+    /// The installed profile's single compiled subject.
+    pub(crate) fn subject_agent(&self) -> &'static str {
+        self.profile.subject.agent_id
+    }
     pub(crate) fn recheck(&self, root: &Path) -> Result<(), String> {
         if root.canonicalize().map_err(|e| e.to_string())? != self.root
             || Workspace::read(&self.root, &self.profile)? != self.workspace
@@ -376,6 +406,7 @@ impl Context {
             id: self.profile.isolated.id,
             owner: self.profile.isolated.owner,
             tip: self.host.isolated_tip.clone(),
+            admission: Some(self.admission_publication()?),
         })
     }
     pub(crate) fn registry(&self, root: &Path) -> Result<&AgentRegistry, String> {
@@ -634,3 +665,12 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, unix))]
+pub(crate) use tests::onboarding_producer_workspace;
+
+#[cfg(test)]
+pub(crate) use tests::admission_fixture;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) use tests::connected_onboarding_publication;

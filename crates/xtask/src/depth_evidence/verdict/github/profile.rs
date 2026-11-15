@@ -16,7 +16,12 @@ pub(super) const EXECUTOR: &str = "github-actions:rust-tests/isolated-channel-v1
 pub(super) const REVIEW: &str = "maintainer-mapping-v1";
 
 pub(super) fn original_for(source: &Source, p: Profile) -> Result<DepthRecord, String> {
-    let record = p.record(&source.read(p.fixture())?)?;
+    use crate::depth_ci::profile::GenerationResolver;
+    let record = p
+        .resolve_generation(source)?
+        .ok_or("generation unavailable")?
+        .record;
+    depth_ci::onboarding::check(source, p, &record)?;
     if record.execution.is_some() || !record.acceptance_entries.is_empty() {
         return Err("fixture is not frozen P/O".into());
     }
@@ -173,6 +178,7 @@ pub(super) fn validate_witness(
         return Err("wrong exact test executable/case population".into());
     }
     w.graph.closure()?;
+    depth_ci::onboarding::check_graph(&built, p, &original, &w.graph)?;
     if let Some(scope) = p.requirements() {
         let prefix = format!("{scope}/");
         let claimed: std::collections::BTreeSet<_> = w

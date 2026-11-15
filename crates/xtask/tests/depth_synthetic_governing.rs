@@ -1,6 +1,14 @@
 //! The synthetic subject's isolated governing-data templates (SA-P1), checked against the reviewed
 //! synthetic record and driven through the real acquisition and manifest commands.
 
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -11,7 +19,7 @@ use serde_json::Value;
 use xtask::{agent_registry::AgentRegistry, support_depth::resolve_policy};
 
 const GOVERNING: &str = "tests/fixtures/depth-synthetic/governing";
-const CANONICAL: &str = include_str!("../data/agent_registry.toml");
+const CANONICAL: &str = registry_fixture::undeclared_registry();
 const TARGET: &str = "x86_64-unknown-linux-gnu";
 const DEBT: &str = "### `support-debt-authorization-contract-target-version-v1`\n";
 
@@ -113,11 +121,23 @@ fn the_manifest_root_adopts_annex_b_and_validates_the_acquired_binary() {
 
 #[test]
 fn the_canonical_registry_never_lists_the_synthetic_agent() {
-    let canonical = AgentRegistry::parse(CANONICAL).unwrap();
-    assert!(canonical.find("depth_fixture").is_none());
-    assert!(!Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../cli_manifests/depth_fixture")
-        .exists());
+    let production = AgentRegistry::parse(CANONICAL).unwrap();
+    assert!(production.find("depth_fixture").is_none());
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let candidate = candidate_registry::registry(&root);
+    if let Some(entry) = candidate.find("depth_fixture") {
+        assert_eq!(entry.manifest_root, "cli_manifests/depth_fixture");
+        assert!(entry.support_depth.is_some());
+        assert!(entry.backend_module.is_none());
+        assert!(root.join(&entry.manifest_root).is_dir());
+        assert!(root
+            .join(&entry.manifest_root)
+            .join("VALIDATOR_SPEC.md")
+            .is_file());
+    } else {
+        assert!(!root.join("cli_manifests/depth_fixture").exists());
+    }
+    assert_eq!(candidate_registry::registry(&root), candidate);
 }
 
 fn xtask(cwd: &Path, args: &[&str]) -> String {

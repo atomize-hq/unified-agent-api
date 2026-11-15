@@ -1,8 +1,11 @@
 //! Check 9: semantic acceptance detection and current record-wide entry matching.
+mod adequacy;
+pub(crate) mod admission;
 mod artifacts;
 mod input;
 mod integration;
 mod isolated;
+pub(crate) mod onboarding;
 #[cfg(test)]
 pub(crate) use isolated::Host as IsolatedHost;
 mod manifest;

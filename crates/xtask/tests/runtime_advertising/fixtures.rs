@@ -1,16 +1,19 @@
+#[path = "../support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 
 pub fn fixture() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
-    for path in [
-        "Cargo.toml",
-        "crates/agent_api/Cargo.toml",
-        "crates/xtask/data/agent_registry.toml",
-    ] {
+    for path in ["Cargo.toml", "crates/agent_api/Cargo.toml"] {
         let dest = temp.path().join(path);
         std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
         std::fs::copy(workspace().join(path), dest).unwrap();
     }
+    let registry = temp.path().join("crates/xtask/data/agent_registry.toml");
+    std::fs::create_dir_all(registry.parent().unwrap()).unwrap();
+    std::fs::write(registry, registry_fixture::undeclared_registry()).unwrap();
     fn copy_tree(from: &std::path::Path, to: &std::path::Path) {
         std::fs::create_dir_all(to).unwrap();
         for entry in std::fs::read_dir(from).unwrap() {

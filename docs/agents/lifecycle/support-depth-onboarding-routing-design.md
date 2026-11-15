@@ -59,7 +59,7 @@ isolated registry is not admission.
 | --- | --- | --- |
 | 1 — actual changed values determine touched tuples | `xtask/depth_acceptance/mod.rs:81-133` combines manifest, artifact and aggregate publication detectors. `publication.rs:149-192` detects qualification, advertising and runtime effects; `artifacts.rs:275-344` charges semantic closeouts and retargeted lifecycle assertions. | ON4 cannot narrow admission to its approval's agent. Its complete aggregate proposal must be compared, including unchanged qualifications and other agents' rows. |
 | 2 — an unenrolled request cannot rewrite an enrolled record | Guards scan declarations, retained records and enclosing roots (`xtask/depth_routes.rs:9-49`), and proposed record/registry destinations (`:55-83`). IN1 preserves old records, prefix entries and selection (`xtask/depth_acceptance/integration.rs:217-228`). Relay preserves Event/P/O/entries (`relay.rs:74-99`). | Execute these guards with onboarding retained records and an omitted declaration, not only maintenance fixtures. ON1 replay must not reset an existing binding. |
-| 3 — authority per tuple under owning path | Maintenance closeout and promotion explicitly require maintenance ownership (`xtask/depth_acceptance/manual.rs:177-206`; `promotion.rs:129-146`). Current-binding derivation reads maintenance requests for closeout (`xtask/support_depth/closeout.rs:58-92`). | Reuse common adequacy, not maintenance Event/request/marker authority. No onboarding owning predicate exists. |
+| 3 — authority per tuple under owning path | Maintenance closeout and promotion explicitly require maintenance ownership (`xtask/depth_acceptance/manual.rs:177-206`; `promotion.rs:129-146`). Current-binding derivation reads maintenance requests for closeout (`xtask/support_depth/closeout.rs:58-92`). | Slice 7 extracts path-neutral adequacy into `depth_acceptance/adequacy.rs` and adds private exact onboarding publication/proving predicates, aggregate effect allowlists and proposed evaluation in `depth_acceptance/onboarding/`, with current policy/O derivation in `support_depth/onboarding.rs`. Public ON4/ON5 and IN1 onboarding acceptance remain refused. See the [slice-7 report](s7-onboarding-predicates-report.md) for executed tests and limits. |
 | 4 — no acceptance on another path's tuple | IN1 rejects onboarding accepting lifecycle effects and requires maintenance authority even for unchanged qualification (`xtask/depth_acceptance/integration.rs:234-250`, `:281-331`). The isolated scope requires one path and a matching Event on every retained record (`xtask/isolated_maintenance/scope.rs:95-148`). | Keep MA1–MA6 unable to accept onboarding tuples after ON routes gain positives. ON routes must similarly refuse maintenance-owned acceptance destinations. Reporting displacement remains governed by Later versions. |
 | 5 — every caller of a lower writer is mediated | Public mutation delivery refuses depth before delegating to private mechanics (`xtask/workspace_mutation/delivery.rs:4-21`). Public lifecycle/packet storage independently refuses (`xtask/agent_lifecycle/storage.rs:54-107`). Private ON2 freeze/candidate paths already use admitted mechanics after their own checks. | Add private checked ON owners; do not relax public LW1 or neutral writers because an isolated route exists. Inventory temporary writes, gate execution, restoration and every admitted-delivery caller too. |
 | 6 — omitted optional scope never narrows touched set | Workspace guards do not depend on an optional depth argument; they inspect ancestors and retained records (`xtask/depth_routes.rs:9-39`). IN1 enumerates the union of old/new registered agents before requested-root narrowing (`xtask/depth_acceptance/integration.rs:124-180`; `xtask/manifest_validate/depth/merge.rs:44`). | Add onboarding tests for other roots, an ordinary requested version/agent, proposed records and nested output destinations. Malformed/deleted binding is an error, not absence. |
@@ -360,8 +360,22 @@ such in results and cannot close those requirements.
 
 ## Implementation slices
 
-Every identified slice is one reviewed PR: fourteen PRs, retaining the slice ids. The explicit
-landing order is **0 → 1 → 2 → 3 → 5 → 4 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+The original fourteen slices retain their ids. The round-2
+[freeze/readiness design](support-depth-freeze-readiness-design.md#ordered-implementation-sub-slices)
+specifies three separately reviewable PRs into the integration branch after existing slices 0–3
+and 5. The remaining landing order is
+**4 → FR1 → FR2 → FR3 → 6 → 7 → 10 → 8 → 9 → 11 → 12 → 13**.
+FR1 delivers versioned IN1 admission/emission, fake-host exact-job publication/commitments and
+independent bounded history/progression, closing slice 5's deferred unobserved-history rollback.
+FR2 shares an exact pure transition planner with real MA2/ON2 freeze writers and installs IN1's
+complete expected-tree check. FR3 adds trusted collector reporting context, canonical MA2 binding
+for collection/discovery, population classification, the noncircular evaluator join, genuine MA2/ON2
+freeze positives, refusal coverage and available evaluation-time source-currentness proofs.
+Their write scopes, dependencies, minimum tests and fake-host limits are in that design. All are
+pending. Production/live activation requires phase-C emitter isolation and exact host transport,
+including a reviewed workflow-layout amendment if the existing layout cannot provide isolation.
+Slices 6–9 consume FR1–FR3 for ON3 reporting E, owning predicates and real ON4/ON5 operations,
+proving protected-closure stability through those actual writers as they connect.
 The connected fixture chain grows from slices 2–3: each later slice consumes actual preceding
 outputs and adds its checkpoint; slice 12 finishes and documents it rather than first connecting
 independently seeded positives. These are future write scopes; this packet writes only
@@ -487,6 +501,10 @@ against the final enforcement revision. No slice installs a live profile or prod
     checkpoints; refuse a hand-assembled record.
 
 - **Slice 5 — Onboarding producer Event binding.**
+  - Freeze/readiness follow-on status, 2026-11-13 — the genuine historical-freeze positive and
+    progression against authenticated IN1 history, including a higher-stage admitted ancestor
+    without a producer run, require the shared slice above. Observed-source progression and the
+    existing closure-refusal characterization remain the implemented boundary.
   - Content: finite onboarding binding of the existing synthetic producer, exact approval-linked
     population authentication and fixture/adoption identities. Keep cases/receipt schema/obligations.
   - Write scope: `xtask/depth_ci/profile.rs`, relevant collector/archive code,
@@ -515,10 +533,14 @@ against the final enforcement revision. No slice installs a live profile or prod
   - Write scope: `xtask/prepare_publication.rs`, `xtask/prepare_publication/`, shared private assembly
     call site, `xtask/depth_acceptance/{publication,integration}.rs` for the reporting dispatch and
     new installed-route reporting tests. Keep the executor record immutable.
-  - Dependencies: 3, 5 and 4. Proving tests: real assembly files bound by delivered E, active-run selection,
+  - Dependencies: 3, 5, 4 and FR1–FR3. Proving tests: real assembly files bound by delivered E, active-run selection,
     repaired-run alternative, stale/missing evidence and no-entry/no-qualification assertions.
 
 - **Slice 7 — Onboarding owning predicates, without public accepting writes.**
+  - Status: private predicate implementation is in `depth_acceptance/onboarding/`, with shared
+    adequacy in `depth_acceptance/adequacy.rs` and current policy/O derivation in
+    `support_depth/onboarding.rs`. Public ON4/ON5 and IN1 onboarding acceptance remain refused.
+    The [slice-7 report](s7-onboarding-predicates-report.md) records focused validation and limits.
   - Content: factor common adequacy, add exact onboarding binding/currentness and publication/proving
     entry derivation, strict debt-free boundary, effect allowlists and read-only proposed evaluation.
   - Write scope: `xtask/depth_acceptance/` focused onboarding/common modules, narrow changes to

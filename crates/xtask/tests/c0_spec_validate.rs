@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -5,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const VERSION: &str = "0.61.0";
 const REPORTED_VERSION: &str = "0.60.0";
 const TS: &str = "1970-01-01T00:00:00Z";

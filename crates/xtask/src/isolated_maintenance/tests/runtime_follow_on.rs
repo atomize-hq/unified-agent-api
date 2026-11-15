@@ -1,15 +1,36 @@
 //! Slice 5: only the installed synthetic onboarding route can freeze a dry-run packet.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{agent_lifecycle as life, runtime_follow_on as runtime};
 use sha2::{Digest, Sha256};
 
 #[path = "runtime_follow_on/authority.rs"]
 mod authority;
+#[cfg(unix)]
+#[path = "bootstrap/e7_chain/execution.rs"]
+mod e7_chain;
 #[path = "runtime_follow_on/public.rs"]
 mod public;
 
 #[path = "../../prepare_publication/acquired_inputs_tests.rs"]
 mod acquired_inputs_tests;
+
+#[test]
+fn e7_executor_module_mounts_are_platform_gated() {
+    let mounts = include_str!("runtime_follow_on.rs");
+    assert!(mounts.contains(concat!(
+        "#[cfg(unix)]\n",
+        "#[path = \"bootstrap/e7_chain/execution.rs\"]\nmod e7_chain;"
+    )));
+    let connected = include_str!("bootstrap/public_on3.rs");
+    assert!(connected
+        .lines()
+        .any(|line| line == "#![cfg(target_os = \"linux\")]"));
+    assert!(connected.contains("#[path = \"e7_chain/mod.rs\"]\nmod e7_chain;"));
+}
 
 const PACK: &str = "depth-fixture-cli-onboarding";
 const APPROVAL: &str =
@@ -33,7 +54,7 @@ fn setup(acquired: bool) -> Fixture {
         REGISTRY_RELATIVE_PATH,
         format!(
             "{}\n{}",
-            include_str!("../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
             include_str!(
                 "../../../tests/fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml"
             )

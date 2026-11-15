@@ -1,18 +1,18 @@
 //! Executable wrapper packet, built by the same context and prompt as write preparation.
 use super::*;
-use crate::workspace_mutation::{PlannedMutation, WorkspacePathJail};
 use serde_json::json;
 
 pub(super) fn json_bytes(value: &impl Serialize) -> Result<Vec<u8>, Error> {
     serde_json::to_vec_pretty(value).map_err(|e| Error::Internal(e.to_string()))
 }
 
-pub(super) fn prepare(
+pub(super) fn context(
     workspace: &Path,
     args: &Args,
     run_id: &str,
     freeze: &Freeze,
-) -> Result<Vec<PlannedMutation>, Error> {
+    contract_generated_at: String,
+) -> Result<RuntimeContext, Error> {
     let raw = freeze
         .view
         .clone()
@@ -22,7 +22,7 @@ pub(super) fn prepare(
         .map_err(Error::Validation)?;
     let mut args = args.clone();
     args.run_id = Some(run_id.into());
-    let context = context::assemble(
+    let context = context::assemble_at(
         workspace,
         &args,
         approval,
@@ -30,15 +30,25 @@ pub(super) fn prepare(
         freeze.state_path.clone(),
         freeze.state.clone(),
         true,
+        contract_generated_at,
     )?;
+    Ok(context)
+}
+
+/// All seven executable-packet files, with explicit clock and invocation inputs.
+pub(super) fn render(
+    args: &Args,
+    context: &RuntimeContext,
+    generated_at: String,
+) -> Result<Vec<(String, Vec<u8>)>, Error> {
+    let run_id = &context.run_id;
     let contract = &context.input_contract;
     let entry = &context.approval.descriptor;
-    let object = freeze
-        .state
+    let object = context
+        .lifecycle_state
         .support_depth
         .as_ref()
         .ok_or_else(|| Error::Validation("missing planned lifecycle object".into()))?;
-    let generated_at = now_rfc3339()?;
     let run_dir = format!("{RUNTIME_RUNS_ROOT}/{run_id}");
     let status = json!({
         "workflow_version":WORKFLOW_VERSION, "generated_at":generated_at,
@@ -51,12 +61,12 @@ pub(super) fn prepare(
     let report = ValidationReport {
         workflow_version: WORKFLOW_VERSION.into(),
         generated_at,
-        run_id: run_id.into(),
+        run_id: run_id.clone(),
         status: "dry_run_ready".into(),
         checks: vec![],
         errors: vec![],
     };
-    let prompt = depth_candidate::render_depth_prompt(&context);
+    let prompt = depth_candidate::render_depth_prompt(context);
     let summary = format!("# Runtime-follow-on dry run\n\nrun_id: {run_id}\n\nP: {}\nO: {}\n", object.policy_identity,
         object.obligations_identity.as_deref().unwrap_or("not yet produced; a passing write closes the window; depth acceptance requires a new approval"));
     let files = [
@@ -78,21 +88,36 @@ pub(super) fn prepare(
             })?,
         ),
     ];
-    let jail = WorkspacePathJail::new(workspace).map_err(|e| Error::Validation(e.to_string()))?;
-    files
+    Ok(files
         .into_iter()
-        .map(|(name, after)| {
-            let path = format!("{run_dir}/{name}");
-            let full = jail
-                .resolve(Path::new(&path))
-                .map_err(|e| Error::Validation(e.to_string()))?;
-            match fs::read(full) {
-                Ok(before) => Ok(PlannedMutation::replace(path, before, after)),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    Ok(PlannedMutation::create(path, after))
-                }
-                Err(e) => Err(Error::Validation(e.to_string())),
-            }
-        })
-        .collect()
+        .map(|(name, bytes)| (format!("{run_dir}/{name}"), bytes))
+        .collect())
+}
+
+pub(super) fn context_from_predecessor(
+    workspace: &Path,
+    args: &Args,
+    registry: &AgentRegistry,
+    state_path: String,
+    state: LifecycleState,
+    contract_generated_at: String,
+) -> Result<RuntimeContext, String> {
+    let raw = fs::read(workspace.join(&args.approval)).map_err(|e| e.to_string())?;
+    let parsed = OnboardingApproval::parse(text(&raw)?, &args.approval)?;
+    let entry = registry
+        .find(&parsed.agent_id)
+        .ok_or("unknown approval agent")?;
+    let approval = approval::execution_for_entry(workspace, &raw, &args.approval, entry)?;
+    let context = context::assemble_at(
+        workspace,
+        args,
+        approval,
+        registry,
+        state_path,
+        state,
+        true,
+        contract_generated_at,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(context)
 }

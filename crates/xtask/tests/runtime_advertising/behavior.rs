@@ -6,7 +6,8 @@ mod baseline;
 
 #[test]
 fn complete_host_feature_and_config_domain_matches_the_pre_bridge_implementations() {
-    let revision = Revision::workspace(&workspace()).unwrap();
+    let ordinary = fixture();
+    let revision = Revision::workspace(ordinary.path()).unwrap();
     for (i, agent) in AGENTS.iter().enumerate() {
         for os in ["linux", "macos", "windows", "other"] {
             for arch in ["x86_64", "aarch64", "other"] {

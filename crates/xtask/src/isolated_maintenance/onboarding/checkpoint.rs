@@ -34,8 +34,9 @@ impl Checkpoint {
         })?;
         let _guard = CandidateRegistry(std::marker::PhantomData);
         let result = check();
-        self.recheck(&self.root)?;
-        result
+        crate::depth_acceptance::admission::observations::after_decision(result, || {
+            self.recheck(&self.root)
+        })
     }
     /// Read-only filesystem engines run against committed candidate bytes, with their registry
     /// bound to that private checkout. The live checkout and materialization are both verified.

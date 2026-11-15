@@ -11,8 +11,11 @@ use std::{path::Path, process::Command};
 
 mod collector;
 mod graph;
+mod maintenance;
 pub(crate) mod native;
+pub(crate) mod onboarding;
 pub(crate) mod profile;
+pub(crate) mod reporting;
 pub const REPOSITORY: &str = "atomize-hq/unified-agent-api";
 pub const FIXTURE: &str = "crates/xtask/tests/fixtures/depth-ci/record.json";
 pub const CONTRACT: &str = "crates/xtask/tests/fixtures/depth-ci/contract.md";
@@ -75,5 +78,5 @@ pub fn collect_core(workspace: &Path) -> Result<(), String> {
 
 /// `synthetic-wrapper-v1` collection: machinery proof on `depth_fixture`; qualifies no agent.
 pub fn collect_synthetic(workspace: &Path) -> Result<(), String> {
-    collector::collect_profile(workspace, profile::Profile::Synthetic)
+    collector::collect_synthetic(workspace)
 }

@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "agent_id": "depth_fixture",
+  "onboarding_pack_prefix": "depth-fixture-cli-onboarding",
+  "approval_artifact_path": "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml",
+  "approval_artifact_sha256": "{{APPROVAL_SHA256}}",
+  "lifecycle_stage": "enrolled",
+  "support_tier": "bootstrap",
+  "side_states": [],
+  "current_owner_command": "onboard-agent --write",
+  "expected_next_command": "scaffold-wrapper-crate --agent depth_fixture --write",
+  "last_transition_at": "2026-11-05T00:00:00Z",
+  "last_transition_by": "onboard-agent --write",
+  "required_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton"
+  ],
+  "satisfied_evidence": [
+    "registry_entry",
+    "docs_pack",
+    "manifest_root_skeleton"
+  ],
+  "blocking_issues": [],
+  "retryable_failures": [],
+  "active_runtime_evidence_run_id": null,
+  "implementation_summary": null,
+  "publication_packet_path": null,
+  "publication_packet_sha256": null,
+  "closeout_baseline_path": null,
+  "support_depth": {
+    "policy_identity": "{{POLICY_IDENTITY}}",
+    "obligations_identity": "{{OBLIGATIONS_IDENTITY}}"
+  }
+}

@@ -35,6 +35,11 @@ fn release_doc_refresh_uses_registry_order_instead_of_workspace_member_order() {
 
 #[test]
 fn dry_run_write_plan_identity_and_no_write_vs_write_parity() {
+    if super::refresh_harness::registry_fixture::run_in_ordinary_workspace(
+        "planning_and_apply::dry_run_write_plan_identity_and_no_write_vs_write_parity",
+    ) {
+        return;
+    }
     let fixture = fixture_root("agent-maintenance-plan-parity");
     seed_publication_inputs(&fixture);
 
@@ -82,6 +87,11 @@ fn dry_run_write_plan_identity_and_no_write_vs_write_parity() {
 
 #[test]
 fn onboarding_and_implementation_historical_roots_untouched() {
+    if super::refresh_harness::registry_fixture::run_in_ordinary_workspace(
+        "planning_and_apply::onboarding_and_implementation_historical_roots_untouched",
+    ) {
+        return;
+    }
     let fixture = fixture_root("agent-maintenance-historical-roots");
     seed_publication_inputs(&fixture);
 
@@ -133,6 +143,11 @@ fn onboarding_and_implementation_historical_roots_untouched() {
 
 #[test]
 fn identical_replay_is_noop() {
+    if super::refresh_harness::registry_fixture::run_in_ordinary_workspace(
+        "planning_and_apply::identical_replay_is_noop",
+    ) {
+        return;
+    }
     let fixture = fixture_root("agent-maintenance-replay-noop");
     seed_publication_inputs(&fixture);
 
@@ -174,6 +189,11 @@ fn identical_replay_is_noop() {
 
 #[test]
 fn publication_refresh_actions_match_shared_publication_planner_bytes() {
+    if super::refresh_harness::registry_fixture::run_in_ordinary_workspace(
+        "planning_and_apply::publication_refresh_actions_match_shared_publication_planner_bytes",
+    ) {
+        return;
+    }
     let fixture = fixture_root("agent-maintenance-publication-planner-parity");
     seed_publication_inputs(&fixture);
     normalize_support_matrix_fixture(&fixture);

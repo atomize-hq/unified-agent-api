@@ -13,6 +13,8 @@ use thiserror::Error;
 
 use crate::support_matrix::{self, SupportMatrixArtifact};
 
+mod check;
+pub(crate) use check::{check_acquisition, check_root};
 mod current;
 mod depth;
 mod fix_mode;
@@ -154,6 +156,14 @@ pub(crate) fn violation_codes(args: Args) -> Result<Vec<&'static str>, FatalErro
 }
 
 fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, FatalError> {
+    run_checks(args, default_root, true)
+}
+
+fn run_checks(
+    args: Args,
+    default_root: Option<&str>,
+    publication: bool,
+) -> Result<Vec<Violation>, FatalError> {
     if args.tip.is_some() && matches!(args.mode, Mode::Fix) {
         return Err(FatalError::TipWithFix);
     }
@@ -342,18 +352,20 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
         &version_metadata,
     );
 
-    // 7) Support-matrix publication drift checks reuse the shared support-matrix policy.
-    depth::validate_support_matrix_publication(
-        &ctx,
-        args.tip.as_deref(),
-        &mut violations,
-        validate_support_matrix_publication,
-    );
+    if publication {
+        // 7) Support-matrix publication drift checks reuse the shared support-matrix policy.
+        depth::validate_support_matrix_publication(
+            &ctx,
+            args.tip.as_deref(),
+            &mut violations,
+            validate_support_matrix_publication,
+        );
 
-    // 8) Depth records.
-    depth::validate_depth_records(&ctx, &mut violations);
-    if let Some(tip) = args.tip.as_deref() {
-        depth::merge::validate(&ctx, tip, &mut violations);
+        // 8) Depth records.
+        depth::validate_depth_records(&ctx, &mut violations);
+        if let Some(tip) = args.tip.as_deref() {
+            depth::merge::validate(&ctx, tip, &mut violations);
+        }
     }
 
     violations.sort_by(|a, b| {

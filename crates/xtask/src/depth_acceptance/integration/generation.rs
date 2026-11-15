@@ -47,6 +47,27 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
         false
     };
     for (version, record) in &new.records {
+        // Lifecycle and packet integrity remain admission inputs when the statement is unchanged.
+        if onboarding
+            && matches!(record.event, Event::Onboarding { .. })
+            && old.records.get(version).is_some_and(|prior| {
+                prior.event == record.event
+                    && prior.policy == record.policy
+                    && prior.obligations == record.obligations
+                    && (prior.execution.is_some() || record.execution.is_some())
+            })
+        {
+            if super::onboarding::candidate(new, record)?.is_some() {
+                continue;
+            }
+            crate::prepare_publication::check_reporting_transition(
+                root,
+                &old.source,
+                record,
+                &new.entry,
+            )?;
+            continue;
+        }
         if old
             .records
             .get(version)
@@ -148,6 +169,14 @@ fn onboarding_bindings(root: &Path, old: &View, new: &View) -> Result<bool, Stri
             prior.lifecycle_stage,
             next.lifecycle_stage,
         )?;
+    }
+    let host = captured.evidence_host(root)?;
+    let candidate = super::resolve(root, "HEAD")?;
+    if let Some(history) = host.admission_history(root, std::slice::from_ref(&candidate))? {
+        for record in new.records.values() {
+            history.check_candidate(root, &candidate, record, &path)?;
+        }
+        history.recheck()?;
     }
     captured.recheck(root)?;
     Ok(true)

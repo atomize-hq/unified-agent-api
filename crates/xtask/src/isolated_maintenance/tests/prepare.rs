@@ -169,11 +169,14 @@ pub(super) fn acquire(root: &Path, version: &str) {
         "cli_manifests/depth_fixture/wrapper_coverage.json",
         serde_json::to_vec_pretty(&coverage).unwrap(),
     );
-    crate::manifest_union::run(crate::manifest_union::Args {
-        root: Some(base.clone()),
-        rules: None,
-        version: version.into(),
-    })
+    crate::manifest_union::run_at(
+        crate::manifest_union::Args {
+            root: Some(base.clone()),
+            rules: None,
+            version: version.into(),
+        },
+        "2026-11-03T00:00:00Z",
+    )
     .unwrap();
     crate::manifest_report::run_at(
         crate::manifest_report::Args {

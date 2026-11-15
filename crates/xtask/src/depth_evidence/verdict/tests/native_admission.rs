@@ -1,3 +1,7 @@
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::super::native::{self, host};
 use super::*;
 use crate::depth_evidence::native as form;
@@ -107,7 +111,7 @@ impl NativeFixture {
         use crate::depth_evidence::payload::{Package, PackageOrigin};
         let mut f = Fixture::new();
         let root = f.root.path();
-        let canonical_registry = include_str!("../../../../data/agent_registry.toml");
+        let canonical_registry = registry_fixture::undeclared_registry();
         write(root, REGISTRY_RELATIVE_PATH, canonical_registry);
         let acquisition = write(
             root,

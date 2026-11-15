@@ -1,13 +1,21 @@
 //! Credential-free scope/IN1 checkpoints and public ON1; no independent host queue proof.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{agent_lifecycle as life, depth_acceptance::check_integration};
 
 use sha2::{Digest, Sha256};
 
+mod baseline;
 mod declaration;
+mod fr2;
 mod producer;
 mod public_on1;
 pub(super) mod public_on2;
+pub(super) mod public_on3;
+mod public_repair;
 mod regressions;
 mod renderer;
 mod sweep;
@@ -29,20 +37,7 @@ const APPROVAL_TEMPLATE: &str = include_str!(
 
 fn setup(scaffold: bool) -> Fixture {
     let f = Fixture::new_for(&scope::SYNTHETIC);
-    write(
-        f.root.path(),
-        REGISTRY_RELATIVE_PATH,
-        include_str!("../../../data/agent_registry.toml"),
-    );
-    write(
-        f.root.path(),
-        APPROVAL,
-        APPROVAL_TEMPLATE
-            .replace("{{APPROVAL_COMMIT}}", "abc1234")
-            .replace("{{APPROVAL_RECORDED_AT}}", "2026-11-05T00:00:00Z"),
-    );
-    write(f.root.path(), "Cargo.toml", "[workspace]\nmembers = []\n");
-    write(f.root.path(), "docs/crates-io-release.md", "# Releases\n");
+    baseline::install(f.root.path());
     if scaffold {
         create(&f);
     }
@@ -276,7 +271,7 @@ fn preparation_refuses_every_binding_and_acceptance_effect() {
             },
             4 => { let raw=fs::read_to_string(f.root.path().join(APPROVAL)).unwrap(); write(f.root.path(), APPROVAL, raw.replace("abc1234","abc5678")); },
             5 => f.registry(|d| { d["agents"].as_array_of_tables_mut().unwrap().iter_mut().find(|e| e["agent_id"].as_str()==Some("depth_fixture")).unwrap()["display_name"]=toml_edit::value("Changed"); }),
-            6 => write(f.root.path(), REGISTRY_RELATIVE_PATH, format!("{}\n{DECLARED}", include_str!("../../../data/agent_registry.toml"))),
+            6 => write(f.root.path(), REGISTRY_RELATIVE_PATH, format!("{}\n{DECLARED}", registry_fixture::undeclared_registry())),
             7 => { let mut v:Value = serde_json::from_slice(&fs::read(f.root.path().join(STATE)).unwrap()).unwrap(); v["support_depth"]=json!({"policy_identity":"a".repeat(64)}); write(f.root.path(),STATE,serde_json::to_vec(&v).unwrap()); },
             8 => write(f.root.path(), "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/publication-ready.json", "{}"),
             9 => write(f.root.path(), "cli_manifests/codex/versions/0.156.1.json", r#"{"status":"validated"}"#),
@@ -340,10 +335,7 @@ fn bootstrap_route_absence_keeps_production_depth_refusal() {
     write(
         f.root.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     f.commit();
     assert!(route(f.root.path()).unwrap().is_none());
@@ -367,10 +359,7 @@ fn bootstrap_scratch_view_keeps_exact_registry_bytes() {
     write(
         scratch.path(),
         REGISTRY_RELATIVE_PATH,
-        format!(
-            "{}\n{DECLARED}",
-            include_str!("../../../data/agent_registry.toml")
-        ),
+        format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
     );
     assert!(captured.bind_view(&view).is_err());
 }
@@ -385,10 +374,7 @@ fn bootstrap_creation_refuses_depth_tables_invented_metadata_and_non_scaffold_fi
             0 => write(
                 f.root.path(),
                 REGISTRY_RELATIVE_PATH,
-                format!(
-                    "{}\n{DECLARED}",
-                    include_str!("../../../data/agent_registry.toml")
-                ),
+                format!("{}\n{DECLARED}", registry_fixture::undeclared_registry()),
             ),
             1 => write(
                 f.root.path(),

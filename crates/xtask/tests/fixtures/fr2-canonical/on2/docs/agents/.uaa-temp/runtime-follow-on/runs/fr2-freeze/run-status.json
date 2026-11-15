@@ -1,0 +1,17 @@
+{
+  "agent_id": "depth_fixture",
+  "approval_artifact_path": "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/approved-agent.toml",
+  "errors": [],
+  "generated_at": "2026-11-14T00:00:01Z",
+  "handoff_ready": false,
+  "host_surface": "isolated synthetic dry run",
+  "loaded_skill_ref": ".codex/skills/runtime-follow-on/SKILL.md",
+  "mode": "dry_run",
+  "requested_tier": "default",
+  "run_dir": "docs/agents/.uaa-temp/runtime-follow-on/runs/fr2-freeze",
+  "run_id": "fr2-freeze",
+  "status": "dry_run_ready",
+  "validation_passed": true,
+  "workflow_version": "runtime_follow_on_v2",
+  "written_paths": []
+}

@@ -71,7 +71,7 @@ pub(super) fn check(before: Source, after: Source, workspace: &Path) -> Result<(
     }
     Ok(())
 }
-fn preserved(old: &DepthRecord, new: &DepthRecord) -> Result<(), String> {
+pub(super) fn preserved(old: &DepthRecord, new: &DepthRecord) -> Result<(), String> {
     if old.event != new.event
         || old.policy != new.policy
         || old.obligations != new.obligations

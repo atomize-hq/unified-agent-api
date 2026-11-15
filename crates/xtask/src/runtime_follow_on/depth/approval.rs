@@ -30,19 +30,29 @@ pub(super) fn read(
 }
 
 /// An internal execution view after strict finite validation, never a production loader.
-pub(super) fn execution(
+pub(crate) fn execution(
     workspace: &Path,
     raw: &[u8],
     path: &str,
     captured: &CapturedRegistry,
 ) -> Result<crate::approval_artifact::ApprovalArtifact, String> {
-    use crate::approval_artifact::{ApprovalArtifact, ApprovalDescriptor};
-    use sha2::{Digest, Sha256};
     let approval = read(raw, path, captured)?;
     let entry = captured
         .registry()
         .find(&approval.agent_id)
         .ok_or("unknown approval agent")?;
+    execution_for_entry(workspace, raw, path, entry)
+}
+
+pub(super) fn execution_for_entry(
+    workspace: &Path,
+    raw: &[u8],
+    path: &str,
+    entry: &crate::agent_registry::AgentRegistryEntry,
+) -> Result<crate::approval_artifact::ApprovalArtifact, String> {
+    use crate::approval_artifact::{ApprovalArtifact, ApprovalDescriptor};
+    use sha2::{Digest, Sha256};
+    let approval = crate::isolated_maintenance::onboarding::approval::read(raw, path, entry)?;
     let descriptor = ApprovalDescriptor {
         agent_id: entry.agent_id.clone(),
         display_name: entry.display_name.clone(),

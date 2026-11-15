@@ -368,6 +368,11 @@ pub fn audit_current_capability_publication(workspace_root: &Path) -> Result<(),
     audit_capability_publication(&backends)
 }
 
+/// Standalone audit closes its own authenticated route after the shared inventory check.
+pub fn check_in_workspace(root: &Path) -> Result<(), String> {
+    crate::readonly_gates::with_readonly_route(root, || audit_current_capability_publication(root))
+}
+
 pub fn manifest_command_available_on_target(
     manifest: &ManifestCurrent,
     path: &[&str],

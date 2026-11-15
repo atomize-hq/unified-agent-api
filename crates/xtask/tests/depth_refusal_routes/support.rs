@@ -81,7 +81,7 @@ pub fn write(root: &Path, relative: &str, bytes: impl AsRef<[u8]>) {
 
 /// The canonical registry plus the synthetic entry, with or without its `support_depth` table.
 pub fn registry_with_subject(with_depth: bool) -> String {
-    let canonical = fs::read_to_string(repo().join(REGISTRY)).unwrap();
+    let canonical = ordinary_registry();
     let entry = fs::read_to_string(synthetic("governing/registry-entry.toml"))
         .unwrap()
         .replace("{{ISOLATED_OWNER}}", "example-owner")
@@ -108,6 +108,33 @@ pub fn registry_with_subject(with_depth: bool) -> String {
         with_depth
     );
     raw
+}
+
+/// Ordinary copied inputs are explicit even when the source checkout declares depth.
+/// Validate that source registry before changing fixture inputs.
+pub fn ordinary_registry() -> String {
+    // Recognize the source checkout's specific production refusal before making an ordinary
+    // fixture. Malformed source bindings must still fail. Commands resolve the copied root.
+    let raw = if declared_build_refusal().is_some() {
+        include_str!("../fixtures/undeclared_registry.toml").to_owned()
+    } else {
+        fs::read_to_string(repo().join(REGISTRY)).unwrap()
+    };
+    xtask::agent_registry::AgentRegistry::parse(&raw).unwrap();
+    raw
+}
+
+pub fn declared_build_refusal() -> Option<String> {
+    use xtask::agent_registry::{AgentRegistry, AgentRegistryError};
+    match AgentRegistry::load(&repo()) {
+        Ok(_) => None,
+        Err(AgentRegistryError::Validation(message))
+            if message.ends_with(" carries `support_depth`, which no command enforces yet") =>
+        {
+            Some(message)
+        }
+        Err(err) => panic!("load build workspace registry: {err}"),
+    }
 }
 
 pub fn synthetic_record() -> Vec<u8> {
@@ -167,6 +194,7 @@ impl Workspace {
         for path in tracked() {
             write(dir.path(), path, fs::read(repo().join(path)).unwrap());
         }
+        write(dir.path(), REGISTRY, ordinary_registry());
         Self {
             dir,
             scratch: tempfile::tempdir().unwrap(),

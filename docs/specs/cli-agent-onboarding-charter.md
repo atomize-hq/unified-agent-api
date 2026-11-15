@@ -205,7 +205,7 @@ Canonical lifecycle record:
    - “live event before completion”
    - redaction (no raw line leakage)
    - exec-policy default behavior (non-interactive) and override levers if applicable
-   - Specified, not installed: for the finite non-runtime, capability-free synthetic onboarding
+   - Implemented finite scope for the non-runtime, capability-free synthetic onboarding
      subject only, items 3 and 5 and runtime-follow-on implementation/evidence/handoff checks
      mean the wrapper work actually due under `wrapper_only` (OR-P2,
      [routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
@@ -219,7 +219,7 @@ Canonical lifecycle record:
    - advance the committed lifecycle record to `publication_ready`, the pre-refresh-only stage in the canonical path `publication_ready -> published -> closed_baseline`
    - clear `active_runtime_evidence_run_id` as part of that stage transition
    - the next command template remains `refresh-publication --approval <path> --write`
-   - Specified, not installed: routed depth ON3's controller also assembles and delivers reporting
+   - Implemented finite scope, routed depth ON3's controller also assembles and delivers reporting
      E, its bound receipt/payload files and coherent reporting publication in the same checked
      proposal as the packet and `publication_ready`, after committed ON2 implementation has
      producer evidence (OR-P6,
@@ -240,8 +240,8 @@ Canonical lifecycle record:
    - on success, commit lifecycle stage `published` in `lifecycle-state.json` and record packet continuity there while leaving `publication-ready.json` as the pre-refresh handoff packet
    - the next command template after refresh remains `prepare-proving-run-closeout --approval <path> --write`
 
-   For depth-enrolled generations only, the green gate and rollback above have this specified,
-   not installed split (OR-P3, OR-P13,
+   For depth-enrolled generations only, the green gate and rollback above use this split,
+   implemented in the finite synthetic route (OR-P3, OR-P13,
    [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)):
    before checked local delivery, the controller MUST run the depth-reading checks behind every
    fixed command against the proposal's scratch view through the same checking functions, inside
@@ -318,9 +318,10 @@ While the support-depth contract is a Draft this section binds nothing.
 Rules 5 to 9 and 12 to 14 adopt the maintainer-approved decisions OF-P1 to OF-P9 of the
 [onboarding freeze decisions](../agents/lifecycle/support-depth-onboarding-freeze-decisions.md),
 with OF-P3 option (A), OF-P4 option (B) and OF-P9 publication check (i). Each sentence that
-adopts one, or the bullet or paragraph that holds it, cites its row. They define the create-lane depth path. They enable no path, and no
-create-lane command implements them yet: [Present behavior](#present-behavior) says what holds
-today.
+adopts one, or the bullet or paragraph that holds it, cites its row. They define the create-lane
+depth path. The finite synthetic isolated implementation now
+executes the bounded ON1–ON5 chain. Production path enablement still requires the independent
+phase C run and per-agent authorization. [Present behavior](#present-behavior) records results.
 
 Rules:
 
@@ -334,7 +335,7 @@ Rules:
    the agent's entry without that table. A maintainer adds the table afterwards, as release-watch
    enrollment is added, in a change that leaves `onboarding` in `enabled_paths`.
 
-   Specified, not installed: the finite synthetic bootstrap admits only ON1's exact ordinary
+   The implemented finite synthetic bootstrap admits only ON1's exact ordinary
    absent-to-scaffold delta, then record-free preparation preserving the scaffold entry and
    approval, then the maintainer's separate first-declaration reporting transition (OR-P1,
    OR-P14, [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
@@ -393,8 +394,8 @@ Rules:
    the depth record and the lifecycle object of rule 7 in the same invocation, through the
    lifecycle writer (OF-P1, OF-P2).
 
-   Specified, not installed: this dry-run proposal MUST also deliver any derived reporting
-   publication needed for coherence with the frozen record (OR-P6,
+   Within the implemented finite synthetic route, this dry-run proposal MUST also deliver any
+   derived reporting publication needed for coherence with the frozen record (OR-P6,
    [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
    It MUST preserve every entry and add no qualification or other acceptance effect; it grants
    no second writer of P/O or of the lifecycle object.
@@ -528,7 +529,7 @@ Rules:
    maintenance relay refuses a changed frozen input. A regenerated `wrapper_coverage.json` is such
    a change (OF-P6). Under rule 5 no re-freeze is then left to the generation (OF-P5, OF-P6).
 
-   Specified, not installed: ON4 owns only its generation's exact
+   Within the implemented finite synthetic route, ON4 owns only its generation's exact
    `Publication { packet, record_sha256 }` entry, packet-bound `published` assertion and supported
    qualification/advertising effects. Final ON5 owns only its exact
    `ProvingRunCloseout { closeout, record_sha256 }` entry, `closed` closeout, `closed_baseline`
@@ -629,27 +630,39 @@ executor can write (OF-P9).
 
 ### Present behavior
 
-The OR-P1–OR-P14 routing amendments above are specified, not installed (the
-[routing design, "Implementation slices"](../agents/lifecycle/support-depth-onboarding-routing-design.md#implementation-slices),
-slice 0). Production still refuses depth; this amendment installs no profile, registry table or
-path enablement. The credential-free connected in-process synthetic chain required by OR-P12
-does not replace the later independent disposable-repository run under phase C's protected
-integration/CI conditions, or authorize that host run. Stubbed hosts/gates MUST be labeled as
-such and cannot prove native queue execution, capability advertising or a real runtime agent.
-The following source inventory retains its stated baseline; it does not describe installation
-of these amendments.
+Present-behavior inventory is pinned to `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`.
+The finite synthetic route implements ON1 bootstrap, separately admitted preparation/declaration,
+ON2 freeze/implementation/repair, ON3 authenticated reporting E, ON4 Publication and both ON5
+commands with independent IN1 at each protected checkpoint. ON1 retains its ordinary depth-free
+scaffold. Governing adoption, actual acquisition and ordinary snapshotted metadata precede the
+maintainer's declaration. Public neutral/lower writers retain their depth refusals.
 
-At the historical source baseline below, only the approval loader's reading of rule 3 is
-implemented. Rules 5 to 9 and 12 to 14 state
-the create-lane depth path that the
-[onboarding freeze decisions](../agents/lifecycle/support-depth-onboarding-freeze-decisions.md#implementation-slices)
-plan in later slices; none of it is installed. Every create-lane entry still refuses a depth
-workspace (Annex A routes ON1 to ON5 of the support-depth contract), production installs no
-profile, and the onboarding path is not enabled. Naming the freeze point and the identity
-artifact meets only the charter's part of the support-depth contract's Path enablement for the
-onboarding path. Items 1, 3, 4 and 5 there, the isolated new-entry run and the maintainer's
-authorization for each agent are still required. Source references are to `staging` at
-`f61534be` unless a bullet names another revision. Today:
+Current controller anchors are `crates/xtask/src/onboard_agent/execution.rs:4`,
+`runtime_follow_on.rs:173`, `repair_runtime_evidence/routed.rs:11`,
+`prepare_publication/routed.rs:10`, `publication_refresh/routed.rs:16`,
+`prepare_proving_run_closeout/routed.rs:9` and `close_proving_run/routed.rs:9`, with the
+last six paths relative to `crates/xtask/src/`. Annex A supplies both inventory directions.
+
+`e7_connected_onboarding_qualified_chain` and
+`e7_connected_onboarding_repaired_qualified_chain` passed through actual public in-process
+writers, real IN1 and modeled post-tip observations. The qualified wrapper-only subject retains
+pointers at `none`, snapshotted metadata, eleven verified obligations and two owning entries.
+The truthful-insufficiency sibling passed and preserves unqualified reporting while acceptance
+refuses. The release-watch sibling uses a separately documented pre-freeze authority-setup seam.
+The fake authenticated host, modeled producer outcomes, offline source-copying executor and
+successful test S/T gate runner bound these results. The independent CP-P5 / OR-P12 host run,
+actual subprocess checks and native queue evidence remain due. Phase C requires explicit
+maintainer authorization. [Slice 12 results](../agents/lifecycle/s12-e7-connected-proof-report.md),
+[current Annex A/A.4](support-depth-contract.md#annex-a-route-inventory).
+
+Stubbed hosts/gates MUST be labeled as such and cannot prove native queue execution,
+capability advertising or a real runtime agent.
+
+#### Historical pre-routing inventory
+
+The following bullets describe the historical `f61534be` baseline and explicitly named later
+pre-routing revisions. They retain the original diagnostic history. Current behavior and
+execution evidence are recorded above.
 
 - An approval artifact carries `approval_commit` and `approval_recorded_at`
   (`crates/xtask/src/approval_artifact.rs:246-249`). The approval loader reads the

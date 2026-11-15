@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
@@ -19,7 +23,7 @@ mod capability_matrix {
 
     use crate::agent_registry::AgentRegistry;
 
-    const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+    const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 
     fn manifest_with_commands(commands: &[(&[&str], &[&str])]) -> UnionManifest {
         let expected_targets = commands
@@ -127,6 +131,11 @@ mod capability_matrix {
 
     #[test]
     fn collect_builtin_backend_capabilities_includes_opencode() {
+        if crate::registry_fixture::run_in_ordinary_workspace(
+            "capability_matrix::collect_builtin_backend_capabilities_includes_opencode",
+        ) {
+            return;
+        }
         let backends = collect_builtin_backend_capabilities().expect("collect backends");
 
         assert!(backends.contains_key("opencode"));
@@ -163,6 +172,11 @@ mod capability_matrix {
 
     #[test]
     fn runtime_backend_kinds_match_seeded_registry_agent_ids() {
+        if crate::registry_fixture::run_in_ordinary_workspace(
+            "capability_matrix::runtime_backend_kinds_match_seeded_registry_agent_ids",
+        ) {
+            return;
+        }
         let registry = seeded_registry();
 
         for entry in registry.capability_matrix_entries() {

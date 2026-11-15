@@ -3,6 +3,8 @@
 use super::*;
 use clap::Parser;
 
+mod admissions;
+
 fn args(write: bool) -> crate::runtime_follow_on::Args {
     crate::runtime_follow_on::Args::parse_from([
         "runtime-follow-on",
@@ -135,7 +137,7 @@ fn public_on2_release_watch_accepts_actual_on1_empty_current() {
 
 #[test]
 fn public_on2_connected_freeze_write_admission_and_observation() {
-    let f = public_on1::declared_chain();
+    let f = public_on1::declared_chain_with_host_approval();
     let _installed = f.install();
     let parent = head(&f);
     crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
@@ -214,6 +216,11 @@ fn public_on2_connected_freeze_write_admission_and_observation() {
     local(&f, &implementation);
     check_integration(f.root.path(), &parent).unwrap();
     assert_eq!(fs::read(f.root.path().join(RECORD)).unwrap(), record_bytes);
+    crate::depth_evidence::prove_unobserved_admission(
+        f.root.path(),
+        f.resolve().unwrap().admission_publication().unwrap(),
+        f.api.3.clone(),
+    );
     let before =
         crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap();
     let error =
@@ -224,6 +231,7 @@ fn public_on2_connected_freeze_write_admission_and_observation() {
         crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap(),
         before
     );
+    admissions::hidden_unmerged_ancestor_refuses_real_in1(&f);
 }
 
 /// The subprocess installs the real wrapper implementation and its substantive offline tests.
@@ -375,4 +383,45 @@ fn public_on2_in1_requires_parent_acquisition_and_intact_binding() {
             parent
         );
     }
+}
+
+/// Reuse the actual public ON1/acquisition/declaration/ON2 outputs for producer authentication.
+/// Each caller owns a fresh repository and both scoped fake-host installations end here.
+pub(crate) fn producer_workspace() -> tempfile::TempDir {
+    let f = public_on1::declared_chain_for(true);
+    // The freeze's reporting admission needs runtime conformance source. Earlier record-free
+    // checkpoints do not; restore it only at this boundary, then trim it in producer fixtures.
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    declaration::copy(
+        &repo.join("crates/agent_api/src"),
+        &f.root.path().join("crates/agent_api/src"),
+    );
+    let _installed = f.install();
+    // Host commit lookups require a full object identity. Settle this before the first freeze.
+    let raw = fs::read_to_string(f.root.path().join(APPROVAL))
+        .unwrap()
+        .replace("abc1234", &f.baseline);
+    let mut state = life::load_lifecycle_state(f.root.path(), STATE).unwrap();
+    write(f.root.path(), APPROVAL, &raw);
+    state.approval_artifact_sha256 = hex::encode(Sha256::digest(raw.as_bytes()));
+    write(
+        f.root.path(),
+        STATE,
+        serde_json::to_vec_pretty(&state).unwrap(),
+    );
+    f.commit();
+    local(&f, &head(&f));
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), args(false), &mut Vec::new())
+        .unwrap();
+    public_on1::producer_checkpoint(&f, &parent);
+    git(f.root.path(), &["tag", "on2-freeze"]);
+    let executor = executor("", 0);
+    let mut write_args = args(true);
+    write_args.codex_binary = Some(executor.path().join("executor.sh").to_string_lossy().into());
+    let parent = head(&f);
+    crate::runtime_follow_on::run_in_workspace(f.root.path(), write_args, &mut Vec::new()).unwrap();
+    public_on1::producer_checkpoint(&f, &parent);
+    drop(_installed);
+    f.root
 }

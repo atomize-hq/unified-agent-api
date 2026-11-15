@@ -130,7 +130,7 @@ pub(super) fn support(
     Ok(())
 }
 /// Recorded target labels are interpreted explicitly; gated-label grammar remains D5's.
-fn host(target: &str) -> Result<(&str, &str), String> {
+pub(super) fn host(target: &str) -> Result<(&str, &str), String> {
     match target {
         "x86_64-unknown-linux-musl" | "x86_64-unknown-linux-gnu" | "linux-x64" => {
             Ok(("linux", "x86_64"))

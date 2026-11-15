@@ -21,7 +21,7 @@ const RECORD: &str = "cli_manifests/depth_fixture/reports/0.2.0/depth-record.jso
 /// Each path's type, mode and digest of its bytes (or link target), as the integration helper.
 type Tree = BTreeMap<std::path::PathBuf, (char, u32, String)>;
 
-fn tree(root: &Path) -> Tree {
+pub(super) fn tree(root: &Path) -> Tree {
     use std::os::unix::fs::PermissionsExt;
     fn walk(root: &Path, dir: &Path, out: &mut Tree) {
         for entry in fs::read_dir(dir).unwrap() {
@@ -54,7 +54,7 @@ fn refused(route: &str, error: impl std::fmt::Debug) {
     );
 }
 
-fn repo_json<T: serde::de::DeserializeOwned>(relative: &str) -> T {
+pub(super) fn repo_json<T: serde::de::DeserializeOwned>(relative: &str) -> T {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join(relative);

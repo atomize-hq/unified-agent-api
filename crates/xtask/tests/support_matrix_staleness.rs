@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -5,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = registry_fixture::undeclared_registry();
 
 const OPENCODE_REQUIRED_TARGET: &str = "linux-x64";
 const OPENCODE_TARGETS: [&str; 3] = ["linux-x64", "darwin-arm64", "win32-x64"];

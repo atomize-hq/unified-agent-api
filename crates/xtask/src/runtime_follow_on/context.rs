@@ -44,6 +44,30 @@ pub(super) fn assemble(
     lifecycle_state: crate::agent_lifecycle::LifecycleState,
     wrapper_only: bool,
 ) -> Result<RuntimeContext, Error> {
+    let generated_at = now_rfc3339()?;
+    assemble_at(
+        workspace_root,
+        args,
+        approval,
+        registry,
+        lifecycle_state_path,
+        lifecycle_state,
+        wrapper_only,
+        generated_at,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn assemble_at(
+    workspace_root: &Path,
+    args: &Args,
+    approval: crate::approval_artifact::ApprovalArtifact,
+    registry: &AgentRegistry,
+    lifecycle_state_path: String,
+    lifecycle_state: crate::agent_lifecycle::LifecycleState,
+    wrapper_only: bool,
+    generated_at: String,
+) -> Result<RuntimeContext, Error> {
     validate_alignment(&approval, registry)?;
     let run_id = args.run_id.clone().unwrap_or_else(generate_run_id);
     let run_dir = workspace_root.join(RUNTIME_RUNS_ROOT).join(&run_id);
@@ -64,7 +88,7 @@ pub(super) fn assemble(
         workflow_version: WORKFLOW_VERSION.to_string(),
         support_depth: SupportDepthContract::copy_from(&approval, &lifecycle_state)
             .map_err(Error::Validation)?,
-        generated_at: now_rfc3339()?,
+        generated_at,
         run_id: run_id.clone(),
         approval_artifact_path: approval.relative_path.clone(),
         approval_artifact_sha256: approval.sha256.clone(),

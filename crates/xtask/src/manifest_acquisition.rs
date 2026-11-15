@@ -149,9 +149,19 @@ pub fn plan_for_agent(
     version: &str,
 ) -> Result<AcquisitionPlan, AcquisitionError> {
     validate_bare_semver(version)?;
-
     let registry = crate::isolated_maintenance::registry(workspace_root)
         .map_err(|err| AcquisitionError::RoutedRegistry(err.to_string()))?;
+    plan_with_registry(workspace_root, agent_id, version, &registry)
+}
+
+/// Protected admission supplies a registry parsed from authenticated predecessor bytes.
+pub(crate) fn plan_with_registry(
+    workspace_root: &std::path::Path,
+    agent_id: &str,
+    version: &str,
+    registry: &crate::agent_registry::AgentRegistry,
+) -> Result<AcquisitionPlan, AcquisitionError> {
+    validate_bare_semver(version)?;
     let entry = registry
         .find(agent_id)
         .ok_or_else(|| AcquisitionError::UnknownAgent(agent_id.to_string()))?;

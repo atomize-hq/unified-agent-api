@@ -1,3 +1,7 @@
+#[path = "../support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::git;
 use serde_json::{json, Value};
 use std::{fs, path::Path, process::Command};
@@ -13,9 +17,8 @@ pub fn write(root: &Path, path: &str, bytes: impl AsRef<[u8]>) {
 pub fn workspace(agent: &str) -> TempDir {
     let root = tempfile::tempdir().unwrap();
     git(root.path(), &["init", "-q"]);
-    let mut registry: toml_edit::DocumentMut = include_str!("../../data/agent_registry.toml")
-        .parse()
-        .unwrap();
+    let mut registry: toml_edit::DocumentMut =
+        registry_fixture::undeclared_registry().parse().unwrap();
     let rules = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../../cli_manifests/{agent}/RULES.json")),
