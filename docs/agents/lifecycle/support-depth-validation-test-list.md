@@ -262,14 +262,17 @@ Must be refused:
 - **Forged written paths (OF-P9).** Publication refuses a non-empty `written-paths.json` whose
   SHA-256 does not match the lifecycle state (check (i)).
 
-## Onboarding routing cases (pending)
+<a id="onboarding-routing-cases-pending"></a>
+
+## Onboarding routing cases
 
 OR-P1–OR-P14 of the
 [routing design, "Maintainer decisions"](support-depth-onboarding-routing-design.md#maintainer-decisions),
 ["Proving evidence and refusal coverage"](support-depth-onboarding-routing-design.md#proving-evidence-and-refusal-coverage)
 and ["Implementation slices"](support-depth-onboarding-routing-design.md#implementation-slices)
-require the following additional cases. **All are pending**; slice 0 specifies them and implements
-no behavior or tests. They extend the freeze cases without changing OF-P1–P9 or CP-P1–P6.
+require the following cases. Slices 6–12 now supply the executed implementation evidence
+indexed below. The independent phase C run and the explicitly listed proof gaps remain due.
+The cases extend the freeze coverage under OF-P1–P9 and CP-P1–P6.
 The connected installed-route chain is credential-free and in-process; the independent phase C
 protected-host run remains separately required and is not authorized by this list.
 
@@ -799,7 +802,7 @@ manifest-scoped guard the record first.
 | ON2 | `runtime-follow-on --write`, `repair-runtime-evidence --write` | `onboarding::on2_runtime_follow_on_and_repair_runtime_evidence_writes_refuse_depth_workspace`; installed route | — |
 | ON3 | `prepare-publication --write` | `onboarding::on3_prepare_publication_write_refuses_depth_workspace`; installed route | — |
 | ON4 | `refresh-publication --write` | `onboarding::on4_refresh_publication_write_refuses_depth_workspace`; installed route | — |
-| ON5 | `close-proving-run`, `prepare-proving-run-closeout --write` | `onboarding::on5_proving_run_closeout_entrypoints_refuse_depth_workspace`; installed route (`prepare-proving-run-closeout` only: `close_proving_run` is binary-only) | — |
+| ON5 | `close-proving-run`, `prepare-proving-run-closeout --write` | `onboarding::on5_proving_run_closeout_entrypoints_refuse_depth_workspace` and installed route (both public command bodies in the current tree) | — |
 | NE1 | `support-matrix` (write) → `support_matrix/publication.rs::write_publication_artifacts` | `neutral::ne1_support_matrix_write_refuses_depth_workspace` (declared, orphaned); installed route delivers a route-generated bundle | — |
 | NE2 | `capability-matrix`, `capability-matrix --out` | `neutral::ne2_capability_matrix_write_refuses_depth_workspace` | — |
 | NE3 | `manifest-version-metadata --root`, alias `codex-version-metadata` | `neutral::ne3_version_metadata_and_its_alias_refuse_depth_manifest`; installed route | `depth_promotion.rs::neutral_lower_batch_cannot_write_retained_depth_even_without_a_declaration` (library `run`) |
@@ -820,4 +823,169 @@ retained or orphaned depth they reach the guard. The **Retained** carrier is not
 with the subject still registered for support publication, the generator first fails on the
 synthetic root's absent `current.json`, which is not a depth refusal.
 
-Every listed entrypoint refuses today; none needed a production change or an ignored test.
+The preceding table records the earlier maintenance-scope refusal matrix. Slice 11 extended
+onboarding carriers and repaired demonstrated NE2 destination, enclosed LW1 and ON2 dry-run
+guard gaps. Its current execution results are indexed below.
+
+
+<a id="executed-slices-6-12"></a>
+
+## Executed slices 6–12
+
+This index is reconciled at `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`.
+Names in the tables are exact function names in the current tree. The named module/file group
+provides their discovery scope. Each result is the recorded completed run in the linked report.
+Slice 13 checked every cited name against current source using `rg`. The separate
+[final inventory report](s13-final-inventory-report.md#validation) records that check and local
+spec validation. The [S12 seven-group negative map](s12-e7-connected-proof-report.md#negative-coverage-map)
+reconciles bootstrap/identity, freeze/acquisition, execution/repair, evidence, owning acceptance,
+complete mediation and IN1/delivery. Historical incomplete containing tests retain their limits.
+
+### S6 reporting E and runtime selection
+
+These tests are under `isolated_maintenance::tests::bootstrap::public_on3`.
+The final S6 run passed all three. They execute real ON3 and IN1 with independently modeled
+host observations. [S6 results](s6-on3-reporting-report.md#review-round-2-fixes).
+
+| Exact test | Executed boundary |
+| --- | --- |
+| `public_on3_connected_active_reporting_e_and_real_in1` | Actual E assembly/files, eleven results, exact active runtime selector, contract/digest/acquisition/receipt/packet refusals, preserved Event/P/O and empty entries/unqualified reporting |
+| `public_on3_connected_repaired_runtime_selection_and_real_in1` | Actual public repair admission, repaired selection, frozen publication-ready selection and IN1 packet integrity |
+| `public_on3_no_route_and_maintenance_scope_refuse_without_writes` | Complete unchanged-tree production and wrong-path refusal |
+
+### S7 owning predicates
+
+These tests are under `depth_acceptance::onboarding::tests` and its `adversarial` and
+`review_round1` modules. The final focused run passed 16 onboarding tests and 41 unchanged
+maintenance predicate tests, including `positive_closeout_and_exact_entry_are_delivered_in_one_checked_batch`
+and `retained_closeout_promotes_after_both_working_files_are_replaced`. The connected
+private-predicate scenario later moved behind the
+S10 test entry `readonly_gates_proposal_runs_every_a_checker`.
+[S7 results](s7-onboarding-predicates-report.md#review-round-1-fixes).
+
+| Exact test | Executed boundary |
+| --- | --- |
+| `private_publication_and_proving_bind_exact_artifact_and_record` | Exact current entry/packet/closed artifact and both private owning positives |
+| `each_due_obligation_missing_has_its_own_bounded_refusal` | All eleven obligations removed independently for publication and proving |
+| `wrong_path_event_packet_and_lifecycle_refuse` | Independent path, Event, packet and lifecycle binding |
+| `stale_evidence_and_pre_entry_verdicts_cannot_satisfy_onboarding` | Exact post-entry record evaluation and current evidence |
+| `classification_carried_work_and_debt_refuse` | Classification, carried work and debt boundary |
+| `aggregate_effect_allowlists_refuse_pointers_status_passed_targets_and_marker_retirement` | Full-batch forbidden accepting destinations |
+| `outside_generation_effect_and_foreign_entry_refuse_the_entire_batch` | Other-version effects and unowned entries |
+| `maintenance_and_onboarding_authorities_cannot_substitute` | Well-formed positive maintenance control and both cross-path refusals |
+| `proving_prepared_wrong_approval_path_and_changed_artifacts_refuse` | Prepared artifact, approval/path and changed final bytes |
+| `published_and_closed_assertions_cannot_be_retargeted_to_foreign_paths` | Retained assertion retargeting |
+| `drift_clearance_and_frozen_object_byte_changes_refuse` | Maintenance drift ownership and exact frozen-object preservation |
+| `public_in1_retains_its_onboarding_effect_refusal` | Unsupported public authority refusal |
+| `grants_renewals_baseline_debt_and_current_inventory_are_all_refused` | Grants, renewal, retirement and inventory drift |
+| `missing_execution_and_inconsistent_execution_bindings_refuse` | Missing E and inconsistent E bindings |
+| `metadata_without_a_record_and_min_supported_cannot_escape_the_batch` | Record-free metadata and pointer effects |
+| `foreign_advertising_without_records_refuses_raw_additions` | Registered foreign capability/runtime additions before retained-record filtering |
+
+### S8 Publication and S9 proving closeout
+
+The modules are `isolated_maintenance::tests::bootstrap::public_on3::public_on4` and
+`public_on5`, including `public_on5::{release_watch,reporting}`.
+S8 round 1b records the completed public IN1/observation positive and production refusal.
+Its preparation containing test remains unverified. S9's final five-test filter passed.
+[S8 results](s8-on4-publication-report.md#refusal-ordering),
+[S9 results](s9-on5-closeout-report.md#round-1-focused-validation).
+
+| Exact test | Recorded result / boundary |
+| --- | --- |
+| `public_on4_connected_publication_real_in1_and_observation` | Passed, real ON4 exact entry/packet/runtime, independent IN1 and unchanged-qualification/downgrade coverage |
+| `public_on4_production_maintenance_and_neutral_writers_refuse_without_writes` | Passed, production/wrong-path/neutral refusal |
+| `public_on4_preparation_gate_and_concurrent_refusals_from_connected_on3` | Containing result remains unverified in S8, including its remaining gate/rollback cases |
+| `public_on5_prepared_closed_real_in1_and_observation` | Passed, actual prepared/human/final writers and committed IN1/readback |
+| `public_on5_production_and_maintenance_refuse_without_writes` | Passed, unsupported authority preserves caller tree |
+| `public_on5_refusals_local_final_and_conflict_preservation` | Passed, all four partial-delivery conflicts, local/final agreement, semantic/timestamp/digest/entry/transfer tampering and truthful closed reporting |
+| `public_on5_release_watch_prepared_closed_real_in1_and_observation` | Passed, bounded pre-freeze authority setup then actual writer settlement and IN1 |
+| `public_on5_downgrade_assertions_require_subject_inventory_and_flags` | Passed, complete subject/promise/capability inventory and qualification assertion controls |
+| `on5_release_watch_settlement_matches_writer_and_refuses_mismatched_registry` | Passed under `depth_acceptance::onboarding::tests::on5`, exact settlement and registry/forged settlement refusal |
+| `on5_prepared_cannot_replace_retained_proving_authority` | Passed in the same module, retained closed authority survives preparation |
+| `on5_commit_identity_ignores_inherited_git_redirects` | Passed in the same module, hardened source commit |
+
+### S10 real read-only check composition
+
+The first nine names are under `isolated_maintenance::tests::readonly_gates` and its
+`validator`, `drift`, `facts` and `process` modules. The last is under
+`depth_acceptance::onboarding::tests::readonly_gates`. Final coverage records nine passes,
+the explicitly launched discovery-ignored child and the separately passing connected proposal.
+[S10 results](s10-readonly-gates-report.md#focused-validation).
+
+| Exact test | Executed boundary |
+| --- | --- |
+| `readonly_gates_two_phases_real_checkers_and_independent_process` | Real shared A checks, actual standalone command entries, independently initialized child and changed committed inputs after local success |
+| `readonly_gates_generation_and_neutral_writers_keep_their_controls` | Ordinary production-verdict rendering, production parser and neutral write refusals |
+| `readonly_gates_closing_observations_refuse_host_and_parent_drift` | Host, transport, source and protected-parent closing observations |
+| `readonly_gates_validator_refuses_committed_prerequisite_deletion` | Required validator root remains required after all prerequisites disappear |
+| `readonly_gates_registry_route_closes_after_final_read` | Read-only wrapper checks drift after final registry read |
+| `readonly_gates_registry_capability_closes_after_final_read` | Standalone capability wrapper closing drift |
+| `readonly_gates_unverified_control_refuses_empty_promises` | Nonempty promise assertions |
+| `readonly_gates_unverified_control_refuses_empty_obligations` | Nonempty obligation assertions |
+| `independent_process` | Explicit child invocation succeeds, normal discovery retains its ignore annotation |
+| `readonly_gates_proposal_runs_every_a_checker` | Actual connected ON3 proposal, exact record sealing and substantive support/capability/audit/validator/runtime refusals |
+
+### S11 E.8 refusal and lower-writer matrix
+
+The binary target is `depth_refusal_routes`, with modules under `mediation_matrix`.
+Library names are under `isolated_maintenance::tests::mediation_matrix` and its `maintenance`
+and `lower` modules, plus the separately named mechanical destination tests. Final S11 runs
+passed 29 binary tests in both ordinary and depth-declared builds, both short lower tests,
+both short maintenance tests, the retained/proposed matrix, ten workspace mutations and four
+destination tests. PR #369 includes the ON2 dry-run guard regression repair in this same
+merged enforcement tree. [S11 results](s11-mediation-matrix-report.md#focused-validation-after-review-fixes).
+
+| Exact test | Executed boundary |
+| --- | --- |
+| `every_on_entry_refuses_onboarding_carriers_without_scope_authority` | Actual ON1, both ON2 persistence forms/repair, ON3, ON4 and both ON5 binaries on five carriers |
+| `on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery` | Ready ordinary approval, all depth carriers including foreign subject/deleted record, ordinary successful dry-run persistence |
+| `every_ne_command_and_alias_refuses_onboarding_carriers` | NE1–NE8, NE3–NE5 aliases, all three legacy snapshots, ordinary/subject/nested roots and omitted scope |
+| `ne2_proposed_record_destinations_refuse_before_writing` | Direct/nested record destination |
+| `ne2_explicit_output_cannot_hide_a_nested_onboarding_workspace` | Enclosed workspace, directory and file aliases |
+| `ne2_registry_output_refuses_before_replacing_bindings` | Proposed registry destination |
+| `ne2_registry_traversal_refuses_before_replacing_bindings` | `data/../data` registry destination |
+| `ne2_registry_directory_alias_refuses_before_replacing_bindings` | Directory alias to registry |
+| `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace` | Missing-prefix traversal, including forbidden intermediate directory creation |
+| `ne2_ordinary_explicit_output_keeps_caller_path_resolution` | Exact ordinary bytes through relative/absolute/alias and missing-prefix caller spellings |
+| `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement` | Every MA public boundary, cached intake/refresh/closeout apply, foreign retained generation and ordinary siblings |
+| `on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route` | Valid foreign depth approval under maintenance authority |
+| `onboarding_retained_and_proposed_lower_writer_matrix` | Batch/lifecycle/packet lower writes across carriers and proposed destinations |
+| `outer_callers_refuse_enclosed_depth_destinations` | Enclosed declared/retained scope, including removal destinations |
+| `ordinary_lower_writers_deliver_literal_bytes` | Independent literal lifecycle/packet delivery and nested controls |
+| `checked_delivery_refuses_final_and_directory_alias_retargeting` | `depth_routes::tests`, deterministic check-to-write substitutions |
+| `checked_delivery_opens_without_following_final_symlinks` | Same module, final link substituted before open |
+| `checked_delivery_rechecks_parent_identity_after_opening` | Same module, parent substituted after open |
+| `resolution_refuses_loops_and_io_errors_and_keeps_ordinary_delivery_bytes` | Same module, bounded resolution/errors and ordinary bytes/directory syntax |
+| `connected_onboarding_mediation_and_admitted_writers` | Aggregate containing result remains unverified in S11 |
+| `connected_on4_aggregate_and_restoration` | Aggregate containing result remains unverified in S11 |
+
+### S12 connected E.7 implementation proof
+
+The first four names are under
+`isolated_maintenance::tests::bootstrap::public_on3::e7_chain` and its `insufficient` module.
+The execution tests are mounted under
+`isolated_maintenance::tests::fixture::runtime_follow_on::e7_chain`.
+Four connected tests and two execution negatives passed in their recorded runs. The round-1
+rerun passed both strengthened execution tests, both acquired-input tests and the platform-mount
+regression. [S12 results](s12-e7-connected-proof-report.md#round-1-focused-validation).
+
+| Exact test | Executed boundary |
+| --- | --- |
+| `e7_connected_onboarding_qualified_chain` | Actual new-entry ON1→ON5, eleven adopted results, two exact entries, independent IN1/readback at each primary checkpoint |
+| `e7_connected_onboarding_repaired_qualified_chain` | Public repair sibling through qualified publication/closed proving |
+| `e7_connected_onboarding_release_watch_chain` | Bounded pre-freeze authority setup seam then ON2→ON5 settlement continuity |
+| `e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` | Actual empty reporting E, zero substantive executions, eleven unverified obligations, unqualified promise and unchanged-tree refusal |
+| `e7_forged_serialized_baseline_cannot_hide_a_snapshot_edit` | Controller-held baseline protects acquired inputs and frozen binding |
+| `e7_interrupted_offline_executor_retains_only_trusted_failure_diagnostics` | SIGTERM after substantive source/handoff writes, exact trusted attempt/diagnostics and preserved caller files/raw binding |
+| `publication_entrypoints_refuse_each_changed_frozen_acquired_input_without_writes` | Eight literal O inputs through isolated ON3–ON5 acquired-input bodies |
+| `publication_entrypoints_refuse_each_deleted_frozen_acquired_input_without_writes` | All eight inputs individually deleted, exact path-specific refusal and unchanged caller |
+| `e7_executor_module_mounts_are_platform_gated` | Both new module mounts retain platform gates |
+
+The producer/host observations are modeled and ON4's S/T executor supplies successful results.
+Actual shared A checks and real IN1 still execute. S12's public-dispatch deletion-specific
+reason remains a gap because the earlier declared-depth guard precedes that precheck.
+Its whole Windows test build encounters existing failures, while the isolated mount regression
+passes. Maintenance socket-blocked controls remain recorded in FR1–FR3/S7/S8/S11. The
+[phase C handoff](support-depth-isolated-proof-plan.md#phase-c-handoff-after-slice-13) carries
+actual subprocess execution, independently issued full-schema artifacts and native queue proof.

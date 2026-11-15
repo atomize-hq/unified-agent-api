@@ -113,3 +113,24 @@ authorization enables the maintenance path for each agent (contract "Path enable
 - Then Claude Code and OpenCode.
 
 **G. Additive shared integration**, last, as the proposal orders it.
+
+
+## Slice 13 phase C handoff
+
+The current inventory is pinned to `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`, including
+PR #369's ON2 dry-run guard repair. Slices 6–12 completed the bounded synthetic in-process
+onboarding implementation gate, its real shared-check composition and executed public refusal
+matrix. The qualified primary chain is `e7_connected_onboarding_qualified_chain`, with repair
+and truthful-insufficiency siblings. The release-watch sibling retains a documented pre-freeze
+authority-setup seam. Results and remaining incomplete/socket-blocked assertions are recorded in
+[the final inventory](s13-final-inventory-report.md), [S10](s10-readonly-gates-report.md),
+[S11](s11-mediation-matrix-report.md) and [S12](s12-e7-connected-proof-report.md).
+
+Phase C remains closed and its independent disposable-public-repository host run remains due
+under CP-P5 / OR-P12. Prerequisites include explicit maintainer authorization for the exact
+repository/baseline and a read-only credential REFERENCE, plus review of the canonical
+`ci.yml` producer/consumer layout amendment, its recursive workspace-test leg, trusted reporting
+branch and scheduling/latency. Real subprocess checks, producer terminality, independent
+full-schema artifacts/adoption, all-root and per-root validation, native queue admission and
+actual post-push readback must execute. The detailed prerequisites, checkpoints and retained
+run evidence are in the [phase C handoff](support-depth-isolated-proof-plan.md#phase-c-handoff-after-slice-13).

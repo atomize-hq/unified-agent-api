@@ -260,10 +260,13 @@ Both runtime-advertising readers use the routed registry in check mode, and stan
 consumers close their independently resolved route. Ordinary rendering and the validator without
 `--tip` retain production verdict selection. Per-root `--tip` and all-root IN1 retain owning
 admission. The connected proposal proof and independent fake-host process composition are
-credential-free machinery evidence. The registry-reader test conversions and full declared-candidate
-preflight test leg remain slice 10b, ON4 controller wiring remains slice 8 and the real protected
-host proof remains phase C. Results are recorded in the
-[slice 10a report](../agents/lifecycle/s10-readonly-gates-report.md).
+credential-free machinery evidence. Slice 10b implemented the registry-reader conversions and
+records ordinary/declared fixture validation and the lead-owned full-workspace leg. Slice 8 installed ON4 controller wiring.
+`readonly_gates_two_phases_real_checkers_and_independent_process` and
+`readonly_gates_proposal_runs_every_a_checker` passed, including independently initialized
+child authority and substantive shared-check refusals. The complete real subprocess inventory
+and protected host proof remain phase C requirements. Results are recorded in the
+[slice 10 report](../agents/lifecycle/s10-readonly-gates-report.md).
 
 ## D2 isolated CI producer
 
@@ -478,7 +481,8 @@ The synthetic onboarding selection below specifies the only pre-declaration exce
 protected-baseline declaration and registry-equality requirements: the exact ON1 bootstrap delta
 and the maintainer's first declaration transition (OR-P1, OR-P14,
 [routing design, "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#route-composition)).
-They are not installed. All other scope, source approval, freshness and ownership checks remain.
+They are implemented within the finite synthetic route. Scope, source approval, freshness
+and ownership continue to govern the complete candidate.
 
 Planning, a derived invocation-local proposal view and apply MUST retain the caller's binding and
 check freshness against independently observed host/source/tip and coherent local inputs. A copied
@@ -501,7 +505,10 @@ ON2 freeze before implementation. The mechanisms below govern its implementation
 activation MUST remain closed until separately authorized phase C proves trusted-emitter isolation
 and exact host transport in the real workflow layout. The
 [freeze/readiness design](../agents/lifecycle/support-depth-freeze-readiness-design.md#four-mechanism-decisions)
-records delivery and qualification obligations. This docs amendment specifies pending behavior.
+records delivery and qualification obligations. FR1–FR3 implement the isolated admission/history,
+complete-tree freeze/acquisition and reporting-context mechanisms. Their measured fake-host
+boundaries and real-transport obligations are recorded in
+[Annex A.4](support-depth-contract.md#a4-reconciliation-and-conformance-status).
 An evaluator MUST refuse the exception whenever required authority cannot be established.
 
 1. Applicability and complete independent population discovery MUST precede classification.
@@ -1066,15 +1073,23 @@ flag selects onboarding scope, and every other agent, version, target or path re
 installs no isolated profile, so no route exists. The production registry keeps refusing
 `support_depth` tables, and the canonical registry never lists `depth_fixture`.
 
-**Grants nothing.** The selection admits a workspace and nothing more:
-- the `synthetic-wrapper-v1` producer, receipts and verdict above stay bound to the maintenance
-  Event, and an onboarding generation's evidence stays unverified until the separately bound
-  onboarding producer variant specified below is implemented (OR-P5);
-- maintenance routes refuse an onboarding enrollment, as they do today;
-- ON1 to ON5 keep refusing depth until roadmap E.6 wires them, in the isolated workspace only;
-- the create lane gets no packet freeze, pointer, `validated` or `supported` route.
+**Present implementation boundary.** At `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`,
+the separately bound onboarding producer variant and finite public in-process ON1–ON5/IN1
+routes are implemented. Maintenance and onboarding retain independent Event/P/O populations
+and adoption. Maintenance routes refuse onboarding acceptance. The create lane's pointer,
+validated/supported status, marker retirement, maintenance drift-clearance and same-version
+path-transfer effects remain refused by the owning predicates and complete aggregate checks.
+`e7_connected_onboarding_qualified_chain` and the repaired sibling passed with independently
+modeled full-schema producer/artifact observations. The producer's outcomes and terminality
+remain modeled, ON2 copies substantive wrapper source/tests, and ON4 uses its test S/T runner.
+`e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` passed with zero
+substantive executions, empty reporting E and all eleven obligations unverified.
+Actual protected-host issuance, real subprocess checks and native queue acceptance remain
+phase C obligations requiring explicit maintainer authorization.
+[Slice 12 results](../agents/lifecycle/s12-e7-connected-proof-report.md),
+[phase C handoff](../agents/lifecycle/support-depth-isolated-proof-plan.md#phase-c-handoff-after-slice-13).
 
-**Bootstrap and first declaration (specified, not installed).** OR-P1 and OR-P14 of the
+**Bootstrap and first declaration within the implemented finite synthetic route.** OR-P1 and OR-P14 of the
 [routing design, "Maintainer decisions" and "Route composition"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)
 extend only this source-installed synthetic route with these bounded states:
 
@@ -1105,7 +1120,7 @@ or depth acceptance authority.
    tip first is not admission. Only ON1 and this transition have registry-delta exceptions. ON2
    MUST still refuse unresolved enrollment and can freeze only after the charter's prerequisites.
 
-**Finite approval adapter (specified, not installed).** The private projection shared by routed
+**Finite approval adapter within the implemented synthetic route.** The private projection shared by routed
 ON1–ON5 and IN1 MUST validate the complete compiled synthetic descriptor and approval, rejecting
 unknown or misplaced fields and any fake backend (OR-P2,
 [routing design, "Maintainer decisions"](../agents/lifecycle/support-depth-onboarding-routing-design.md#maintainer-decisions)).
@@ -1115,7 +1130,7 @@ operate on validated path/Event/subject inputs; neither `depth_fixture` nor Code
 ownership, adequacy, currentness, effect admission, integration or delivery checks. Production
 approval acceptance is unchanged; no second subject is added.
 
-**Onboarding producer binding (specified, not installed).** OR-P5 of the
+**Onboarding producer binding within the implemented synthetic route.** OR-P5 of the
 [routing design, "Maintainer decisions" and "Inspection A — producer population and CI terminality"](../agents/lifecycle/support-depth-onboarding-routing-design.md#inspection-a--producer-population-and-ci-terminality)
 adds a finite onboarding variant of `synthetic-wrapper-v1`, reusing the fake CLI, substantive
 cases, target, eleven due obligations, revision-1 receipt schema, adoption format and IR-P3
@@ -1143,5 +1158,6 @@ This can qualify only the synthetic wrapper promise, never a runtime adapter or 
 **Templates.** `crates/xtask/tests/fixtures/depth-synthetic/onboarding/` holds the isolated
 registry-entry variant with deferred maintenance and the approval template. It also holds a
 template acquisition statement at `governance/depth-acquisition/<version>.toml` (OF-P4 B), which
-lists each acquired input that O binds (OF-P6). The statement's fields are not normative until the
-onboarding charter defines them (slice 1), and nothing reads it until slice 2.
+lists each acquired input that O binds (OF-P6). The onboarding charter defines the statement fields. ON2 and IN1 read and authenticate the
+statement against protected acquisition. ON3–ON5 recheck its frozen acquired inputs. Executed
+results and the isolated public-dispatch diagnostic gap are recorded in Annex A.4.
