@@ -119,7 +119,7 @@ fn fixture(mode: &str) -> tempfile::TempDir {
     .unwrap();
     fs::write(tmp.path().join("mode"), mode).unwrap();
     let script = r##"#!/usr/bin/python3
-import sys,json,pathlib
+import sys,json,pathlib,os
 p=pathlib.Path(__file__).parent
 (p/'invoked').touch()
 if 'app-server' not in sys.argv:
@@ -131,7 +131,13 @@ else:
   if 'id' not in req: continue
   method=req['method']
   if method=='initialize': result={'userAgent':'fixture'}
-  elif method=='config/read': result={'origins':{},'config':{'model':'sk-sentinel-model','model_provider':'sk-sentinel-provider','approval_policy':'sk-sentinel-policy','sandbox_mode':'sk-sentinel-sandbox','private_secret':'sk-sentinel-layer'}}
+  elif method=='config/read':
+   home=os.environ['CODEX_HOME'] if (p/'mode').read_text()!='foreign' else '/sk-native-home'
+   user={'type':'user','file':home+'/config.toml'}
+   result={'origins':{'model':{'name':user,'version':'sk-sentinel-version'}},'config':{'model':'sk-sentinel-model','model_provider':'sk-sentinel-provider','approval_policy':'sk-sentinel-policy','sandbox_mode':'sk-sentinel-sandbox','private_secret':'sk-sentinel-layer'}}
+   if req['params'].get('includeLayers'):
+    result['layers']=[{'name':user,'version':'sk-sentinel-version','config':{'model':'sk-sentinel-user-layer'}},{'name':{'type':'system','file':'/etc/codex/config.toml'},'version':'sk-sentinel-system','config':{}}]
+    if (p/'mode').read_text()=='foreign': result['layers'].insert(0,{'name':{'type':'enterpriseManaged','id':'sk-native-id','name':'sk-native-name'},'version':'sk-native-v','config':{'model':'sk-native-cloud'}})
   elif method=='thread/list': result={'data':[{'id':'source','cwd':req['params']['cwd'],'createdAt':1,'updatedAt':2}],'nextCursor':None}
   elif method in ['thread/start','thread/resume','thread/fork']:
    result={'thread':{'id':'aaaaaaaa-1111-4111-8111-111111111111'},'model':'gpt-5','modelProvider':'openai','serviceTier':None,'approvalPolicy':'on-request','approvalsReviewer':'user','sandbox':{'type':'workspaceWrite'},'cwd':req['params']['cwd'],'runtimeWorkspaceRoots':req['params'].get('runtimeWorkspaceRoots',[]),'instructionSources':[]}
@@ -204,7 +210,23 @@ fn actual_exec_resume_and_managed_children_emit_only_finite_observations() {
             && managed.approval.is_none()
             && managed.sandbox.is_none()
     );
-    assert!(!managed.layers_complete && managed.requirements_empty);
+    assert!(managed.requirements_empty);
+    // The actual managed child was asked for its stack; only finite classes/roles survive.
+    let layers = managed
+        .layers
+        .as_ref()
+        .expect("requested native layer stack");
+    assert_eq!(
+        layers.entries,
+        [context::LayerClass::User, context::LayerClass::System].map(|class| context::Layer {
+            class,
+            enabled: true,
+            empty: class == context::LayerClass::System,
+            role_matches: true,
+        })
+    );
+    assert_eq!(layers.origin_classes, [context::LayerClass::User]);
+    assert!(layers.origins_enabled);
     assert_eq!(
         fs::read_to_string(tmp.path().join("home/auth.json")).unwrap(),
         "sk-synthetic-auth-never-read"
@@ -253,6 +275,12 @@ fn unknown_or_missing_native_settings_never_become_empty_defaults_or_leak() {
         assert_eq!(thread["runtime_roots_match"], false);
         assert_eq!(thread["instructions_empty"], false);
         assert_eq!(reports[2]["missing"].as_array().unwrap().len(), 6);
+        if mode == "foreign" {
+            let layers = &reports[2]["config"]["layers"];
+            assert_eq!(layers["entries"][0]["class"], "enterprise_managed");
+            assert_eq!(layers["entries"][1]["class"], "user");
+            assert_eq!(layers["entries"][1]["role_matches"], false);
+        }
         assert!(!String::from_utf8(bytes).unwrap().contains("sk-"));
     }
 }

@@ -5,9 +5,12 @@ use std::path::PathBuf;
 pub(crate) struct ReplyRoles {
     cwd: Option<PathBuf>,
     roots: Option<Vec<PathBuf>>,
+    home: Option<PathBuf>,
 }
 impl ReplyRoles {
-    pub(crate) fn from_params(params: &Value) -> Option<Self> {
+    /// `home` is the native home the owning child was launched with, resolved like the native
+    /// resolver (`CODEX_HOME`, else `$HOME/.codex`) from its effective environment.
+    pub(crate) fn from_params(params: &Value, home: Option<&Path>) -> Option<Self> {
         if !tracing::enabled!(target: TARGET, tracing::Level::TRACE) {
             return None;
         }
@@ -23,7 +26,11 @@ impl ReplyRoles {
                     .map(|p| p.as_str().filter(|p| p.len() <= 4096).map(PathBuf::from))
                     .collect()
             });
-        Some(Self { cwd, roots })
+        Some(Self {
+            cwd,
+            roots,
+            home: home.map(Path::to_path_buf),
+        })
     }
 }
 fn matches_path(value: &Value, expected: &Path) -> bool {
@@ -38,6 +45,100 @@ fn matches_path(value: &Value, expected: &Path) -> bool {
         && !expected
             .components()
             .any(|c| matches!(c, std::path::Component::ParentDir))
+}
+
+const SYSTEM_CONFIG: &str = "/etc/codex/config.toml";
+// Exact member sets of each pinned wire source; extra or missing members are `Unknown`.
+fn source(name: &Value, roles: Option<&ReplyRoles>) -> (LayerClass, bool) {
+    let Some(o) = name.as_object() else {
+        return (LayerClass::Unknown, false);
+    };
+    let keys = |expected: &[&str]| {
+        o.len() == expected.len() && expected.iter().all(|k| o.contains_key(*k))
+    };
+    let path =
+        |key: &str, expected: Option<PathBuf>| expected.is_some_and(|p| matches_path(&o[key], &p));
+    let home = roles.and_then(|r| r.home.as_ref());
+    let cwd = roles.and_then(|r| r.cwd.as_ref());
+    match o.get("type").and_then(Value::as_str) {
+        Some("packagedDefaults") if keys(&["type", "file"]) => {
+            (LayerClass::PackagedDefaults, false)
+        }
+        Some("mdm") if keys(&["type", "domain", "key"]) => (LayerClass::Mdm, false),
+        Some("system") if keys(&["type", "file"]) => (
+            LayerClass::System,
+            path("file", Some(PathBuf::from(SYSTEM_CONFIG))),
+        ),
+        Some("enterpriseManaged") if keys(&["type", "id", "name"]) => {
+            (LayerClass::EnterpriseManaged, false)
+        }
+        Some("user") if keys(&["type", "file"]) || keys(&["type", "file", "profile"]) => (
+            LayerClass::User,
+            matches!(o.get("profile"), None | Some(Value::Null))
+                && path("file", home.map(|h| h.join("config.toml"))),
+        ),
+        Some("project") if keys(&["type", "dotCodexFolder"]) => (
+            LayerClass::Project,
+            path("dotCodexFolder", cwd.map(|c| c.join(".codex"))),
+        ),
+        Some("sessionFlags") if keys(&["type"]) => (LayerClass::SessionFlags, true),
+        Some("legacyManagedConfigTomlFromFile") if keys(&["type", "file"]) => {
+            (LayerClass::LegacyManagedFile, false)
+        }
+        Some("legacyManagedConfigTomlFromMdm") if keys(&["type"]) => {
+            (LayerClass::LegacyManagedMdm, false)
+        }
+        _ => (LayerClass::Unknown, false),
+    }
+}
+/// Project the requested native layer stack. Raw layer configs, paths, versions and disabled
+/// reasons stay in memory; only classes and booleans are emitted.
+pub(crate) fn layers(value: &Value, roles: Option<&ReplyRoles>) -> Option<Layers> {
+    let raw = value.get("layers")?.as_array()?;
+    let origins = value.get("origins")?.as_object()?;
+    if raw.len() > MAX_LAYERS || origins.len() > 4096 {
+        return None;
+    }
+    let mut entries = Vec::with_capacity(raw.len());
+    let mut enabled = Vec::new();
+    for layer in raw {
+        let o = layer.as_object()?;
+        let disabled = match o.get("disabledReason") {
+            None => false,
+            Some(Value::String(_)) => true,
+            _ => return None,
+        };
+        if !o
+            .keys()
+            .all(|k| matches!(k.as_str(), "name" | "version" | "config" | "disabledReason"))
+            || !o.get("version").is_some_and(Value::is_string)
+        {
+            return None;
+        }
+        let (class, role_matches) = source(o.get("name")?, roles);
+        if !disabled {
+            enabled.push((o.get("name")?, o.get("version")?));
+        }
+        entries.push(Layer {
+            class,
+            enabled: !disabled,
+            empty: o.get("config")?.as_object().is_some_and(|c| c.is_empty()),
+            role_matches,
+        });
+    }
+    let mut classes = std::collections::BTreeSet::new();
+    let mut origins_enabled = true;
+    for metadata in origins.values() {
+        let m = metadata.as_object()?;
+        let (name, version) = (m.get("name")?, m.get("version")?);
+        classes.insert(source(name, roles).0);
+        origins_enabled &= m.len() == 2 && enabled.iter().any(|(n, v)| *n == name && *v == version);
+    }
+    Some(Layers {
+        entries,
+        origin_classes: classes.into_iter().collect(),
+        origins_enabled,
+    })
 }
 
 fn approval(value: &Value) -> Option<ThreadApproval> {
@@ -137,6 +238,147 @@ mod tests {
             &Value::String("/root/../work".into()),
             Path::new("/root/../work")
         ));
+    }
+    fn roles() -> ReplyRoles {
+        ReplyRoles {
+            cwd: Some(PathBuf::from("/role/project")),
+            roots: None,
+            home: Some(PathBuf::from("/role/home")),
+        }
+    }
+    fn stack() -> Value {
+        let v = |name: Value| serde_json::json!({"name":name,"version":"sk-sentinel-version"});
+        serde_json::json!({
+            "config":{},
+            "origins":{
+                "model":v(serde_json::json!({"type":"user","file":"/role/home/config.toml"})),
+                "sandbox_mode":v(serde_json::json!({"type":"sessionFlags"}))
+            },
+            "layers":[
+                {"name":{"type":"sessionFlags"},"version":"sk-sentinel-version","config":{"sandbox_mode":"sk-sentinel-flag"}},
+                {"name":{"type":"project","dotCodexFolder":"/role/project/.codex"},"version":"sk-sentinel-version","config":{},"disabledReason":"sk-sentinel-untrusted"},
+                {"name":{"type":"user","file":"/role/home/config.toml"},"version":"sk-sentinel-version","config":{"model":"sk-sentinel-user"}},
+                {"name":{"type":"system","file":"/etc/codex/config.toml"},"version":"sk-sentinel-version","config":{}}
+            ]
+        })
+    }
+    #[test]
+    fn layer_stack_projects_classes_roles_and_origins_without_retaining_native_strings() {
+        let observed = layers(&stack(), Some(&roles())).unwrap();
+        let class = |c, enabled, empty| Layer {
+            class: c,
+            enabled,
+            empty,
+            role_matches: true,
+        };
+        assert_eq!(
+            observed,
+            Layers {
+                entries: vec![
+                    class(LayerClass::SessionFlags, true, false),
+                    class(LayerClass::Project, false, true),
+                    class(LayerClass::User, true, false),
+                    class(LayerClass::System, true, true),
+                ],
+                origin_classes: vec![LayerClass::User, LayerClass::SessionFlags],
+                origins_enabled: true,
+            }
+        );
+        let raw = serde_json::to_string(&observed).unwrap();
+        assert!(!raw.contains("sk-") && !raw.contains("/role") && !raw.contains("/etc"));
+        // Without the requested member, or with an unbounded stack, nothing is claimed.
+        let mut absent = stack();
+        absent.as_object_mut().unwrap().remove("layers");
+        assert!(layers(&absent, Some(&roles())).is_none());
+        let mut many = stack();
+        let first = many["layers"][0].clone();
+        many["layers"] = Value::Array(vec![first; MAX_LAYERS + 1]);
+        assert!(layers(&many, Some(&roles())).is_none());
+    }
+    #[test]
+    fn foreign_managed_and_malformed_layers_never_match_their_roles() {
+        let at = |i: usize, name: Value| {
+            let mut v = stack();
+            v["layers"][i]["name"] = name;
+            layers(&v, Some(&roles())).unwrap().entries[i].clone()
+        };
+        use serde_json::json;
+        // Wrong user file, a selected profile, an ancestor project and another system file.
+        assert!(!at(2, json!({"type":"user","file":"/other/config.toml"})).role_matches);
+        let profile = at(
+            2,
+            json!({"type":"user","file":"/role/home/config.toml","profile":"p"}),
+        );
+        assert!(profile.class == LayerClass::User && !profile.role_matches);
+        assert!(!at(1, json!({"type":"project","dotCodexFolder":"/role/.codex"})).role_matches);
+        assert!(
+            !at(
+                3,
+                json!({"type":"system","file":"/etc/codex/../codex/config.toml"})
+            )
+            .role_matches
+        );
+        for (name, class) in [
+            (
+                json!({"type":"enterpriseManaged","id":"i","name":"n"}),
+                LayerClass::EnterpriseManaged,
+            ),
+            (
+                json!({"type":"mdm","domain":"d","key":"k"}),
+                LayerClass::Mdm,
+            ),
+            (
+                json!({"type":"legacyManagedConfigTomlFromFile","file":"/etc/codex/managed_config.toml"}),
+                LayerClass::LegacyManagedFile,
+            ),
+            (
+                json!({"type":"legacyManagedConfigTomlFromMdm"}),
+                LayerClass::LegacyManagedMdm,
+            ),
+            (
+                json!({"type":"packagedDefaults","file":"/bin/codex"}),
+                LayerClass::PackagedDefaults,
+            ),
+            (json!({"type":"future"}), LayerClass::Unknown),
+            (
+                json!({"type":"sessionFlags","secret":"sk"}),
+                LayerClass::Unknown,
+            ),
+            (
+                json!({"type":"user","file":"/role/home/config.toml","extra":1}),
+                LayerClass::Unknown,
+            ),
+        ] {
+            let l = at(0, name);
+            assert!(l.class == class && !l.role_matches);
+        }
+        // Unknown layer members or a non-string disabled reason refuse the whole projection.
+        let mut extra = stack();
+        extra["layers"][0]["secret"] = json!("sk");
+        assert!(layers(&extra, Some(&roles())).is_none());
+        let mut reason = stack();
+        reason["layers"][1]["disabledReason"] = json!(true);
+        assert!(layers(&reason, Some(&roles())).is_none());
+        // Without assigned home/cwd roles only the fixed system path and flags can match.
+        let unassigned = layers(&stack(), None).unwrap();
+        assert!(unassigned
+            .entries
+            .iter()
+            .all(|l| l.role_matches
+                == matches!(l.class, LayerClass::SessionFlags | LayerClass::System)));
+    }
+    #[test]
+    fn origins_must_name_an_enabled_layer_and_version() {
+        use serde_json::json;
+        for origin in [
+            json!({"name":{"type":"project","dotCodexFolder":"/role/project/.codex"},"version":"sk-sentinel-version"}),
+            json!({"name":{"type":"user","file":"/role/home/config.toml"},"version":"other"}),
+            json!({"name":{"type":"user","file":"/role/home/config.toml"},"version":"sk-sentinel-version","x":1}),
+        ] {
+            let mut v = stack();
+            v["origins"]["model"] = origin;
+            assert!(!layers(&v, Some(&roles())).unwrap().origins_enabled);
+        }
     }
     #[test]
     fn granular_projection_requires_all_flags_and_rejects_unknown_fields() {

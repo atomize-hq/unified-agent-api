@@ -2,7 +2,7 @@ use super::super::{AppServerMessage, CodexAppServer, StdioServerConfig, ThreadSt
 use serde_json::{json, Value};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf, time::Duration};
 
-fn fixture_config(body: &str) -> (tempfile::TempDir, StdioServerConfig) {
+pub(super) fn fixture_config(body: &str) -> (tempfile::TempDir, StdioServerConfig) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("server");
     fs::write(&path, format!("#!/usr/bin/env python3\nimport json,sys\ndef send(x):\n print(json.dumps(x),flush=True)\n{body}\n")).unwrap();

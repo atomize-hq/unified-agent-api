@@ -262,7 +262,7 @@ mod tests {
                 approval: Some(context::Approval::Never),
                 sandbox: Some(context::Sandbox::WorkspaceWrite),
                 origins_present: true,
-                layers_complete: false,
+                layers: None,
                 requirements_empty: false,
             })
             .unwrap();

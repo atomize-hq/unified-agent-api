@@ -30,10 +30,47 @@ pub struct Config {
     #[serde(deserialize_with = "required_nullable")]
     pub sandbox: Option<Sandbox>,
     pub origins_present: bool,
-    // Existing API requests includeLayers:false; never invent layer/turn closure.
-    pub layers_complete: bool,
+    /// Native high-to-low layer stack from the owning `config/read`; null when not observed.
+    #[serde(deserialize_with = "required_nullable")]
+    pub layers: Option<Layers>,
     pub requirements_empty: bool,
 }
+/// Wire `ConfigLayerSource` type at the pinned revision; any other spelling is `Unknown`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayerClass {
+    PackagedDefaults,
+    Mdm,
+    System,
+    EnterpriseManaged,
+    User,
+    Project,
+    SessionFlags,
+    LegacyManagedFile,
+    LegacyManagedMdm,
+    Unknown,
+}
+/// One native layer without its path, version or values. `role_matches` compares the
+/// layer's path with its assigned role in memory: system `/etc/codex/config.toml`, user
+/// `<native home>/config.toml` with no profile, project `<cwd>/.codex`; flags have no path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Layer {
+    pub class: LayerClass,
+    pub enabled: bool,
+    pub empty: bool,
+    pub role_matches: bool,
+}
+/// Finite layer/origin correspondence. This is the managed `config/read` input stack before
+/// thread/turn overrides; it is not an effective-turn, loader or exec/fork-route observation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Layers {
+    pub entries: Vec<Layer>,
+    pub origin_classes: Vec<LayerClass>,
+    pub origins_enabled: bool,
+}
+pub(crate) const MAX_LAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Approval {

@@ -6,7 +6,8 @@ use std::collections::BTreeSet;
 mod projection;
 pub(crate) use projection::environment_known;
 pub use projection::{
-    Approval, Config, Launch, Route, Sandbox, ThreadApproval, ThreadOperation, ThreadSettings,
+    Approval, Config, Launch, Layer, LayerClass, Layers, Route, Sandbox, ThreadApproval,
+    ThreadOperation, ThreadSettings,
 };
 pub const TRACE_TARGET: &str = projection::TARGET;
 pub(crate) const INPUTS: [&str; 2] = [
@@ -14,6 +15,30 @@ pub(crate) const INPUTS: [&str; 2] = [
     "cli_manifests/codex/reports/0.156.1/pilot-protocol-facts.json",
 ];
 pub mod guard;
+/// Source-owned eligibility: only reviewed local classes, each at its assigned role, in the
+/// pinned loader's high-to-low order, and every effective origin naming an enabled layer.
+/// The exact stack still has to equal the profile's reviewed expectation.
+pub(crate) fn layers_eligible(layers: &Layers) -> bool {
+    let rank = |c: LayerClass| match c {
+        LayerClass::SessionFlags => Some(3),
+        LayerClass::Project => Some(2),
+        LayerClass::User => Some(1),
+        LayerClass::System => Some(0),
+        _ => None,
+    };
+    let ranks: Option<Vec<_>> = layers.entries.iter().map(|l| rank(l.class)).collect();
+    let Some(ranks) = ranks else { return false };
+    let one = |c| layers.entries.iter().filter(|l| l.class == c).count() == 1;
+    !layers.entries.is_empty()
+        && layers.entries.len() <= projection::MAX_LAYERS
+        && ranks.windows(2).all(|w| w[0] >= w[1])
+        && one(LayerClass::System)
+        && one(LayerClass::User)
+        && layers.entries.iter().all(|l| l.role_matches)
+        && layers.origins_enabled
+        && layers.origin_classes.windows(2).all(|w| w[0] < w[1])
+        && layers.origin_classes.iter().all(|c| rank(*c).is_some())
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -169,6 +194,7 @@ impl Observation {
                         || p.approval.is_none()
                         || p.sandbox.is_none()
                         || !p.origins_present
+                        || !p.layers.as_ref().is_some_and(layers_eligible)
                         || !p.requirements_empty
                 })
             {
