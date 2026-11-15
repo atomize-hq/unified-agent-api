@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use xtask::{
@@ -332,7 +336,7 @@ fn workspace_evaluation_is_read_only_and_rejects_dirty_untracked_or_symlink_inpu
     files.insert(inv_path.into(), inventory(&[g]));
     files.insert(
         "crates/xtask/data/agent_registry.toml".into(),
-        include_str!("../data/agent_registry.toml").into(),
+        registry_fixture::undeclared_registry().into(),
     );
     for (p, v) in &files {
         fs::create_dir_all(root.join(p).parent().unwrap()).unwrap();

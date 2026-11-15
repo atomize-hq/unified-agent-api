@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 mod agent_registry {
     pub use xtask::agent_registry::*;
 }
@@ -28,7 +32,7 @@ mod capability_matrix {
             canonical_target_header: String,
         }
 
-        const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+        const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 
         fn seeded_registry() -> AgentRegistry {
             AgentRegistry::parse(SEEDED_REGISTRY).expect("parse seeded registry")

@@ -1,3 +1,11 @@
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -140,7 +148,19 @@ fn stage_minimum_evidence_helper_matches_contract() {
 #[test]
 fn backfilled_lifecycle_states_validate_for_registry_targets() {
     let workspace_root = repo_root();
-    let registry = AgentRegistry::load(&workspace_root).expect("load agent registry");
+    let registry = candidate_registry::registry(&workspace_root);
+
+    for entry in &registry.agents {
+        let path = lifecycle_state_path_for_entry(entry);
+        let state = load_repo_lifecycle_state_for_contract_test(&workspace_root, &path)
+            .unwrap_or_else(|err| panic!("{path}: {err}"));
+        assert_eq!(state.agent_id, entry.agent_id);
+        assert_eq!(
+            state.approval_artifact_path,
+            approval_artifact_path_for_entry(entry)
+        );
+        state.validate().expect("actual candidate lifecycle schema");
+    }
 
     let expectations = [
         ("codex", LifecycleStage::Published, SupportTier::FirstClass),
@@ -179,9 +199,7 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
         assert_eq!(state.approval_artifact_path, approval_path);
         state.validate().expect("lifecycle schema validation");
         if agent_id == "claude_code" {
-            state
-                .validate_in_workspace(&workspace_root)
-                .expect("Claude adoption linkage validates");
+            candidate_registry::validate_claude_lifecycle(&workspace_root);
         }
 
         match expected_stage {
@@ -280,6 +298,7 @@ fn backfilled_lifecycle_states_validate_for_registry_targets() {
             }
         }
     }
+    assert_eq!(candidate_registry::registry(&workspace_root), registry);
 }
 
 #[test]
@@ -353,12 +372,10 @@ fn runtime_integrated_rejects_invalid_active_runtime_evidence_run_id_shape() {
 }
 
 fn sample_closed_baseline_state() -> LifecycleState {
-    let workspace_root = repo_root();
-    let registry = AgentRegistry::load(&workspace_root).expect("load registry");
+    let registry = AgentRegistry::parse(registry_fixture::undeclared_registry())
+        .expect("load ordinary registry");
     let entry = registry.find("gemini_cli").expect("gemini entry");
-    let lifecycle_path = lifecycle_state_path_for_entry(entry);
-    load_repo_lifecycle_state_for_contract_test(&workspace_root, &lifecycle_path)
-        .expect("load sample lifecycle state")
+    registry_fixture::ordinary_lifecycle_state(&entry.agent_id)
 }
 
 #[test]
@@ -378,6 +395,11 @@ fn claude_adoption_requires_current_watch_and_unchanged_historical_evidence() {
         fs::create_dir_all(destination.parent().expect("parent")).expect("mkdir");
         fs::copy(source.join(path), destination).expect("copy evidence");
     }
+    fs::write(
+        root.join("crates/xtask/data/agent_registry.toml"),
+        registry_fixture::undeclared_registry(),
+    )
+    .expect("ordinary adoption registry");
     let state_path =
         "docs/agents/lifecycle/claude-code-cli-onboarding/governance/lifecycle-state.json";
     let state: LifecycleState =
@@ -520,12 +542,10 @@ fn claude_adoption_requires_current_watch_and_unchanged_historical_evidence() {
 }
 
 fn sample_runtime_integrated_state() -> LifecycleState {
-    let workspace_root = repo_root();
-    let registry = AgentRegistry::load(&workspace_root).expect("load registry");
+    let registry = AgentRegistry::parse(registry_fixture::undeclared_registry())
+        .expect("load ordinary registry");
     let entry = registry.find("aider").expect("aider entry");
-    let lifecycle_path = lifecycle_state_path_for_entry(entry);
-    let mut state = load_repo_lifecycle_state_for_contract_test(&workspace_root, &lifecycle_path)
-        .expect("load aider lifecycle");
+    let mut state = registry_fixture::ordinary_lifecycle_state(&entry.agent_id);
     state.lifecycle_stage = LifecycleStage::RuntimeIntegrated;
     state.support_tier = SupportTier::BaselineRuntime;
     state.current_owner_command = "runtime-follow-on --write".to_string();

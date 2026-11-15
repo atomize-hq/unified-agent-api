@@ -46,31 +46,62 @@ impl Error {
     }
 }
 
-fn prepare(root: &std::path::Path) -> Result<String, String> {
+fn prepare(root: &std::path::Path, check: bool) -> Result<String, String> {
     let source = source::Source::workspace(root)?;
     conformance::check(&source)?;
     features::Features::load(&source)?;
     source.optional(DATA)?;
-    let registry = crate::agent_registry::AgentRegistry::parse(
-        &source.read(crate::agent_registry::REGISTRY_RELATIVE_PATH)?,
-    )
-    .map_err(|e| e.to_string())?;
+    let registry = if check {
+        check_registry(root, &source)?
+    } else {
+        crate::agent_registry::AgentRegistry::parse(
+            &source.read(crate::agent_registry::REGISTRY_RELATIVE_PATH)?,
+        )
+        .map_err(|e| e.to_string())?
+    };
     Ok(projection::render(&projection::project(&registry)?))
+}
+
+fn check_registry(
+    root: &std::path::Path,
+    source: &source::Source,
+) -> Result<crate::agent_registry::AgentRegistry, String> {
+    // Preserve Source's regular-file checks and bind this loader's bytes to the authenticated
+    // registry. The routed load retains the production parser when no profile is installed.
+    let raw = source.read(crate::agent_registry::REGISTRY_RELATIVE_PATH)?;
+    let registry = crate::isolated_maintenance::registry(root).map_err(|e| e.to_string())?;
+    if crate::agent_registry::AgentRegistry::parse_unenforced(&raw).map_err(|e| e.to_string())?
+        != registry
+    {
+        return Err("runtime advertising registry differs from authenticated reading".into());
+    }
+    Ok(registry)
 }
 
 pub fn run(args: Args) -> Result<(), Error> {
     let root = workspace_root().map_err(Error::Operational)?;
-    if !args.check {
-        xtask::depth_routes::refuse_workspace(&root, "runtime-advertising-model")
-            .map_err(Error::Invalid)?;
-    }
-    let source = prepare(&root).map_err(Error::Invalid)?;
+    run_in_workspace(&root, args)
+}
+
+pub fn run_in_workspace(root: &std::path::Path, args: Args) -> Result<(), Error> {
     if args.check {
-        revision::Revision::workspace(&root).map_err(Error::Invalid)?;
-    } else {
-        fs::create_dir_all(root.join(DATA).parent().unwrap())
-            .map_err(|e| Error::Operational(e.to_string()))?;
-        fs::write(root.join(DATA), source).map_err(|e| Error::Operational(e.to_string()))?;
+        return check_in_workspace(root).map_err(Error::Invalid);
     }
+    xtask::depth_routes::refuse_workspace(root, "runtime-advertising-model")
+        .map_err(Error::Invalid)?;
+    let source = prepare(root, false).map_err(Error::Invalid)?;
+    fs::create_dir_all(root.join(DATA).parent().unwrap())
+        .map_err(|e| Error::Operational(e.to_string()))?;
+    fs::write(root.join(DATA), source).map_err(|e| Error::Operational(e.to_string()))?;
     Ok(())
+}
+
+/// Both preparation and revision loading authenticate the routed registry read-only.
+pub fn check_in_workspace(root: &std::path::Path) -> Result<(), String> {
+    crate::readonly_gates::with_readonly_route(root, || check_current(root))
+}
+
+pub(crate) fn check_current(root: &std::path::Path) -> Result<(), String> {
+    prepare(root, true)?;
+    revision::Revision::workspace(root).map(drop)
 }

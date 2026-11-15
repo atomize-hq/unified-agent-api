@@ -1,3 +1,7 @@
+#[path = "../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::agent_registry::{AgentRegistry, REGISTRY_RELATIVE_PATH};
 use serde_json::json;
@@ -6,6 +10,9 @@ use std::{collections::BTreeMap, fs};
 mod authority;
 mod authority_gaps;
 mod bootstrap;
+#[cfg(target_os = "linux")]
+pub(crate) use bootstrap::public_on3::private_onboarding_predicates_from_connected_on3 as connected_onboarding_publication;
+mod declared_test_leg;
 #[cfg(unix)]
 pub(crate) use bootstrap::public_on2::producer_workspace as onboarding_producer_workspace;
 pub(super) mod fixture;
@@ -28,6 +35,7 @@ mod ma6_promotion;
 mod onboarding_scope;
 mod prepare;
 mod publication;
+mod readonly_gates;
 mod registry_tables;
 mod subject;
 #[cfg(unix)]
@@ -152,7 +160,7 @@ fn canonical_ordinary_registry_and_isolated_protected_declaration_are_distinct()
         .unwrap()
         .support_depth
         .is_some());
-    let ordinary = include_str!("../../data/agent_registry.toml");
+    let ordinary = registry_fixture::undeclared_registry();
     assert!(AgentRegistry::parse(ordinary)
         .unwrap()
         .find("codex")

@@ -1,5 +1,9 @@
 //! Slice 0 of the onboarding freeze decisions: the isolated scope admits the onboarding selection
 //! for the synthetic subject alone. It is a proof workspace, not onboarding path enablement.
+#[path = "../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::agent_registry::support_depth::LifecyclePath;
 
@@ -27,7 +31,7 @@ fn entry_index(doc: &toml_edit::DocumentMut, agent: &str) -> usize {
 /// Install the canonical registry plus the deferred-maintenance onboarding entry, in place of the
 /// maintenance entry, and commit it to the protected tip.
 fn install_onboarding_entry(f: &Fixture) {
-    let canonical = include_str!("../../../data/agent_registry.toml");
+    let canonical = registry_fixture::undeclared_registry();
     let registry = format!("{canonical}\n{DEFERRED_ENTRY}");
     write(f.root.path(), REGISTRY_RELATIVE_PATH, registry);
     f.commit();

@@ -1,3 +1,11 @@
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,12 +14,12 @@ use agent_api::RuntimeSupportRecord;
 use serde_json::{json, Value};
 use xtask::support_matrix::{
     derive_rows, derive_rows_for_test_roots, derive_validated_runtime_support_for_agent_root,
-    derive_validated_runtime_support_for_test_roots, render_agent_api_runtime_support_data,
+    derive_validated_runtime_support_for_test_roots,
     render_agent_api_runtime_support_data_for_test_roots, validate_publication_consistency,
     BackendSupportState, ManifestSupportState, PointerPromotionState, SupportRow, UaaSupportState,
 };
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = registry_fixture::undeclared_registry();
 const CODEX_TARGET_TRIPLES: &[&str] = &[
     "aarch64-apple-darwin",
     "aarch64-unknown-linux-musl",
@@ -211,8 +219,7 @@ fn checked_in_agent_api_runtime_support_data_matches_committed_truth() {
         .expect("workspace root")
         .to_path_buf();
 
-    let rendered = render_agent_api_runtime_support_data(&workspace_root)
-        .expect("render runtime support data");
+    let rendered = candidate_registry::runtime_support_data(&workspace_root);
     let checked_in =
         fs::read_to_string(workspace_root.join("crates/agent_api/src/runtime_support_data.rs"))
             .expect("read checked-in runtime support data");

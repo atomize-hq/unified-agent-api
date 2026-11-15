@@ -2,6 +2,10 @@
 //! `docs/agents/lifecycle/support-depth-onboarding-freeze-decisions.md`): typed, refusing unknown
 //! keys, and preserved by the lifecycle writer.
 
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -31,7 +35,24 @@ fn committed_states() -> Vec<PathBuf> {
 }
 
 fn sample() -> Value {
-    serde_json::from_slice(&fs::read(repo_root().join(STATE)).unwrap()).unwrap()
+    ordinary_states()
+        .into_iter()
+        .find(|state| state["agent_id"] == "gemini_cli")
+        .unwrap()
+}
+
+fn ordinary_states() -> Vec<Value> {
+    serde_json::from_str(include_str!("fixtures/undeclared_lifecycle_states.json")).unwrap()
+}
+
+#[test]
+fn ordinary_lifecycle_fixtures_carry_no_depth() {
+    for value in ordinary_states() {
+        let parsed = state(&value).unwrap();
+        parsed.validate().unwrap();
+        assert_eq!(parsed.support_depth, None);
+        assert_eq!(parsed.written_paths_sha256, None);
+    }
 }
 
 fn state(value: &Value) -> Result<LifecycleState, String> {
@@ -46,6 +67,7 @@ fn parse(text: &str) -> Result<LifecycleState, String> {
 fn every_committed_lifecycle_state_parses_and_is_written_back_unchanged() {
     let states = committed_states();
     assert!(states.len() >= 5, "found {states:?}");
+    let candidate = candidate_registry::registry(&repo_root());
     for path in states {
         let bytes = fs::read(&path).unwrap();
         let parsed: LifecycleState = serde_json::from_slice(&bytes)
@@ -53,8 +75,15 @@ fn every_committed_lifecycle_state_parses_and_is_written_back_unchanged() {
         parsed
             .validate()
             .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
-        assert_eq!(parsed.support_depth, None, "{}", path.display());
-        assert_eq!(parsed.written_paths_sha256, None, "{}", path.display());
+        let entry = candidate
+            .find(&parsed.agent_id)
+            .expect("actual candidate lifecycle agent");
+        assert_eq!(
+            repo_root().join(xtask::agent_lifecycle::lifecycle_state_path_for_entry(
+                entry
+            )),
+            path,
+        );
         let mut written = serde_json::to_vec_pretty(&parsed).unwrap();
         written.push(b'\n');
         assert_eq!(
@@ -64,6 +93,7 @@ fn every_committed_lifecycle_state_parses_and_is_written_back_unchanged() {
             path.display()
         );
     }
+    assert_eq!(candidate_registry::registry(&repo_root()), candidate);
 }
 
 #[test]

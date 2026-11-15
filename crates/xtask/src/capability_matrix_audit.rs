@@ -7,7 +7,7 @@ pub struct Args {}
 
 pub fn run(_args: Args) -> Result<(), String> {
     let workspace_root = resolve_workspace_root()?;
-    xtask::capability_publication::audit_current_capability_publication(&workspace_root)
+    xtask::capability_publication::check_in_workspace(&workspace_root)
 }
 
 fn resolve_workspace_root() -> Result<PathBuf, String> {

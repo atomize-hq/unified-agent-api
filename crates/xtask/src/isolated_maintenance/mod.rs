@@ -137,13 +137,18 @@ pub fn registry(root: &Path) -> Result<AgentRegistry, RegistryError> {
     if let Some(registry) = candidate_registry(root).map_err(RegistryError::Isolated)? {
         return Ok(registry);
     }
-    match route(root).map_err(RegistryError::Isolated)? {
+    let result = match route(root).map_err(RegistryError::Isolated)? {
         Some(route) => route
             .registry(root)
             .cloned()
             .map_err(RegistryError::Isolated),
         None => AgentRegistry::load(root).map_err(|err| RegistryError::Production(err.to_string())),
+    };
+    #[cfg(test)]
+    if result.is_ok() {
+        tests::fixture::registry_observed();
     }
+    result
 }
 /// A resolved route and its scoped registry, captured when an MA4 execution started. Only
 /// [`Route::capture`] mints one. MA4's independent candidate cannot resolve the route itself, so
@@ -662,3 +667,6 @@ pub(crate) use tests::onboarding_producer_workspace;
 
 #[cfg(test)]
 pub(crate) use tests::admission_fixture;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) use tests::connected_onboarding_publication;

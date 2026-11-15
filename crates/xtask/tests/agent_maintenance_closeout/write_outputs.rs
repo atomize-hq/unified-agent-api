@@ -1,3 +1,7 @@
+#[path = "../support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::harness::repo_root;
 
@@ -237,9 +241,8 @@ fn automated_request_closeout_preserves_trigger_truth_in_handoff() {
 fn automated_request_execution_contract_still_supports_manual_closeout() {
     let fixture = fixture_root("automated-request-closeout-execution-contract");
     seed_opencode_basis(&fixture);
-    let registry =
-        agent_registry::AgentRegistry::parse(include_str!("../../data/agent_registry.toml"))
-            .expect("parse seeded registry");
+    let registry = agent_registry::AgentRegistry::parse(registry_fixture::undeclared_registry())
+        .expect("parse seeded registry");
     let entry = registry.find("opencode").expect("find opencode entry");
     let maintenance_root = "docs/agents/lifecycle/opencode-maintenance";
     write_text(

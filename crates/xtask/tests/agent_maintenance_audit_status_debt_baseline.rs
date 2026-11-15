@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
@@ -12,7 +16,7 @@ mod harness;
 
 use harness::{fixture_root, write_text};
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const REQUEST_PATH: &str =
     "docs/agents/lifecycle/codex-maintenance/governance/maintenance-request.toml";
 const DEBT_PATH: &str = "docs/specs/unified-agent-api/non-tui-support-debt.md";

@@ -13,6 +13,8 @@ use thiserror::Error;
 
 use crate::support_matrix::{self, SupportMatrixArtifact};
 
+mod check;
+pub(crate) use check::{check_acquisition, check_root};
 mod current;
 mod depth;
 mod fix_mode;
@@ -157,24 +159,6 @@ fn run_inner(args: Args, default_root: Option<&str>) -> Result<Vec<Violation>, F
     run_checks(args, default_root, true)
 }
 
-/// Acquisition schema/pointer/report checks. The owning freeze separately derives and checks
-/// depth records and complete aggregate publication, which do not exist before re-freeze.
-pub(crate) fn check_acquisition(root: PathBuf) -> Result<(), String> {
-    let args = Args {
-        root: Some(root),
-        rules: None,
-        schema: None,
-        version_schema: None,
-        mode: Mode::Check,
-        json: false,
-        tip: None,
-    };
-    let violations = run_checks(args, None, false).map_err(|e| e.to_string())?;
-    if !violations.is_empty() {
-        return Err("manifest acquisition validation refused".into());
-    }
-    Ok(())
-}
 fn run_checks(
     args: Args,
     default_root: Option<&str>,

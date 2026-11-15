@@ -65,6 +65,17 @@ fn seeded_registry_carries_no_support_depth() {
     let registry = AgentRegistry::parse(SEEDED_REGISTRY).expect("parse seeded registry");
     assert!(registry.agents.iter().all(|a| a.support_depth.is_none()));
     assert_eq!(registry.agents.last().unwrap().agent_id, "aider");
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let candidate = candidate_registry::registry(&workspace);
+    for entry in &candidate.agents {
+        if let Some(depth) = &entry.support_depth {
+            assert_eq!(entry.agent_id, "depth_fixture");
+            assert!(depth
+                .enabled_paths
+                .as_ref()
+                .is_some_and(|paths| !paths.is_empty()));
+        }
+    }
 }
 
 #[test]

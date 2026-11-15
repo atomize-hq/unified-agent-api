@@ -3,15 +3,17 @@
 //! mediation rule 7 requires). A spec says its root adopts Annex B only where the root's
 //! `RULES.json` names the record path; a root that does not adopt it holds no depth record.
 
+#[path = "support/candidate_registry.rs"]
+#[allow(clippy::duplicate_mod)]
+mod candidate_registry;
+
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
 use serde_json::Value;
-use xtask::agent_registry::AgentRegistry;
 
-const CANONICAL: &str = include_str!("../data/agent_registry.toml");
 const DEPTH_SECTION: &str = "## Depth records\n";
 const SYNTHETIC_SPEC: &str =
     "tests/fixtures/depth-synthetic/governing/manifest-root/VALIDATOR_SPEC.md";
@@ -86,7 +88,7 @@ fn xtask_source() -> String {
 
 #[test]
 fn every_registry_root_states_the_shared_depth_records_section() {
-    let registry = AgentRegistry::parse(CANONICAL).unwrap();
+    let registry = candidate_registry::registry(&repo_root());
     let synthetic = read(&Path::new(env!("CARGO_MANIFEST_DIR")).join(SYNTHETIC_SPEC));
     let shared = depth_section(&synthetic, SYNTHETIC_SPEC);
     for code in DEPTH_CODES {
@@ -121,11 +123,12 @@ fn every_registry_root_states_the_shared_depth_records_section() {
         checked.push(entry.agent_id.clone());
     }
     assert_eq!(checked.len(), registry.agents.len());
+    assert_eq!(candidate_registry::registry(&repo_root()), registry);
 }
 
 #[test]
 fn a_spec_claims_adoption_only_where_rules_name_the_record_path() {
-    let registry = AgentRegistry::parse(CANONICAL).unwrap();
+    let registry = candidate_registry::registry(&repo_root());
     for entry in &registry.agents {
         let root = repo_root().join(&entry.manifest_root);
         let spec = read(&root.join("VALIDATOR_SPEC.md"));
@@ -149,13 +152,14 @@ fn a_spec_claims_adoption_only_where_rules_name_the_record_path() {
             "{origin} must list the truth decisions its root still needs"
         );
     }
+    assert_eq!(candidate_registry::registry(&repo_root()), registry);
 }
 
 /// A non-adopting root's spec restates its committed version metadata and pointers, so drift
 /// between the spec and the files fails here rather than going unnoticed.
 #[test]
 fn a_non_adopting_spec_matches_its_committed_versions_and_pointers() {
-    let registry = AgentRegistry::parse(CANONICAL).unwrap();
+    let registry = candidate_registry::registry(&repo_root());
     for entry in &registry.agents {
         let root = repo_root().join(&entry.manifest_root);
         if adopts_annex_b(&root, &entry.manifest_root) {
@@ -197,4 +201,5 @@ fn a_non_adopting_spec_matches_its_committed_versions_and_pointers() {
             }
         }
     }
+    assert_eq!(candidate_registry::registry(&repo_root()), registry);
 }

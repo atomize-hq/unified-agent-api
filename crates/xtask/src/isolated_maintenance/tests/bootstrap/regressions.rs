@@ -1,3 +1,7 @@
+#[path = "../../../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 
 /// Exercise ON1's public dry-run and extract its ordinary renderer's exact bytes. No copy of
@@ -16,7 +20,7 @@ fn ordinary_render() -> String {
         write(
             root.path(),
             REGISTRY_RELATIVE_PATH,
-            include_str!("../../../../data/agent_registry.toml"),
+            registry_fixture::undeclared_registry(),
         );
         write(root.path(), "Cargo.toml", "[workspace]\nmembers = []\n");
         write(root.path(), "docs/crates-io-release.md", "# Releases\n");

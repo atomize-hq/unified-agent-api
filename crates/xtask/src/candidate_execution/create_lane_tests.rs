@@ -1,4 +1,8 @@
 //! Binding and candidate execution tests, independent of unavailable onboarding route scope.
+#[path = "../../tests/support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use super::*;
 use crate::{agent_lifecycle as life, depth_record::onboarding::OnboardingApproval};
 use std::os::unix::fs::PermissionsExt;
@@ -41,7 +45,7 @@ fn setup(depth: bool) -> (tempfile::TempDir, RuntimeContext) {
     write(
         root.path(),
         crate::agent_registry::REGISTRY_RELATIVE_PATH,
-        fs::read(repo.join(crate::agent_registry::REGISTRY_RELATIVE_PATH)).unwrap(),
+        registry_fixture::undeclared_registry(),
     );
     let mut state: life::LifecycleState =
         serde_json::from_slice(&fs::read(repo.join(STATE)).unwrap()).unwrap();

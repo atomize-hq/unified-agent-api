@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -34,7 +38,7 @@ mod watch;
 use harness::{fixture_root, write_text};
 use watch::{build_watch_queue_with_resolver, run_in_workspace_with_resolver, Args, Error};
 
-const SEEDED_REGISTRY: &str = include_str!("../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = crate::registry_fixture::undeclared_registry();
 const CLAUDE_NPM_RELEASE_WATCH_UPSTREAM: &str =
     "source_kind = \"npm_dist_tag\"\npackage = \"@anthropic-ai/claude-code\"\ndist_tag = \"stable\"";
 const CLAUDE_GCS_RELEASE_WATCH_UPSTREAM: &str = "source_kind = \"gcs_object_listing\"\nbucket = \"claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819\"\nprefix = \"claude-code-releases\"\nversion_marker = \"manifest.json\"";

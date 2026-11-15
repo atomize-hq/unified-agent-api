@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{fs, path::Path};
 
 use tempfile::TempDir;
@@ -60,13 +64,16 @@ fn inline_table_mismatch_wins_over_an_invalid_request_commit() {
     );
     let root = fixture(&request);
     for relative_path in [
-        "crates/xtask/data/agent_registry.toml",
         "cli_manifests/codex/latest_validated.txt",
         ".github/workflows/agent-maintenance-open-pr.yml",
         "docs/specs/unified-agent-api/non-tui-support-debt.md",
     ] {
         copy_repo_file(&root, relative_path);
     }
+
+    let registry = root.path().join("crates/xtask/data/agent_registry.toml");
+    fs::create_dir_all(registry.parent().unwrap()).unwrap();
+    fs::write(registry, registry_fixture::undeclared_registry()).unwrap();
 
     assert_mismatch(run(&root, None));
 }

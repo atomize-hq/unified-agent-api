@@ -1,3 +1,7 @@
+#[path = "support/registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{fs, path::Path};
 
 use clap::{CommandFactory, Parser};
@@ -31,7 +35,7 @@ use maintenance_harness::{
 fn prepare_execute_fixture(prefix: &str) -> std::path::PathBuf {
     let fixture = maintenance_harness::prepare_execute_fixture(prefix);
     let registry =
-        xtask::agent_registry::AgentRegistry::parse(include_str!("../data/agent_registry.toml"))
+        xtask::agent_registry::AgentRegistry::parse(crate::registry_fixture::undeclared_registry())
             .expect("parse seeded registry");
     let entry = registry.find("codex").expect("codex registry entry");
     harness::write_text(

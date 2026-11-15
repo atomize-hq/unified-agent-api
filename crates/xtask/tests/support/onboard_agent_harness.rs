@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+#[path = "registry_fixture.rs"]
+#[allow(clippy::duplicate_mod)]
+mod registry_fixture;
+
 use std::{
     collections::BTreeMap,
     fs,
@@ -9,7 +13,7 @@ use std::{
 
 use sha2::{Digest, Sha256};
 
-const SEEDED_REGISTRY: &str = include_str!("../../data/agent_registry.toml");
+const SEEDED_REGISTRY: &str = registry_fixture::undeclared_registry();
 const ROOT_LICENSE_APACHE: &str = include_str!("../../../../LICENSE-APACHE");
 const ROOT_LICENSE_MIT: &str = include_str!("../../../../LICENSE-MIT");
 pub const SEEDED_GEMINI_CRATE_PATH: &str = "crates/gemini_cli";

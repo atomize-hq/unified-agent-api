@@ -100,6 +100,7 @@ pub(crate) fn connected_publication(root: &Path) {
         super::super::super::publication::validate_current(scratch.path(), &candidate)
     })
     .unwrap();
+    readonly_gates::check_connected(root, &proposal, &captured, &view, scratch.path(), &record);
     review_round1::connected_refusals(root, &proposal, &captured, &view, scratch.path(), &record);
     proving(root, &proposal, &captured, &view, scratch.path(), &record);
     assert_eq!(
