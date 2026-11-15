@@ -4,8 +4,8 @@ Status: the credential-free in-process E.7 implementation gate passed. The quali
 chain, repaired qualified sibling, bounded release-watch variant and truthful-insufficiency
 sibling all passed, as did the two new execution negatives and five ON2 controls. Required
 phase C host evidence remains missing; the release-watch setup seam is bounded below.
-Changes remain unstaged and uncommitted on `feat/s12-e7-connected-proof` at baseline `33688373`
-for the lead; nothing is pushed.
+Review round 1 changes remain uncommitted in the detached fix worktree at baseline `95bc9706`
+for `feat/s12-e7-connected-proof`.
 
 This bounded proof follows the [routing design](support-depth-onboarding-routing-design.md#proving-evidence-and-refusal-coverage),
 OR-P5, OR-P12 and OR-P13, and [contract Annex A/A.4](../../specs/support-depth-contract.md).
@@ -57,10 +57,11 @@ Prefixes: `B = isolated_maintenance::tests::bootstrap`,
 | Bootstrap and identity | No route; foreign subject/version/target; fake backend; undeclared version; unknown/misplaced approval fields | `B::public_on1::public_on1_refuses_foreign_descriptors_and_mixed_approval_without_writes`, `B::public_on1::public_on1_absent_route_keeps_ordinary_success_and_depth_refusal`, `B::finite_approval_projection_rejects_unknown_misplaced_backend_and_foreign_fields`, `B::bootstrap_scope_refuses_records_foreign_descriptor_and_unknown_scope_without_fallback`, `B::bootstrap_absent_and_unselected_subject_require_exact_approval_and_scaffold` — prior [S10 bootstrap run](s10-readonly-gates-report.md#declared-registry-test-leg-fixes), 68 passed |
 | Bootstrap and identity | Preexisting records; ON1 replay over bindings; proposed declaration/record/entry | `B::public_on1::public_on1_refuses_divergent_scaffolds_and_retained_acceptance`, `B::public_on1::public_on1_creation_admission_refuses_injected_table_record_and_entry`, `B::declaration::first_declaration_refuses_extra_tables_records_entries_acceptance_and_selection_changes` — prior S10 bootstrap run |
 | Bootstrap and identity | Missing Annex B adoption; unacquired metadata; full validation of actual ON1 output | `B::preparation_refuses_every_binding_and_acceptance_effect` (including the unacquired 0.3.0 metadata case), `B::sweep::bootstrap_preparation_requires_exact_reviewed_governing_bytes`, `B::public_on1::public_on1_connected_preparation_metadata_and_first_declaration_chain`, `B::declaration::bootstrap_publication_checks_complete_files_for_preparation_and_declaration` — prior S10 bootstrap run. The new chains also call the actual full `manifest-validate` entry in ON1 preparation |
-| Freeze and acquisition | P-only; absent/malformed/extra/missing/changed statement entries; branch-only statement; every changed/deleted O input; incomplete union | `isolated_maintenance::tests::fixture::runtime_follow_on::runtime_follow_on_freezes_p_record_object_and_contract_then_o`, `runtime_follow_on_refuses_missing_malformed_mismatched_and_extra_statement_inputs`, `runtime_follow_on_branch_local_statement_is_ineffective_until_integration`, `runtime_follow_on_requires_inputs_to_equal_both_statement_and_protected_tip`, `runtime_follow_on_incomplete_union_names_missing_targets_without_a_freeze` (same module) — prior [FR2 retained coverage](fr2-freeze-planner-report.md), [S7 depth-acceptance/connected coverage](s7-onboarding-predicates-report.md) |
+| Freeze and acquisition | P-only; absent/malformed/extra/missing/changed statement entries; branch-only statement; incomplete union | `isolated_maintenance::tests::fixture::runtime_follow_on::runtime_follow_on_freezes_p_record_object_and_contract_then_o`, `runtime_follow_on_refuses_missing_malformed_mismatched_and_extra_statement_inputs`, `runtime_follow_on_branch_local_statement_is_ineffective_until_integration`, `runtime_follow_on_requires_inputs_to_equal_both_statement_and_protected_tip`, `runtime_follow_on_incomplete_union_names_missing_targets_without_a_freeze` (same module) — prior [FR2 retained coverage](fr2-freeze-planner-report.md), [S7 depth-acceptance/connected coverage](s7-onboarding-predicates-report.md) |
+| Freeze and acquisition | Every changed/deleted frozen O input at the ON3–ON5 acquired-input precheck | `isolated_maintenance::tests::fixture::runtime_follow_on::acquired_inputs_tests::publication_entrypoints_refuse_each_changed_frozen_acquired_input_without_writes` and `publication_entrypoints_refuse_each_deleted_frozen_acquired_input_without_writes` (same module) — round 1 focused validation below. Both compare the committed statement and frozen vector to eight reviewed literal paths. Each isolated deletion requires the complete literal refusal naming that path and an unchanged caller snapshot. Public dispatch deletion-specific coverage remains a gap because its declared-depth guard precedes this precheck |
 | Freeze and acquisition | Changed P; post-integration re-freeze; earlier approval; record/object deletion; authentic parent acquisition | `B::public_on2::public_on2_in1_refuses_lifecycle_rollback_and_closed_generation_refreeze`, `public_on2_in1_requires_parent_acquisition_and_intact_binding`, `public_on2_connected_freeze_write_admission_and_observation` (same module) — prior [S11 ordinary/declared runs](s11-mediation-matrix-report.md), repeated here in the five-test ON2 filter; `B::fr2::fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` — prior [FR2](fr2-freeze-planner-report.md) |
 | Freeze and acquisition | Git replacements/grafts/alternates/environment; hidden bytes/modes/kinds and complete-tree acquisition authority | `isolated_maintenance::tests::fixture::runtime_follow_on::authority::runtime_follow_on_replace_ref_cannot_admit_a_branch_only_statement`, `runtime_follow_on_replaced_statement_blob_cannot_supply_provenance`, `runtime_follow_on_replaced_bound_blob_cannot_fake_integration_equality`, `runtime_follow_on_grafts_and_alternates_cannot_supply_integration_authority`, `runtime_follow_on_inherited_git_redirects_cannot_change_statement_authority` (same authority module) — prior FR2 46-test runtime-follow-on run; `B::regressions::bootstrap_checkpoint_refuses_masked_acquisition_bytes_and_modes`, `B::regressions::bootstrap_checkpoint_rejects_uncommitted_additions_in_its_bound_view`, `B::fr2::fr2_on2_complete_tree_canonical_outputs_authority_and_real_in1` — prior S10 bootstrap/FR2 runs. These protections are unchanged |
-| Execution and repair | Forged serialized baseline; interruption | `isolated_maintenance::tests::fixture::runtime_follow_on::e7_chain::e7_forged_serialized_baseline_cannot_hide_a_snapshot_edit` and `e7_interrupted_offline_executor_retains_only_trusted_failure_diagnostics` (same new module) — **executed here**, both passed in 3.90 seconds. The forged baseline preclaims the malicious snapshot digest; the real observed boundary still refuses. SIGTERM terminates the offline executor after substantive writes; none is copied back |
+| Execution and repair | Forged serialized baseline; interruption | `isolated_maintenance::tests::fixture::runtime_follow_on::e7_chain::e7_forged_serialized_baseline_cannot_hide_a_snapshot_edit` and `e7_interrupted_offline_executor_retains_only_trusted_failure_diagnostics` (same new module) — original execution run passed in 3.90 seconds, with strengthened round 1 validation below. SIGTERM follows substantive source and successful handoff writes in the retained candidate. The caller retains its original contract, prompt, handoff and raw lifecycle `support_depth` bytes. Exact trusted attempt fields and eight diagnostic files are checked while every other caller node is compared |
 | Execution and repair | Protected input/snapshot/controller edits; execution failure; caller validation/delivery changes; nonempty written-path claim | `isolated_maintenance::tests::fixture::runtime_follow_on::public::runtime_follow_on_public_failed_candidates_preserve_record_inputs_and_truthful_diagnostics`, `runtime_follow_on_public_delivery_preserves_concurrent_caller_and_reports_refusal` (same public module) — prior FR2 runtime-follow-on run; `B::public_repair::public_repair_refuses_forged_success_when_protected_generation_is_enrolled`, `B::public_repair::public_repair_sibling_chain_preserves_frozen_generation_and_written_paths` — prior [S11 repair run](s11-mediation-matrix-report.md); `P::public_on3_connected_active_reporting_e_and_real_in1` — prior [S6](s6-on3-reporting-report.md), including changed written-paths and frozen-input refusals |
 | Execution and repair | Repair preserves P/O; cannot backfill E, lose digest or heal orphan binding; runtime selection after repair | `B::public_repair::public_repair_sibling_chain_preserves_frozen_generation_and_written_paths`, `P::public_on3_connected_repaired_runtime_selection_and_real_in1` — prior S11/S6; new `P::e7_chain::e7_connected_onboarding_repaired_qualified_chain` continues the repair sibling through public acceptance |
 | Evidence | Maintenance receipts vs onboarding; another Event; wrong P/O; unadopted mapping | `H::onboarding::onboarding_refuses_cross_event_population_and_independent_adoption_mismatch`, `P::public_on3_connected_active_reporting_e_and_real_in1` — prior [FR3 complete population](fr3-reporting-context-report.md), S6/S10 onboarding runs |
@@ -176,7 +177,7 @@ Final-run result: `e7_connected_onboarding_qualified_chain`,
 The connected run used the final connected sources; its invocation began before the two
 execution-only tests were mounted. Those two tests passed separately on final sources. Current
 `e7_chain` discovery lists six tests, all covered by the successful connected and execution runs.
-No expectation or controller source changed after those successful runs.
+The round 1 section below records subsequent execution-test changes and focused reruns.
 
 The insufficiency sibling models one genuine admitted reporting checkpoint and zero substantive
 producer executions. Public ON3 writes its actual empty reporting E; all eleven independently
@@ -187,3 +188,88 @@ empty. ON4 refuses with `onboarding is missing a due depth obligation` naming `R
 Each refusal separately preserves the complete caller tree. The sibling does not invent a
 published predecessor to reach ON5's deeper predicate; S7's all-due publication/proving matrix
 separately proves the evidence requirement in both owning predicates.
+
+## Review round 1 fixes
+
+The deletion regression iterates the eight committed OF-P4 statement literals individually,
+including all three coverage reports. The statement and frozen O vector must each equal the
+nonempty literal inventory, including its cardinality. Each deletion exercises the isolated
+prepare-publication, publication-refresh and close-proving-run entry bodies and requires
+`changed or missing frozen acquired inputs; publication refused: <literal path>` while the
+complete caller snapshot stays equal. The existing per-input mutation regression now uses the
+same independently reviewed inventory. These tests use the small declared FR2 refusal fixture.
+The public entrypoints' declared-depth guard precedes this precheck, so public dispatch has a
+deletion-specific diagnostic coverage gap. The coverage map records that boundary.
+
+The execution refusal helper captures the full caller tree and raw lifecycle binding before
+execution. Only the following lifecycle attempt keys may differ, with their expected values
+asserted individually and the timestamp bounded to the invocation.
+
+- `current_owner_command` becomes `runtime-follow-on --write`.
+- `last_transition_by` becomes `xtask runtime-follow-on --write`.
+- `last_transition_at` records the invocation time.
+- `active_runtime_evidence_run_id` stays null.
+- `side_states` becomes `["failed_retryable"]`.
+- `blocking_issues` stays empty.
+- `retryable_failures` becomes `["write attempt freeze started; consult run diagnostics"]`.
+
+All remaining lifecycle keys must equal their captured values, and the parsed raw JSON bytes
+of `support_depth` must match exactly. The immutable run files are `input-contract.json`,
+`codex-prompt.md` and `handoff.json`. The eight permitted diagnostic outputs are
+`validation-report.json`, `written-paths.json`, `run-status.json`, `run-summary.md`,
+`recovery-candidate.txt`, `codex-execution.json`, `codex-stdout.log` and `codex-stderr.log`.
+Assertions require failure status/errors, empty written paths, false handoff readiness, the
+expected exit code and captured streams, a failure summary and an existing retained candidate.
+That candidate must contain substantive source and its successful executor-authored handoff.
+The caller's original pending handoff must remain byte-identical. Every remaining caller node,
+including run-directory entries and modes, participates in the full-tree comparison.
+Trusted output files must retain their captured modes, with new diagnostics at mode `0644`.
+
+The execution module mount now has `#[cfg(unix)]`. The other new E.7 mount is enclosed by
+`public_on3.rs`'s existing Linux module gate. The platform-gating regression is
+`isolated_maintenance::tests::fixture::runtime_follow_on::e7_executor_module_mounts_are_platform_gated`.
+
+### Round 1 focused validation
+
+All commands used `env -u TMPDIR`. Scratch logs are under ignored
+`target/s12-review-round1/`.
+
+| Focused command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Pass after all temporary mutations were restored |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Pass on final sources, 7.07 seconds |
+| `cargo test -p xtask --lib fixture::runtime_follow_on::e7_chain -- --nocapture` | 2 passed on final sources, 2.73 seconds |
+| `cargo test -p xtask --lib publication_entrypoints_refuse_each_ -- --nocapture` | 2 passed on final sources, 6.22 seconds, including all eight deletions across three entry bodies |
+| `cargo test -p xtask --lib e7_executor_module_mounts_are_platform_gated -- --nocapture` | 1 passed |
+| `make loc-check` | Pass |
+| `git diff --check` | Pass |
+
+A supplementary `cargo check -p xtask --lib --tests --target x86_64-pc-windows-gnu`
+failed in existing Unix-only tests outside this packet, including
+`src/support_matrix/depth/tests/generator.rs` and integration test files under
+`tests/c0_spec_validate`, `tests/depth_record` and `tests/agent_maintenance_closeout`.
+The new E.7 execution module produced no Windows diagnostic. Clean non-Unix test compilation
+remains unverified because of those existing failures. The source-mount regression independently
+checks both new E.7 include sites' platform gates.
+
+### Regression sensitivity
+
+Temporary test-harness edits changed disposable fixture state or an in-memory source copy.
+Each targeted test failed with its intended assertion, and each temporary edit was restored.
+
+| Disposable mutation | Observed failing regression |
+| --- | --- |
+| Restore and commit the isolated deleted `coverage.all.json` before the entry call | `publication_entrypoints_refuse_each_deleted_frozen_acquired_input_without_writes` rejects the missing complete path-specific acquisition refusal |
+| Copy the retained candidate's successful `handoff.json` into the caller after interruption | `e7_interrupted_offline_executor_retains_only_trusted_failure_diagnostics` fails at `immutable run file handoff.json` |
+| Clear the caller lifecycle `support_depth` after interruption | The same interruption regression fails its captured lifecycle equality |
+| Compact the caller's `support_depth` JSON while preserving its parsed value | The same interruption regression fails its raw-byte equality |
+| Remove the Unix gate from the in-memory module-mount source | `e7_executor_module_mounts_are_platform_gated` fails its gate assertion |
+
+A separate disposable `rustc --target x86_64-pc-windows-gnu --crate-type lib` fixture copied
+the actual execution-module mount and substituted its absolute source path. The gated fixture
+compiled successfully. Removing that gate from the disposable copy failed compilation on the
+Unix-only `public_on2::executor` import. This isolates the mount behavior from the unrelated
+repository-wide Windows test failures.
+
+Final focused checks ran after all temporary mutations were restored. The fix remains
+uncommitted in the detached worktree at `95bc9706` for lead review.
