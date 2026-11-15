@@ -4,12 +4,14 @@
 > synthetic isolated agent (machinery proof only); E1-P2's threshold and the chain are unchanged.
 
 Status: E1-P1 and E1-P2 approved by the maintainer on 2026-10-25.
-The first prerequisite is the evidence bridge; public-route wiring and the host run follow separately.
+The historical prerequisite sequence is retained below. The current implementation and remaining
+independent host obligations are recorded in the phase C handoff at the end of this plan.
 The original E1-P1 one-CORE mapped-proof premise is retired by approved
 [PI-P1–PI-P3](support-depth-packet-intake-design.md): initial mutation effects and complete
 initial/resume/fork declarations need separate review before positive mapped proof. The GNU target
 premise was superseded by IR-P2's acquired musl target; existing CORE fixtures remain diagnostic.
-Source baseline: staging `dd10558157583f1969b4ac0a412107ef617648e1` (PR #296).
+Historical plan baseline is staging `dd10558157583f1969b4ac0a412107ef617648e1` (PR #296).
+The phase C handoff is reconciled at `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`.
 This plan accompanies the refreshed [Annex A inventory](../../specs/support-depth-contract.md#annex-a-route-inventory).
 The [support-depth contract](../../specs/support-depth-contract.md) remains normative. E1 changes
 no code, enrollment, host settings, credentials or automation. It creates no background jobs.
@@ -169,3 +171,100 @@ Production enrollment still needs separately reviewed production-origin evidence
 explicit per-agent maintainer authorization under Path enablement. Isolated selections/receipts
 never qualify a real production promise. Independent onboarding enablement remains separate;
 unsupported onboarding routes continue to refuse depth effects.
+
+
+## Phase C handoff after slice 13
+
+Phase C remains closed. Slice 13 authorizes this documentation reconciliation only.
+Before any disposable-host operation, the maintainer must explicitly authorize the exact public
+disposable repository, protected installation baseline and credential references. A read-only
+credential REFERENCE is required for independent observations of the disposable repository and
+canonical protected source. Record a secret-store reference or approved credential handle.
+Credential values belong in the authorized host environment. Separate host-controlled delivery
+credentials require the existing repository-scoped authorization and stay outside executor reach.
+[CP-P5](support-depth-closeout-promotion-design.md#g9--ci-and-host-wiring-of-the-isolated-repository-phase-c),
+[OR-P12](support-depth-onboarding-routing-design.md#maintainer-decisions).
+
+### Implementation evidence carried forward
+
+The enforcement revision is `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`.
+The completed `e7_connected_onboarding_qualified_chain` consumes public ON1 bootstrap,
+reviewed governing adoption, actual B.1 acquisition, ordinary snapshotted metadata and separate
+declaration, ON2 freeze/implementation, independently modeled onboarding evidence, ON3 E,
+ON4 Publication and prepared/human/final ON5 through real IN1 and modeled readback.
+`e7_connected_onboarding_repaired_qualified_chain` covers the public repair sibling.
+`e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` covers zero execution
+credit and preserved unqualified reporting. `e7_connected_onboarding_release_watch_chain`
+retains a pre-freeze authority-setup seam, so its settled ON2→ON5 variant has that bounded claim.
+[S12 results and negative map](s12-e7-connected-proof-report.md).
+
+`readonly_gates_two_phases_real_checkers_and_independent_process` and
+`readonly_gates_proposal_runs_every_a_checker` passed with actual shared checking code and
+independently initialized fake authority in a test-owned child. The full declared-registry
+workspace legs retain the lead's execution ownership and their report status. The independent
+host run must execute the complete subprocess inventory, including actual wrapper tests.
+[S10 results](s10-readonly-gates-report.md#focused-validation).
+
+FR1–FR3 provide independently versioned admission/reporting contexts, exact-job commitments,
+complete-tree freeze/acquisition classification and canonical MA2 discovery. The fake-host
+proofs retain reporting-only attempts with zero obligation credit and irreversible progression
+over higher-stage admissions without producer runs. Real deployed issuance, executable/source
+binding, retention and trusted-emitter isolation still need host evidence.
+[FR1](fr1-admission-history-report.md), [FR2](fr2-freeze-planner-report.md),
+[FR3](fr3-reporting-context-report.md).
+
+### Prerequisites needing review and authorization
+
+| Prerequisite | Required handoff evidence |
+| --- | --- |
+| Disposable public repository and temporary runner | Exact repository/owner IDs, accepted origin, independent installation baseline and compiled profile binding, protected staging ruleset readback and explicit maintainer authorization. Source installation is independently approved |
+| Read-only observation credential reference | Authorized reference and least-privilege scope covering independent disposable/canonical repository observations, with a verified read path in every route consumer |
+| Canonical `ci.yml` producer/consumer layout amendment | CP-P5 needs a reviewed invocation graph covering every routed evidence consumer, including the recursive workspace-test leg inside `rust-tests`. The current layout places workspace tests before synthetic collection in that same job. The review must resolve terminal-producer ordering for those consumers and place the trusted reporting branch before candidate execution. Review ordinary scheduling/latency and emitter isolation before landing any amendment |
+| Consumer scheduling | Every preflight selection, support/read-only check, per-root `manifest-validate --tip` and integration consumer follows a terminal authenticated `rust-tests` producer through failure-preserving dependencies. Failed/cancelled/missing producers remain observable. The producer never invokes or waits for its own admission. The existing 17-job result policy and terminal gate continue to govern |
+| Canonical workflow provenance | Reviewed canonical workflow source is part of the independently approved protected closure. The disposable repository executes those canonical bytes. Any proposed isolated-only divergence requires a separately reviewed contract amendment |
+| History and root coverage | Full history in every route-resolving checkout, including post-push validation, accepted `origin`, registry-derived per-root validation loops covering the subject. Canonical root adoption and complete validation are required for every retained root |
+| Genuine producer/artifact/adoption population | Real full-schema witnesses, receipts, payloads, reporting contexts and IN1 admission records with independent run/job/attempt/log/artifact commitments. Adoption binds the reviewed onboarding approval Event and exact source. Every applicable attempt and retry is discoverable |
+
+The `ci.yml` layout amendment remains a phase C review prerequisite. Slice 13 leaves its design
+and implementation pending. Current source anchors are `.github/workflows/ci.yml:166`, `:248`,
+`:345`, `:623` and `.github/workflows/depth-tip.yml:33`. The latter currently fetches a shallow
+parent and loops fixed roots. The route's absent live profile is
+`crates/xtask/src/isolated_maintenance/mod.rs:47`. Each source/profile/workflow amendment needs
+fresh correspondence with the final reviewed installation revision.
+
+### Independent run and retained observations
+
+| Checkpoint | Required proof |
+| --- | --- |
+| Protected baseline | Independently read effective desired rules, inherited/legacy protections, bypass actors, check application, required checks and native MERGE queue. Retain protected source/repository/profile/tree identities and production before/after identities |
+| Real new-entry onboarding | Start from the absent synthetic entry/root. Use public CLI subprocesses for ON1 and each supported ON2–ON5 form over actual preceding outputs. Integrate declaration, freeze, implementation, reporting, Publication and proving checkpoints under their exact independent admission |
+| Real checks | Execute support-matrix check, capability check, capability audit and every `make preflight` S/T leaf as unchanged subprocesses over the actual committed candidate. Proposal A checks bind exact scratch bytes. Each process resolves independent installed authority. Preserve frozen O and re-observe candidate/expected-before inputs after gates |
+| Producer terminality | Observe the exact existing producer job and successful collection/upload/binding steps. Exercise failed, cancelled, missing and retried attempts with the complete population retained. Evidence may be consumed after producer terminality while unrelated workflow jobs continue. Full workflow/checks/terminal gate must succeed before MERGE |
+| Real artifact forms and authority | Retain complete schema-valid witness/receipt/payload, acquisition authority, reporting context and IN1 admission bytes, digests and exact emitting job/attempt/log commitments. Re-authenticate all eleven onboarding obligations and fresh independent adoption. Reporting-only freeze attempts retain zero execution/adoption credit |
+| Native queue admission and readback | Queue the actual PR candidate against the pinned current integration base. Run real all-root IN1 and per-root validators on the exact merge-group result. Retain queue/base/head/tree/check identities, conditional protected-ref update and post-push admission/readback of the actual transition. A moved base requires fresh current admission |
+| Refusal/recovery | Execute applicable Annex A public-boundary negatives and S12's seven negative groups, including retained/omitted/malformed roots, hand edits, foreign aggregate acceptance, missing evidence, stale currentness and concurrent delivery changes. Retain each case's before/after bytes/modes/kinds and bounded refusal |
+| Maintenance control | Run E1 steps 0–7 and its rejection matrix in a separate maintenance-path workspace. Independently prove both MA5 writers, separate MA6 promotion and retained-closeout replay through the native queue. Complete socket-dependent assertions that remain unverified in local reports |
+
+Each retained run index records exact source/installation revisions, repository/owner IDs,
+workflow/profile/approval/Event/P/O identities, commands and exits, full-schema artifact
+identities, independent adoption, complete producer/admission populations, actual queue/base/tree
+and post-tip observations. Links to host artifacts and raw logs accompany the index. Every
+positive requires independently adequate evidence for every due obligation. A rejected candidate
+preserves concurrent state and receives a retained refusal/recovery record as the existing
+protocol requires.
+
+### Per-root adoption and all-root D7
+
+`RULES.json` must name the canonical depth-record path, the root's validator spec must adopt
+Annex B, and complete manifest validation must execute for each root holding a record.
+`crates/xtask/src/manifest_validate/depth/merge.rs:44` additionally invokes all-root IN1 before
+requested-root narrowing. `depth_acceptance/integration.rs:172` compares the old/new registry
+union. A named ordinary root therefore still detects a foreign retained-root violation.
+All-root D7 and per-root canonical adoption/validation are independently required.
+The current fixed Codex/Claude/OpenCode loops need CP-P5's registry-derived coverage for the
+synthetic root. `aider` and `gemini_cli` retain their schema-free, unadopted state.
+
+Production path enablement and real-agent qualification each retain their separate authorization
+and evidence requirements after the independent machinery run. Same-version onboarding-to-
+maintenance transfer remains refused pending its transition design. The current synthetic
+positive remains wrapper-only and debt-free.
