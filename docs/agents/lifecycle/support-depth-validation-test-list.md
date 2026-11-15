@@ -834,12 +834,36 @@ guard gaps. Its current execution results are indexed below.
 
 This index is reconciled at `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`.
 Names in the tables are exact function names in the current tree. The named module/file group
-provides their discovery scope. Each result is the recorded completed run in the linked report.
+provides their discovery scope. Results combine the linked slice reports with the supplied
+lead-gate reconciliation below.
 Slice 13 checked every cited name against current source using `rg`. The separate
 [final inventory report](s13-final-inventory-report.md#validation) records that check and local
 spec validation. The [S12 seven-group negative map](s12-e7-connected-proof-report.md#negative-coverage-map)
 reconciles bootstrap/identity, freeze/acquisition, execution/repair, evidence, owning acceptance,
-complete mediation and IN1/delivery. Historical incomplete containing tests retain their limits.
+complete mediation and IN1/delivery. Lead results below supersede worker-only execution limits.
+
+### Lead-gate reconciliation
+
+The lead supplied these local/offline gate results from an unrestricted host. They supersede
+worker-report execution limits; they are not new runs performed for this documentation repair.
+
+| Slice / revision | Lead-gate result |
+| --- | --- |
+| S11 full gate, `c9920d58` | Ordinary `cargo test -p xtask --tests`: 1767 passed; declared xtask library leg: 702 passed. Failures were limited to the two `depth_evidence::native::context` ForeignLoader tests (host flakes), EAGAIN (`os error 11`) under load, and the stale-packet checkpoint repaired in `8a34a55b` |
+| S11 focused after fixes, including `8a34a55b` | `isolated_maintenance::tests::mediation_matrix` 7/7 in 2670s, including both long connected tests; `depth_routes` 4/4; `workspace_mutation` 10/10; `depth_refusal_routes` 29/29 |
+| S12 full gate, `95bc9706` | Ordinary gate: 1780 passed. Failures were limited to the same ForeignLoader pair and EAGAIN host flakes, plus five `create_candidate` tests affected by the slice-11 ON2 dry-run persistence-guard regression, repaired in PR #369 (`994b28ab` / `b272e8ab`) |
+| S12 focused, `b272e8ab` | `create_candidate` 17/17; `runtime_follow_on` 50/50; `on2_dry_run` borrow refusal 1/1; `e7_chain` 6/6; `acquired_inputs_tests` 10/10; `depth_refusal_routes` 29/29 |
+
+The S11 7/7 result includes `connected_onboarding_mediation_and_admitted_writers` and
+`connected_on4_aggregate_and_restoration`, including the ON4 preparation/gate/rollback body.
+
+Earlier FR1–FR3/S6–S10 PRs likewise merged after lead full gates. Worker sandboxes could
+not open sockets: their socket-blocked/unfinished/unverified execution labels are historical
+provenance only, superseded by these lead results for the implementation checks, including
+MA5/MA6, FR1–FR3 IN1, mediation, aggregate and restoration coverage. The independent
+protected-host phase C run remains required and unauthorized. These local/offline gates do
+not substitute for real subprocess/producer/artifact issuance, protected integration or native
+queue admission/readback proof.
 
 ### S6 reporting E and runtime selection
 
@@ -887,7 +911,8 @@ S10 test entry `readonly_gates_proposal_runs_every_a_checker`.
 The modules are `isolated_maintenance::tests::bootstrap::public_on3::public_on4` and
 `public_on5`, including `public_on5::{release_watch,reporting}`.
 S8 round 1b records the completed public IN1/observation positive and production refusal.
-Its preparation containing test remains unverified. S9's final five-test filter passed.
+Its preparation/gate/rollback body also completed through S11's connected ON4 matrix in the
+lead 7/7 run (2670s). S9's final five-test filter passed.
 [S8 results](s8-on4-publication-report.md#refusal-ordering),
 [S9 results](s9-on5-closeout-report.md#round-1-focused-validation).
 
@@ -895,7 +920,7 @@ Its preparation containing test remains unverified. S9's final five-test filter 
 | --- | --- |
 | `public_on4_connected_publication_real_in1_and_observation` | Passed, real ON4 exact entry/packet/runtime, independent IN1 and unchanged-qualification/downgrade coverage |
 | `public_on4_production_maintenance_and_neutral_writers_refuse_without_writes` | Passed, production/wrong-path/neutral refusal |
-| `public_on4_preparation_gate_and_concurrent_refusals_from_connected_on3` | Containing result remains unverified in S8, including its remaining gate/rollback cases |
+| `public_on4_preparation_gate_and_concurrent_refusals_from_connected_on3` | Preparation/gate/rollback body completed through `connected_on4_aggregate_and_restoration` in the lead S11 mediation run (7/7, 2670s) |
 | `public_on5_prepared_closed_real_in1_and_observation` | Passed, actual prepared/human/final writers and committed IN1/readback |
 | `public_on5_production_and_maintenance_refuse_without_writes` | Passed, unsupported authority preserves caller tree |
 | `public_on5_refusals_local_final_and_conflict_preservation` | Passed, all four partial-delivery conflicts, local/final agreement, semantic/timestamp/digest/entry/transfer tampering and truthful closed reporting |
@@ -933,8 +958,11 @@ Library names are under `isolated_maintenance::tests::mediation_matrix` and its 
 and `lower` modules, plus the separately named mechanical destination tests. Final S11 runs
 passed 29 binary tests in both ordinary and depth-declared builds, both short lower tests,
 both short maintenance tests, the retained/proposed matrix, ten workspace mutations and four
-destination tests. PR #369 includes the ON2 dry-run guard regression repair in this same
-merged enforcement tree. [S11 results](s11-mediation-matrix-report.md#focused-validation-after-review-fixes).
+destination tests. The lead post-fix run completed all seven library mediation tests in 2670s,
+including both long connected matrices; `depth_routes` 4/4, `workspace_mutation` 10/10 and
+`depth_refusal_routes` 29/29 also passed. The lead-gate table above records the full-gate
+revisions and the `8a34a55b` checkpoint repair. PR #369 (`994b28ab` / `b272e8ab`) repaired
+the ON2 dry-run guard regression in this same merged enforcement tree. [S11 results](s11-mediation-matrix-report.md#focused-validation-after-review-fixes).
 
 | Exact test | Executed boundary |
 | --- | --- |
@@ -948,7 +976,7 @@ merged enforcement tree. [S11 results](s11-mediation-matrix-report.md#focused-va
 | `ne2_registry_directory_alias_refuses_before_replacing_bindings` | Directory alias to registry |
 | `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace` | Missing-prefix traversal, including forbidden intermediate directory creation |
 | `ne2_ordinary_explicit_output_keeps_caller_path_resolution` | Exact ordinary bytes through relative/absolute/alias and missing-prefix caller spellings |
-| `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement` | Every MA public boundary, cached intake/refresh/closeout apply, foreign retained generation and ordinary siblings |
+| `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement` | Every MA public boundary, cached preparation/refresh apply, fresh closeout writers, foreign retained generation and ordinary siblings. This test does not cover applying a cached closeout plan after it becomes stale |
 | `on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route` | Valid foreign depth approval under maintenance authority |
 | `onboarding_retained_and_proposed_lower_writer_matrix` | Batch/lifecycle/packet lower writes across carriers and proposed destinations |
 | `outer_callers_refuse_enclosed_depth_destinations` | Enclosed declared/retained scope, including removal destinations |
@@ -957,8 +985,8 @@ merged enforcement tree. [S11 results](s11-mediation-matrix-report.md#focused-va
 | `checked_delivery_opens_without_following_final_symlinks` | Same module, final link substituted before open |
 | `checked_delivery_rechecks_parent_identity_after_opening` | Same module, parent substituted after open |
 | `resolution_refuses_loops_and_io_errors_and_keeps_ordinary_delivery_bytes` | Same module, bounded resolution/errors and ordinary bytes/directory syntax |
-| `connected_onboarding_mediation_and_admitted_writers` | Aggregate containing result remains unverified in S11 |
-| `connected_on4_aggregate_and_restoration` | Aggregate containing result remains unverified in S11 |
+| `connected_onboarding_mediation_and_admitted_writers` | Passed in the lead S11 mediation run (7/7, 2670s), including actual owning writers and independent IN1/readback |
+| `connected_on4_aggregate_and_restoration` | Passed in the same lead S11 7/7 run, including ON4 preparation, aggregate effects, gates, partial delivery and rollback |
 
 ### S12 connected E.7 implementation proof
 
@@ -968,7 +996,10 @@ The execution tests are mounted under
 `isolated_maintenance::tests::fixture::runtime_follow_on::e7_chain`.
 Four connected tests and two execution negatives passed in their recorded runs. The round-1
 rerun passed both strengthened execution tests, both acquired-input tests and the platform-mount
-regression. [S12 results](s12-e7-connected-proof-report.md#round-1-focused-validation).
+regression. The lead post-fix `b272e8ab` run also passed `create_candidate` 17/17,
+`runtime_follow_on` 50/50, `on2_dry_run` borrow refusal 1/1, `e7_chain` 6/6,
+`acquired_inputs_tests` 10/10 and `depth_refusal_routes` 29/29. Full-gate exceptions and
+PR #369 repair commits are enumerated above. [S12 results](s12-e7-connected-proof-report.md#round-1-focused-validation).
 
 | Exact test | Executed boundary |
 | --- | --- |
@@ -986,6 +1017,8 @@ The producer/host observations are modeled and ON4's S/T executor supplies succe
 Actual shared A checks and real IN1 still execute. S12's public-dispatch deletion-specific
 reason remains a gap because the earlier declared-depth guard precedes that precheck.
 Its whole Windows test build encounters existing failures, while the isolated mount regression
-passes. Maintenance socket-blocked controls remain recorded in FR1–FR3/S7/S8/S11. The
+passes. The unrestricted-host lead gates above complete the local maintenance and FR1–FR3
+controls previously limited in worker reports. The independent protected-host run remains
+required and unauthorized; these local/offline gates do not substitute for it. The
 [phase C handoff](support-depth-isolated-proof-plan.md#phase-c-handoff-after-slice-13) carries
 actual subprocess execution, independently issued full-schema artifacts and native queue proof.

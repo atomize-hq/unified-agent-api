@@ -6,15 +6,15 @@ The inventory is reconciled on `feat/s13-final-inventory` at
 `e0d6ffbcd8cce99ccdcdfb448c662622b1e65ddc`, the merged slices 1–12 tree.
 PR #369 also repaired the slice-11 ordinary ON2 dry-run persistence guard regression.
 The actual guard is `crates/xtask/src/runtime_follow_on.rs:173`, with its ordinary
-persistence check at line 189 and workspace refusal at line 207. Source citations
+persistence check at line 190 and workspace refusal at line 207. Source citations
 in this report refer to that enforcement revision. Paths are repository-relative.
 Changes remain uncommitted for the lead.
 
 The report was created before documentation edits and updated during reconciliation.
 Inputs were the routing design including E.8/OR-P12, canonical contract/charter/evidence
 requirements, CP-P5, validation list, isolated proof/rescope plans and FR1–FR3/S6–S12
-reports. Completed runs and unfinished or environment-blocked runs retain their
-respective report status.
+reports, supplemented by the lead-gate results below. Those unrestricted-host results
+supersede the worker reports' execution limits for completed implementation checks.
 
 ## Deliverables
 
@@ -25,14 +25,15 @@ respective report status.
 | Annex A.3/A.4 | Serialization and restoration inventories distinguish expected-before local preparation, index locking, transport and final protected-ref admission. Current completed S6–S12 results replace stale pending claims. S11 private delivery inventory is reconciled below |
 | `docs/specs/cli-agent-onboarding-charter.md` | ON present behavior describes the implemented finite synthetic chain. Pre-routing observations are labeled historical. Required behavior and phase C/path-enablement requirements remain in force |
 | `docs/specs/support-depth-evidence-v1.md` | Present behavior records completed gate/ON/FR mechanisms and the fake-host/S/T proof boundary. Event/population separation and independent artifact/adoption requirements continue to govern |
-| `docs/agents/lifecycle/support-depth-validation-test-list.md` | Executed S6–S12 index adds exact current names, result provenance and incomplete/blocked boundaries. Original required scenarios remain listed |
+| `docs/agents/lifecycle/support-depth-validation-test-list.md` | Executed S6–S12 index adds exact current names, lead-gate result provenance and independent phase C boundaries. Original required scenarios remain listed |
 | `docs/agents/lifecycle/support-depth-isolated-proof-plan.md` | Phase C handoff specifies prerequisites, canonical workflow layout review, real subprocesses/producers/artifacts and native queue/readback proof |
 | `docs/agents/lifecycle/support-depth-machinery-proof-rescope.md` | Current implementation status and link to the independently authorized phase C handoff |
 
 ## Results supporting the inventory
 
 Names below are exact leaf function names. The validation list gives module scopes and
-per-case coverage. Result provenance remains the linked executed slice report.
+per-case coverage. Result provenance combines the linked slice reports with the supplied
+lead-gate reconciliation below.
 
 | Route/effect | Executed result |
 | --- | --- |
@@ -47,6 +48,29 @@ per-case coverage. Result provenance remains the linked executed slice report.
 | Real shared checks | `readonly_gates_two_phases_real_checkers_and_independent_process` and `readonly_gates_proposal_runs_every_a_checker` passed with all substantive A-check refusals and independently initialized child authority. [S10](s10-readonly-gates-report.md#focused-validation) |
 | Truthful insufficiency | `e7_connected_truthful_insufficiency_refuses_on4_and_both_on5_entries` passed, retaining actual empty E, eleven unverified obligations and unqualified publication, then unchanged-tree acceptance refusals. [S12](s12-e7-connected-proof-report.md) |
 
+### Lead-gate reconciliation
+
+The lead supplied these local/offline gate results from an unrestricted host. They supersede
+worker-report execution limits; they are not new runs performed for this documentation repair.
+
+| Slice / revision | Lead-gate result |
+| --- | --- |
+| S11 full gate, `c9920d58` | Ordinary `cargo test -p xtask --tests`: 1767 passed; declared xtask library leg: 702 passed. Failures were limited to the two `depth_evidence::native::context` ForeignLoader tests (host flakes), EAGAIN (`os error 11`) under load, and the stale-packet checkpoint repaired in `8a34a55b` |
+| S11 focused after fixes, including `8a34a55b` | `isolated_maintenance::tests::mediation_matrix` 7/7 in 2670s, including both long connected tests; `depth_routes` 4/4; `workspace_mutation` 10/10; `depth_refusal_routes` 29/29 |
+| S12 full gate, `95bc9706` | Ordinary gate: 1780 passed. Failures were limited to the same ForeignLoader pair and EAGAIN host flakes, plus five `create_candidate` tests affected by the slice-11 ON2 dry-run persistence-guard regression, repaired in PR #369 (`994b28ab` / `b272e8ab`) |
+| S12 focused, `b272e8ab` | `create_candidate` 17/17; `runtime_follow_on` 50/50; `on2_dry_run` borrow refusal 1/1; `e7_chain` 6/6; `acquired_inputs_tests` 10/10; `depth_refusal_routes` 29/29 |
+
+The S11 7/7 result includes `connected_onboarding_mediation_and_admitted_writers` and
+`connected_on4_aggregate_and_restoration`, including the ON4 preparation/gate/rollback body.
+
+Earlier FR1–FR3/S6–S10 PRs likewise merged after lead full gates. Worker sandboxes could
+not open sockets: their socket-blocked/unfinished/unverified execution labels are historical
+provenance only, superseded by these lead results for the implementation checks, including
+MA5/MA6, FR1–FR3 IN1, mediation, aggregate and restoration coverage. The independent
+protected-host phase C run remains required and unauthorized. These local/offline gates do
+not substitute for real subprocess/producer/artifact issuance, protected integration or native
+queue admission/readback proof.
+
 ## Refusals and their guards
 
 The public binary tests run actual commands and aliases. The library matrices cover
@@ -57,7 +81,7 @@ include 29 binary passes in both ordinary and depth-declared build checkouts.
 | Refusal | Current guard | Executed evidence |
 | --- | --- | --- |
 | Unsupported ON forms across declared/omitted/disabled/orphaned/removed-record carriers and foreign approval | `crates/xtask/src/depth_routes.rs:15`, individual public dispatch, production parser and captured route failures | `every_on_entry_refuses_onboarding_carriers_without_scope_authority` |
-| ON2 dry-run persistence, including unrelated depth and foreign approval under maintenance authority | `crates/xtask/src/runtime_follow_on.rs:189` guards both persistence modes before context building, installed own-subject dry-run exemption is checked explicitly | `on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery`, `on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route`. These record PR #369's guard repair |
+| ON2 dry-run persistence, including unrelated depth and foreign approval under maintenance authority | `crates/xtask/src/runtime_follow_on.rs:190` guards both persistence modes before context building, installed own-subject dry-run exemption is checked explicitly | `on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery`, `on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route`. These record PR #369's guard repair |
 | MA1/MA2 intake/cached apply and later ordinary displacement, MA3 cached refresh, MA4 public relay, both MA5 entries/lower writer and MA6 promotion against onboarding | `agent_maintenance/prepare/guard.rs:194`, `refresh.rs:212`, `depth_acceptance/relay.rs:8`, `manual.rs:163`, `promotion.rs:121`, all under `crates/xtask/src/` | `ma_intake_and_apply_refuse_onboarding_and_later_version_displacement`, with real ordinary siblings |
 | NE1 complete-bundle write | `crates/xtask/src/support_matrix/publication.rs:130` workspace refusal, production loader may refuse earlier | `every_ne_command_and_alias_refuses_onboarding_carriers` |
 | NE2 generating scope and explicit destination, traversal, directory/file alias, proposed record/registry and intermediate directory creation | `crates/xtask/src/capability_matrix.rs:29`, `depth_routes/destination.rs:80`, `:124`, `:136` | Same neutral matrix, `ne2_proposed_record_destinations_refuse_before_writing`, `ne2_explicit_output_cannot_hide_a_nested_onboarding_workspace`, `ne2_registry_output_refuses_before_replacing_bindings`, `ne2_registry_traversal_refuses_before_replacing_bindings`, `ne2_registry_directory_alias_refuses_before_replacing_bindings`, `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace` |
@@ -88,12 +112,12 @@ This reconciles the S11 inventory against the actual enforcement tree.
 | `agent_lifecycle/storage.rs:36`, callers `:54`, `:83` | Typed lifecycle/packet checks, public workspace/output guards, preserved depth object | Completed S11 literal lower-writer tests |
 | `agent_maintenance/prepare/guard.rs:194`, call at `:232` | Exact plan rebuild, reporting effect check, input/index/output binding and final route recheck | Completed FR2 MA1/MA2 writers and S11 wrong-owner matrix |
 | `freeze_transition/delivery.rs:84` | ON2 dry-run approval/derived freeze/reporting proposal/view/route checks | Completed S11 ON2 and S12 primary chain |
-| `candidate_execution/candidate.rs:164`, call at `:241` | MA4/ON2 unconditional observation, candidate/Git/envelope/frozen-input and reporting admission, exact index publication | Completed S12 ON2 chain and failure negatives. MA4 socket-dependent full-chain limits remain recorded |
+| `candidate_execution/candidate.rs:164`, call at `:241` | MA4/ON2 unconditional observation, candidate/Git/envelope/frozen-input and reporting admission, exact index publication | Completed S12 ON2 chain and failure negatives; MA4 implementation checks are covered by the lead full gates above |
 | `candidate_execution/create_lane.rs:88`, `:316`, `:326` | Authenticated ON2 attempt, exact owned attempt/original substitutions under index lock and captured-route recheck | Completed S11 public ON2 and S12 chains |
-| `agent_maintenance/closeout_proposal.rs:274`, call at `:289` | Public apply at `:258` supplies exact manual-closeout admission, captured snapshots/view | S7 maintenance predicates passed, connected MA5 socket limits remain in S11 |
-| `depth_acceptance/publication.rs:521`, call at `:532` | Both MA5 writers/lower CloseoutPlan apply, exact closeout/marker/P/O/E/entry/scoped publication and route recheck | S7 maintenance predicates and S11 wrong-owner matrix, connected socket limits retained |
+| `agent_maintenance/closeout_proposal.rs:274`, call at `:289` | Public apply at `:258` supplies exact manual-closeout admission, captured snapshots/view | S7 maintenance predicates and lead full gates completed the local MA5 controls |
+| `depth_acceptance/publication.rs:521`, call at `:532` | Both MA5 writers/lower CloseoutPlan apply, exact closeout/marker/P/O/E/entry/scoped publication and route recheck | S7 maintenance predicates, S11 wrong-owner matrix and lead full gates completed the local controls |
 | `manifest_promotion.rs:49`, call at `:63` | Exact clean validated HEAD/protected tip, snapshot, maintenance ownership/evidence/entry and fresh apply admission | S7 maintenance predicates, S11 ordinary promotion sibling and wrong-owner refusal |
-| `depth_evidence/staged.rs:374` | Invocation-bound MA4 offer/channel, bundle identity/Event/P/O, allowed reporting paths and exact bytes/digests. Relay/IN1 independently authenticate E | S11 records ten socket-blocked MA5/MA6 containing tests. Real channel positive remains an explicit unverified dependent assertion in those runs |
+| `depth_evidence/staged.rs:374` | Invocation-bound MA4 offer/channel, bundle identity/Event/P/O, allowed reporting paths and exact bytes/digests. Relay/IN1 independently authenticate E | MA4 channel and MA5/MA6 local controls are covered by the lead full gates above. Independent protected-host channel/artifact issuance remains phase C |
 | `repair_runtime_evidence/routed.rs:296`, call at `:309` | Protected runtime-integrated generation, exact contract/inventory/digest, frozen acquisition, record/entry preservation and reporting batch, closing view/route observations | Completed S11 repair sibling and S12 repaired qualified chain |
 | `prepare_publication/routed.rs:195` | Authenticated E/files, complete aggregate reporting/relay proposal and closing view/route recheck | Completed S6 ON3 siblings |
 | `publication_refresh/routed.rs:216`, call at `:235` | Exact current Publication entry, full fresh post-entry/aggregate admission, real proposal A checks, S/T runner and closing observations | Completed S8 IN1 positive and S12 qualified chain with the documented S/T seam |
@@ -108,7 +132,7 @@ and checked path jails. Resulting caller writes cross the inventoried owner agai
 | Restoration writer | Guard and scope | Executed evidence / limit |
 | --- | --- | --- |
 | `prepare_publication.rs:385`, raw lifecycle restore `:414` and temporary packet cleanup | Ordinary ON3 outer workspace refusal at `:121` precedes multi-step writer. Routed ON3 uses one admitted batch | Completed S11 public ON3 refusal and S6 routed ON3 |
-| `publication_refresh.rs:499`, replacement and newly created output removal | Ordinary ON4 outer guard at `:206`, replacements also cross LW1. Routed ON4 uses shared expected-before rollback | Completed S11 public ON4 refusal. ON4-specific connected preparation aggregate result remains unverified in S8/S11 |
+| `publication_refresh.rs:499`, replacement and newly created output removal | Ordinary ON4 outer guard at `:206`, replacements also cross LW1. Routed ON4 uses shared expected-before rollback | Completed S11 public ON4 refusal and connected ON4 aggregate/preparation/restoration in the lead mediation matrix (7/7, 2670s) |
 | `repair_runtime_evidence.rs:183`, `:198`, `:354` backup/lifecycle restoration | Ordinary repair outer guard at `:115`, routed repair uses its admitted batch | Completed S11 repair sibling includes delivery failure/rollback |
 | `candidate_execution/create_lane.rs:308`, writes at `:316`, `:326` | Recheck substitutes exactly its owned attempt/original bytes under caller index lock, reinstating attempt after checked outcome | Completed S11 ON2 and S12 primary chain |
 | `workspace_mutation.rs:509`, immediate backup restoration `:544` | Just-observed expected-before source, retained backup, refusal if destination appeared before immediate restoration | Ten S11 mechanical writer tests passed. Retained backup remains on conflict |
@@ -125,7 +149,7 @@ and checked path jails. Resulting caller writes cross the inventoried owner agai
 | Maintenance packet branch | MA1/MA2 transport, MA3, MA4, MA5. Rebuilt plan, stand-down and bound source/output/index checks. `agent_maintenance/prepare/guard.rs:194` | IN1 still evaluates exact integration result |
 | Onboarding branch candidate | ON1–ON5 including dry-run, repair and prepared closeout. Captured approval/registry/route/view, immutable acquisition and expected-before output checks | Local delivery prepares branch state. Independent committed checks and IN1 precede protected acceptance |
 | Promotion candidate | MA6 pins validated HEAD/protected tip, exact post-entry rendering, marker/evidence/debt and fresh apply admission at `manifest_promotion.rs:49` | IN1 plus native queue |
-| Aggregate publication | Every support/runtime/capability renderer and hand edit. Fresh exact-record derivation and all touched destinations at `depth_acceptance/integration.rs:232` | All-root integration admission |
+| Aggregate publication | Every support/runtime/capability renderer and hand edit. Fresh exact-record derivation and all touched destinations at `depth_acceptance/integration.rs:231` | All-root integration admission |
 | Local file batch | All public/admitted mutation callers. `workspace_mutation.rs:248` reclassifies each expected-before mutation, stages jailed temporary files and conditionally restores owned writes | Best-effort conflict-preserving mechanics, with the owner's semantic admission |
 | Caller/candidate index | MA4/ON2 evidence publication, attempt recheck, private candidate validation. `candidate_execution/delivery_index.rs:209`, `:246`, `:364`, existing index lock | Exclusive local index protocol. Protected ref serialization remains native queue work |
 | Producer/admission/reporting transport | Existing collector, reporting dispatcher, IN1 emitter. `depth_ci/reporting/dispatcher.rs:5`, `depth_acceptance/admission/emitter.rs:272` pin exact job/attempt/artifact/context and closing observations | Independently authenticated retained host facts. Deployed emitter isolation/retention/transport remains phase C |
@@ -159,11 +183,12 @@ The fake authenticated host models producer outcomes and terminality using full-
 artifacts. ON2 copies substantive source/tests. ON4's test S/T runner supplies successful
 subprocess outcomes, while real shared A checks and real IN1 execute separately.
 
-S8's preparation containing test and S11's two long connected matrix tests retain unfinished
-aggregate status in their reports. This inventory uses completed S9 conflict preservation and
-S12 writer chains as its positive anchors. S7/S8/S11 retain ten socket-blocked MA5/MA6 writer
-cases. FR1–FR3 retain four socket-blocked IN1 cases and their additional environment-dependent
-evidence cases. Their dependent assertions remain unverified.
+The lead-gate reconciliation above records completed S11 mediation (7/7, 2670s), including
+both long connected tests and ON4 preparation/aggregate/restoration, alongside completed S9
+conflict preservation and S12 writer chains. The unrestricted-host full gates supersede the
+worker-only limits on MA5/MA6, FR1–FR3 IN1 and evidence assertions. The enumerated host
+flakes and repaired checkpoint/create-candidate regressions are recorded there separately
+from the independent phase C proof.
 
 S12's eight-input deletion matrix exercises isolated entry bodies. Public dispatch's earlier
 declared-depth refusal leaves deletion-specific public diagnostics unproved. Its supplementary
@@ -180,7 +205,10 @@ checkpoints and retained evidence are in the [phase C handoff](support-depth-iso
 
 ## Validation
 
-Every command uses `env -u TMPDIR`.
+### Original slice 13 checks (historical)
+
+The following checks were recorded before this documentation repair. Every original command
+used `env -u TMPDIR`.
 
 | Check | Result |
 | --- | --- |
@@ -194,5 +222,23 @@ Every command uses `env -u TMPDIR`.
 | `cargo test --offline -p xtask --test c4_spec_ci_wiring --test depth_record` | Passed, 45 CI/transport/gate tests and 37 canonical record/binding/digest tests. The four focused targets total 168 passes |
 | `git diff --check` and final scope/status | Passed. Exactly seven named Markdown files changed, all uncommitted on the expected branch/revision |
 
-The focused checks require no fixture update. Changes are limited to the seven named Markdown
+The original focused checks required no fixture update and covered the seven named Markdown
 deliverables above. The lead retains commit ownership.
+
+
+### Round 1 documentation repair
+
+This repair started from clean `feat/s13-final-inventory` at `c192a506` and changes only
+this report, contract Annex A/A.4 and the validation list. The lead-gate reconciliation
+supersedes worker-only execution limits, the cached-closeout claim is removed, and the
+persistence/aggregate anchors now point to `runtime_follow_on.rs:190` and
+`depth_acceptance/integration.rs:231`.
+
+The case-insensitive `socket|unfinished|blocked|unverified` audit of all three changed docs
+retains only historical sandbox provenance, contract result values/qualification rules,
+required behavior/design questions, negative scenarios (including eleven empty-E obligations)
+and exact test names. No worker execution limit remains an outstanding implementation claim.
+The independent protected-host phase C run remains required and unauthorized.
+
+`git diff --check` and `make -s hygiene` passed. No Cargo command ran for this repair.
+All three Markdown changes remain uncommitted; nothing was pushed.
