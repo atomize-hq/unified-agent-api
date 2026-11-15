@@ -253,6 +253,12 @@ fn prove_with(
     check_integration(root, &parent).unwrap();
     run(root, false).unwrap();
     reporting_facts(root);
+    if super::super::mediation_matrix::connected_enabled() {
+        super::super::mediation_matrix::onboarding_checkpoint(root);
+        super::super::mediation_matrix::integration_checkpoint(root, &head, || {
+            commit(root, &_api, &f.baseline, &head);
+        });
+    }
     if let Some(phase) = publication {
         public_on4::prove(f, root, &host, &evidence, &_api, &head, phase);
     } else if owning_only {
@@ -643,6 +649,14 @@ fn template(release_watch: bool) -> &'static (Fixture, SyntheticHost) {
 
 fn connected(repaired: bool, owning_only: bool) {
     connected_with(repaired, owning_only, None);
+}
+
+pub(in crate::isolated_maintenance::tests) fn mediation_chain() {
+    connected_with(false, true, Some(public_on4::Phase::CloseoutRefusals));
+}
+
+pub(in crate::isolated_maintenance::tests) fn mediation_on4_preparation() {
+    connected_with(false, true, Some(public_on4::Phase::Preparation));
 }
 
 fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_on4::Phase>) {

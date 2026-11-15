@@ -332,18 +332,9 @@ pub fn build_plan(root: &Path, args: &Args) -> Result<PromotionPlan, String> {
                 fs::write(full, bytes).map_err(|e| e.to_string())?;
             }
         }
-        if crate::manifest_validate::run(crate::manifest_validate::Args {
-            root: Some(scratch.path().join(base)),
-            rules: None,
-            schema: None,
-            version_schema: None,
-            mode: crate::manifest_validate::Mode::Check,
-            json: false,
-            tip: None,
-        }) != 0
-        {
-            return Err("promotion candidate fails canonical manifest validation".into());
-        }
+        crate::manifest_validate::check_root(scratch.path().join(base)).map_err(|error| {
+            format!("promotion candidate fails canonical manifest validation: {error}")
+        })?;
         Ok(())
     };
     if let Some((captured, view)) = captured.as_ref().zip(view.as_ref()) {

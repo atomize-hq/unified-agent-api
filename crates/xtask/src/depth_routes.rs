@@ -6,18 +6,19 @@ use crate::{
 };
 use std::path::Path;
 
+mod destination;
+pub use destination::{refuse_file_destination, write_file_destination};
+
+#[cfg(all(test, unix))]
+mod tests;
+
 pub fn refuse_workspace(root: &Path, route: &str) -> Result<(), String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     refuse_here(&root, route)?;
     // A caller-supplied inner directory cannot establish a stopping boundary. Inspect every
     // enclosing retained scope, including standalone manifests and outer registered workspaces.
     for parent in root.ancestors().skip(1) {
-        if parent.join(REGISTRY_RELATIVE_PATH).exists()
-            || parent.join("cli_manifests").is_dir()
-            || parent.join("reports").is_dir()
-        {
-            refuse_here(parent, route)?;
-        }
+        refuse_here(parent, route)?;
     }
     Ok(())
 }
@@ -63,6 +64,36 @@ pub fn refuse_output(
         .map_err(|e| e.to_string())?
         .resolve(relative)
         .map_err(|e| e.to_string())?;
+    refuse_proposed(&full, bytes, route)?;
+    refuse_resolved_scope(root, &full, route)
+}
+
+/// Inspect destination scope for removals, which carry no proposed output bytes.
+pub fn refuse_output_scope(root: &Path, relative: &Path, route: &str) -> Result<(), String> {
+    let full = crate::workspace_mutation::WorkspacePathJail::new(root)
+        .map_err(|e| e.to_string())?
+        .resolve(relative)
+        .map_err(|e| e.to_string())?;
+    refuse_resolved_scope(root, &full, route)
+}
+
+fn refuse_resolved_scope(root: &Path, full: &Path, route: &str) -> Result<(), String> {
+    let root = root.canonicalize().map_err(|e| e.to_string())?;
+    for ancestor in full.parent().ok_or("output has no parent")?.ancestors() {
+        if ancestor == root {
+            break;
+        }
+        match std::fs::symlink_metadata(ancestor) {
+            Ok(metadata) if metadata.is_dir() => refuse_here(ancestor, route)?,
+            Ok(_) => return Err("unsupported output ancestor type".into()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(())
+}
+
+fn refuse_proposed(full: &Path, bytes: &[u8], route: &str) -> Result<(), String> {
     if full.file_name().is_some_and(|n| n == "depth-record.json")
         && full
             .parent()

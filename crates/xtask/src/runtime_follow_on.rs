@@ -187,11 +187,13 @@ pub fn run_in_workspace<W: Write>(
             return depth::run(workspace_root, args, route, writer);
         }
     }
-    if args.write {
-        // Ordinary approvals keep the original workspace refusal, even inside an isolated route.
-        let depth_approval = load_approval_artifact(workspace_root, &args.approval)
-            .ok()
-            .is_some_and(|a| a.support_depth_version.is_some());
+    if args.write || args.dry_run {
+        // Owning ON2 dry-runs dispatch above. Remaining dry-runs check workspace depth.
+        // Write calls retain their existing approval and captured-route checks.
+        let depth_approval = args.write
+            && load_approval_artifact(workspace_root, &args.approval)
+                .ok()
+                .is_some_and(|a| a.support_depth_version.is_some());
         if !depth_approval
             || crate::isolated_maintenance::route(workspace_root)
                 .map_err(Error::Validation)?
