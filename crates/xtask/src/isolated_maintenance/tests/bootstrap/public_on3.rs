@@ -8,6 +8,7 @@ use crate::{
 };
 use clap::Parser;
 
+mod public_on4;
 mod review;
 
 fn install_route(
@@ -138,6 +139,18 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     repaired: bool,
     owning_only: bool,
 ) {
+    prove_with(f, root, host, evidence, repaired, owning_only, None);
+}
+
+fn prove_with(
+    f: &Fixture,
+    root: &Path,
+    host: &Arc<MemoryHost>,
+    evidence: SyntheticHost,
+    repaired: bool,
+    owning_only: bool,
+    publication: Option<public_on4::Phase>,
+) {
     let review_refusals = !repaired && !owning_only;
     eprintln!("ON3 connected proof enters reporting and IN1 siblings");
     let implemented = git(root, &["rev-parse", "HEAD"]);
@@ -239,7 +252,9 @@ pub(in crate::isolated_maintenance::tests) fn prove(
     check_integration(root, &parent).unwrap();
     run(root, false).unwrap();
     reporting_facts(root);
-    if owning_only {
+    if let Some(phase) = publication {
+        public_on4::prove(f, root, &host, &evidence, &_api, &head, phase);
+    } else if owning_only {
         crate::depth_acceptance::onboarding::tests::connected_publication(root);
     } else {
         review::publication_checkpoint(f, root, &_api, &head);
@@ -616,6 +631,10 @@ fn template() -> &'static (Fixture, SyntheticHost) {
 }
 
 fn connected(repaired: bool, owning_only: bool) {
+    connected_with(repaired, owning_only, None);
+}
+
+fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_on4::Phase>) {
     let (template, evidence) = template();
     let root = tempfile::tempdir().unwrap();
     git(
@@ -647,13 +666,14 @@ fn connected(repaired: bool, owning_only: bool) {
         baseline: template.baseline.clone(),
         subject: template.subject,
     };
-    prove(
+    prove_with(
         &f,
         f.root.path(),
         &f.api.3,
         evidence.fork(),
         repaired,
         owning_only,
+        publication,
     );
 }
 

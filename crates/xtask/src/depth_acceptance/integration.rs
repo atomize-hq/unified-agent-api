@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, path::Path};
 mod binding;
 mod bootstrap;
 mod generation;
+mod onboarding;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     // Resolve repository-wide authority before enumerating or narrowing to any manifest root.
@@ -276,12 +277,19 @@ pub(super) fn admit(
     }
     for (version, record) in &new.records {
         let digest = record.stated_sha256()?;
+        let qualified = qualifications
+            .iter()
+            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version);
+        if record.policy.selection.enrollment.lifecycle_path
+            == crate::agent_registry::support_depth::LifecyclePath::Onboarding
+            && (qualified || onboarding::publication_candidate(new, record)?)
+        {
+            onboarding::admit(root, old, new, tip, record)?;
+            continue;
+        }
         // Dependency-only changes can invalidate a still-published qualification without
         // changing the record, its entries or any newly accepting value.
-        if qualifications
-            .iter()
-            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version)
-        {
+        if qualified {
             if record.policy.selection.enrollment.lifecycle_path
                 != crate::agent_registry::support_depth::LifecyclePath::Maintenance
                 || !record.policy.path_enabled

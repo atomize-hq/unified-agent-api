@@ -2,7 +2,7 @@
 use super::*;
 use std::collections::BTreeSet;
 
-pub(super) fn check(
+pub(in crate::depth_acceptance) fn check(
     before: &Source,
     after: &Source,
     owner: &View,
