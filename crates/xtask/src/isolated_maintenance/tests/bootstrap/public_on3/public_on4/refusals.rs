@@ -94,8 +94,41 @@ pub(super) fn integration(
     parent: &str,
     candidate: &str,
 ) {
-    for case in ["packet", "entry", "pointer", "foreign_pointer"] {
+    for case in [
+        "packet",
+        "entry",
+        "pointer",
+        "foreign_pointer",
+        "written_paths",
+        "validation_report",
+    ] {
         match case {
+            "written_paths" | "validation_report" => {
+                // ON4 retains the packet's publication-ready predecessor hash after publishing.
+                let packet: life::PublicationReadyPacket =
+                    serde_json::from_slice(&fs::read(root.join(PACKET)).unwrap()).unwrap();
+                packet.validate().unwrap();
+                let name = if case == "written_paths" {
+                    "written-paths.json"
+                } else {
+                    "validation-report.json"
+                };
+                let path = packet
+                    .runtime_evidence_paths
+                    .iter()
+                    .find(|p| p.ends_with(name))
+                    .unwrap();
+                if case == "written_paths" {
+                    let mut bytes = fs::read(root.join(path)).unwrap();
+                    bytes.push(b'\n');
+                    write(root, path, bytes);
+                } else {
+                    let mut value: Value =
+                        serde_json::from_slice(&fs::read(root.join(path)).unwrap()).unwrap();
+                    value["status"] = json!("fail");
+                    write(root, path, serde_json::to_vec_pretty(&value).unwrap());
+                }
+            }
             "packet" => {
                 let mut packet: Value =
                     serde_json::from_slice(&fs::read(root.join(PACKET)).unwrap()).unwrap();
@@ -128,6 +161,8 @@ pub(super) fn integration(
         let before = tree::capture(root, &Default::default()).unwrap();
         let error = check_integration(root, parent).unwrap_err();
         let expected = match case {
+            "written_paths" => "written-paths.json differs from lifecycle written_paths_sha256",
+            "validation_report" => "validation-report.json is not green",
             "packet" => "onboarding publication packet differs from committed authority",
             "entry" => "integration publication lacks its exact current owning entry",
             "pointer" => "onboarding cannot change pointer file cli_manifests/depth_fixture/min_supported.txt",

@@ -11,7 +11,7 @@ mod gates;
 #[cfg(test)]
 mod test_hooks;
 #[cfg(test)]
-pub(crate) use test_hooks::with_delivery_failure;
+pub(crate) use test_hooks::{with_delivery_failure, with_delivery_hook};
 
 pub(super) fn run(
     root: &Path,
@@ -187,6 +187,15 @@ fn context(root: &Path, args: &Args, captured: &CapturedRegistry) -> Result<Refr
         .find(&approval.descriptor.agent_id)
         .cloned()
         .ok_or_else(|| Error::Validation("unknown onboarding agent".into()))?;
+    let lifecycle_state_path =
+        agent_lifecycle::lifecycle_state_path(&approval.descriptor.onboarding_pack_prefix);
+    let lifecycle_state = load_lifecycle_state_relaxed(root, &lifecycle_state_path)?;
+    // Earlier onboarding checkpoints have no ON4 writer. Preserve their existing write refusal
+    // before the shared context requires the publication-ready stage and its evidence.
+    if args.write && lifecycle_state.lifecycle_stage != LifecycleStage::PublicationReady {
+        crate::depth_routes::refuse_workspace(root, "publication_refresh")
+            .map_err(Error::Validation)?;
+    }
     context_for(root, approval, entry)
 }
 
@@ -205,6 +214,16 @@ fn materialize(root: &Path, files: &[(PathBuf, Vec<u8>)]) -> Result<(), Error> {
 }
 
 fn deliver(root: &Path, mutations: &[PlannedMutation]) -> Result<(), Error> {
+    #[cfg(test)]
+    if let Some(hook) = test_hooks::delivery_hook() {
+        return crate::workspace_mutation::delivery::apply_admitted_mutations_with_test_hook(
+            root,
+            mutations,
+            |index| hook(root, mutations, index),
+        )
+        .map(drop)
+        .map_err(Into::into);
+    }
     #[cfg(test)]
     if let Some(index) = test_hooks::delivery_failure() {
         return crate::workspace_mutation::delivery::apply_admitted_mutations_with_test_failure(

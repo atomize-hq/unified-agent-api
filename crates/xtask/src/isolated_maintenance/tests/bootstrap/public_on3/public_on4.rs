@@ -3,6 +3,8 @@ use super::*;
 use crate::publication_refresh;
 
 mod refusals;
+mod reporting;
+mod rollback;
 
 const PACKET: &str =
     "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/publication-ready.json";
@@ -54,7 +56,28 @@ pub(super) fn prove(
             crate::candidate_execution::tree::capture(root, &Default::default()).unwrap(),
             before
         );
+        // Corruption exists only while the real proposal A checker executes. Its restoration
+        // keeps later proposal validation green if the controller ever omits check_proposed.
+        publication_refresh::set_test_gate_runner(Some(green));
+        let error = crate::readonly_gates::test_hooks::with_shared_changes(
+            vec![(
+                crate::support_matrix::JSON_OUTPUT_PATH.into(),
+                Some(b"{}\n".to_vec()),
+            )],
+            || refresh(root),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            error.contains("is stale; regenerate with `cargo run -p xtask -- support-matrix`"),
+            "{error}"
+        );
+        assert_eq!(
+            crate::candidate_execution::tree::capture(root, &Default::default()).unwrap(),
+            before
+        );
         refusals::preparation(root, &before);
+        rollback::check(root, &before);
         return;
     }
     publication_refresh::set_test_gate_runner(Some(green));
@@ -140,6 +163,7 @@ pub(super) fn prove(
         crate::readonly_gates::check_shared(root)
     })
     .unwrap();
+    reporting::check(f, root, &_api, &candidate);
     refusals::unchanged(f, root, host, &candidate, evidence);
 }
 
