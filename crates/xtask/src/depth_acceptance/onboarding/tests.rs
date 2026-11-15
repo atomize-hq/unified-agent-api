@@ -5,6 +5,7 @@
 mod registry_fixture;
 
 use super::*;
+mod on5;
 mod readonly_gates;
 use crate::{
     agent_lifecycle as life,

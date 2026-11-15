@@ -10,6 +10,7 @@ mod candidate_execution;
 pub mod capability_matrix;
 pub mod capability_projection;
 pub mod capability_publication;
+pub mod close_proving_run;
 pub mod depth_evidence;
 pub mod depth_fixture_snapshot;
 pub mod depth_fixture_wrapper_coverage;

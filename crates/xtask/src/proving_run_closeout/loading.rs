@@ -70,6 +70,44 @@ fn validate_closeout(
     expected: ProvingRunCloseoutExpected<'_>,
     allowed_states: &[ProvingRunCloseoutState],
 ) -> Result<ProvingRunCloseout, ProvingRunCloseoutError> {
+    validate_closeout_using(closeout_path, raw, expected, allowed_states, |path| {
+        load_approval_artifact(workspace_root, path, closeout_path)
+    })
+}
+
+pub(super) fn from_authenticated(
+    text: &str,
+    closeout_path: &Path,
+    approval: &crate::approval_artifact::ApprovalArtifact,
+    allowed_states: &[ProvingRunCloseoutState],
+) -> Result<ProvingRunCloseout, ProvingRunCloseoutError> {
+    let raw = serde_json::from_str::<RawProvingRunCloseout>(text).map_err(|e| {
+        ProvingRunCloseoutError::Validation(format!("parse {}: {e}", closeout_path.display()))
+    })?;
+    let expected = ProvingRunCloseoutExpected {
+        approval_path: Some(Path::new(&approval.relative_path)),
+        onboarding_pack_prefix: &approval.descriptor.onboarding_pack_prefix,
+    };
+    validate_closeout_using(closeout_path, raw, expected, allowed_states, |path| {
+        if path != Path::new(&approval.relative_path) {
+            return Err(ProvingRunCloseoutError::Validation(
+                "ON5 closeout differs from its authenticated approval path".into(),
+            ));
+        }
+        Ok(approval.clone())
+    })
+}
+
+fn validate_closeout_using(
+    closeout_path: &Path,
+    raw: RawProvingRunCloseout,
+    expected: ProvingRunCloseoutExpected<'_>,
+    allowed_states: &[ProvingRunCloseoutState],
+    mut load: impl FnMut(
+        &Path,
+    )
+        -> Result<crate::approval_artifact::ApprovalArtifact, ProvingRunCloseoutError>,
+) -> Result<ProvingRunCloseout, ProvingRunCloseoutError> {
     let state = parse_closeout_state(closeout_path, &raw.state)?;
     validate_allowed_state(closeout_path, state, allowed_states)?;
 
@@ -130,11 +168,9 @@ fn validate_closeout(
         }
     };
 
-    let linked_approval =
-        load_approval_artifact(workspace_root, Path::new(&approval_ref), closeout_path)?;
+    let linked_approval = load(Path::new(&approval_ref))?;
     if let Some(approval_path) = expected.approval_path {
-        let provided_approval =
-            load_approval_artifact(workspace_root, approval_path, closeout_path)?;
+        let provided_approval = load(approval_path)?;
         validate_same_approval_artifact(closeout_path, &provided_approval, &linked_approval)?;
     }
     validate_approval_hash(closeout_path, &linked_approval, &approval_sha256)?;

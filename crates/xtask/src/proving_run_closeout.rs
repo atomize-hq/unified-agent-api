@@ -369,3 +369,13 @@ fn render_maintenance_settlement(settlement: &MaintenanceSettlement) -> serde_js
         "deferral_sha256": settlement.deferral_sha256,
     })
 }
+
+/// Structural validation with an approval already authenticated by the owning captured route.
+pub(crate) fn from_authenticated(
+    text: &str,
+    closeout_path: &Path,
+    approval: &crate::approval_artifact::ApprovalArtifact,
+    allowed_states: &[ProvingRunCloseoutState],
+) -> Result<ProvingRunCloseout, ProvingRunCloseoutError> {
+    loading::from_authenticated(text, closeout_path, approval, allowed_states)
+}

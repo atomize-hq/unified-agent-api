@@ -9,6 +9,7 @@ use crate::{
 use clap::Parser;
 
 mod public_on4;
+mod public_on5;
 mod review;
 
 fn install_route(

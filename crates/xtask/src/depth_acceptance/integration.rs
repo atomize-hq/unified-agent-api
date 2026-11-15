@@ -293,14 +293,15 @@ pub(super) fn admit(
             .collect();
         if record.policy.selection.enrollment.lifecycle_path
             == crate::agent_registry::support_depth::LifecyclePath::Onboarding
-            && (qualified || onboarding::publication_candidate(new, record)?)
         {
-            if qualified || !added.is_empty() || !effects.is_empty() {
-                onboarding::admit(root, old, new, tip, record)?;
-            } else {
-                onboarding::reporting(root, old, new, tip, record)?;
+            if let Some(kind) = onboarding::candidate(new, record)? {
+                if qualified || !added.is_empty() || !effects.is_empty() {
+                    onboarding::admit(root, old, new, tip, record, kind)?;
+                } else {
+                    onboarding::reporting(root, old, new, tip, record, kind)?;
+                }
+                continue;
             }
-            continue;
         }
         // Dependency-only changes can invalidate a still-published qualification without
         // changing the record, its entries or any newly accepting value.

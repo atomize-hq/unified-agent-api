@@ -57,7 +57,7 @@ pub(super) fn check(root: &Path, old: &View, new: &View) -> Result<(), String> {
                     && (prior.execution.is_some() || record.execution.is_some())
             })
         {
-            if super::onboarding::publication_candidate(new, record)? {
+            if super::onboarding::candidate(new, record)?.is_some() {
                 continue;
             }
             crate::prepare_publication::check_reporting_transition(
