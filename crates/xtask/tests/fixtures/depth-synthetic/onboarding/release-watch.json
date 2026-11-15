@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "version_policy": "latest_stable_minus_one",
+  "dispatch_kind": "packet_pr",
+  "upstream": {
+    "source_kind": "github_releases",
+    "owner": "fixture",
+    "repo": "isolated",
+    "tag_prefix": "v"
+  }
+}

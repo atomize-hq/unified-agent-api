@@ -3,9 +3,7 @@ use std::path::Path;
 use clap::{Parser, Subcommand};
 use xtask::onboard_agent;
 
-#[allow(dead_code)]
-#[path = "../src/close_proving_run.rs"]
-mod close_proving_run;
+use xtask::close_proving_run;
 
 #[path = "support/onboard_agent_harness.rs"]
 mod harness;

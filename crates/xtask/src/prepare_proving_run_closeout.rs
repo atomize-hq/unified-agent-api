@@ -1,3 +1,5 @@
+mod routed;
+
 use std::{
     fs,
     io::{self, Write},
@@ -22,8 +24,7 @@ use crate::{
         ProvingRunCloseoutState, ResidualFrictionTruth,
     },
     workspace_mutation::{
-        apply_mutations, plan_create_or_replace, PlannedMutation, WorkspaceMutationError,
-        WorkspacePathJail,
+        apply_mutations, plan_create_or_replace, WorkspaceMutationError, WorkspacePathJail,
     },
 };
 
@@ -103,6 +104,11 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if let Some(route) =
+        crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?
+    {
+        return routed::run(workspace_root, args, route, writer);
+    }
     if !args.check {
         xtask::depth_routes::refuse_workspace(workspace_root, "prepare_proving_run_closeout")
             .map_err(Error::Validation)?;
@@ -117,37 +123,12 @@ pub fn run_in_workspace<W: Write>(
         return Ok(());
     }
 
-    let recorded_at = now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
-    let closeout = build_closeout_draft(
-        &context,
-        ProvingRunCloseoutMachineFields {
-            approval_ref: context.approval.relative_path.clone(),
-            approval_sha256: context.approval.sha256.clone(),
-            approval_source: APPROVAL_SOURCE.to_string(),
-            maintenance_settlement: None,
-            preflight_passed: true,
-            recorded_at: recorded_at.clone(),
-            commit: current_head_commit(workspace_root)?,
-        },
-    )?;
-    let lifecycle_state = build_next_lifecycle_state(&context, recorded_at)?;
+    let files = prepare_files(workspace_root, &context)?;
     let jail = WorkspacePathJail::new(workspace_root)?;
-    let docs_preview = build_closeout_docs_preview_for_entry(&context.entry, &closeout);
-    let mut mutations = vec![
-        plan_create_or_replace(
-            &jail,
-            PathBuf::from(&context.closeout_path),
-            render_closeout_json(&closeout)
-                .map_err(map_closeout_error)?
-                .into_bytes(),
-        )?,
-        plan_create_or_replace(
-            &jail,
-            PathBuf::from(&context.lifecycle_state_path),
-            serialize_json_pretty(&lifecycle_state)?,
-        )?,
-    ];
-    mutations.extend(plan_docs_mutations(&jail, &docs_preview)?);
+    let mutations = files
+        .into_iter()
+        .map(|(path, bytes)| plan_create_or_replace(&jail, path, bytes).map_err(Error::from))
+        .collect::<Result<Vec<_>, _>>()?;
     apply_mutations(workspace_root, &mutations)?;
 
     writeln!(writer, "OK: prepare-proving-run-closeout write complete.")
@@ -172,6 +153,27 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<PrepareContext, E
                 crate::agent_registry::REGISTRY_RELATIVE_PATH
             ))
         })?;
+    context_for(workspace_root, approval, entry, |path, approval| {
+        load_validated_closeout_if_present_with_states(
+            workspace_root,
+            Path::new(path),
+            &workspace_root.join(path),
+            ProvingRunCloseoutExpected {
+                approval_path: Some(Path::new(&approval.relative_path)),
+                onboarding_pack_prefix: &approval.descriptor.onboarding_pack_prefix,
+            },
+            &[ProvingRunCloseoutState::Prepared],
+        )
+        .map_err(map_closeout_error)
+    })
+}
+
+fn context_for(
+    workspace_root: &Path,
+    approval: ApprovalArtifact,
+    entry: AgentRegistryEntry,
+    load_closeout: impl FnOnce(&str, &ApprovalArtifact) -> Result<Option<ProvingRunCloseout>, Error>,
+) -> Result<PrepareContext, Error> {
     let lifecycle_state_path =
         agent_lifecycle::lifecycle_state_path(&approval.descriptor.onboarding_pack_prefix);
     let lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
@@ -200,17 +202,7 @@ fn build_context(workspace_root: &Path, args: &Args) -> Result<PrepareContext, E
 
     let closeout_path =
         agent_lifecycle::proving_run_closeout_path(&approval.descriptor.onboarding_pack_prefix);
-    let existing_closeout = load_validated_closeout_if_present_with_states(
-        workspace_root,
-        Path::new(&closeout_path),
-        &workspace_root.join(&closeout_path),
-        ProvingRunCloseoutExpected {
-            approval_path: Some(Path::new(&approval.relative_path)),
-            onboarding_pack_prefix: &approval.descriptor.onboarding_pack_prefix,
-        },
-        &[ProvingRunCloseoutState::Prepared],
-    )
-    .map_err(map_closeout_error)?;
+    let existing_closeout = load_closeout(&closeout_path, &approval)?;
 
     Ok(PrepareContext {
         approval,
@@ -469,23 +461,6 @@ fn serialize_json_pretty<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, Erro
     Ok(bytes)
 }
 
-fn plan_docs_mutations(
-    jail: &WorkspacePathJail,
-    docs_preview: &[(String, Option<String>)],
-) -> Result<Vec<PlannedMutation>, Error> {
-    docs_preview
-        .iter()
-        .map(|(relative_path, contents)| {
-            plan_create_or_replace(
-                jail,
-                PathBuf::from(relative_path),
-                contents.clone().unwrap_or_default().into_bytes(),
-            )
-            .map_err(Error::from)
-        })
-        .collect()
-}
-
 fn resolve_workspace_root() -> Result<PathBuf, Error> {
     let current_dir = std::env::current_dir()
         .map_err(|err| Error::Internal(format!("resolve current directory: {err}")))?;
@@ -516,4 +491,51 @@ fn map_closeout_error(err: ProvingRunCloseoutError) -> Error {
         ProvingRunCloseoutError::Validation(message) => Error::Validation(message),
         ProvingRunCloseoutError::Internal(message) => Error::Internal(message),
     }
+}
+
+fn prepare_files(
+    workspace_root: &Path,
+    context: &PrepareContext,
+) -> Result<Vec<(PathBuf, Vec<u8>)>, Error> {
+    let recorded_at = now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
+    prepare_files_at(context, recorded_at, current_head_commit(workspace_root)?)
+}
+
+fn prepare_files_at(
+    context: &PrepareContext,
+    recorded_at: String,
+    commit: String,
+) -> Result<Vec<(PathBuf, Vec<u8>)>, Error> {
+    let closeout = build_closeout_draft(
+        context,
+        ProvingRunCloseoutMachineFields {
+            approval_ref: context.approval.relative_path.clone(),
+            approval_sha256: context.approval.sha256.clone(),
+            approval_source: APPROVAL_SOURCE.to_string(),
+            maintenance_settlement: None,
+            preflight_passed: true,
+            recorded_at: recorded_at.clone(),
+            commit,
+        },
+    )?;
+    let lifecycle_state = build_next_lifecycle_state(context, recorded_at)?;
+    let docs_preview = build_closeout_docs_preview_for_entry(&context.entry, &closeout);
+    let mut files = vec![
+        (
+            PathBuf::from(&context.closeout_path),
+            render_closeout_json(&closeout)
+                .map_err(map_closeout_error)?
+                .into_bytes(),
+        ),
+        (
+            PathBuf::from(&context.lifecycle_state_path),
+            serialize_json_pretty(&lifecycle_state)?,
+        ),
+    ];
+    files.extend(
+        docs_preview
+            .into_iter()
+            .map(|(path, bytes)| (path.into(), bytes.unwrap_or_default().into_bytes())),
+    );
+    Ok(files)
 }

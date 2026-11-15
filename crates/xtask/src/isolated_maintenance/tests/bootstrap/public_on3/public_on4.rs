@@ -33,6 +33,9 @@ fn green(_: &Path, commands: &[String]) -> Result<(), String> {
 pub(super) enum Phase {
     Preparation,
     Integration,
+    Closeout,
+    CloseoutRefusals,
+    CloseoutReleaseWatch,
 }
 
 pub(super) fn prove(
@@ -144,7 +147,9 @@ pub(super) fn prove(
     qualified(root);
     let candidate = commit(root, api, &f.baseline, parent);
     closure(root, parent, &candidate);
-    refusals::integration(f, root, api, parent, &candidate);
+    if matches!(phase, Phase::Integration) {
+        refusals::integration(f, root, api, parent, &candidate);
+    }
     crate::readonly_gates::with_committed_evaluation(root, || {
         crate::readonly_gates::check_shared(root)
     })
@@ -163,6 +168,13 @@ pub(super) fn prove(
         crate::readonly_gates::check_shared(root)
     })
     .unwrap();
+    if matches!(
+        phase,
+        Phase::Closeout | Phase::CloseoutRefusals | Phase::CloseoutReleaseWatch
+    ) {
+        super::public_on5::prove(f, root, host, evidence, &_api, &candidate, phase);
+        return;
+    }
     reporting::check(f, root, &_api, &candidate);
     refusals::unchanged(f, root, host, &candidate, evidence);
 }

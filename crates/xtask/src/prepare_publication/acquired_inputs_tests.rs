@@ -2,9 +2,7 @@
 use super::*;
 use crate::{prepare_publication as prepare, publication_refresh as refresh};
 
-#[allow(dead_code)]
-#[path = "../close_proving_run.rs"]
-mod close;
+use crate::close_proving_run as close;
 #[path = "../../tests/support/lifecycle_depth.rs"]
 mod lifecycle_depth;
 

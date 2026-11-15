@@ -108,35 +108,12 @@ pub(super) fn proving(view: &View, state: &LifecycleState, path: &str) -> Result
         &state.approval_artifact_path,
     )
     .map_err(|e| e.to_string())?;
-    let (mode, release_watch_sha256, deferral_sha256) = match maintenance.mode {
-        crate::approval_artifact::ApprovalMaintenanceMode::ExplicitlyDeferred {
-            deferral_sha256,
-            ..
-        } => (
-            closeout::MaintenanceSettlementMode::ExplicitlyDeferred,
-            None,
-            Some(deferral_sha256),
-        ),
-        crate::approval_artifact::ApprovalMaintenanceMode::ReleaseWatchEnrolled {
-            release_watch,
-            release_watch_sha256,
-        } => {
-            if view.entry.maintenance.release_watch.as_ref() != Some(&release_watch) {
-                return Err("onboarding proving release-watch differs from registry".into());
-            }
-            (
-                closeout::MaintenanceSettlementMode::ReleaseWatchEnrolled,
-                Some(release_watch_sha256),
-                None,
-            )
-        }
-    };
-    let settlement = closeout::MaintenanceSettlement {
-        mode,
-        approval_section_sha256: maintenance.section_sha256,
-        release_watch_sha256,
-        deferral_sha256,
-    };
+    let settlement = crate::close_proving_run::settlement::settle_maintenance_readiness(
+        &view.entry,
+        &maintenance,
+        std::path::Path::new(path),
+    )
+    .map_err(|e| e.to_string())?;
     let expected = serde_json::json!({"mode":settlement.mode.as_str(),"approval_section_sha256":settlement.approval_section_sha256,"release_watch_sha256":settlement.release_watch_sha256,"deferral_sha256":settlement.deferral_sha256});
     if value["maintenance_settlement"] != expected {
         return Err("onboarding proving maintenance settlement differs from exact approval".into());

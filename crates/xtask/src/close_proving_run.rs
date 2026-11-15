@@ -1,3 +1,9 @@
+mod routed;
+pub(crate) mod settlement;
+mod validation;
+use settlement::settle_maintenance_readiness;
+use validation::validate_closeout_prerequisites;
+
 #[cfg(test)]
 #[allow(clippy::duplicate_mod)]
 #[path = "prepare_publication/isolated_entrypoint.rs"]
@@ -98,6 +104,11 @@ pub fn run_in_workspace<W: Write>(
     args: Args,
     writer: &mut W,
 ) -> Result<(), Error> {
+    if let Some(route) =
+        crate::isolated_maintenance::route(workspace_root).map_err(Error::Validation)?
+    {
+        return routed::run(workspace_root, args, route, writer);
+    }
     xtask::depth_routes::refuse_workspace(workspace_root, "close_proving_run")
         .map_err(Error::Validation)?;
     run_body(workspace_root, args, writer)
@@ -261,172 +272,24 @@ fn write_docs(
     Ok(())
 }
 
-fn validate_closeout_prerequisites(
-    workspace_root: &Path,
-    entry: &AgentRegistryEntry,
-    approval: &ApprovalArtifact,
-    closeout_path: &Path,
-    closeout: &ProvingRunCloseout,
-) -> Result<(), Error> {
-    let lifecycle_state_path =
-        agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
-    let lifecycle_state = load_lifecycle_state(workspace_root, &lifecycle_state_path)
-        .map_err(|err| Error::Validation(err.to_string()))?;
-    if lifecycle_state.approval_artifact_path != approval.relative_path {
-        return Err(Error::Validation(format!(
-            "`{lifecycle_state_path}` approval_artifact_path `{}` does not match `{}`",
-            lifecycle_state.approval_artifact_path, approval.relative_path
-        )));
-    }
-    if lifecycle_state.approval_artifact_sha256 != approval.sha256 {
-        return Err(Error::Validation(format!(
-            "`{lifecycle_state_path}` approval_artifact_sha256 does not match `{}`",
-            approval.relative_path
-        )));
-    }
-    match lifecycle_state.lifecycle_stage {
-        LifecycleStage::Published => {}
-        LifecycleStage::PublicationReady
-            if agent_lifecycle::is_legacy_post_refresh_publication_ready_state(&lifecycle_state) => {}
-        LifecycleStage::PublicationReady => {
-            return Err(Error::Validation(format!(
-                "close-proving-run rejects ordinary prepare-time `publication_ready` at `{}`; run `refresh-publication --approval {} --write` first",
-                lifecycle_state_path,
-                approval.relative_path
-            )))
-        }
-        other => {
-            return Err(Error::Validation(format!(
-                "close-proving-run requires lifecycle stage `published`, or the explicit legacy post-refresh `publication_ready` compatibility shape, at `{}` (found `{}`)",
-                lifecycle_state_path,
-                other.as_str()
-            )))
-        }
-    }
-
-    let packet_path =
-        agent_lifecycle::publication_ready_path(&entry.scaffold.onboarding_pack_prefix);
-    validate_publication_packet_continuity(
-        workspace_root,
-        &packet_path,
-        &lifecycle_state,
-        approval,
-        &entry.manifest_root,
-    )?;
-    if has_unresolved_placeholders(closeout) {
-        return Err(Error::Validation(format!(
-            "{} contains unresolved prepared-closeout placeholders in: {}",
-            closeout_path.display(),
-            unresolved_placeholder_fields(closeout).join(", ")
-        )));
-    }
-    if !closeout.preflight_passed {
-        return Err(Error::Validation(format!(
-            "{} records `preflight_passed = false`; close-proving-run requires a green preflight gate",
-            closeout_path.display()
-        )));
-    }
-
-    let drift_report =
-        drift::check_agent_drift(workspace_root, &entry.agent_id).map_err(|err| {
-            Error::Validation(format!(
-                "drift re-check failed for `{}`: {err}",
-                entry.agent_id
-            ))
-        })?;
-    let blocking_findings = drift_report
-        .findings
-        .iter()
-        .filter(|finding| {
-            matches!(
-                finding.category,
-                DriftCategory::RegistryManifest
-                    | DriftCategory::CapabilityPublication
-                    | DriftCategory::SupportPublication
-            )
-        })
-        .collect::<Vec<_>>();
-    if !blocking_findings.is_empty() {
-        return Err(Error::Validation(format!(
-            "green publication surfaces are required before closeout: {}",
-            blocking_findings
-                .iter()
-                .map(|finding| finding.summary.clone())
-                .collect::<Vec<_>>()
-                .join(" | ")
-        )));
-    }
-    validate_capability_matrix_audit_green(workspace_root)?;
-    Ok(())
-}
-
-fn validate_publication_packet_continuity(
-    workspace_root: &Path,
-    packet_path: &str,
-    lifecycle_state: &LifecycleState,
-    approval: &ApprovalArtifact,
-    manifest_root: &str,
-) -> Result<(), Error> {
-    match lifecycle_state.lifecycle_stage {
-        LifecycleStage::PublicationReady => {
-            let packet = load_publication_ready_packet(workspace_root, packet_path)
-                .map_err(|err| Error::Validation(err.to_string()))?;
-            validate_packet_identity(packet_path, &packet, approval, manifest_root)?;
-        }
-        LifecycleStage::Published => {
-            let packet_bytes = fs::read(workspace_root.join(packet_path))
-                .map_err(|err| Error::Validation(format!("read {packet_path}: {err}")))?;
-            let packet: PublicationReadyPacket = serde_json::from_slice(&packet_bytes)
-                .map_err(|err| Error::Validation(format!("parse {packet_path}: {err}")))?;
-            packet
-                .validate()
-                .map_err(|err| Error::Validation(err.to_string()))?;
-            validate_packet_identity(packet_path, &packet, approval, manifest_root)?;
-        }
-        _ => unreachable!("caller validates allowed lifecycle stages"),
-    }
-    Ok(())
-}
-
-fn validate_packet_identity(
-    packet_path: &str,
-    packet: &PublicationReadyPacket,
-    approval: &ApprovalArtifact,
-    manifest_root: &str,
-) -> Result<(), Error> {
-    if packet.approval_artifact_path != approval.relative_path {
-        return Err(Error::Validation(format!(
-            "`{packet_path}` approval_artifact_path `{}` does not match `{}`",
-            packet.approval_artifact_path, approval.relative_path
-        )));
-    }
-    if packet.approval_artifact_sha256 != approval.sha256 {
-        return Err(Error::Validation(format!(
-            "`{packet_path}` approval_artifact_sha256 does not match `{}`",
-            approval.relative_path
-        )));
-    }
-    if packet.agent_id != approval.descriptor.agent_id {
-        return Err(Error::Validation(format!(
-            "`{packet_path}` agent_id `{}` does not match `{}`",
-            packet.agent_id, approval.descriptor.agent_id
-        )));
-    }
-    if packet.manifest_root != manifest_root {
-        return Err(Error::Validation(format!(
-            "`{packet_path}` manifest_root `{}` does not match `{}`",
-            packet.manifest_root, manifest_root
-        )));
-    }
-    Ok(())
-}
-
 fn update_lifecycle_baseline(
     workspace_root: &Path,
     entry: &AgentRegistryEntry,
     approval: &ApprovalArtifact,
     closeout_path: &Path,
 ) -> Result<(), Error> {
+    let state = next_lifecycle_baseline(workspace_root, entry, approval, closeout_path)?;
+    let path = agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
+    write_lifecycle_state(workspace_root, &path, &state)
+        .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+}
+
+fn next_lifecycle_baseline(
+    workspace_root: &Path,
+    entry: &AgentRegistryEntry,
+    approval: &ApprovalArtifact,
+    closeout_path: &Path,
+) -> Result<LifecycleState, Error> {
     let lifecycle_state_path =
         agent_lifecycle::lifecycle_state_path(&entry.scaffold.onboarding_pack_prefix);
     let packet_path =
@@ -487,8 +350,7 @@ fn update_lifecycle_baseline(
     lifecycle_state.publication_packet_sha256 = Some(packet_sha);
     lifecycle_state.closeout_baseline_path = Some(closeout_path.display().to_string());
 
-    write_lifecycle_state(workspace_root, &lifecycle_state_path, &lifecycle_state)
-        .map_err(|err| Error::Internal(format!("write lifecycle state: {err}")))
+    Ok(lifecycle_state)
 }
 
 fn validate_capability_matrix_audit_green(workspace_root: &Path) -> Result<(), Error> {
@@ -503,7 +365,25 @@ fn finalize_closeout(
     closeout: &ProvingRunCloseout,
     closeout_path: &Path,
 ) -> Result<ProvingRunCloseout, Error> {
-    let maintenance_settlement = settle_maintenance_readiness(entry, approval, closeout_path)?;
+    finalize_closeout_using(entry, approval, closeout, closeout_path, || {
+        current_head_commit(workspace_root, &closeout.commit)
+    })
+}
+
+fn finalize_closeout_using(
+    entry: &AgentRegistryEntry,
+    approval: &ApprovalArtifact,
+    closeout: &ProvingRunCloseout,
+    closeout_path: &Path,
+    commit: impl FnOnce() -> String,
+) -> Result<ProvingRunCloseout, Error> {
+    let maintenance_settlement =
+        settle_maintenance_readiness(entry, &approval.maintenance, closeout_path)?;
+    let recorded_at =
+        agent_lifecycle::now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
+    #[cfg(test)]
+    let recorded_at = crate::depth_acceptance::onboarding::on5::proposal_hooks::recorded_at()
+        .unwrap_or(recorded_at);
     build_closeout(
         ProvingRunCloseoutState::Closed,
         ProvingRunCloseoutMachineFields {
@@ -512,9 +392,8 @@ fn finalize_closeout(
             approval_source: APPROVAL_SOURCE.to_string(),
             maintenance_settlement: Some(maintenance_settlement),
             preflight_passed: true,
-            recorded_at: agent_lifecycle::now_rfc3339()
-                .map_err(|err| Error::Internal(err.to_string()))?,
-            commit: current_head_commit(workspace_root, &closeout.commit),
+            recorded_at,
+            commit: commit(),
         },
         ProvingRunCloseoutHumanFields {
             manual_control_plane_edits: closeout.manual_control_plane_edits,
@@ -541,65 +420,6 @@ fn finalize_closeout(
         }
         other => other,
     })
-}
-
-fn settle_maintenance_readiness(
-    entry: &AgentRegistryEntry,
-    approval: &ApprovalArtifact,
-    closeout_path: &Path,
-) -> Result<MaintenanceSettlement, Error> {
-    match &approval.maintenance.mode {
-        ApprovalMaintenanceMode::ReleaseWatchEnrolled {
-            release_watch_sha256,
-            ..
-        } => {
-            let registry_release_watch = entry.maintenance.release_watch.as_ref().ok_or_else(|| {
-                Error::Validation(format!(
-                    "{}: approval maintenance mode `release_watch_enrolled` requires registry `maintenance.release_watch` for `{}`",
-                    closeout_path.display(),
-                    entry.agent_id
-                ))
-            })?;
-            let registry_release_watch_sha256 =
-                normalized_release_watch_sha256(registry_release_watch).map_err(|err| {
-                    Error::Validation(format!(
-                        "{}: registry maintenance.release_watch is invalid for `{}`: {err}",
-                        closeout_path.display(),
-                        entry.agent_id
-                    ))
-                })?;
-            if registry_release_watch_sha256 != *release_watch_sha256 {
-                return Err(Error::Validation(format!(
-                    "{}: approval and registry maintenance.release_watch truth diverge for `{}`",
-                    closeout_path.display(),
-                    entry.agent_id
-                )));
-            }
-            Ok(MaintenanceSettlement {
-                mode: MaintenanceSettlementMode::ReleaseWatchEnrolled,
-                approval_section_sha256: approval.maintenance.section_sha256.clone(),
-                release_watch_sha256: Some(registry_release_watch_sha256),
-                deferral_sha256: None,
-            })
-        }
-        ApprovalMaintenanceMode::ExplicitlyDeferred {
-            deferral_sha256, ..
-        } => {
-            if entry.maintenance.release_watch.is_some() {
-                return Err(Error::Validation(format!(
-                    "{}: approval maintenance mode `explicitly_deferred` forbids registry `maintenance.release_watch` for `{}`",
-                    closeout_path.display(),
-                    entry.agent_id
-                )));
-            }
-            Ok(MaintenanceSettlement {
-                mode: MaintenanceSettlementMode::ExplicitlyDeferred,
-                approval_section_sha256: approval.maintenance.section_sha256.clone(),
-                release_watch_sha256: None,
-                deferral_sha256: Some(deferral_sha256.clone()),
-            })
-        }
-    }
 }
 
 fn write_closeout_artifact(
