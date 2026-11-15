@@ -183,6 +183,9 @@ pub(super) fn prove(
         reporting::check(f, root, &api, &candidate);
     }
     eprintln!("ON5 real writer, IN1 admission and post-tip observation completed");
+    if crate::isolated_maintenance::tests::mediation_matrix::connected_enabled() {
+        crate::isolated_maintenance::tests::mediation_matrix::onboarding_checkpoint(root);
+    }
 }
 
 #[test]

@@ -104,3 +104,52 @@ pub fn refuse_destination(path: &Path, route: &str) -> Result<(), String> {
     }
     Err("unresolved output destination".into())
 }
+
+/// A file output can belong to a different enclosing scope or propose a new depth record.
+/// Observe its destination without changing the path the owning writer will use.
+pub fn refuse_file_destination(path: &Path, bytes: &[u8], route: &str) -> Result<(), String> {
+    let mut full = if path.is_absolute() {
+        path.to_owned()
+    } else {
+        std::env::current_dir()
+            .map_err(|e| e.to_string())?
+            .join(path)
+    };
+    // Inspect file aliases as well as directory aliases, including a dangling output link.
+    for links in 0..=40 {
+        let metadata = match std::fs::symlink_metadata(&full) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => return Err(error.to_string()),
+        };
+        if !metadata.file_type().is_symlink() {
+            break;
+        }
+        if links == 40 {
+            return Err("too many output symlinks".into());
+        }
+        let target = std::fs::read_link(&full).map_err(|e| e.to_string())?;
+        full = if target.is_absolute() {
+            target
+        } else {
+            full.parent().ok_or("output has no parent")?.join(target)
+        };
+    }
+    let parent = full.parent().ok_or("output has no parent")?;
+    let ancestor = parent
+        .ancestors()
+        .find(|p| p.is_dir())
+        .ok_or("unresolved output destination")?;
+    let observed_root = ancestor.canonicalize().map_err(|e| e.to_string())?;
+    let relative = full.strip_prefix(ancestor).map_err(|e| e.to_string())?;
+    let observed_parent = observed_root.join(relative.parent().ok_or("output has no parent")?);
+    refuse_destination(&observed_parent, route)?;
+    if full
+        .file_name()
+        .is_some_and(|name| name == "depth-record.json")
+        || full.ends_with(REGISTRY_RELATIVE_PATH)
+    {
+        refuse_output(&observed_root, relative, bytes, route)?;
+    }
+    Ok(())
+}

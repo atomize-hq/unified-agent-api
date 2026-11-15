@@ -49,6 +49,9 @@ pub(super) fn prove(
 ) {
     eprintln!("ON4 connected proof enters real publication writer");
     if matches!(phase, Phase::Preparation) {
+        if crate::isolated_maintenance::tests::mediation_matrix::connected_enabled() {
+            crate::isolated_maintenance::tests::mediation_matrix::on4_aggregate(root);
+        }
         let before = crate::candidate_execution::tree::capture(root, &Default::default()).unwrap();
         publication_refresh::set_test_gate_runner(Some(|_, _| {
             Err("injected ON4 candidate gate failure".into())

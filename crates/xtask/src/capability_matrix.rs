@@ -33,6 +33,7 @@ pub fn run(args: Args) -> Result<(), String> {
     xtask::depth_routes::refuse_workspace(&resolve_workspace_root()?, "capability-matrix")?;
     let markdown = generate_markdown()?;
     let out = resolve_output_path(args.out.as_deref())?;
+    xtask::depth_routes::refuse_file_destination(&out, markdown.as_bytes(), "capability-matrix")?;
     write_file(&out, &markdown)?;
     Ok(())
 }

@@ -32,6 +32,8 @@ mod ma4_evidence;
 mod ma4_route;
 mod ma5_closeout;
 mod ma6_promotion;
+#[cfg(unix)]
+mod mediation_matrix;
 mod onboarding_scope;
 mod prepare;
 mod publication;
