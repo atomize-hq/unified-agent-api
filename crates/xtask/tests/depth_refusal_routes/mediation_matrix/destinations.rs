@@ -49,6 +49,43 @@ fn ne2_registry_output_refuses_before_replacing_bindings() {
 }
 
 #[test]
+fn ne2_registry_traversal_refuses_before_replacing_bindings() {
+    let ws = Workspace::plain();
+    ws.assert_refuses(
+        &[
+            "capability-matrix",
+            "--out",
+            "crates/xtask/data/../data/agent_registry.toml",
+        ],
+        "parse agent registry TOML:",
+    );
+}
+
+#[test]
+fn ne2_registry_directory_alias_refuses_before_replacing_bindings() {
+    let ws = Workspace::plain();
+    std::os::unix::fs::symlink("crates/xtask/data", ws.root().join("alias")).unwrap();
+    ws.assert_refuses(
+        &["capability-matrix", "--out", "alias/agent_registry.toml"],
+        "parse agent registry TOML:",
+    );
+}
+
+#[test]
+fn ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace() {
+    let ws = Workspace::plain();
+    write(
+        ws.root(),
+        &format!("nested/{REGISTRY}"),
+        include_str!("../../fixtures/depth-synthetic/onboarding/registry-entry-deferred.toml"),
+    );
+    ws.assert_refuses(
+        &["capability-matrix", "--out", "new/../nested/matrix.md"],
+        "capability-matrix: unsupported depth write (declared enrollment)",
+    );
+}
+
+#[test]
 fn ne2_ordinary_explicit_output_keeps_caller_path_resolution() {
     let ws = Workspace::plain();
     fs::create_dir_all(ws.root().join("relative-output")).unwrap();
@@ -60,6 +97,7 @@ fn ne2_ordinary_explicit_output_keeps_caller_path_resolution() {
     )
     .unwrap();
     let absolute = ws.root().join("absolute-output/matrix.md");
+    let expected = xtask::capability_matrix::generate_markdown_for_workspace(ws.root()).unwrap();
     for destination in [
         "relative-output/../ordinary-output/matrix.md",
         "linked-output/nested/matrix.md",
@@ -70,6 +108,6 @@ fn ne2_ordinary_explicit_output_keeps_caller_path_resolution() {
         let error = String::from_utf8_lossy(&output.stderr);
         assert!(output.status.success(), "{error}");
         let actual = fs::read_to_string(ws.root().join(destination)).unwrap();
-        assert!(actual.contains("# Capability matrix"));
+        assert_eq!(actual, expected);
     }
 }

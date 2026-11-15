@@ -181,3 +181,69 @@ Under `isolated_maintenance::tests::ma6_promotion::connected`
 - `ma6_a5_replay_first_promotion_uses_retained_closeout_after_ordinary_later_generation`
 - `ma6_apply_refuses_captured_route_drift_and_production_cannot_admit_depth`
 - `ma6_positive_promotion_after_each_ma5_writer_with_in1_admission_and_observation`
+
+
+## Review round 1 fixes
+
+The review-round changes supersede the original NE2 check-then-reopen delivery
+and extend the destination and dry-run coverage recorded above.
+
+| Finding | Repair and regression |
+| --- | --- |
+| P1 NE2 check-to-write race | `depth_routes/destination.rs::write_file_destination` holds the resolved destination and existing ancestor identity across validation. Unix delivery opens the canonical parent, uses `openat` with `O_NOFOLLOW` and creation, and checks parent device/inode identity after opening and before truncation. It also rechecks the original caller aliases. `depth_routes::tests::checked_delivery_refuses_final_and_directory_alias_retargeting` replaces an existing final component, retargets a directory alias, and replaces a parent directory. `checked_delivery_opens_without_following_final_symlinks` substitutes the final link immediately before open. `checked_delivery_rechecks_parent_identity_after_opening` replaces the parent immediately after open. Every case refuses and preserves protected bytes. Ordinary directory-only spellings such as `file/`, `file/.` and a file link ending in `/` retain refusal and preserve existing bytes in `resolution_refuses_loops_and_io_errors_and_keeps_ordinary_delivery_bytes`. Hooks compile only under `#[cfg(test)]` |
+| P2 NE2 effective classification | The resolver follows at most 40 links, resolves existing ancestors, and normalizes missing suffix traversal against the canonical ancestor. I/O errors propagate as refusals. `mediation_matrix::destinations::ne2_registry_traversal_refuses_before_replacing_bindings` and `ne2_registry_directory_alias_refuses_before_replacing_bindings` cover `crates/xtask/data/../data/agent_registry.toml` and `alias/agent_registry.toml` with `alias -> crates/xtask/data`. `ne2_missing_prefix_traversal_cannot_hide_a_nested_onboarding_workspace` covers missing `new/../nested/matrix.md`. Each refusal compares the entire tree. `ne2_ordinary_explicit_output_keeps_caller_path_resolution` compares exact rendered bytes across relative traversal, absolute paths and ordinary file/directory aliases |
+| P2 LW1 enclosed scopes | `refuse_output` reuses the existing registry/retained-record scans on resolved ancestors between the output and caller root, after specific proposed-output checks. Batch removals receive a destination-scope check too. `isolated_maintenance::tests::mediation_matrix::lower::outer_callers_refuse_enclosed_depth_destinations` exercises declared and retained nested workspaces through batch, lifecycle and packet writers with complete literal refusal reasons and unchanged trees. The batch cases include an earlier ordinary output and a removal. Ordinary nested delivery remains covered |
+| P2 ON2 dry-run persistence | The ordinary `runtime_follow_on::run_in_workspace` guard covers `args.dry_run` as well as `args.write`, after owning-route dispatch and before context construction or persistence. `mediation_matrix::onboarding::every_on_entry_refuses_onboarding_carriers_without_scope_authority` now includes dry-run for all five carriers. `on2_dry_run_guards_persistence_for_foreign_approval_and_keeps_ordinary_delivery` makes the foreign ordinary approval runnable, checks all seven persisted files in an ordinary workspace, then requires unchanged-tree refusal with declared, omitted, disabled, orphaned and removed-record carriers. `maintenance::on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route` pins the unsupported-depth refusal for a valid foreign depth approval under an installed maintenance route, before context loading |
+| P2 MA6 specificity | The promotion builder uses the existing canonical `check_root` helper and retains its specific violation text in the returned error. `maintenance::ma_intake_and_apply_refuse_onboarding_and_later_version_displacement` requires `DEPTH_LIFECYCLE_BINDING_MISSING` for the omitted-declaration retained onboarding record. The same test first builds a valid ordinary promotion candidate with the same acquired version and targets |
+| P2 lower delivery assertions | `lower::ordinary_lower_writers_deliver_literal_bytes` and the existing lower matrix read lifecycle and publication-packet destinations at direct and ordinary nested paths. They compare the full bytes, formatting and terminal newline against the independently pinned literals in `mediation_matrix/lower_expected.rs` |
+
+NE2 delivery uses invocation-local observations. Declaration and record contents
+can change after the guard reads. Another process can change directory placement
+or hard-link bindings after the final identity observation and before truncation
+or write. Parent-handle binding and final-component no-follow opening close the
+demonstrated symlink substitutions. Serialization across processes requires the
+design's owning integration boundary. A refusal after file creation can leave an empty
+ordinary output. The race regressions specifically verify refusal and preserved
+protected bytes. The classification and LW1 regressions additionally require the
+complete caller tree to remain unchanged.
+
+The Unix implementation uses the existing `rustix` dependency with its filesystem
+feature. Focused execution uses Linux. The portable path uses Windows reparse
+point opening and directory handles, with creation-time directory observations.
+Windows runtime execution remains unverified in this round.
+
+### Regression sensitivity
+
+Temporary guard reversions and delivery mutations run only against disposable
+fixtures. Their logs live under `target/s11-review-r1/s11-red-*.log`. The final source restores all
+repairs before focused validation. The regression cases require failure when the
+legacy check-to-write delivery, lexical NE2 guard, caller-only LW1 guard, write-only
+ON2 guard, or generic MA6 diagnostic is restored. Separate lifecycle and packet
+byte mutations exercise the two independent delivery expectations.
+
+### Focused validation after review fixes
+
+All Cargo commands use `env -u TMPDIR`. The lead owns the full gate. Focused logs
+are under ignored `target/s11-review-r1/`.
+
+| Focused validation | Review round 1 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Passed |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed |
+| `cargo test -p xtask --test depth_refusal_routes` | 29 passed in the ordinary build workspace, 99.09 seconds. Repeated with the build workspace depth-declared, 29 passed, 122.39 seconds |
+| `cargo test -p xtask --lib isolated_maintenance::tests::mediation_matrix::lower` | 2 passed, including enclosed declared/retained destinations and independent literal delivery checks. Also passed with the build workspace depth-declared |
+| `cargo test -p xtask --lib isolated_maintenance::tests::mediation_matrix::maintenance` | 2 passed, including the specific MA6 diagnostic, valid ordinary sibling and foreign maintenance-route ON2 refusal. Also passed with the build workspace depth-declared |
+| `cargo test -p xtask --lib workspace_mutation` | 10 passed in both build workspace configurations |
+| `cargo test -p xtask --lib depth_routes` | 4 passed in both build workspace configurations, including check/open/write races, loop/I/O refusals, ordinary delivery and directory-only syntax |
+| `cargo test -p xtask --lib isolated_maintenance::tests::mediation_matrix::onboarding_retained_and_proposed_lower_writer_matrix` | 1 passed in both build workspace configurations |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on2::public_on2_connected_freeze_write_admission_and_observation` | 1 passed in both build workspace configurations. Final depth-declared run passed in 91.52 seconds |
+| `make loc-check` | Passed, 700-code-line cap |
+| `git diff --check` | Passed |
+
+The declared-build repetition temporarily appended the committed synthetic
+onboarding declaration to the build checkout's registry and restored its original
+bytes after every focused command completed. The final ordinary binary suite and
+`depth_routes` unit tests ran after that restoration. Every temporary guard/byte
+mutation failed its regression as expected. The additional directory-syntax and
+foreign-route regressions have their own red logs in the same directory.
+The full connected matrix and full gate remain assigned to the lead.

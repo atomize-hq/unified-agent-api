@@ -8,7 +8,14 @@ pub fn apply_mutations(
     xtask::depth_routes::refuse_workspace(workspace_root, "neutral mutation writer")
         .map_err(WorkspaceMutationError::Validation)?;
     for mutation in mutations {
-        if !mutation.remove {
+        if mutation.remove {
+            xtask::depth_routes::refuse_output_scope(
+                workspace_root,
+                mutation.relative_path(),
+                "neutral mutation writer",
+            )
+            .map_err(WorkspaceMutationError::Validation)?;
+        } else {
             xtask::depth_routes::refuse_output(
                 workspace_root,
                 mutation.relative_path(),

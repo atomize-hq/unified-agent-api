@@ -8,6 +8,7 @@ mod aggregate;
 mod guard_record;
 mod integration;
 mod lower;
+mod lower_expected;
 mod maintenance;
 
 thread_local! {
@@ -52,7 +53,11 @@ pub(super) fn onboarding_checkpoint(root: &Path) {
     assert_eq!(parsed.policy.selection.enrollment.version, "0.2.0");
     assert_eq!(parsed.execution.as_ref().unwrap().results.len(), 11);
     let state = crate::agent_lifecycle::load_lifecycle_state(root, STATE).unwrap();
-    let packet = crate::agent_lifecycle::load_publication_ready_packet(root, PACKET).unwrap();
+    // After ON4/ON5 the lifecycle state legitimately advances past the packet's pinned
+    // `lifecycle_state_sha256`; the lower-writer carriers need only a structurally valid packet.
+    let packet: crate::agent_lifecycle::PublicationReadyPacket =
+        serde_json::from_slice(&fs::read(root.join(PACKET)).unwrap()).unwrap();
+    packet.validate().unwrap();
     lower::carriers(&record, &state, &packet);
     let bundle = crate::support_matrix::PublicationBundle {
         json: fs::read_to_string(root.join(crate::support_matrix::JSON_OUTPUT_PATH)).unwrap(),

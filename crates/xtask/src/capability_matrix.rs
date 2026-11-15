@@ -33,8 +33,7 @@ pub fn run(args: Args) -> Result<(), String> {
     xtask::depth_routes::refuse_workspace(&resolve_workspace_root()?, "capability-matrix")?;
     let markdown = generate_markdown()?;
     let out = resolve_output_path(args.out.as_deref())?;
-    xtask::depth_routes::refuse_file_destination(&out, markdown.as_bytes(), "capability-matrix")?;
-    write_file(&out, &markdown)?;
+    xtask::depth_routes::write_file_destination(&out, markdown.as_bytes(), "capability-matrix")?;
     Ok(())
 }
 
@@ -77,14 +76,6 @@ pub fn generate_markdown_for_workspace(root: &Path) -> Result<String, String> {
         &inventory.backends,
         &inventory.canonical_target_header,
     ))
-}
-
-fn write_file(path: &Path, contents: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| format!("create_dir_all({path:?}): {err}"))?;
-    }
-    fs::write(path, contents).map_err(|err| format!("write({path:?}): {err}"))?;
-    Ok(())
 }
 
 fn validate_checked_in_file(path: &Path, contents: &str) -> Result<(), String> {

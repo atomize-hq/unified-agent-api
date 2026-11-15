@@ -149,9 +149,120 @@ pub(super) fn proposed(state: &LifecycleState, packet: &PublicationReadyPacket, 
             },
         );
     }
+    ordinary_delivery(root, state, packet);
+}
+
+#[test]
+fn ordinary_lower_writers_deliver_literal_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = super::super::unsupported_routes::repo_json(
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
+    );
+    let packet = super::super::unsupported_routes::repo_json(
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
+    );
+    ordinary_delivery(dir.path(), &state, &packet);
+}
+
+fn ordinary_delivery(root: &Path, state: &LifecycleState, packet: &PublicationReadyPacket) {
     // An ordinary workspace and ordinary output remain writable through all three boundaries.
     apply_mutations(root, &[PlannedMutation::create("ordinary", b"ok".to_vec())]).unwrap();
     write_lifecycle_state(root, STATE, state).unwrap();
     write_publication_ready_packet(root, PACKET, packet).unwrap();
     assert_eq!(fs::read(root.join("ordinary")).unwrap(), b"ok");
+    assert_eq!(
+        fs::read(root.join(STATE)).unwrap(),
+        super::lower_expected::STATE.as_bytes()
+    );
+    assert_eq!(
+        fs::read(root.join(PACKET)).unwrap(),
+        super::lower_expected::PACKET.as_bytes()
+    );
+    // A nested ordinary destination keeps the same bytes through all three boundaries.
+    apply_mutations(
+        root,
+        &[PlannedMutation::create(
+            "nested/ordinary",
+            b"nested ok".to_vec(),
+        )],
+    )
+    .unwrap();
+    write_lifecycle_state(root, "nested/state.json", state).unwrap();
+    write_publication_ready_packet(root, "nested/packet.json", packet).unwrap();
+    assert_eq!(
+        fs::read(root.join("nested/ordinary")).unwrap(),
+        b"nested ok"
+    );
+    assert_eq!(
+        fs::read(root.join("nested/state.json")).unwrap(),
+        super::lower_expected::STATE.as_bytes()
+    );
+    assert_eq!(
+        fs::read(root.join("nested/packet.json")).unwrap(),
+        super::lower_expected::PACKET.as_bytes()
+    );
+}
+
+#[test]
+fn outer_callers_refuse_enclosed_depth_destinations() {
+    let state = super::super::unsupported_routes::repo_json(
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/lifecycle-state.json",
+    );
+    let packet = super::super::unsupported_routes::repo_json(
+        "docs/agents/lifecycle/opencode-cli-onboarding/governance/publication-ready.json",
+    );
+    for (carrier, reason) in [
+        ("declared", "unsupported depth write (declared enrollment)"),
+        ("retained", "unsupported depth write (retained record)"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        write(
+            root,
+            REGISTRY_RELATIVE_PATH,
+            super::super::registry_fixture::undeclared_registry(),
+        );
+        if carrier == "declared" {
+            write(root, &format!("nested/{REGISTRY_RELATIVE_PATH}"), DECLARED);
+        } else {
+            write(root, &format!("nested/{RECORD}"), guard_record::record());
+        }
+        unchanged(root, &format!("neutral mutation writer: {reason}"), || {
+            apply_mutations(
+                root,
+                &[
+                    PlannedMutation::create("ordinary-first", b"must remain absent".to_vec()),
+                    PlannedMutation::create("nested/new/output", b"refuse".to_vec()),
+                ],
+            )
+            .unwrap_err()
+            .to_string()
+        });
+        write(root, "nested/existing", b"preserve nested bytes");
+        unchanged(root, &format!("neutral mutation writer: {reason}"), || {
+            apply_mutations(
+                root,
+                &[PlannedMutation::remove(
+                    "nested/existing",
+                    b"preserve nested bytes".to_vec(),
+                )],
+            )
+            .unwrap_err()
+            .to_string()
+        });
+        unchanged(root, &format!("lifecycle writer: {reason}"), || {
+            write_lifecycle_state(root, "nested/new/state.json", &state)
+                .unwrap_err()
+                .to_string()
+        });
+        unchanged(
+            root,
+            &format!("publication packet writer: {reason}"),
+            || {
+                write_publication_ready_packet(root, "nested/new/packet.json", &packet)
+                    .unwrap_err()
+                    .to_string()
+            },
+        );
+    }
 }

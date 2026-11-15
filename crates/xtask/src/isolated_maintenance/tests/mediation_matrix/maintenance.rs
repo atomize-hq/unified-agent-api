@@ -46,6 +46,18 @@ fn ma_intake_and_apply_refuse_onboarding_and_later_version_displacement() {
     assert!(!cached.files.is_empty());
     assert!(!refresh_plan.files.is_empty());
     refresh::apply_refresh_plan(root, &refresh_plan).unwrap();
+    let head = git(root, &["rev-parse", "HEAD"]);
+    git(root, &["update-ref", "refs/remotes/origin/staging", &head]);
+    let promotion = crate::manifest_promotion::Args {
+        agent: "depth_fixture".into(),
+        version: "0.2.0".into(),
+        passed_targets: vec!["x86_64-unknown-linux-gnu".into()],
+        validation_commit: head,
+        write: true,
+    };
+    // The ordinary candidate is valid before inserting the retained onboarding record
+    // with its lifecycle binding absent. Pin the resulting canonical binding violation.
+    crate::manifest_promotion::build_plan(root, &promotion).unwrap();
     let ordinary_registry = fs::read_to_string(root.join(REGISTRY_RELATIVE_PATH)).unwrap();
     let onboarding = AgentRegistry::parse_unenforced(DECLARED).unwrap();
     let table =
@@ -159,7 +171,7 @@ fn ma_intake_and_apply_refuse_onboarding_and_later_version_displacement() {
         let head = git(root, &["rev-parse", "HEAD"]);
         git(root, &["update-ref", "refs/remotes/origin/staging", &head]);
         let promotion_reason = if carrier == "omitted" {
-            "promotion candidate fails canonical manifest validation"
+            "DEPTH_LIFECYCLE_BINDING_MISSING"
         } else {
             request_reason
         };
@@ -178,4 +190,55 @@ fn ma_intake_and_apply_refuse_onboarding_and_later_version_displacement() {
             .unwrap()
         });
     }
+}
+
+#[test]
+fn on2_dry_run_depth_approval_cannot_borrow_a_maintenance_route() {
+    use clap::Parser;
+    let (f, _) = super::super::prepare::workspace();
+    let root = f.root.path();
+    let approval = "docs/agents/lifecycle/opencode-cli-onboarding/governance/approved-agent.toml";
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(approval);
+    let raw = format!(
+        "{}\n[support_depth]\nversion = \"0.2.0\"\n",
+        fs::read_to_string(source).unwrap()
+    );
+    write(root, approval, raw);
+    let comparison = "docs/agents/selection/cli-agent-selection-packet.md";
+    write(
+        root,
+        comparison,
+        fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../..")
+                .join(comparison),
+        )
+        .unwrap(),
+    );
+    f.commit();
+    let _installed = f.install();
+    // A structurally valid foreign depth approval establishes no owning ON2 route.
+    crate::approval_artifact::load_approval_artifact(root, approval).unwrap();
+    unchanged(
+        root,
+        "runtime_follow_on: unsupported depth write (declared enrollment)",
+        || {
+            crate::runtime_follow_on::run_in_workspace(
+                root,
+                crate::runtime_follow_on::Args::parse_from([
+                    "runtime-follow-on",
+                    "--dry-run",
+                    "--approval",
+                    approval,
+                    "--run-id",
+                    "s11-foreign-route",
+                ]),
+                &mut Vec::new(),
+            )
+            .unwrap_err()
+            .to_string()
+        },
+    );
 }
