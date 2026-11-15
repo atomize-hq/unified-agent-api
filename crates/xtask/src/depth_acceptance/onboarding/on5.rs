@@ -76,20 +76,23 @@ pub(crate) fn runtime(
         root, &approval, &packet,
     )
     .map_err(|e| e.to_string())?;
-    // A retained prepared artifact stays reporting-only, but still has the same semantic
-    // validation as local preparation, including unchanged-lifecycle and human-edit candidates.
+    // Retained artifacts share local preparation's semantic validation, including
+    // unchanged-lifecycle and human-edit candidates.
     let closeout =
         agent_lifecycle::proving_run_closeout_path(&entry.scaffold.onboarding_pack_prefix);
     if let Some(raw) = Source::workspace(root)?.optional(&closeout)? {
-        let value: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-        if value["state"] == "prepared" {
-            crate::proving_run_closeout::from_authenticated(
-                &raw,
-                Path::new(&closeout),
-                &approval,
-                &[crate::proving_run_closeout::ProvingRunCloseoutState::Prepared],
-            )
-            .map_err(|e| e.to_string())?;
+        use crate::proving_run_closeout::{from_authenticated, ProvingRunCloseoutState};
+        let parsed = from_authenticated(
+            &raw,
+            Path::new(&closeout),
+            &approval,
+            &[
+                ProvingRunCloseoutState::Prepared,
+                ProvingRunCloseoutState::Closed,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        if parsed.state == ProvingRunCloseoutState::Prepared {
             let version = approval
                 .support_depth_version
                 .as_deref()

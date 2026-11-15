@@ -163,3 +163,63 @@ Their aggregate outcomes remain unverified until their processes finish.
 Active logs are `target/s9-validation/public-on5.log` and
 `target/s9-validation/on5-final-refusals.log`. The lead's full gate and depth-declared
 build leg remain separately assigned. No focused test has hit a Unix-socket refusal.
+
+## Review round 1 fixes
+
+Closed and prepared artifacts now pass through the shared authenticated semantic
+loader during ON5 runtime validation. Settlement equality and unresolved-placeholder
+checks remain in the independent proving predicate. Real committed IN1 candidates
+blank `approval_source` and `explicit_none_reason` with whitespace and update the
+ProvingRunCloseout entry digest. Each requires its field-specific semantic refusal
+and preserves the caller tree. The original prepared-only dispatch admitted the
+blank approval source despite the coherent updated digest.
+
+A separate immutable release-watch checkpoint commits matching approval and registry
+authority before the real ON2 freeze. Its connected chain uses public prepared ON5,
+committed prepared and human-edit IN1 checkpoints, public final ON5, committed final
+IN1 admission and protected-tip observation. The actual writer settlement is compared
+in full with the committed `release-watch-settlement.json` literal, including both
+hashes and the absent deferral hash. The earlier helper-level settlement/refusal test
+continues to cover mismatched registry and forged settlement inputs.
+
+The connected human-edit checkpoint seeds `recorded_at` with
+`2020-01-01T00:00:00Z`. A thread-local, scoped `#[cfg(test)]` clock seam sets the final
+close invocation to `2026-11-14T12:34:56Z`. Final bytes must record that exact invocation
+time and differ from the prepared timestamp. Copying the prepared timestamp fails
+this assertion. Production clock acquisition retains its existing behavior.
+
+Downgrade assertions require exactly one synthetic subject row, its depth object and
+its complete expected inventory before examining qualification flags. The connected
+subject declares exactly one `run` promise and zero capability mappings, which are
+pinned explicitly. A focused assertion regression additionally supplies a nonempty
+`agent_api.run` capability inventory and requires refusal of a missing subject,
+missing depth, empty promise/capability inventories and either qualification flag
+remaining true. The original conditional loops allowed absent rows/depth and empty
+inventories to skip their assertions.
+
+### Round 1 focused validation
+
+| Command | Round 1 result |
+| --- | --- |
+| `cargo fmt --all -- --check` | Passed after final Rust edits |
+| `cargo clippy -p xtask --all-targets --all-features -- -D warnings` | Passed after final Rust edits |
+| `cargo test -p xtask --lib depth_acceptance::onboarding -- --test-threads=2` | Passed, 20 tests in 569.26 seconds |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on3::public_on5 -- --nocapture --test-threads=3` | Passed, all 5 tests in 1757.94 seconds |
+| `cargo test -p xtask --lib isolated_maintenance::tests::bootstrap::public_on3::public_on5::release_watch -- --nocapture` | Passed, connected release-watch writer/IN1/observation proof in 619.88 seconds |
+| `make loc-check` | Passed after final Rust edits |
+
+The first release-watch fixture run exposed a setup-order bug when the lifecycle
+reader checked its old digest against already-replaced approval bytes. Setup now
+loads the original lifecycle before replacing the approval and updating its digest.
+An early assertion-side registry read also required a clean workspace immediately
+after the writer changed it. The selected test phase now chooses its expected
+settlement oracle directly. Superseded runs were stopped or failed before these
+corrections. Final focused logs are under `target/s9-round1-validation/`.
+
+The final ON5 filter passed all five tests. Its connected refusal case completed all
+four conflict-preserving rollback siblings, both coherent-digest whitespace-field
+IN1 refusals, the remaining committed tampering cases and all closed-reporting
+siblings. The genuine deferral and release-watch chains both passed public writers,
+IN1 admission and post-tip observation. The nonempty reporting-inventory assertion
+regression passed its positive fixture and all six malformed/qualified cases.
+`git diff --check` also passed. Changes remain uncommitted at `4ba1e718`.

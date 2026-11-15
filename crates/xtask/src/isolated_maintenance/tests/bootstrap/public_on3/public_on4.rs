@@ -35,6 +35,7 @@ pub(super) enum Phase {
     Integration,
     Closeout,
     CloseoutRefusals,
+    CloseoutReleaseWatch,
 }
 
 pub(super) fn prove(
@@ -167,16 +168,11 @@ pub(super) fn prove(
         crate::readonly_gates::check_shared(root)
     })
     .unwrap();
-    if matches!(phase, Phase::Closeout | Phase::CloseoutRefusals) {
-        super::public_on5::prove(
-            f,
-            root,
-            host,
-            evidence,
-            &_api,
-            &candidate,
-            matches!(phase, Phase::CloseoutRefusals),
-        );
+    if matches!(
+        phase,
+        Phase::Closeout | Phase::CloseoutRefusals | Phase::CloseoutReleaseWatch
+    ) {
+        super::public_on5::prove(f, root, host, evidence, &_api, &candidate, phase);
         return;
     }
     reporting::check(f, root, &_api, &candidate);

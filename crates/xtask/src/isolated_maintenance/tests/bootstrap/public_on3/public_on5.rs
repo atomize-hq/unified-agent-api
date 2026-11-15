@@ -7,6 +7,7 @@ use crate::{
 };
 
 mod refusals;
+pub(super) mod release_watch;
 mod reporting;
 mod rollback;
 
@@ -51,8 +52,9 @@ pub(super) fn prove(
     evidence: &SyntheticHost,
     api: &super::super::super::fixture::Fake,
     published: &str,
-    refusals: bool,
+    phase: public_on4::Phase,
 ) {
+    let refusals = matches!(phase, public_on4::Phase::CloseoutRefusals);
     eprintln!("ON5 connected proof enters prepared reporting writer");
     let packet = fs::read(root.join(PACKET)).unwrap();
     let original: DepthRecord =
@@ -84,6 +86,7 @@ pub(super) fn prove(
     check_integration(root, published).unwrap();
     // Bounded human edits are a reporting checkpoint with their own independent admission.
     let mut edited = draft.clone();
+    edited["recorded_at"] = json!("2020-01-01T00:00:00Z");
     edited
         .as_object_mut()
         .unwrap()
@@ -104,30 +107,28 @@ pub(super) fn prove(
         let before = crate::candidate_execution::tree::capture(root, &Default::default()).unwrap();
         rollback::check(root, &before);
     }
-    close(root).unwrap();
+    const CLOSED_AT: &str = "2026-11-14T12:34:56Z";
+    crate::depth_acceptance::onboarding::on5::proposal_hooks::with_recorded_at(CLOSED_AT, || {
+        close(root)
+    })
+    .unwrap();
     let closed_bytes = fs::read(root.join(CLOSEOUT)).unwrap();
     let closed: Value = serde_json::from_slice(&closed_bytes).unwrap();
     let expected = literal();
     assert_eq!(closed["state"], expected["state"]);
     assert_eq!(closed["approval_source"], expected["approval_source"]);
-    assert_eq!(
-        closed["maintenance_settlement"]["mode"],
-        expected["maintenance_mode"]
-    );
+    if matches!(phase, public_on4::Phase::CloseoutReleaseWatch) {
+        release_watch::assert_settlement(&closed);
+    } else {
+        assert_eq!(
+            closed["maintenance_settlement"]["mode"],
+            expected["maintenance_mode"]
+        );
+    }
     assert_eq!(closed["commit"], human);
     assert_ne!(closed, edited);
-    let recorded = time::OffsetDateTime::parse(
-        closed["recorded_at"].as_str().unwrap(),
-        &time::format_description::well_known::Rfc3339,
-    )
-    .unwrap();
-    let prepared_at = time::OffsetDateTime::parse(
-        draft["recorded_at"].as_str().unwrap(),
-        &time::format_description::well_known::Rfc3339,
-    )
-    .unwrap();
-    assert!(recorded >= prepared_at);
-    assert_ne!(closed["recorded_at"], Value::Null);
+    assert_eq!(closed["recorded_at"], CLOSED_AT);
+    assert_ne!(closed["recorded_at"], edited["recorded_at"]);
     for (key, value) in expected["human"].as_object().unwrap() {
         assert_eq!(&closed[key], value);
     }

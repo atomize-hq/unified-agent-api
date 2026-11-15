@@ -379,6 +379,11 @@ fn finalize_closeout_using(
 ) -> Result<ProvingRunCloseout, Error> {
     let maintenance_settlement =
         settle_maintenance_readiness(entry, &approval.maintenance, closeout_path)?;
+    let recorded_at =
+        agent_lifecycle::now_rfc3339().map_err(|err| Error::Internal(err.to_string()))?;
+    #[cfg(test)]
+    let recorded_at = crate::depth_acceptance::onboarding::on5::proposal_hooks::recorded_at()
+        .unwrap_or(recorded_at);
     build_closeout(
         ProvingRunCloseoutState::Closed,
         ProvingRunCloseoutMachineFields {
@@ -387,8 +392,7 @@ fn finalize_closeout_using(
             approval_source: APPROVAL_SOURCE.to_string(),
             maintenance_settlement: Some(maintenance_settlement),
             preflight_passed: true,
-            recorded_at: agent_lifecycle::now_rfc3339()
-                .map_err(|err| Error::Internal(err.to_string()))?,
+            recorded_at,
             commit: commit(),
         },
         ProvingRunCloseoutHumanFields {

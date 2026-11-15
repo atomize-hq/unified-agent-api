@@ -172,6 +172,8 @@ pub(super) fn integration(
         "entry",
         "retained",
         "closeout",
+        "approval_source",
+        "explicit_none_reason",
         "runtime",
         "written_paths",
         "evidence",
@@ -200,6 +202,22 @@ pub(super) fn integration(
                     serde_json::from_slice(&fs::read(root.join(CLOSEOUT)).unwrap()).unwrap();
                 value["recorded_at"] = json!("2026-11-05T00:00:00Z");
                 write(root, CLOSEOUT, serde_json::to_vec_pretty(&value).unwrap());
+            }
+            "approval_source" | "explicit_none_reason" => {
+                let mut value: Value =
+                    serde_json::from_slice(&fs::read(root.join(CLOSEOUT)).unwrap()).unwrap();
+                value[case] = json!(" \t\n ");
+                let bytes = serde_json::to_vec_pretty(&value).unwrap();
+                write(root, CLOSEOUT, &bytes);
+                let mut record: DepthRecord =
+                    serde_json::from_slice(&fs::read(root.join(RECORD)).unwrap()).unwrap();
+                let AcceptanceEntry::ProvingRunCloseout { closeout, .. } =
+                    &mut record.acceptance_entries[1]
+                else {
+                    panic!("proving entry missing")
+                };
+                closeout.sha256 = hex::encode(Sha256::digest(&bytes));
+                write(root, RECORD, serde_json::to_vec_pretty(&record).unwrap());
             }
             "runtime" | "written_paths" => {
                 let packet: life::PublicationReadyPacket =
@@ -275,6 +293,8 @@ pub(super) fn integration(
             "entry" | "closeout" | "maintenance" => {
                 "integration proving lacks its exact current owning entry"
             }
+            "approval_source" => "`approval_source` must not be empty",
+            "explicit_none_reason" => "`explicit_none_reason` must not be empty",
             "retained" => "integration changed retained entries or shrank selection",
             "runtime" => "validation-report.json is not green",
             "evidence" => "onboarding obligation is not independently satisfied",

@@ -547,13 +547,23 @@ fn in1_refusals(
 }
 
 // Publish only an immutable real-writer checkpoint, after scoped host guards have dropped.
-fn template() -> &'static (Fixture, SyntheticHost) {
+fn template(release_watch: bool) -> &'static (Fixture, SyntheticHost) {
     static TEMPLATE: std::sync::OnceLock<(Fixture, SyntheticHost)> = std::sync::OnceLock::new();
-    TEMPLATE.get_or_init(|| {
+    static RELEASE_WATCH: std::sync::OnceLock<(Fixture, SyntheticHost)> =
+        std::sync::OnceLock::new();
+    let template = if release_watch {
+        &RELEASE_WATCH
+    } else {
+        &TEMPLATE
+    };
+    template.get_or_init(|| {
         use crate::depth_acceptance::admission::{
             self, freeze::authority::Observation, Generation,
         };
         let f = public_on1::declared_chain_with_host_approval();
+        if release_watch {
+            public_on5::release_watch::configure(&f);
+        }
         let _route = f.install();
         let parent = head(&f);
         fr2::run(&f);
@@ -636,7 +646,10 @@ fn connected(repaired: bool, owning_only: bool) {
 }
 
 fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_on4::Phase>) {
-    let (template, evidence) = template();
+    let (template, evidence) = template(matches!(
+        publication,
+        Some(public_on4::Phase::CloseoutReleaseWatch)
+    ));
     let root = tempfile::tempdir().unwrap();
     git(
         template.root.path(),
