@@ -14,6 +14,33 @@ enum Entrypoint {
 }
 const ENTRYPOINTS: [Entrypoint; 3] = [Entrypoint::Prepare, Entrypoint::Refresh, Entrypoint::Close];
 
+// Reviewed OF-P4 statement literals, independent of acquisition planners and O derivation.
+const FROZEN_INPUTS: [&str; 8] = [
+    "cli_manifests/depth_fixture/RULES.json",
+    "cli_manifests/depth_fixture/SCHEMA.json",
+    "cli_manifests/depth_fixture/reports/0.2.0/coverage.all.json",
+    "cli_manifests/depth_fixture/reports/0.2.0/coverage.any.json",
+    "cli_manifests/depth_fixture/reports/0.2.0/coverage.x86_64-unknown-linux-gnu.json",
+    "cli_manifests/depth_fixture/snapshots/0.2.0/union.json",
+    "cli_manifests/depth_fixture/snapshots/0.2.0/x86_64-unknown-linux-gnu.json",
+    "cli_manifests/depth_fixture/wrapper_coverage.json",
+];
+
+fn assert_frozen_input_inventory(f: &Fixture) {
+    let statement: Value = toml_edit::de::from_str(TEMPLATE).unwrap();
+    for inputs in [
+        statement["inputs"].as_array().unwrap(),
+        json_file(f, RECORD)["obligations"]["acquired_inputs"]
+            .as_array()
+            .unwrap(),
+    ] {
+        let mut paths: Vec<_> = inputs.iter().map(|v| v["path"].as_str().unwrap()).collect();
+        assert!(!paths.is_empty());
+        paths.sort();
+        assert_eq!(paths, FROZEN_INPUTS);
+    }
+}
+
 impl Entrypoint {
     fn run(self, root: &Path, public: bool) -> String {
         let mut output = Vec::new();
@@ -68,6 +95,8 @@ impl Entrypoint {
 
 fn unchanged(f: &Fixture, entry: Entrypoint, expected: &str, paths: &[String]) {
     let before = lifecycle_depth::snapshot(f.root.path());
+    let before_tree =
+        crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap();
     let error = entry.run(f.root.path(), false);
     assert!(
         error.contains(expected),
@@ -81,6 +110,11 @@ fn unchanged(f: &Fixture, entry: Entrypoint, expected: &str, paths: &[String]) {
         lifecycle_depth::snapshot(f.root.path()),
         "{entry:?} wrote on refusal"
     );
+    assert_eq!(
+        before_tree,
+        crate::candidate_execution::tree::capture(f.root.path(), &Default::default()).unwrap(),
+        "{entry:?} changed caller nodes or modes on refusal"
+    );
 }
 
 #[test]
@@ -88,17 +122,9 @@ fn publication_entrypoints_refuse_each_changed_frozen_acquired_input_without_wri
     let f = setup(true);
     let _installed = f.install();
     freeze(&f).unwrap();
-    let inputs = json_file(&f, RECORD)["obligations"]["acquired_inputs"]
-        .as_array()
-        .unwrap()
-        .clone();
-    assert_eq!(
-        inputs.len(),
-        8,
-        "the shared single-target O includes all OF-P6 inputs"
-    );
-    for input in inputs {
-        let path = input["path"].as_str().unwrap().to_string();
+    assert_frozen_input_inventory(&f);
+    for input in FROZEN_INPUTS {
+        let path = input.to_string();
         let bytes = fs::read(f.root.path().join(&path)).unwrap();
         write(f.root.path(), &path, [bytes.as_slice(), b"\n"].concat());
         f.commit();
@@ -111,6 +137,25 @@ fn publication_entrypoints_refuse_each_changed_frozen_acquired_input_without_wri
             );
         }
         write(f.root.path(), &path, bytes);
+    }
+}
+
+#[test]
+fn publication_entrypoints_refuse_each_deleted_frozen_acquired_input_without_writes() {
+    let f = setup(true);
+    let _installed = f.install();
+    freeze(&f).unwrap();
+    assert_frozen_input_inventory(&f);
+    for path in FROZEN_INPUTS {
+        let bytes = fs::read(f.root.path().join(path)).unwrap();
+        fs::remove_file(f.root.path().join(path)).unwrap();
+        f.commit();
+        let reason =
+            format!("changed or missing frozen acquired inputs; publication refused: {path}");
+        for entry in ENTRYPOINTS {
+            unchanged(&f, entry, &reason, &[path.into()]);
+        }
+        write(f.root.path(), path, bytes);
     }
 }
 

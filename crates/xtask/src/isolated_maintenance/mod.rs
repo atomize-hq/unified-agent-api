@@ -372,6 +372,10 @@ impl Context {
         result.recheck(&result.root)?;
         Ok(result)
     }
+    /// The installed profile's single compiled subject.
+    pub(crate) fn subject_agent(&self) -> &'static str {
+        self.profile.subject.agent_id
+    }
     pub(crate) fn recheck(&self, root: &Path) -> Result<(), String> {
         if root.canonicalize().map_err(|e| e.to_string())? != self.root
             || Workspace::read(&self.root, &self.profile)? != self.workspace

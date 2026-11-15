@@ -8,6 +8,8 @@ use crate::{
 };
 use clap::Parser;
 
+#[path = "e7_chain/mod.rs"]
+mod e7_chain;
 mod public_on4;
 mod public_on5;
 mod review;
@@ -572,7 +574,7 @@ fn template(release_watch: bool) -> &'static (Fixture, SyntheticHost) {
         }
         let _route = f.install();
         let parent = head(&f);
-        fr2::run(&f);
+        let writer = e7_chain::freeze(&f);
         let frozen = candidate(&f, &parent);
         let publication = f.resolve().unwrap().admission_publication().unwrap();
         let record = crate::depth_record::DepthRecord::parse(
@@ -586,7 +588,7 @@ fn template(release_watch: bool) -> &'static (Fixture, SyntheticHost) {
             predecessor: admission::emitter::object(f.root.path(), &parent).unwrap(),
             generation: Generation::from_record(&record),
             policy: publication.authority.policy.clone(),
-            writer: fr2::variables(),
+            writer,
         };
         f.api.3.put(
             &format!("freeze-inputs/{frozen}"),
@@ -659,11 +661,8 @@ pub(in crate::isolated_maintenance::tests) fn mediation_on4_preparation() {
     connected_with(false, true, Some(public_on4::Phase::Preparation));
 }
 
-fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_on4::Phase>) {
-    let (template, evidence) = template(matches!(
-        publication,
-        Some(public_on4::Phase::CloseoutReleaseWatch)
-    ));
+fn fork_checkpoint(release_watch: bool) -> (Fixture, SyntheticHost) {
+    let (template, evidence) = template(release_watch);
     let root = tempfile::tempdir().unwrap();
     git(
         template.root.path(),
@@ -694,11 +693,19 @@ fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_
         baseline: template.baseline.clone(),
         subject: template.subject,
     };
+    (f, evidence.fork())
+}
+
+fn connected_with(repaired: bool, owning_only: bool, publication: Option<public_on4::Phase>) {
+    let (f, evidence) = fork_checkpoint(matches!(
+        publication,
+        Some(public_on4::Phase::CloseoutReleaseWatch)
+    ));
     prove_with(
         &f,
         f.root.path(),
         &f.api.3,
-        evidence.fork(),
+        evidence,
         repaired,
         owning_only,
         publication,
