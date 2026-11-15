@@ -38,6 +38,16 @@ pub(crate) fn apply_admitted_mutations_with_test_failure(
     })
 }
 
+/// Exercise concurrent caller changes between actual writes through an owning controller.
+#[cfg(test)]
+pub(crate) fn apply_admitted_mutations_with_test_hook(
+    root: &Path,
+    mutations: &[PlannedMutation],
+    hook: impl FnMut(usize) -> Result<(), WorkspaceMutationError>,
+) -> Result<ApplySummary, WorkspaceMutationError> {
+    apply_with_hook(root, mutations, hook)
+}
+
 impl PlannedMutation {
     /// Owning proposals may retire a regular file in the same checked batch as their writes.
     pub(crate) fn remove(relative_path: impl Into<PathBuf>, expected_before: Vec<u8>) -> Self {

@@ -1,4 +1,4 @@
-//! Private ON4/ON5 owning predicates. No public writer or IN1 acceptance dispatch calls these.
+//! ON4/ON5 owning predicates shared by controllers and independent IN1 admission.
 //! Entry locators alone grant no authority. Later controllers must evaluate the coherent
 //! post-entry proposal freshly, render under that evaluation and re-admit the aggregate batch.
 #![allow(dead_code)] // Slices 8–9 connect these private cores to their owning controllers.
@@ -19,6 +19,7 @@ use crate::{
 mod advertising;
 mod binding;
 mod effects;
+pub(super) use effects::check as check_effects;
 mod proposed;
 #[allow(unused_imports)]
 pub(crate) use proposed::{coherent_entry, evaluate_proposed};

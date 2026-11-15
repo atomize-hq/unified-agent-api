@@ -10,6 +10,7 @@ use std::{collections::BTreeSet, path::Path};
 mod binding;
 mod bootstrap;
 mod generation;
+mod onboarding;
 
 pub(super) fn check(root: &Path, revision: &str) -> Result<(), String> {
     // Resolve repository-wide authority before enumerating or narrowing to any manifest root.
@@ -276,12 +277,34 @@ pub(super) fn admit(
     }
     for (version, record) in &new.records {
         let digest = record.stated_sha256()?;
+        let qualified = qualifications
+            .iter()
+            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version);
+        let previous = old
+            .records
+            .get(version)
+            .map(|r| r.acceptance_entries.as_slice())
+            .unwrap_or(&[]);
+        let added = &record.acceptance_entries[previous.len()..];
+        let effects: Vec<_> = comparison
+            .effects
+            .iter()
+            .filter(|e| e.version == *version)
+            .collect();
+        if record.policy.selection.enrollment.lifecycle_path
+            == crate::agent_registry::support_depth::LifecyclePath::Onboarding
+            && (qualified || onboarding::publication_candidate(new, record)?)
+        {
+            if qualified || !added.is_empty() || !effects.is_empty() {
+                onboarding::admit(root, old, new, tip, record)?;
+            } else {
+                onboarding::reporting(root, old, new, tip, record)?;
+            }
+            continue;
+        }
         // Dependency-only changes can invalidate a still-published qualification without
         // changing the record, its entries or any newly accepting value.
-        if qualifications
-            .iter()
-            .any(|(agent, v, _, _)| agent == &new.entry.agent_id && v == version)
-        {
+        if qualified {
             if record.policy.selection.enrollment.lifecycle_path
                 != crate::agent_registry::support_depth::LifecyclePath::Maintenance
                 || !record.policy.path_enabled
@@ -297,17 +320,6 @@ pub(super) fn admit(
                 return Err("qualified publication has no current entry".into());
             }
         }
-        let previous = old
-            .records
-            .get(version)
-            .map(|r| r.acceptance_entries.as_slice())
-            .unwrap_or(&[]);
-        let added = &record.acceptance_entries[previous.len()..];
-        let effects: Vec<_> = comparison
-            .effects
-            .iter()
-            .filter(|e| e.version == *version)
-            .collect();
         if added.is_empty() && effects.is_empty() {
             continue;
         }

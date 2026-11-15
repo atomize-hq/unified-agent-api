@@ -6,19 +6,6 @@ pub(crate) fn connected_publication(root: &Path) {
     use clap::Parser;
     let caller_before =
         crate::candidate_execution::tree::capture(root, &Default::default()).unwrap();
-    let refresh = crate::publication_refresh::Args::parse_from([
-        "refresh-publication",
-        "--write",
-        "--approval",
-        APPROVAL,
-    ]);
-    let error = crate::publication_refresh::run_in_workspace(root, refresh, &mut Vec::new())
-        .unwrap_err()
-        .to_string();
-    assert_eq!(
-        error,
-        "publication_refresh: unsupported depth write (declared enrollment)"
-    );
     let prepare = crate::prepare_proving_run_closeout::Args::parse_from([
         "prepare-proving-run-closeout",
         "--write",
