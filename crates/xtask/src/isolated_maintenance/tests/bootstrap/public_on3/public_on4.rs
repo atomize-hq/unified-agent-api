@@ -9,7 +9,7 @@ mod rollback;
 const PACKET: &str =
     "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/publication-ready.json";
 
-fn refresh(root: &Path) -> Result<(), publication_refresh::Error> {
+pub(super) fn refresh(root: &Path) -> Result<(), publication_refresh::Error> {
     publication_refresh::run_in_workspace(
         root,
         publication_refresh::Args::parse_from([

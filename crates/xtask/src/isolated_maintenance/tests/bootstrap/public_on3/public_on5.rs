@@ -16,7 +16,7 @@ const CLOSEOUT: &str =
 const PACKET: &str =
     "docs/agents/lifecycle/depth-fixture-cli-onboarding/governance/publication-ready.json";
 
-fn prepare(root: &Path, check: bool) -> Result<(), prepare_proving_run_closeout::Error> {
+pub(super) fn prepare(root: &Path, check: bool) -> Result<(), prepare_proving_run_closeout::Error> {
     prepare_proving_run_closeout::run_in_workspace(
         root,
         prepare_proving_run_closeout::Args::parse_from([
@@ -28,7 +28,7 @@ fn prepare(root: &Path, check: bool) -> Result<(), prepare_proving_run_closeout:
         &mut Vec::new(),
     )
 }
-fn close(root: &Path) -> Result<(), close_proving_run::Error> {
+pub(super) fn close(root: &Path) -> Result<(), close_proving_run::Error> {
     close_proving_run::run_in_workspace(
         root,
         close_proving_run::Args::parse_from([
@@ -158,6 +158,9 @@ pub(super) fn prove(
         &record.acceptance_entries[..1],
         original.acceptance_entries.as_slice()
     );
+    assert_eq!(record.event, original.event);
+    assert_eq!(record.policy, original.policy);
+    assert_eq!(record.obligations, original.obligations);
     assert_eq!(record.acceptance_entries.len(), 2);
     assert_eq!(
         record.acceptance_entries[1],
@@ -182,6 +185,11 @@ pub(super) fn prove(
     if refusals {
         reporting::check(f, root, &api, &candidate);
     }
+    super::e7_chain::final_state(
+        root,
+        host,
+        matches!(phase, public_on4::Phase::CloseoutReleaseWatch),
+    );
     eprintln!("ON5 real writer, IN1 admission and post-tip observation completed");
     if crate::isolated_maintenance::tests::mediation_matrix::connected_enabled() {
         crate::isolated_maintenance::tests::mediation_matrix::onboarding_checkpoint(root);

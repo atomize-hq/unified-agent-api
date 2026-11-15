@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 #[path = "runtime_follow_on/authority.rs"]
 mod authority;
+#[path = "bootstrap/e7_chain/execution.rs"]
+mod e7_chain;
 #[path = "runtime_follow_on/public.rs"]
 mod public;
 
